@@ -215,6 +215,10 @@ final class AnswerDelta extends InferenceEvent {
   final String text;
 }
 
+final class AnswerResetEvent extends InferenceEvent {
+  const AnswerResetEvent();
+}
+
 final class MetricsEvent extends InferenceEvent {
   const MetricsEvent(this.metrics);
   final InferenceMetrics metrics;

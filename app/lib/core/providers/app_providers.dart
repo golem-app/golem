@@ -231,6 +231,8 @@ class ChatController extends _$ChatController {
           messages[messages.length - 1] = draft.copyWith(
             text: '${draft.text}${event.text}',
           );
+        } else if (event is AnswerResetEvent) {
+          messages[messages.length - 1] = draft.copyWith(text: '');
         } else if (event is MetricsEvent) {
           messages[messages.length - 1] = draft.copyWith(
             metrics: event.metrics,
@@ -279,6 +281,7 @@ class ChatController extends _$ChatController {
   void stop() {
     _generationEpoch++;
     if (!state.hasValue || _value.generation == GenerationPhase.idle) return;
+    unawaited(ref.read(inferenceRepositoryProvider).cancel());
     final active = _value.active;
     if (active == null || active.messages.isEmpty) return;
     final messages = [...active.messages];

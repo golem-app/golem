@@ -93,12 +93,12 @@ packages:
     dependency: transitive
     description:
       name: build_daemon
-      sha256: "8c0535c3b2f625619f4dd1036ef1127f2e77bfedf89ed2eb2676ef076e0b6712"
+      sha256: fd754058c342243718d5171a95f352cfc9fcf0cba8cfa26df67cb13a5836db78
       url: "https://pub.dev"
     source: hosted
-    version: "4.1.3"
+    version: "4.1.2"
   build_runner:
-    dependency: "direct dev"
+    dependency: transitive
     description:
       name: build_runner
       sha256: "5367e521935b102bdf1e735d2aab461e36b2edca6517662d088dd04cc39f8d16"
@@ -226,7 +226,7 @@ packages:
     source: hosted
     version: "1.0.2"
   cupertino_icons:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: cupertino_icons
       sha256: "41e005c33bd814be4d3096aff55b1908d419fde52ca656c8c47719ec745873cd"
@@ -298,7 +298,7 @@ packages:
     source: hosted
     version: "1.1.1"
   flutter:
-    dependency: "direct main"
+    dependency: transitive
     description: flutter
     source: sdk
     version: "0.0.0"
@@ -308,7 +308,7 @@ packages:
     source: sdk
     version: "0.0.0"
   flutter_launcher_icons:
-    dependency: "direct dev"
+    dependency: transitive
     description:
       name: flutter_launcher_icons
       sha256: "10f13781741a2e3972126fae08393d3c4e01fa4cd7473326b94b72cf594195e7"
@@ -316,7 +316,7 @@ packages:
     source: hosted
     version: "0.14.4"
   flutter_lints:
-    dependency: "direct dev"
+    dependency: transitive
     description:
       name: flutter_lints
       sha256: "3105dc8492f6183fb076ccf1f351ac3d60564bff92e20bfc4af9cc1651f4e7e1"
@@ -324,12 +324,12 @@ packages:
     source: hosted
     version: "6.0.0"
   flutter_localizations:
-    dependency: "direct main"
+    dependency: transitive
     description: flutter
     source: sdk
     version: "0.0.0"
   flutter_native_splash:
-    dependency: "direct dev"
+    dependency: transitive
     description:
       name: flutter_native_splash
       sha256: "9db4b80b044e9af17cc4b1272137fc7ace0054d879ef8210a76adc34aaf4cdff"
@@ -337,7 +337,7 @@ packages:
     source: hosted
     version: "2.4.8"
   flutter_riverpod:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: flutter_riverpod
       sha256: "9e2d6907f12cc7d23a846847615941bddee8709bf2bfd274acdf5e80bcf22fde"
@@ -345,7 +345,7 @@ packages:
     source: hosted
     version: "3.0.3"
   flutter_test:
-    dependency: "direct dev"
+    dependency: transitive
     description: flutter
     source: sdk
     version: "0.0.0"
@@ -384,7 +384,7 @@ packages:
     source: hosted
     version: "2.1.3"
   go_router:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: go_router
       sha256: "5922b2861e2235a3504896f0d6fa07d84141b480cf52eecd2f42cd25585a9e8a"
@@ -432,7 +432,7 @@ packages:
     source: hosted
     version: "4.1.2"
   image:
-    dependency: "direct dev"
+    dependency: transitive
     description:
       name: image
       sha256: "6300175e00616bbc832e2fc91bfa4d776af5402c81c7151bee6905bb08473c52"
@@ -440,7 +440,7 @@ packages:
     source: hosted
     version: "4.9.1"
   integration_test:
-    dependency: "direct dev"
+    dependency: transitive
     description: flutter
     source: sdk
     version: "0.0.0"
@@ -572,6 +572,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.6.4"
+  native_toolchain_c:
+    dependency: transitive
+    description:
+      name: native_toolchain_c
+      sha256: f9c168717100ae6d9fee9ffb0be379bf1f8b26b0f6bcbd4fdddcd931993a6a72
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.19.2"
   node_preamble:
     dependency: transitive
     description:
@@ -605,7 +613,7 @@ packages:
     source: hosted
     version: "1.9.1"
   path_provider:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: path_provider
       sha256: a7f4874f987173da295a61c181b8ee71dab59b332a486b391babf26a1b884825
@@ -741,7 +749,7 @@ packages:
     source: hosted
     version: "1.0.0-dev.7"
   riverpod_annotation:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: riverpod_annotation
       sha256: "7230014155777fc31ba3351bc2cb5a3b5717b11bfafe52b1553cb47d385f8897"
@@ -749,7 +757,7 @@ packages:
     source: hosted
     version: "3.0.3"
   riverpod_generator:
-    dependency: "direct dev"
+    dependency: transitive
     description:
       name: riverpod_generator
       sha256: "49894543a42cf7a9954fc4e7366b6d3cb2e6ec0fa07775f660afcdd92d097702"
@@ -757,7 +765,7 @@ packages:
     source: hosted
     version: "3.0.3"
   share_plus:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: share_plus
       sha256: "34f00f9becd2743c1fb05363d624f9f70d37f7ccdcdda47450bc0b8c9d327b8c"

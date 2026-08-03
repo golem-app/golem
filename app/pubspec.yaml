@@ -1,5 +1,5 @@
 name: golem_flutter
-description: "A fake-only Flutter UI port of Golem for iOS and Android."
+description: "The cross-platform Golem Flutter application."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -21,6 +21,8 @@ version: 1.0.0+1
 environment:
   sdk: ^3.12.2
 
+resolution: workspace
+
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
 # consider running `flutter pub upgrade --major-versions`. Alternatively,
@@ -41,6 +43,7 @@ dependencies:
   go_router: ^17.3.0
   path_provider: ^2.1.6
   share_plus: ^13.3.0
+  inferno: ^0.1.0
 
 dev_dependencies:
   flutter_test:

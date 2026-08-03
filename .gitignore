@@ -5,3 +5,10 @@
 *.iml
 *.log
 coverage/
+.dart_tool/
+build/
+
+# SwiftPM build output and caches for the Inferno MLX carrier. Neither
+# upstream source trees nor compiled libraries belong in git.
+.build/
+.swiftpm/
