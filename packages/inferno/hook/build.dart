@@ -66,7 +66,12 @@ Future<void> main(List<String> arguments) async {
         file: library.uri,
       ),
     );
-    if (config.targetOS == OS.iOS || config.targetOS == OS.macOS) {
+    // MLX Swift is Apple-silicon-only. Flutter still runs the hook for x64
+    // simulator slices, so skip the carrier there instead of failing; app
+    // projects exclude those slices from linking (EXCLUDED_ARCHS) and no
+    // supported Apple device runs Inferno on x64.
+    if ((config.targetOS == OS.iOS || config.targetOS == OS.macOS) &&
+        config.targetArchitecture == Architecture.arm64) {
       final mlxLibrary = await _buildMlxCarrier(
         input.packageRoot,
         input.outputDirectoryShared,
@@ -101,11 +106,13 @@ Future<File> _buildMlxCarrier(
   Directory outputDirectory,
   CodeConfig config,
 ) async {
+  // MLX Swift runs on Apple silicon only; an Intel slice can never link the
+  // carrier. Fail with intent instead of a deep SwiftPM macro error — app
+  // projects must exclude x86_64 simulator slices (EXCLUDED_ARCHS).
   final architecture = switch (config.targetArchitecture) {
     Architecture.arm64 => 'arm64',
-    Architecture.x64 => 'x86_64',
     final unsupported => throw UnsupportedError(
-      'Unsupported MLX architecture $unsupported.',
+      'MLX requires Apple silicon; cannot build the carrier for $unsupported.',
     ),
   };
   final sdk = config.targetOS == OS.iOS
