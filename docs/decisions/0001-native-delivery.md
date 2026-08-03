@@ -1,16 +1,46 @@
-# Native delivery feasibility
+# Native delivery: `hook/build.dart` native assets — selected
 
-Status: in progress on `feat/3-inferno`
+Status: decided on `feat/3-inferno`
 
-Target: `hook/build.dart` compiles and bundles the llama.cpp shim for Linux and
-Android, and supplies Apple-compatible assets with a consistent library name.
-The spike is deliberately first because Dart build hooks and SwiftPM/XCFramework
-composition are the highest-risk integration point.
+The sub-issue-zero spike is complete: Dart build hooks assemble and deliver
+every native runtime this ticket needs, on every target, without the
+binaries-only carrier fallback. The fallback clause is retired.
 
-If the hook cannot reproducibly assemble MLX Swift's Swift/Metal dependency
-graph, v0 may use a binaries-only carrier that exports the same `inferno.h` ABI.
-That fallback must pin its inputs and preserve the pure-Dart package and broker
-boundaries; it is not permission to create a Flutter method-channel plugin.
+## Evidence
 
-The final decision, commands, failure evidence, and artifact provenance will
-replace this section before review.
+- **macOS (dev bench):** `dart test` in `packages/inferno` runs the hook,
+  which downloads the pinned llama.cpp source archive
+  (`9bd4c09ea571a9020f30eeef169b552625b5b5a4`, SHA-256 verified), builds the
+  CPU shim via CMake, and builds the MLX carrier via SwiftPM/xcodebuild.
+  Full suite: 17/17 with the Gemma fixtures present, including cross-engine
+  tokenization parity.
+- **Android:** `flutter build apk --release` cross-compiles the llama shim
+  through the NDK toolchain file for `arm64-v8a` and `armeabi-v7a`;
+  `libinferno.so` ships in the APK. Validated on a OnePlus 12R
+  (Android 16): the pinned GGUF loads, streams coherent text, honours stop
+  conditions, and cancels mid-generation.
+- **iOS:** `flutter build ios --release` builds the llama shim with
+  `GGML_METAL` and an embedded metallib plus the MLX Swift carrier;
+  validated end to end on an iPhone 17 (iOS 26.6) for both engines — see
+  the [iOS engine decision](0002-ios-engine.md).
+
+## Constraints recorded
+
+- Building with hooks requires `flutter config --enable-native-assets` once
+  per machine; `dart test` needs no flag.
+- MLX Swift is Apple-silicon-only. The hook skips the carrier for non-arm64
+  Apple slices (Flutter still invokes the hook for x86_64 simulator slices
+  regardless of Xcode settings), and the Runner project excludes x86_64
+  simulator slices from linking.
+- MLX resolves its Metal shader library and tokenizer resources from
+  SwiftPM bundles. In the app these are staged by the
+  "Stage Inferno Apple Resources" build phase; bare CLI processes instead
+  colocate `mlx.metallib` beside the hook-built dylib (the env-gated tests
+  stage it automatically).
+- The shared build cache lives under `.dart_tool/hooks_runner/shared/`;
+  nothing from the native builds enters git.
+- On Android 11+ scoped storage, files pushed via `adb` into the app's
+  storage are invisible to the app. On-device validation provisions models
+  through a debug build and `run-as` into internal storage; production
+  model acquisition remains the app's future download flow (out of scope
+  here).
