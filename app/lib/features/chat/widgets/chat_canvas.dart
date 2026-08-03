@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/domain/app_state.dart';
@@ -16,6 +17,7 @@ class ChatCanvas extends ConsumerWidget {
     required this.focus,
     required this.scroll,
     required this.scrollToLatest,
+    required this.onUserScroll,
     required this.showJump,
     super.key,
   });
@@ -24,6 +26,7 @@ class ChatCanvas extends ConsumerWidget {
   final FocusNode focus;
   final ScrollController scroll;
   final VoidCallback scrollToLatest;
+  final ValueChanged<ScrollDirection> onUserScroll;
   final bool showJump;
 
   @override
@@ -37,18 +40,24 @@ class ChatCanvas extends ConsumerWidget {
               if (active == null || active.messages.isEmpty)
                 const EmptyChat()
               else
-                ListView.builder(
-                  key: const Key('message-list'),
-                  controller: scroll,
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                  itemCount: active.messages.length,
-                  itemBuilder: (context, index) => MessageBubble(
-                    message: active.messages[index],
-                    canRegenerate:
-                        index == active.messages.length - 1 &&
-                        chat.generation == GenerationPhase.idle,
+                NotificationListener<UserScrollNotification>(
+                  onNotification: (notification) {
+                    onUserScroll(notification.direction);
+                    return false;
+                  },
+                  child: ListView.builder(
+                    key: const Key('message-list'),
+                    controller: scroll,
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                    itemCount: active.messages.length,
+                    itemBuilder: (context, index) => MessageBubble(
+                      message: active.messages[index],
+                      canRegenerate:
+                          index == active.messages.length - 1 &&
+                          chat.generation == GenerationPhase.idle,
+                    ),
                   ),
                 ),
               if (showJump)
