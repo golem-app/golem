@@ -1,0 +1,90 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/domain/app_state.dart';
+import '../../../core/domain/models.dart';
+import '../../../core/theme/golem_theme.dart';
+import 'composer.dart';
+import 'empty_chat.dart';
+import 'message_bubble.dart';
+import 'recovery_banner.dart';
+
+class ChatCanvas extends ConsumerWidget {
+  const ChatCanvas({
+    required this.chat,
+    required this.composer,
+    required this.focus,
+    required this.scroll,
+    required this.scrollToLatest,
+    required this.showJump,
+    super.key,
+  });
+  final ChatState chat;
+  final TextEditingController composer;
+  final FocusNode focus;
+  final ScrollController scroll;
+  final VoidCallback scrollToLatest;
+  final bool showJump;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final active = chat.active;
+    return Column(
+      children: [
+        Expanded(
+          child: Stack(
+            children: [
+              if (active == null || active.messages.isEmpty)
+                const EmptyChat()
+              else
+                ListView.builder(
+                  key: const Key('message-list'),
+                  controller: scroll,
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  itemCount: active.messages.length,
+                  itemBuilder: (context, index) => MessageBubble(
+                    message: active.messages[index],
+                    canRegenerate:
+                        index == active.messages.length - 1 &&
+                        chat.generation == GenerationPhase.idle,
+                  ),
+                ),
+              if (showJump)
+                Positioned(
+                  bottom: 10,
+                  right: 18,
+                  child: Semantics(
+                    button: true,
+                    label: 'Jump to latest message',
+                    child: CupertinoButton(
+                      key: const Key('jump-to-latest'),
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(44, 44),
+                      onPressed: scrollToLatest,
+                      child: const Glass(
+                        radius: 22,
+                        child: SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: Icon(CupertinoIcons.arrow_down, size: 20),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (chat.failure != null) RecoveryBanner(message: chat.failure!),
+        Composer(
+          controller: composer,
+          focus: focus,
+          reasoningEnabled: active?.reasoningEnabled ?? false,
+          generation: chat.generation,
+        ),
+      ],
+    );
+  }
+}
