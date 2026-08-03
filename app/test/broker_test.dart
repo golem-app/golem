@@ -1,6 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+// The broker test is the one app test allowed to import Inferno: the ticket's
+// mock engine exists exactly to verify broker behavior without native
+// inference (see tool/check_inferno_imports.dart).
+import 'package:inferno/inferno.dart';
+import 'package:inferno/testing.dart';
+
 import 'package:golem_flutter/broker/gemma4_chat_template.dart';
 import 'package:golem_flutter/broker/inferno_inference_repository.dart';
 import 'package:golem_flutter/broker/runtime.dart';
@@ -35,6 +42,25 @@ final class _RecordingRuntime implements BrokerRuntime {
         promptTokensPerSecond: 120,
         generatedTokenCount: 4,
         elapsedSeconds: 0.2,
+        promptTokenCount: 12,
+        timeToFirstTokenSeconds: 0.05,
+        peakPhysicalFootprintBytes: 128 << 20,
+      ),
+    );
+    yield const BrokerGenerationCompleted();
+  }
+}
+
+final class _MetricsRuntime extends _RecordingRuntime {
+  @override
+  Stream<BrokerRuntimeEvent> generate(BrokerGenerationRequest request) async* {
+    yield const BrokerTextDelta('Answer');
+    yield const BrokerMetricsDelta(
+      BrokerRuntimeMetrics(
+        decodeTokensPerSecond: 18.5,
+        promptTokensPerSecond: 240,
+        generatedTokenCount: 7,
+        elapsedSeconds: 0.4,
       ),
     );
     yield const BrokerGenerationCompleted();
@@ -93,7 +119,11 @@ void main() {
       events.whereType<AnswerDelta>().map((event) => event.text).join(),
       'Visible answer.',
     );
-    expect(events.whereType<MetricsEvent>().single.metrics.tokenCount, 4);
+    final metrics = events.whereType<MetricsEvent>().single.metrics;
+    expect(metrics.tokenCount, 4);
+    expect(metrics.decodeTokensPerSecond, 20);
+    expect(metrics.promptTokensPerSecond, 120);
+    expect(metrics.elapsedSeconds, 0.2);
     expect(events.last, isA<CompletedEvent>());
     expect(runtime.request!.prompt, contains('<|think|>'));
     expect('<bos>'.allMatches(runtime.request!.prompt), hasLength(1));
@@ -111,6 +141,66 @@ void main() {
     expect(last.reasoning, '\n');
     expect(last.answer, 'Final');
   });
+
+  test('the adapter forwards optional measurement fields', () async {
+    final adapter = InfernoRuntimeAdapter(
+      Inferno.withBackend(MockInfernoBackend()),
+    );
+    // Inferno validates path shape before touching any backend, so even the
+    // mock needs an existing file.
+    final model = File(
+      '${Directory.systemTemp.createTempSync('golem-broker-').path}/m.gguf',
+    )..writeAsBytesSync(const [0]);
+    addTearDown(() => model.parent.deleteSync(recursive: true));
+    await adapter.load(engine: BrokerEngine.llamaCpp, modelPath: model.path);
+    final metrics =
+        (await adapter
+                .generate(
+                  const BrokerGenerationRequest(
+                    prompt: 'Hi',
+                    sampling: BrokerSamplingParameters(
+                      maxTokens: 8,
+                      temperature: 1,
+                      topP: 0.95,
+                      seed: null,
+                      stopSequences: [],
+                      stopTokenIds: [],
+                    ),
+                  ),
+                )
+                .toList())
+            .whereType<BrokerMetricsDelta>()
+            .single
+            .metrics;
+    expect(metrics.promptTokenCount, 'Hi'.length);
+    expect(metrics.timeToFirstTokenSeconds, isNotNull);
+    expect(metrics.peakPhysicalFootprintBytes, 1 << 20);
+  });
+
+  test(
+    'metrics without optional fields still reach the app contract',
+    () async {
+      final repository = InfernoInferenceRepository(
+        _MetricsRuntime(),
+        engine: BrokerEngine.llamaCpp,
+        modelPath: '/local/model.gguf',
+      );
+      await repository.prepare();
+      final events = await repository
+          .generate(
+            context: const [
+              {'role': 'user', 'content': 'Hello'},
+            ],
+            reasoningEnabled: false,
+          )
+          .toList();
+      final metrics = events.whereType<MetricsEvent>().single.metrics;
+      expect(metrics.decodeTokensPerSecond, 18.5);
+      expect(metrics.promptTokensPerSecond, 240);
+      expect(metrics.tokenCount, 7);
+      expect(events.last, isA<CompletedEvent>());
+    },
+  );
 
   test('subscription cancellation reaches the runtime', () async {
     final runtime = _RecordingRuntime();

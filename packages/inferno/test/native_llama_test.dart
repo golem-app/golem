@@ -33,9 +33,46 @@ void main() {
     final metrics = events.whereType<InfernoMetricsEvent>().single.metrics;
     expect(metrics.generatedTokenCount, greaterThan(0));
     expect(metrics.elapsedSeconds, greaterThanOrEqualTo(0));
+    // Peak footprint is measured on Apple platforms and null elsewhere,
+    // never a misleading zero.
+    if (Platform.isMacOS || Platform.isIOS) {
+      expect(metrics.peakPhysicalFootprintBytes, greaterThan(0));
+    } else {
+      expect(metrics.peakPhysicalFootprintBytes, isNull);
+    }
     expect(events.last, isA<InfernoGenerationCompleted>());
     await inferno.unload();
   }, skip: skipReason);
+
+  test(
+    'the runtime survives load, unload, and reload in one process',
+    () async {
+      final inferno = Inferno.native();
+      const request = InfernoGenerationRequest(
+        prompt: 'Hello',
+        sampling: InfernoSamplingParameters(maxTokens: 4, seed: 11),
+      );
+      for (var cycle = 0; cycle < 2; cycle++) {
+        await inferno.load(
+          engine: InfernoEngineKind.llamaCpp,
+          modelPath: modelPath!,
+        );
+        final events = await inferno.generate(request).toList();
+        expect(
+          events.whereType<InfernoTextDelta>(),
+          isNotEmpty,
+          reason: 'cycle $cycle',
+        );
+        expect(
+          events.last,
+          isA<InfernoGenerationCompleted>(),
+          reason: 'cycle $cycle',
+        );
+        await inferno.unload();
+      }
+    },
+    skip: skipReason,
+  );
 
   test(
     'toy GGUF generation can be cancelled without wedging the runtime',
