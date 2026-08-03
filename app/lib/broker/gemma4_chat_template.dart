@@ -4,12 +4,10 @@
 /// add-BOS disabled; see `docs/architecture/inferno.md`.
 abstract final class Gemma4ChatTemplate {
   static const bos = '<bos>';
-  static const eos = '<eos>';
   static const turnStart = '<|turn>';
   static const turnEnd = '<turn|>';
   static const thoughtControl = '<|think|>';
   static const eosTokenId = 1;
-  static const bosTokenId = 2;
   static const turnEndTokenId = 106;
 
   static String render(

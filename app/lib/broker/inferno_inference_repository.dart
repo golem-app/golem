@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../core/domain/models.dart';
 import '../core/repositories/contracts.dart';
 import 'gemma4_chat_template.dart';
@@ -41,6 +43,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
   }) async* {
     if (!_loaded) throw StateError('Inferno is not loaded.');
     final parser = ReasoningStreamParser();
+    BrokerRuntimeMetrics? finalMetrics;
     await for (final event in _runtime.generate(
       BrokerGenerationRequest(
         prompt: Gemma4ChatTemplate.render(
@@ -67,6 +70,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
           }
         case BrokerMetricsDelta():
           final metrics = event.metrics;
+          finalMetrics = metrics;
           yield MetricsEvent(
             InferenceMetrics(
               promptTokensPerSecond: metrics.promptTokensPerSecond,
@@ -76,12 +80,29 @@ final class InfernoInferenceRepository implements InferenceRepository {
             ),
           );
         case BrokerGenerationCompleted():
+          _logMetrics(finalMetrics);
           for (final domainEvent in _domainEvents(parser.finish())) {
             yield domainEvent;
           }
           yield const CompletedEvent();
       }
     }
+  }
+
+  /// One greppable line per completed generation; this is the capture channel
+  /// for on-device measurement (the app contract carries only core metrics).
+  void _logMetrics(BrokerRuntimeMetrics? metrics) {
+    if (metrics == null) return;
+    debugPrint(
+      'INFERNO_METRICS engine=${engine.name}'
+      ' decodeTokensPerSecond=${metrics.decodeTokensPerSecond.toStringAsFixed(2)}'
+      ' promptTokensPerSecond=${metrics.promptTokensPerSecond.toStringAsFixed(2)}'
+      ' generatedTokenCount=${metrics.generatedTokenCount}'
+      ' promptTokenCount=${metrics.promptTokenCount}'
+      ' timeToFirstTokenSeconds=${metrics.timeToFirstTokenSeconds?.toStringAsFixed(3)}'
+      ' elapsedSeconds=${metrics.elapsedSeconds.toStringAsFixed(2)}'
+      ' peakPhysicalFootprintBytes=${metrics.peakPhysicalFootprintBytes}',
+    );
   }
 
   static Iterable<InferenceEvent> _domainEvents(

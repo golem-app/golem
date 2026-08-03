@@ -100,10 +100,7 @@ external int _infernoTokenize(
 )
 external int _infernoCancel(Pointer<Void> engine);
 
-@Native<_UnloadNative>(
-  symbol: 'inferno_engine_unload',
-  assetId: _llamaAssetId,
-)
+@Native<_UnloadNative>(symbol: 'inferno_engine_unload', assetId: _llamaAssetId)
 external int _infernoUnload(
   Pointer<Void> engine,
   int operationId,
@@ -568,12 +565,8 @@ final class NativeInfernoBackend implements InfernoBackend {
     final api = _activeApi!;
     try {
       await _startFuture(
-        (operationId) => api.unload(
-          _engine,
-          operationId,
-          _callback.nativeFunction,
-          nullptr,
-        ),
+        (operationId) =>
+            api.unload(_engine, operationId, _callback.nativeFunction, nullptr),
       );
     } finally {
       api.destroy(_engine);

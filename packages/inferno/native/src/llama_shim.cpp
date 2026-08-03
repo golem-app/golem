@@ -511,7 +511,8 @@ int32_t inferno_engine_generate(inferno_engine *engine,
            first_token == steady_clock::time_point{}
                ? json(nullptr)
                : json(seconds_between(prompt_end, first_token))},
-          {"peakPhysicalFootprintBytes", peak_footprint}};
+          {"peakPhysicalFootprintBytes",
+           peak_footprint > 0 ? json(peak_footprint) : json(nullptr)}};
       emit(callback, operation_id, INFERNO_EVENT_METRICS, metrics.dump(), user_data);
       emit(callback, operation_id, INFERNO_EVENT_COMPLETED, stop_reason, user_data);
       emit(callback, operation_id, INFERNO_EVENT_OPERATION_COMPLETED, "", user_data);

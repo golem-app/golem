@@ -18,10 +18,7 @@ void main() {
 
   test('llama.cpp and MLX produce identical raw prompt token IDs', () async {
     final llama = NativeInfernoTestHarness();
-    await llama.load(
-      engine: InfernoEngineKind.llamaCpp,
-      modelPath: ggufPath!,
-    );
+    await llama.load(engine: InfernoEngineKind.llamaCpp, modelPath: ggufPath!);
     final llamaTokens = await llama.tokenize(_renderedConversation);
     await llama.unload();
 

@@ -156,7 +156,9 @@ private func modelDirectoryError(_ path: String) -> (String, String)? {
     guard isDirectory.boolValue else {
         return ("invalid_model_path", "The MLX model path is not a directory.")
     }
-    for file in ["config.json", "tokenizer.json", "processor_config.json"] {
+    // Text-only v0: the pinned MLX artifact deliberately ships without vision
+    // or audio processor files, so only the text-side inputs are required.
+    for file in ["config.json", "tokenizer.json"] {
         guard FileManager.default.fileExists(atPath: "\(path)/\(file)") else {
             return ("corrupt_model", "The MLX model directory is missing \(file).")
         }

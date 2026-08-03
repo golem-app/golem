@@ -80,6 +80,9 @@ final class MockInfernoBackend implements InfernoBackend {
         promptTokensPerSecond: 100,
         generatedTokenCount: generated,
         elapsedSeconds: elapsed,
+        promptTokenCount: request.prompt.length,
+        timeToFirstTokenSeconds: elapsed == 0 ? 0 : elapsed / generated,
+        peakPhysicalFootprintBytes: 1 << 20,
       ),
     );
     yield const InfernoGenerationCompleted(InfernoStopReason.maxTokens);

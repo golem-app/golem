@@ -33,12 +33,21 @@ final class BrokerRuntimeMetrics {
     required this.promptTokensPerSecond,
     required this.generatedTokenCount,
     required this.elapsedSeconds,
+    this.promptTokenCount,
+    this.timeToFirstTokenSeconds,
+    this.peakPhysicalFootprintBytes,
   });
 
   final double decodeTokensPerSecond;
   final double promptTokensPerSecond;
   final int generatedTokenCount;
   final double elapsedSeconds;
+
+  // Null when an engine cannot measure them; the iOS bake-off record
+  // requires all three, so the adapter must not drop them.
+  final int? promptTokenCount;
+  final double? timeToFirstTokenSeconds;
+  final int? peakPhysicalFootprintBytes;
 }
 
 sealed class BrokerRuntimeEvent {
@@ -121,6 +130,9 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
               promptTokensPerSecond: metrics.promptTokensPerSecond,
               generatedTokenCount: metrics.generatedTokenCount,
               elapsedSeconds: metrics.elapsedSeconds,
+              promptTokenCount: metrics.promptTokenCount,
+              timeToFirstTokenSeconds: metrics.timeToFirstTokenSeconds,
+              peakPhysicalFootprintBytes: metrics.peakPhysicalFootprintBytes,
             ),
           );
         case InfernoGenerationCompleted():
