@@ -4,7 +4,7 @@ import HuggingFace
 import MLX
 import MLXHuggingFace
 import MLXLMCommon
-import MLXVLM
+import MLXLLM
 import Tokenizers
 
 private let infernoMlxABI: UInt32 = 1
@@ -304,7 +304,7 @@ public func infernoMlxEngineLoad(
         }
         do {
             MLX.Memory.cacheLimit = 64 * 1024 * 1024
-            let container = try await VLMModelFactory.shared.loadContainer(
+            let container = try await LLMModelFactory.shared.loadContainer(
                 from: URL(fileURLWithPath: path, isDirectory: true),
                 using: #huggingFaceTokenizerLoader()
             )
@@ -408,9 +408,9 @@ public func infernoMlxEngineGenerate(
                     )
                 }
 
-                let input = LMInput(
-                    tokens: MLXArray(promptTokenIDs).expandedDimensions(axis: 0)
-                )
+                // Tokens stay 1-D: the iterator adds the batch dimension,
+                // and a pre-batched array reaches the model double-batched.
+                let input = LMInput(tokens: MLXArray(promptTokenIDs))
                 let parameters = GenerateParameters(
                     maxTokens: request.maxTokens,
                     temperature: request.temperature,
@@ -420,19 +420,20 @@ public func infernoMlxEngineGenerate(
                 var generationContext = context
                 generationContext.configuration.eosTokenIds = Set(request.stopTokenIds)
                 generationContext.configuration.stopStrings = []
-                let (stream, task) = try generateTokensTask(
+                // The token-task path miscomputes Gemma 4 per-layer inputs
+                // during prefill; this overload is the exact path the proven
+                // native app streams through. Requested stop-token IDs are
+                // enforced by the library via the per-request context copy.
+                let stream = try MLXLMCommon.generate(
                     input: input,
                     parameters: parameters,
-                    context: generationContext,
-                    includeStopToken: true
+                    context: generationContext
                 )
-                engine.setGenerationTask(task)
 
                 let started = ContinuousClock.now
                 var firstTokenAt: ContinuousClock.Instant?
                 var peakFootprint = physicalFootprintBytes()
-                var generatedTokenIDs: [Int] = []
-                var previousDecoded = ""
+                var generatedChunkCount = 0
                 var pending: [UInt8] = []
                 let stopBytes = request.stopSequences.map { Array($0.utf8) }
                 let requestedStopIDs = Set(request.stopTokenIds)
@@ -442,35 +443,20 @@ public func infernoMlxEngineGenerate(
                 for await event in stream {
                     if Task.isCancelled {
                         stopReason = "cancelled"
-                        task.cancel()
                         break
                     }
                     switch event {
-                    case .token(let token):
-                        if requestedStopIDs.contains(token) {
-                            stopReason = "stop_token"
-                            task.cancel()
-                            break
-                        }
-                        generatedTokenIDs.append(token)
+                    case .chunk(let text):
                         if firstTokenAt == nil { firstTokenAt = .now }
-                        let decoded = context.tokenizer.decode(tokenIds: generatedTokenIDs)
-                        let piece: String
-                        if decoded.hasPrefix(previousDecoded) {
-                            piece = String(decoded.dropFirst(previousDecoded.count))
-                        } else {
-                            piece = context.tokenizer.decode(tokenIds: [token])
-                        }
-                        previousDecoded = decoded
+                        generatedChunkCount += 1
                         peakFootprint = max(peakFootprint, physicalFootprintBytes())
                         if emitVisibleBytes(
                             pending: &pending,
-                            piece: Array(piece.utf8),
+                            piece: Array(text.utf8),
                             stops: stopBytes,
                             sink: sink
                         ) {
                             stopReason = "stop_sequence"
-                            task.cancel()
                             break
                         }
                     case .info(let info):
@@ -481,16 +467,21 @@ public func infernoMlxEngineGenerate(
                         case .length:
                             stopReason = "max_tokens"
                         case .stop:
+                            // The library cannot distinguish the model's own
+                            // EOS from a requested stop-token ID; report the
+                            // requested kind when the caller supplied IDs.
                             if stopReason == "max_tokens" {
-                                stopReason = "end_of_sequence"
+                                stopReason = requestedStopIDs.isEmpty
+                                    ? "end_of_sequence" : "stop_token"
                             }
                         }
+                    case .toolCall:
+                        break
                     }
-                    if stopReason == "stop_token" || stopReason == "stop_sequence" {
+                    if stopReason == "stop_sequence" || stopReason == "cancelled" {
                         break
                     }
                 }
-                await task.value
                 if !pending.isEmpty && stopReason != "stop_sequence" {
                     sink.emit(EventKind.textDelta, bytes: pending)
                 }
@@ -502,7 +493,7 @@ public func infernoMlxEngineGenerate(
                 let promptSeconds = completion?.promptTime ?? 0
                 let decodeSeconds = completion?.generateTime ?? 0
                 let generatedCount = completion?.generationTokenCount
-                    ?? generatedTokenIDs.count
+                    ?? generatedChunkCount
                 let firstTokenSeconds: Double? = firstTokenAt.map { first in
                     let duration = started.duration(to: first).components
                     return Double(duration.seconds)

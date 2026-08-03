@@ -38,7 +38,7 @@ let package = Package(
             name: "InfernoMLXCarrier",
             dependencies: [
                 .product(name: "MLX", package: "mlx-swift"),
-                .product(name: "MLXVLM", package: "mlx-swift-lm"),
+                .product(name: "MLXLLM", package: "mlx-swift-lm"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "MLXHuggingFace", package: "mlx-swift-lm"),
                 .product(name: "HuggingFace", package: "swift-huggingface"),
