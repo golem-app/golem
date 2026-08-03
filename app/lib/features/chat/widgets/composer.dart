@@ -55,7 +55,10 @@ class Composer extends ConsumerWidget {
                         : 'Reasoning off',
                     color: reasoningEnabled
                         ? GolemTheme.amber
-                        : GolemTheme.mutedInk,
+                        : CupertinoDynamicColor.resolve(
+                            GolemTheme.mutedInk,
+                            context,
+                          ),
                     size: 20,
                   ),
                 ),
@@ -87,7 +90,10 @@ class Composer extends ConsumerWidget {
                       padding: EdgeInsets.zero,
                       minimumSize: const Size(48, 48),
                       color: generating || hasText
-                          ? GolemTheme.accent
+                          ? CupertinoDynamicColor.resolve(
+                              GolemTheme.accent,
+                              context,
+                            )
                           : CupertinoDynamicColor.resolve(
                               GolemTheme.divider,
                               context,

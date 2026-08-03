@@ -58,7 +58,12 @@ class BenchmarkScreen extends ConsumerWidget {
                           Expanded(
                             child: Text(
                               _caseTitle(benchmark.caseId),
-                              style: const TextStyle(color: GolemTheme.ink),
+                              style: TextStyle(
+                                color: CupertinoDynamicColor.resolve(
+                                  GolemTheme.ink,
+                                  context,
+                                ),
+                              ),
                             ),
                           ),
                           const Icon(
@@ -106,10 +111,13 @@ class BenchmarkScreen extends ConsumerWidget {
                     value: _seed(benchmark.caseId).toString(),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
+                  Text(
                     'Uses the tracked production prompt fixture. Output and timing are deterministic simulations only.',
                     style: TextStyle(
-                      color: GolemTheme.mutedInk,
+                      color: CupertinoDynamicColor.resolve(
+                        GolemTheme.mutedInk,
+                        context,
+                      ),
                       height: 1.4,
                       fontSize: 14,
                     ),

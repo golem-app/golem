@@ -96,9 +96,14 @@ class _SettingsBody extends ConsumerWidget {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 5),
-              const Text(
+              Text(
                 'Simulated size: 4.3 GB · MLX 4-bit',
-                style: TextStyle(color: GolemTheme.mutedInk),
+                style: TextStyle(
+                  color: CupertinoDynamicColor.resolve(
+                    GolemTheme.mutedInk,
+                    context,
+                  ),
+                ),
               ),
               const SizedBox(height: 14),
               Semantics(
@@ -168,9 +173,14 @@ class _SettingsBody extends ConsumerWidget {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 5),
-              const Text(
+              Text(
                 'Simulated size: 14.29 GB · 16-slot LFU + pread',
-                style: TextStyle(color: GolemTheme.mutedInk),
+                style: TextStyle(
+                  color: CupertinoDynamicColor.resolve(
+                    GolemTheme.mutedInk,
+                    context,
+                  ),
+                ),
               ),
               const SizedBox(height: 14),
               Semantics(
@@ -252,7 +262,10 @@ class _SettingsBody extends ConsumerWidget {
                       : 'Load Simulated Runtime',
                   style: TextStyle(
                     color: model.runtime == RuntimePhase.loaded
-                        ? GolemTheme.accent
+                        ? CupertinoDynamicColor.resolve(
+                            GolemTheme.accent,
+                            context,
+                          )
                         : CupertinoColors.white,
                   ),
                 ),
@@ -267,10 +280,10 @@ class _SettingsBody extends ConsumerWidget {
           key: const Key('open-benchmark'),
           padding: EdgeInsets.zero,
           onPressed: () => context.push('/benchmark'),
-          child: const GolemCard(
+          child: GolemCard(
             child: Row(
               children: [
-                Icon(CupertinoIcons.speedometer),
+                const Icon(CupertinoIcons.speedometer),
                 SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -284,7 +297,10 @@ class _SettingsBody extends ConsumerWidget {
                       Text(
                         'Exercise protocol UI and JSON export',
                         style: TextStyle(
-                          color: GolemTheme.mutedInk,
+                          color: CupertinoDynamicColor.resolve(
+                            GolemTheme.mutedInk,
+                            context,
+                          ),
                           fontSize: 14,
                         ),
                       ),
@@ -308,17 +324,23 @@ class _SettingsBody extends ConsumerWidget {
         const SizedBox(height: 28),
         const SectionHeader('About'),
         const SizedBox(height: 8),
-        const GolemCard(
+        GolemCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              LabeledRow(label: 'App', value: 'Golem Flutter 1.0.0'),
+              const LabeledRow(label: 'App', value: 'Golem Flutter 1.0.0'),
               SizedBox(height: 10),
               LabeledRow(label: 'Bundle', value: 'app.golem.flutter'),
               SizedBox(height: 12),
               Text(
                 'UI evaluation build. It never reads native Golem data and includes no model weights, network downloader, inference engine, or hardware measurement.',
-                style: TextStyle(color: GolemTheme.mutedInk, height: 1.4),
+                style: TextStyle(
+                  color: CupertinoDynamicColor.resolve(
+                    GolemTheme.mutedInk,
+                    context,
+                  ),
+                  height: 1.4,
+                ),
               ),
             ],
           ),
@@ -339,15 +361,18 @@ class _SimulationBanner extends StatelessWidget {
       color: CupertinoDynamicColor.resolve(GolemTheme.accentSoft, context),
       borderRadius: BorderRadius.circular(18),
     ),
-    child: const Row(
+    child: Row(
       children: [
-        Icon(CupertinoIcons.lab_flask_solid, color: GolemTheme.accent),
-        SizedBox(width: 10),
+        Icon(
+          CupertinoIcons.lab_flask_solid,
+          color: CupertinoDynamicColor.resolve(GolemTheme.accent, context),
+        ),
+        const SizedBox(width: 10),
         Expanded(
           child: Text(
             'SIMULATED BACKENDS · No hardware validation',
             style: TextStyle(
-              color: GolemTheme.accent,
+              color: CupertinoDynamicColor.resolve(GolemTheme.accent, context),
               fontWeight: FontWeight.w600,
               fontSize: 13,
             ),
@@ -384,7 +409,10 @@ class _BackendOption extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           border: Border.all(
-            color: selected ? GolemTheme.accent : GolemTheme.divider,
+            color: CupertinoDynamicColor.resolve(
+              selected ? GolemTheme.accent : GolemTheme.divider,
+              context,
+            ),
             width: selected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(14),
@@ -398,16 +426,22 @@ class _BackendOption extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: GolemTheme.ink,
+                    style: TextStyle(
+                      color: CupertinoDynamicColor.resolve(
+                        GolemTheme.ink,
+                        context,
+                      ),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      color: GolemTheme.mutedInk,
+                    style: TextStyle(
+                      color: CupertinoDynamicColor.resolve(
+                        GolemTheme.mutedInk,
+                        context,
+                      ),
                       fontSize: 13,
                     ),
                   ),
@@ -418,7 +452,10 @@ class _BackendOption extends StatelessWidget {
               selected
                   ? CupertinoIcons.check_mark_circled_solid
                   : CupertinoIcons.circle,
-              color: selected ? GolemTheme.accent : GolemTheme.mutedInk,
+              color: CupertinoDynamicColor.resolve(
+                selected ? GolemTheme.accent : GolemTheme.mutedInk,
+                context,
+              ),
             ),
           ],
         ),
@@ -435,7 +472,11 @@ class _Status extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      Icon(icon, color: GolemTheme.accent, size: 20),
+      Icon(
+        icon,
+        color: CupertinoDynamicColor.resolve(GolemTheme.accent, context),
+        size: 20,
+      ),
       const SizedBox(width: 8),
       Expanded(
         child: Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),

@@ -66,7 +66,12 @@ class MessageBubble extends ConsumerWidget {
                   SelectableText(
                     message.text,
                     style: TextStyle(
-                      color: isUser ? CupertinoColors.white : GolemTheme.ink,
+                      color: isUser
+                          ? CupertinoColors.white
+                          : CupertinoDynamicColor.resolve(
+                              GolemTheme.ink,
+                              context,
+                            ),
                       height: 1.42,
                       fontSize: 16,
                     ),

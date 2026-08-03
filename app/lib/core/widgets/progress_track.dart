@@ -22,10 +22,16 @@ class ProgressTrack extends StatelessWidget {
       height: height,
       child: Stack(
         children: [
-          Positioned.fill(child: ColoredBox(color: trackColor)),
+          Positioned.fill(
+            child: ColoredBox(
+              color: CupertinoDynamicColor.resolve(trackColor, context),
+            ),
+          ),
           FractionallySizedBox(
             widthFactor: value,
-            child: ColoredBox(color: fillColor),
+            child: ColoredBox(
+              color: CupertinoDynamicColor.resolve(fillColor, context),
+            ),
           ),
         ],
       ),
