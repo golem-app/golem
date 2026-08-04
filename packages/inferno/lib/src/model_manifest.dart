@@ -99,6 +99,9 @@ const infernoToyGguf = InfernoModelArtifact(
   ],
 );
 
+// Each release/version constant names the upstream tag whose commit is the
+// paired revision. Nothing in CI ties the pairs together — after bumping
+// any of them, run `dart run tool/verify_pins.dart` (network) to confirm.
 const llamaCppRevision = '9bd4c09ea571a9020f30eeef169b552625b5b5a4';
 const llamaCppRelease = 'b10241';
 const mlxSwiftLmRevision = 'bd4b7434e6bdb588c7ef55706ff8904cb7fd4c57';
