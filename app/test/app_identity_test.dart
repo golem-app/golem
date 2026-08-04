@@ -15,9 +15,11 @@ void main() {
     expect(AppIdentity.dev.applicationId, 'app.golem.dev');
   });
 
-  test('flavorless and unknown builds resolve to production', () {
-    expect(AppIdentity.forFlavor(null), AppIdentity.production);
-    expect(AppIdentity.forFlavor('unknown'), AppIdentity.production);
+  test('flavorless and unknown builds resolve to the legacy identity', () {
+    expect(AppIdentity.forFlavor(null), AppIdentity.flutter);
+    expect(AppIdentity.forFlavor('unknown'), AppIdentity.flutter);
+    expect(AppIdentity.flutter.displayName, 'Golem Flutter');
+    expect(AppIdentity.flutter.applicationId, 'app.golem.flutter');
     // Host-side flutter test runs inherit the pubspec default flavor.
     expect(AppIdentity.current, AppIdentity.dev);
   });
