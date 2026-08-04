@@ -1,6 +1,6 @@
 # Golem (Flutter)
 
-High-fidelity Flutter port of native Golem. The repository is a pub
+High-fidelity Flutter implementation of Golem. The repository is a pub
 workspace with two members:
 
 - [`app/`](app/) — the Flutter application. By default every model

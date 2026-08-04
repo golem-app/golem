@@ -161,7 +161,7 @@ class _SettingsBody extends ConsumerWidget {
         const SectionHeader(
           'TurboFieldfare model',
           subtitle:
-              'The native app imports over USB; this port only animates the equivalent states.',
+              'This build only animates the states of a USB import; nothing is transferred.',
         ),
         const SizedBox(height: 8),
         GolemCard(
@@ -333,7 +333,7 @@ class _SettingsBody extends ConsumerWidget {
               LabeledRow(label: 'Bundle', value: 'app.golem.flutter'),
               SizedBox(height: 12),
               Text(
-                'UI evaluation build. It never reads native Golem data and includes no model weights, network downloader, inference engine, or hardware measurement.',
+                'UI evaluation build. It reads no other app\'s data and includes no model weights, network downloader, inference engine, or hardware measurement.',
                 style: TextStyle(
                   color: CupertinoDynamicColor.resolve(
                     GolemTheme.mutedInk,

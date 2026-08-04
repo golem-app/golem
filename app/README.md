@@ -1,9 +1,9 @@
 # Golem Flutter
 
-High-fidelity Flutter port of native Golem. The iOS and Android application
-identifier is `app.golem.flutter`; the display name is **Golem Flutter**. It
-installs beside native Golem and stores its own versioned JSON under its
-separate application-support container.
+High-fidelity Flutter implementation of Golem. The iOS and Android
+application identifier is `app.golem.flutter`; the display name is
+**Golem Flutter**. It stores its own versioned JSON under its separate
+application-support container.
 
 ## Deterministic by default
 
@@ -25,7 +25,7 @@ enforce that. Benchmark exports contain both:
 }
 ```
 
-The Flutter app never migrates, opens, or otherwise reads native Golem data.
+The Flutter app never migrates, opens, or otherwise reads another app's data.
 
 ## Architecture
 
@@ -111,11 +111,11 @@ Flutter splash. `flutter_native_splash` runs with `ios: false` and
 `tool/prepare_ios_launch.dart` guards the wiring.
 `platform_assets_test.dart` guards the navy image-free storyboard, splash
 alpha, mascot transparency, the Android-only navy-matted launcher icon, and
-the unmodified native artwork used for the iOS icon. Both launcher sources
+the unmodified source artwork used for the iOS icon. Both launcher sources
 derive from the tracked artwork in `assets/source/`.
 
-User-facing copy is intentionally hardcoded English, matching the native app
-this port mirrors; there is no ARB/gen-l10n layer to keep half-wired. If a
+User-facing copy is intentionally hardcoded English; there is no
+ARB/gen-l10n layer to keep half-wired. If a
 second locale ever materializes, reintroduce `l10n.yaml` + `generate: true`
 and migrate the presentation strings then.
 

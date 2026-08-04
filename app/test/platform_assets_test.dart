@@ -115,12 +115,12 @@ void main() {
       expect(corner.b, 36);
     }
 
-    // Inside the squircle the native silver frame survives untouched.
+    // Inside the squircle the artwork's silver frame survives untouched.
     final frame = source.getPixel(source.width ~/ 2, 16);
     expect(frame.b, greaterThan(200));
 
-    // iOS ships the exact native artwork so the Home Screen icon is
-    // pixel-identical to native Golem: white matte corners, silver frame.
+    // iOS ships the exact source artwork so the Home Screen icon keeps
+    // its white matte corners and silver frame.
     final generatedBytes = await File(
       'ios/Runner/Assets.xcassets/AppIcon.appiconset/'
       'Icon-App-1024x1024@1x.png',

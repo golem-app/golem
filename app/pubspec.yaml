@@ -97,7 +97,7 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: assets/images/golem_launcher.png
-  image_path_ios: assets/source/golem_icon_native_1024.png
+  image_path_ios: assets/source/golem_icon_1024.png
   adaptive_icon_background: assets/images/golem_adaptive_background.png
   adaptive_icon_foreground: assets/images/golem_adaptive_foreground.png
   remove_alpha_ios: true
