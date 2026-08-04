@@ -49,7 +49,10 @@ Future<void> main(List<String> arguments) async {
       'Release',
       '--target',
       'inferno',
+      // A bare --parallel forwards an unbounded -j to the native tool;
+      // llama.cpp's heaviest translation units then OOM small CI runners.
       '--parallel',
+      '${Platform.numberOfProcessors}',
     ]);
 
     final library = File(

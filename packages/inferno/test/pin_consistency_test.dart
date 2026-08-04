@@ -33,4 +33,12 @@ void main() {
     expect(resolved, contains(mlxSwiftLmRevision));
     expect(resolved, contains(mlxSwiftRevision));
   });
+
+  test('the SwiftPM manifest requests the manifest MLX revisions', () {
+    // Package.swift drives resolution; the lockfile only records it. Both
+    // must carry the pin or a bump to one silently drifts the other.
+    final manifest = read('native/apple/Package.swift');
+    expect(manifest, contains(mlxSwiftLmRevision));
+    expect(manifest, contains(mlxSwiftRevision));
+  });
 }

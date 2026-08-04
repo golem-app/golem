@@ -11,8 +11,11 @@ Future<void> main() async {
       continue;
     }
     final source = await entity.readAsString();
+    // The directive is scanned up to its semicolon so a conditional
+    // `if (dart.library.ffi) 'package:...'` clause cannot slip the package
+    // past the boundary.
     if (!RegExp(
-      r'''(?:import|export)\s+['"]package:inferno/''',
+      r'''(?:import|export)\s[^;]*['"]package:inferno/''',
     ).hasMatch(source)) {
       continue;
     }
