@@ -262,25 +262,23 @@ void main() {
       expect(scheme, contains('macos_assemble.sh prepare'));
     }
 
-    // The MLX Swift package declares macOS 14 and Apple silicon only; every
-    // configuration must hold both — a sample assertion would pass with one.
-    expect(
-      RegExp(
-        r'MACOSX_DEPLOYMENT_TARGET = ([\d.]+);',
-      ).allMatches(project).map((match) => match[1]).toSet(),
-      {'14.0'},
-    );
-    expect(
-      RegExp(
-        r'ARCHS = (\S+);',
-      ).allMatches(project).map((match) => match[1]).toSet(),
-      {'arm64'},
-    );
-    expect(
-      RegExp(r'ARCHS = arm64;').allMatches(project).length,
-      12,
-      reason: 'all twelve project-level configurations pin the architecture',
-    );
+    // The MLX Swift package declares macOS 14 and Apple silicon only; all
+    // twelve project-level configurations must hold both — a value-set
+    // assertion alone would pass with a single surviving occurrence, and the
+    // line anchor keeps EXCLUDED_ARCHS-style settings out of the match.
+    final deploymentTargets = RegExp(
+      r'^\s*MACOSX_DEPLOYMENT_TARGET = ([\d.]+);$',
+      multiLine: true,
+    ).allMatches(project).map((match) => match[1]).toList();
+    expect(deploymentTargets.toSet(), {'14.0'});
+    expect(deploymentTargets, hasLength(12));
+
+    final architectures = RegExp(
+      r'^\s*ARCHS = (\S+);$',
+      multiLine: true,
+    ).allMatches(project).map((match) => match[1]).toList();
+    expect(architectures.toSet(), {'arm64'});
+    expect(architectures, hasLength(12));
 
     // The staging phase feeds the MLX shader/tokenizer bundles into the app;
     // without it MLX fails to resolve default.metallib at runtime.
