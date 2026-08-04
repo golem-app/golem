@@ -24,9 +24,15 @@ void main() {
     if (icon == null || icon.width != 1024 || icon.height != 1024) {
       throw StateError('Expected the tracked 1024×1024 $flavor Golem icon.');
     }
-    // Order matters: the background samples the artwork before the matte
-    // mutates the decoded icon in place.
+    // Order matters: the background and macOS writers sample the artwork
+    // before the matte mutates the decoded icon in place.
     _writeAdaptiveBackground(flavor, icon);
+    _writeMacIconset('AppIcon-$flavor', icon);
+    if (flavor == 'production') {
+      // The flavorless legacy identity (xcodebuild -scheme Runner) keeps a
+      // real Golem icon in the template's default catalog slot.
+      _writeMacIconset('AppIcon', icon);
+    }
     _writeMattedLauncher(flavor, icon);
   }
 
@@ -111,6 +117,90 @@ void _writeAdaptiveForeground() {
   File(
     'assets/images/golem_adaptive_foreground.png',
   ).writeAsBytesSync(image.encodePng(canvas, level: 9));
+}
+
+/// macOS Dock iconsets, generated here because flutter_launcher_icons can
+/// only write one fixed AppIcon.appiconset for macOS (no per-flavor naming).
+/// Apple's Big Sur convention: the artwork scaled to 824×824, masked by a
+/// rounded rectangle, centered on a transparent 1024 canvas so the Dock
+/// renders the standard margin. The per-flavor catalogs are selected by
+/// `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon-<flavor>` in the pbxproj.
+void _writeMacIconset(String name, image.Image icon) {
+  const canvasSize = 1024;
+  const artworkSize = 824;
+  // Apple's macOS icon grid rounds corners at ~22.5% of the artwork edge.
+  const cornerRadius = artworkSize * 0.225;
+  final scaled = image.copyResize(
+    icon,
+    width: artworkSize,
+    height: artworkSize,
+    interpolation: image.Interpolation.cubic,
+  );
+  final canvas = image.Image(
+    width: canvasSize,
+    height: canvasSize,
+    numChannels: 4,
+  );
+  const offset = (canvasSize - artworkSize) ~/ 2;
+  const half = artworkSize / 2;
+  const boxHalf = half - cornerRadius;
+  for (var y = 0; y < artworkSize; y++) {
+    final dy = math.max(((y + 0.5) - half).abs() - boxHalf, 0.0);
+    for (var x = 0; x < artworkSize; x++) {
+      final dx = math.max(((x + 0.5) - half).abs() - boxHalf, 0.0);
+      // Signed distance to the rounded-rect edge; one-pixel smoothstep for
+      // an anti-aliased rim.
+      final distance = math.sqrt(dx * dx + dy * dy) - cornerRadius;
+      final coverage = (0.5 - distance).clamp(0.0, 1.0);
+      if (coverage == 0) continue;
+      final pixel = scaled.getPixel(x, y);
+      canvas.setPixelRgba(
+        offset + x,
+        offset + y,
+        pixel.r,
+        pixel.g,
+        pixel.b,
+        (coverage * 255).round(),
+      );
+    }
+  }
+
+  final directory = Directory('macos/Runner/Assets.xcassets/$name.appiconset')
+    ..createSync(recursive: true);
+  for (final size in [16, 32, 64, 128, 256, 512, 1024]) {
+    final resized = size == canvasSize
+        ? canvas
+        : image.copyResize(
+            canvas,
+            width: size,
+            height: size,
+            interpolation: image.Interpolation.cubic,
+          );
+    File(
+      '${directory.path}/app_icon_$size.png',
+    ).writeAsBytesSync(image.encodePng(resized, level: 9));
+  }
+  final entries = [
+    for (final size in [16, 32, 128, 256, 512])
+      for (final scale in [1, 2])
+        '    {\n'
+            '      "size" : "${size}x$size",\n'
+            '      "idiom" : "mac",\n'
+            '      "filename" : "app_icon_${size * scale}.png",\n'
+            '      "scale" : "${scale}x"\n'
+            '    }',
+  ];
+  File('${directory.path}/Contents.json').writeAsStringSync(
+    '{\n'
+    '  "images" : [\n'
+    '${entries.join(',\n')}\n'
+    '  ],\n'
+    '  "info" : {\n'
+    '    "version" : 1,\n'
+    '    "author" : "xcode"\n'
+    '  }\n'
+    '}\n',
+  );
 }
 
 /// Adaptive-icon background: the flavor icon's vertical gradient, sampled

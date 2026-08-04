@@ -16,6 +16,9 @@ InferenceRepository createConfiguredInferenceRepository({
     defaultValue: 'fake',
   ),
   modelPath: const String.fromEnvironment('GOLEM_MODEL_PATH'),
+  // A fixed seed pins sampling for cross-device determinism probes; regular
+  // builds leave it unset (0 sentinel -> engine-default seeding).
+  samplingSeed: const int.fromEnvironment('GOLEM_SAMPLING_SEED'),
   fakeStreamDelay: fakeStreamDelay,
   documentsDirectory: documentsDirectory,
   createRuntime: InfernoRuntimeAdapter.native,
@@ -30,6 +33,7 @@ InferenceRepository selectInferenceRepository({
   required Duration fakeStreamDelay,
   required String documentsDirectory,
   required BrokerRuntime Function() createRuntime,
+  required int samplingSeed,
 }) {
   if (backend == 'fake') {
     return FakeInferenceRepository(eventDelay: fakeStreamDelay);
@@ -55,5 +59,6 @@ InferenceRepository selectInferenceRepository({
     createRuntime(),
     engine: engine,
     modelPath: resolvedModelPath,
+    seed: samplingSeed == 0 ? null : samplingSeed,
   );
 }

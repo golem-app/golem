@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show SelectableText;
 import 'package:flutter/services.dart';
@@ -16,6 +18,10 @@ class MessageBubble extends ConsumerWidget {
   final ChatMessage message;
   final bool canRegenerate;
 
+  /// Readable measure for a bubble on wide desktop windows; phone layouts
+  /// never reach it (82% of a phone viewport stays below the cap).
+  static const _maxBubbleWidth = 640.0;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isUser = message.role == MessageRole.user;
@@ -28,7 +34,10 @@ class MessageBubble extends ConsumerWidget {
           onLongPress: () => _showActions(context, ref),
           child: Container(
             constraints: BoxConstraints(
-              maxWidth: MediaQuery.sizeOf(context).width * 0.82,
+              maxWidth: math.min(
+                MediaQuery.sizeOf(context).width * 0.82,
+                _maxBubbleWidth,
+              ),
             ),
             margin: const EdgeInsets.only(bottom: 14),
             padding: const EdgeInsets.all(18),

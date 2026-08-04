@@ -23,14 +23,18 @@ final class _StubRuntime implements BrokerRuntime {
       const Stream.empty();
 }
 
-InferenceRepository _select({required String backend, String modelPath = ''}) =>
-    selectInferenceRepository(
-      backend: backend,
-      modelPath: modelPath,
-      fakeStreamDelay: Duration.zero,
-      documentsDirectory: '/documents',
-      createRuntime: _StubRuntime.new,
-    );
+InferenceRepository _select({
+  required String backend,
+  String modelPath = '',
+  int samplingSeed = 0,
+}) => selectInferenceRepository(
+  backend: backend,
+  modelPath: modelPath,
+  samplingSeed: samplingSeed,
+  fakeStreamDelay: Duration.zero,
+  documentsDirectory: '/documents',
+  createRuntime: _StubRuntime.new,
+);
 
 void main() {
   test('the fake backend stays the default', () {
@@ -52,6 +56,19 @@ void main() {
         _select(backend: 'llama', modelPath: 'documents:models/m.gguf')
             as InfernoInferenceRepository;
     expect(repository.modelPath, '/documents/models/m.gguf');
+  });
+
+  test('sampling stays engine-seeded unless a probe seed is configured', () {
+    final unseeded =
+        _select(backend: 'llama', modelPath: '/models/m')
+            as InfernoInferenceRepository;
+    expect(unseeded.seed, isNull);
+
+    // The dart-define arrives as an int with 0 as its unset sentinel.
+    final seeded =
+        _select(backend: 'mlx', modelPath: '/models/m', samplingSeed: 7)
+            as InfernoInferenceRepository;
+    expect(seeded.seed, 7);
   });
 
   test('a real backend without a model path fails at construction', () {
