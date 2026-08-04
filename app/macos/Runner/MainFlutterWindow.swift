@@ -16,15 +16,21 @@ class MainFlutterWindow: NSWindow {
     self.contentViewController = flutterViewController
     self.setFrame(windowFrame, display: true)
 
-    self.title = Bundle.main.object(
+    let displayName = Bundle.main.object(
       forInfoDictionaryKey: "CFBundleDisplayName"
-    ) as? String ?? "Golem"
+    ) as? String
+    self.title = displayName?.isEmpty == false ? displayName! : "Golem"
     self.contentMinSize = Self.minimumContentSize
 
     // Restore the user's last frame when one was saved; otherwise open at
     // the iPad-class default. setFrameUsingName returns false on first run.
+    // The window has no screen before it is ordered front, so fall back to
+    // the main screen — otherwise the clamp silently no-ops on small
+    // displays, which is exactly what it exists to prevent.
     if !self.setFrameUsingName(Self.frameAutosaveKey) {
-      self.setContentSize(Self.clampedDefaultContentSize(for: self.screen))
+      self.setContentSize(
+        Self.clampedDefaultContentSize(for: self.screen ?? NSScreen.main)
+      )
       self.center()
     }
     self.setFrameAutosaveName(Self.frameAutosaveKey)

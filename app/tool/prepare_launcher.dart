@@ -127,13 +127,13 @@ void _writeAdaptiveForeground() {
 /// `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon-<flavor>` in the pbxproj.
 void _writeMacIconset(String name, image.Image icon) {
   const canvasSize = 1024;
-  const artworkSize = 824.0;
+  const artworkSize = 824;
   // Apple's macOS icon grid rounds corners at ~22.5% of the artwork edge.
-  const cornerRadius = 185.4;
+  const cornerRadius = artworkSize * 0.225;
   final scaled = image.copyResize(
     icon,
-    width: artworkSize.toInt(),
-    height: artworkSize.toInt(),
+    width: artworkSize,
+    height: artworkSize,
     interpolation: image.Interpolation.cubic,
   );
   final canvas = image.Image(
@@ -141,12 +141,12 @@ void _writeMacIconset(String name, image.Image icon) {
     height: canvasSize,
     numChannels: 4,
   );
-  const offset = (canvasSize - 824) ~/ 2;
+  const offset = (canvasSize - artworkSize) ~/ 2;
   const half = artworkSize / 2;
   const boxHalf = half - cornerRadius;
-  for (var y = 0; y < 824; y++) {
+  for (var y = 0; y < artworkSize; y++) {
     final dy = math.max(((y + 0.5) - half).abs() - boxHalf, 0.0);
-    for (var x = 0; x < 824; x++) {
+    for (var x = 0; x < artworkSize; x++) {
       final dx = math.max(((x + 0.5) - half).abs() - boxHalf, 0.0);
       // Signed distance to the rounded-rect edge; one-pixel smoothstep for
       // an anti-aliased rim.

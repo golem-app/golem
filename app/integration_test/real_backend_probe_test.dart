@@ -20,43 +20,60 @@ import 'package:golem_flutter/main.dart' as app;
 /// The `INFERNO_METRICS` and `INFERNO_PROBE` lines land in the test log; the
 /// probe line's hash is the value compared across devices. The prompt must
 /// stay byte-identical between the runs being compared.
+const _backend = String.fromEnvironment(
+  'GOLEM_INFERENCE_BACKEND',
+  defaultValue: 'fake',
+);
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('one seeded generation through the real backend', (tester) async {
-    await app.main();
-    await tester.pumpAndSettle(const Duration(seconds: 2));
-    if (find.byKey(const Key('empty-chat')).evaluate().isEmpty) {
-      await tester.tap(find.byKey(const Key('new-chat-header')));
+  testWidgets(
+    'one seeded generation through the real backend',
+    (tester) async {
+      await app.main();
+      await tester.pump(const Duration(seconds: 2));
       await tester.pumpAndSettle();
-    }
-
-    await tester.tap(find.byKey(const Key('chat-composer')));
-    await tester.enterText(
-      find.byKey(const Key('chat-composer')),
-      'Name the largest planet in the solar system.',
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('send-button')));
-
-    // A real model load plus generation takes tens of seconds on a phone;
-    // poll until the composer is idle again (send button back, no stop).
-    final deadline = DateTime.now().add(const Duration(minutes: 5));
-    while (DateTime.now().isBefore(deadline)) {
-      await tester.pump(const Duration(milliseconds: 500));
-      final stopped = find.byKey(const Key('stop-button')).evaluate().isEmpty;
-      final sendBack = find
-          .byKey(const Key('send-button'))
-          .evaluate()
-          .isNotEmpty;
-      if (stopped && sendBack && tester.binding.transientCallbackCount == 0) {
-        break;
+      if (find.byKey(const Key('empty-chat')).evaluate().isEmpty) {
+        await tester.tap(find.byKey(const Key('new-chat-header')));
+        await tester.pumpAndSettle();
       }
-    }
-    await tester.pumpAndSettle();
 
-    // The reply bubble must carry a real answer (the probe line in the log
-    // carries the hash; this asserts the UI surfaced the same generation).
-    expect(find.textContaining('Jupiter'), findsWidgets);
-  });
+      await tester.tap(find.byKey(const Key('chat-composer')));
+      await tester.enterText(
+        find.byKey(const Key('chat-composer')),
+        'Name the largest planet in the solar system.',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('send-button')));
+
+      // A real model load plus generation takes tens of seconds on a phone;
+      // poll until the composer is idle again (send button back, no stop).
+      final deadline = DateTime.now().add(const Duration(minutes: 5));
+      var completed = false;
+      while (DateTime.now().isBefore(deadline)) {
+        await tester.pump(const Duration(milliseconds: 500));
+        final stopped = find.byKey(const Key('stop-button')).evaluate().isEmpty;
+        final sendBack = find
+            .byKey(const Key('send-button'))
+            .evaluate()
+            .isNotEmpty;
+        if (stopped && sendBack && tester.binding.transientCallbackCount == 0) {
+          completed = true;
+          break;
+        }
+      }
+      if (!completed) {
+        fail('The generation never finished within the five-minute deadline.');
+      }
+      await tester.pumpAndSettle();
+
+      // The reply bubble must carry a real answer (the probe line in the log
+      // carries the hash; this asserts the UI surfaced the same generation).
+      expect(find.textContaining('Jupiter'), findsWidgets);
+    },
+    // Self-skips against the default fake backend so a plain
+    // `flutter test integration_test` run cannot burn the poll deadline.
+    skip: _backend == 'fake',
+  );
 }

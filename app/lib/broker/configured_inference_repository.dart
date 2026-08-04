@@ -33,7 +33,7 @@ InferenceRepository selectInferenceRepository({
   required Duration fakeStreamDelay,
   required String documentsDirectory,
   required BrokerRuntime Function() createRuntime,
-  int samplingSeed = 0,
+  required int samplingSeed,
 }) {
   if (backend == 'fake') {
     return FakeInferenceRepository(eventDelay: fakeStreamDelay);

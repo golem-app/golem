@@ -24,7 +24,9 @@ Future<void> main(List<String> arguments) async {
       : 'Reply with one short word.';
   final rendered = '<bos><|turn>user\n$userPrompt<turn|>\n<|turn>model\n';
 
-  if (Platform.isMacOS) _stageMetallibForCliRun();
+  if (Platform.isMacOS && engine == InfernoEngineKind.mlx) {
+    _stageMetallibForCliRun();
+  }
   final inferno = Inferno.native();
   await inferno.load(engine: engine, modelPath: arguments[1]);
   final buffer = StringBuffer();
@@ -72,5 +74,11 @@ void _stageMetallibForCliRun() {
   );
   if (dylib.existsSync() && metallib.existsSync()) {
     metallib.copySync('${dylib.parent.path}/mlx.metallib');
+  } else {
+    stderr.writeln(
+      'warning: could not stage mlx.metallib '
+      '(dylib: ${dylib.existsSync()}, metallib: ${metallib.existsSync()}); '
+      'the MLX load may fail to resolve its shader library.',
+    );
   }
 }
