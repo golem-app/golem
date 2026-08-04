@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/app_identity.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
@@ -328,10 +329,16 @@ class _SettingsBody extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const LabeledRow(label: 'App', value: 'Golem Flutter 1.0.0'),
-              SizedBox(height: 10),
-              LabeledRow(label: 'Bundle', value: 'app.golem.flutter'),
-              SizedBox(height: 12),
+              LabeledRow(
+                label: 'App',
+                value: '${AppIdentity.current.displayName} 1.0.0',
+              ),
+              const SizedBox(height: 10),
+              LabeledRow(
+                label: 'Bundle',
+                value: AppIdentity.current.applicationId,
+              ),
+              const SizedBox(height: 12),
               Text(
                 'UI evaluation build. It reads no other app\'s data and includes no model weights, network downloader, inference engine, or hardware measurement.',
                 style: TextStyle(

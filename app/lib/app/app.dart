@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/app_identity.dart';
 import '../core/theme/golem_theme.dart';
 import '../features/benchmark/benchmark_screen.dart';
 import '../features/chat/chat_screen.dart';
@@ -50,7 +51,7 @@ class _GolemAppState extends State<GolemApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) => CupertinoApp.router(
-    title: 'Golem Flutter',
+    title: AppIdentity.current.displayName,
     debugShowCheckedModeBanner: false,
     routerConfig: _router,
     theme: GolemTheme.theme(
