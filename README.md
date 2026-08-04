@@ -20,7 +20,11 @@ The app ships as three coexisting build flavors — `production` (**Golem**,
 `app.golem`, blue icon), `qa` (**Golem QA**, `app.golem.qa`, red icon), and
 `dev` (**Golem Dev**, `app.golem.dev`, green icon) — selected with
 `--flavor` (plain commands default to `dev`). QA is the canonical flavor
-for automated testing; see [`app/README.md`](app/README.md).
+for automated testing; see [`app/README.md`](app/README.md). The same
+flavors exist on iOS, Android, and the macOS desktop target, which opens
+as an iPad-shaped resizable window, runs both real engines GPU-accelerated
+(llama.cpp-Metal and MLX), and deliberately disables the App Sandbox for
+development; Mac results validate correctness, never mobile performance.
 
 The simulated backend is the default in every build. A real local runtime
 is opt-in via build configuration:

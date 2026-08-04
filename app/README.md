@@ -12,13 +12,15 @@ launcher icons:
 
 Select a flavor with the standard workflow — `flutter run --flavor qa`,
 `flutter build apk --release --flavor production`,
-`flutter build ios --simulator --flavor dev` — or omit `--flavor` to get
-`dev` (`default-flavor` in `pubspec.yaml`). Each flavor stores its own
-versioned JSON under its separate application-support container; only the
-launcher icon and identity differ — every in-app asset, theme, and
-behavior is shared. The flavorless legacy identity `app.golem.flutter`
-(**Golem Flutter**) remains reachable only through direct
-`xcodebuild -scheme Runner` builds.
+`flutter build ios --simulator --flavor dev`,
+`flutter build macos --flavor qa` — or omit `--flavor` to get
+`dev` (`default-flavor` in `pubspec.yaml`). The same three flavors exist on
+iOS, Android, and macOS. Each flavor stores its own versioned JSON under its
+separate application-support container; only the launcher icon and identity
+differ — every in-app asset, theme, and behavior is shared. The flavorless
+legacy identity `app.golem.flutter` (**Golem Flutter**) remains reachable
+only through direct `xcodebuild -scheme Runner` builds and is never used for
+QA or automation.
 
 > **Physical iPhone caution:** never install the `production`
 > (`app.golem`) or `dev` (`app.golem.dev`) flavor on the physical iPhone —
@@ -124,9 +126,13 @@ the default fake-backend workflow does not need it.
 `dart run tool/prepare_launcher.dart` derives every flavor's Android
 launcher inputs from the tracked native artwork in `assets/source/`
 (`golem_icon_<flavor>_1024.png`), sampling each adaptive-icon gradient from
-the artwork itself. One `dart run flutter_launcher_icons` invocation then
-generates all three flavors from the `flutter_launcher_icons-<flavor>.yaml`
-configs (their presence makes the tool ignore any pubspec block): the
+the artwork itself, and writes the per-flavor macOS Dock iconsets
+(`macos/Runner/Assets.xcassets/AppIcon-<flavor>.appiconset`) directly —
+Apple-style rounded squares on a transparent margin — because
+flutter_launcher_icons can only emit one fixed macOS catalog. One
+`dart run flutter_launcher_icons` invocation then generates all three
+flavors from the `flutter_launcher_icons-<flavor>.yaml` configs (their
+presence makes the tool ignore any pubspec block): the
 `AppIcon-<flavor>.appiconset` catalogs on iOS and the
 `android/app/src/<flavor>/res` source sets on Android. The launch splash is
 deliberately identical for every flavor.
@@ -183,3 +189,45 @@ Use Mobile MCP for launch, element inspection, interaction, screenshots, and nat
 share-sheet review after installation. Android startup, the shared integration
 journey, and launcher/splash presentation have also been verified on a OnePlus
 12R running Android 16; Android release signing remains intentionally unconfigured.
+
+## macOS verification
+
+The macOS target mirrors the mobile flavors and exists for two jobs:
+previewing tablet-proportioned layout without an iPad, and running real-model
+inference at desktop GPU speed. **Mac GPU numbers are for correctness and
+iteration speed only — never quote them as mobile performance.**
+
+```sh
+flutter run -d macos                      # dev flavor via default-flavor
+flutter build macos --flavor qa           # or production / dev
+flutter test integration_test/app_journey_test.dart -d macos --flavor qa
+```
+
+The window opens at the iPad Pro 11" logical portrait size (834 × 1194),
+clamped to the screen and freely resizable down to 480 × 640
+(`macos/Runner/MainFlutterWindow.swift`); the frame autosaves per identity.
+The App Sandbox is **deliberately disabled** in both entitlement files: this
+is a development target that must read model files from arbitrary local
+paths. Distribution hardening (sandbox, notarization, signing) is a later,
+separate effort. Because the sandbox is off,
+`getApplicationDocumentsDirectory()` resolves to the real `~/Documents` —
+prefer absolute `GOLEM_MODEL_PATH` values on macOS:
+
+```sh
+flutter run -d macos --flavor qa \
+  --dart-define=GOLEM_INFERENCE_BACKEND=llama \
+  --dart-define=GOLEM_MODEL_PATH=/abs/path/gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf
+```
+
+Both engines run GPU-accelerated on Apple silicon: llama.cpp with Metal
+(enabled for every Apple target by Inferno's build hook) and MLX exactly as
+on iOS. `INFERNO_METRICS` lines appear on the `flutter run` console, or on
+stdout when launching the built binary directly
+(`build/macos/Build/Products/Release-qa/golem_flutter.app/Contents/MacOS/golem_flutter`).
+
+For cross-device determinism probes, build with
+`--dart-define=GOLEM_SAMPLING_SEED=<n>`: every completed generation then
+logs one `INFERNO_PROBE` line hashing the raw pre-parser output, and
+`integration_test/real_backend_probe_test.dart` drives one seeded
+generation through the chat UI with a fixed prompt. Findings live in
+`../docs/notes/determinism-probe.md`.
