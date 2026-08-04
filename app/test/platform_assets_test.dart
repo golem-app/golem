@@ -1,30 +1,27 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/core/app_identity.dart';
 import 'package:image/image.dart' as image;
 
-/// The three build flavors and their expected platform identity. `dominant`
-/// selects the color channel that must lead at the artwork sample point —
-/// blue production, red QA, green dev.
+/// The three build flavors, keyed by the in-app [AppIdentity] so the strings
+/// the platforms ship are asserted against the single Dart-side source of
+/// truth. `displaySetting` spells out the pbxproj quoting; `dominant` selects
+/// the color channel that must lead at the artwork sample point — blue
+/// production, red QA, green dev.
 const _flavors = [
   (
-    name: 'production',
-    applicationId: 'app.golem',
-    label: 'Golem',
+    identity: AppIdentity.production,
     displaySetting: 'GOLEM_DISPLAY_NAME = Golem;',
     dominant: 'b',
   ),
   (
-    name: 'qa',
-    applicationId: 'app.golem.qa',
-    label: 'Golem QA',
+    identity: AppIdentity.qa,
     displaySetting: 'GOLEM_DISPLAY_NAME = "Golem QA";',
     dominant: 'r',
   ),
   (
-    name: 'dev',
-    applicationId: 'app.golem.dev',
-    label: 'Golem Dev',
+    identity: AppIdentity.dev,
     displaySetting: 'GOLEM_DISPLAY_NAME = "Golem Dev";',
     dominant: 'g',
   ),
@@ -33,7 +30,8 @@ const _flavors = [
 num _channel(image.Pixel pixel, String channel) => switch (channel) {
   'r' => pixel.r,
   'g' => pixel.g,
-  _ => pixel.b,
+  'b' => pixel.b,
+  _ => throw ArgumentError.value(channel, 'channel'),
 };
 
 void _expectDominantChannel(image.Pixel pixel, String channel) {
@@ -105,11 +103,16 @@ void main() {
     expect(gradle, isNot(contains('applicationId = "app.golem.flutter"')));
     expect(gradle, contains('flavorDimensions += "environment"'));
     for (final flavor in _flavors) {
-      expect(gradle, contains('create("${flavor.name}")'));
-      expect(gradle, contains('applicationId = "${flavor.applicationId}"'));
+      expect(gradle, contains('create("${flavor.identity.name}")'));
       expect(
         gradle,
-        contains('resValue("string", "app_name", "${flavor.label}")'),
+        contains('applicationId = "${flavor.identity.applicationId}"'),
+      );
+      expect(
+        gradle,
+        contains(
+          'resValue("string", "app_name", "${flavor.identity.displayName}")',
+        ),
       );
     }
 
@@ -133,7 +136,7 @@ void main() {
 
   test('Android launcher resources are owned by the flavor source sets', () {
     for (final flavor in _flavors) {
-      final res = 'android/app/src/${flavor.name}/res';
+      final res = 'android/app/src/${flavor.identity.name}/res';
       expect(File('$res/mipmap-xxxhdpi/ic_launcher.png').existsSync(), isTrue);
       expect(
         File('$res/mipmap-anydpi-v26/ic_launcher.xml').existsSync(),
@@ -177,35 +180,44 @@ void main() {
       ),
     );
     for (final flavor in _flavors) {
+      final name = flavor.identity.name;
       for (final mode in ['Debug', 'Release', 'Profile']) {
-        expect(project, contains('name = "$mode-${flavor.name}";'));
+        expect(project, contains('name = "$mode-$name";'));
       }
       expect(
         project,
-        contains('PRODUCT_BUNDLE_IDENTIFIER = ${flavor.applicationId};'),
+        contains(
+          'PRODUCT_BUNDLE_IDENTIFIER = ${flavor.identity.applicationId};',
+        ),
       );
       expect(
         project,
-        contains(
-          'ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-${flavor.name}";',
-        ),
+        contains('ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-$name";'),
       );
       expect(project, contains(flavor.displaySetting));
 
       final scheme = await File(
-        'ios/Runner.xcodeproj/xcshareddata/xcschemes/${flavor.name}.xcscheme',
+        'ios/Runner.xcodeproj/xcshareddata/xcschemes/$name.xcscheme',
       ).readAsString();
-      expect(scheme, contains('buildConfiguration = "Debug-${flavor.name}"'));
-      expect(scheme, contains('buildConfiguration = "Profile-${flavor.name}"'));
-      expect(scheme, contains('buildConfiguration = "Release-${flavor.name}"'));
+      expect(scheme, contains('buildConfiguration = "Debug-$name"'));
+      expect(scheme, contains('buildConfiguration = "Profile-$name"'));
+      expect(scheme, contains('buildConfiguration = "Release-$name"'));
       expect(scheme, contains('xcode_backend.sh&quot; prepare'));
     }
 
     // The flavorless legacy identity remains for RunnerTests and direct
     // xcodebuild use, and the shared Info.plist resolves its display name
     // through the per-configuration variable.
-    expect(project, contains('PRODUCT_BUNDLE_IDENTIFIER = app.golem.flutter;'));
-    expect(project, contains('GOLEM_DISPLAY_NAME = "Golem Flutter";'));
+    expect(
+      project,
+      contains(
+        'PRODUCT_BUNDLE_IDENTIFIER = ${AppIdentity.flutter.applicationId};',
+      ),
+    );
+    expect(
+      project,
+      contains('GOLEM_DISPLAY_NAME = "${AppIdentity.flutter.displayName}";'),
+    );
     final plist = await File('ios/Runner/Info.plist').readAsString();
     expect(plist, contains(r'<string>$(GOLEM_DISPLAY_NAME)</string>'));
   });
@@ -241,7 +253,7 @@ void main() {
   test('platform launchers use their configured native artwork', () async {
     for (final flavor in _flavors) {
       final sourceBytes = await File(
-        'assets/images/golem_launcher_${flavor.name}.png',
+        'assets/images/golem_launcher_${flavor.identity.name}.png',
       ).readAsBytes();
       final source = image.decodePng(sourceBytes)!;
       expect(source.width, 1024);
@@ -272,7 +284,7 @@ void main() {
       _expectDominantChannel(source.getPixel(512, 900), flavor.dominant);
       final background = image.decodePng(
         await File(
-          'assets/images/golem_adaptive_background_${flavor.name}.png',
+          'assets/images/golem_adaptive_background_${flavor.identity.name}.png',
         ).readAsBytes(),
       )!;
       _expectDominantChannel(background.getPixel(512, 512), flavor.dominant);
@@ -281,8 +293,8 @@ void main() {
       // white matte corners, silver frame, and flavor hue.
       final generated = image.decodePng(
         await File(
-          'ios/Runner/Assets.xcassets/AppIcon-${flavor.name}.appiconset/'
-          'AppIcon-${flavor.name}-1024x1024@1x.png',
+          'ios/Runner/Assets.xcassets/AppIcon-${flavor.identity.name}.appiconset/'
+          'AppIcon-${flavor.identity.name}-1024x1024@1x.png',
         ).readAsBytes(),
       )!;
       final generatedCorner = generated.getPixel(0, 0);

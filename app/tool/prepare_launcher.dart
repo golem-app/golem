@@ -24,6 +24,8 @@ void main() {
     if (icon == null || icon.width != 1024 || icon.height != 1024) {
       throw StateError('Expected the tracked 1024×1024 $flavor Golem icon.');
     }
+    // Order matters: the background samples the artwork before the matte
+    // mutates the decoded icon in place.
     _writeAdaptiveBackground(flavor, icon);
     _writeMattedLauncher(flavor, icon);
   }
