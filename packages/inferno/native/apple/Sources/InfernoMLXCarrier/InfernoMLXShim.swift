@@ -76,7 +76,7 @@ private struct GenerationRequest: Decodable, Sendable {
 }
 
 private final class InfernoMlxEngine: @unchecked Sendable {
-    private let lock = NSLock()
+    private let condition = NSCondition()
     private var busy = false
     private var operation: Task<Void, Never>?
     private var generationTask: Task<Void, Never>?
@@ -85,9 +85,16 @@ private final class InfernoMlxEngine: @unchecked Sendable {
     func start(
         _ body: @escaping @Sendable (InfernoMlxEngine) async -> Void
     ) -> Int32 {
-        lock.lock()
+        condition.lock()
+        // Terminal events are emitted before the operation task finishes
+        // unwinding, so a caller reacting to one can arrive while busy is
+        // still set. Give the outgoing operation a moment to clear instead
+        // of rejecting the follow-on call; only genuinely concurrent use
+        // still fails.
+        let deadline = Date().addingTimeInterval(2)
+        while busy, condition.wait(until: deadline) {}
         guard !busy else {
-            lock.unlock()
+            condition.unlock()
             return -1
         }
         busy = true
@@ -96,43 +103,44 @@ private final class InfernoMlxEngine: @unchecked Sendable {
             finishOperation()
         }
         operation = task
-        lock.unlock()
+        condition.unlock()
         return 0
     }
 
     private func finishOperation() {
-        lock.lock()
+        condition.lock()
         busy = false
         operation = nil
         generationTask = nil
-        lock.unlock()
+        condition.broadcast()
+        condition.unlock()
     }
 
     func cancel() {
-        lock.lock()
+        condition.lock()
         let activeOperation = operation
         let activeGeneration = generationTask
-        lock.unlock()
+        condition.unlock()
         activeGeneration?.cancel()
         activeOperation?.cancel()
     }
 
     func setGenerationTask(_ task: Task<Void, Never>?) {
-        lock.lock()
+        condition.lock()
         generationTask = task
-        lock.unlock()
+        condition.unlock()
     }
 
     func container() -> ModelContainer? {
-        lock.lock()
-        defer { lock.unlock() }
+        condition.lock()
+        defer { condition.unlock() }
         return model
     }
 
     func setContainer(_ container: ModelContainer?) {
-        lock.lock()
+        condition.lock()
         model = container
-        lock.unlock()
+        condition.unlock()
     }
 }
 
@@ -398,9 +406,13 @@ public func infernoMlxEngineGenerate(
                         userInfo: [NSLocalizedDescriptionKey: "The rendered prompt could not be tokenized."]
                     )
                 }
+                // The tokenizer defines BOS; the shim must stay model-blind.
+                // Tokenizers without a BOS token skip the guard entirely.
                 if promptTokenIDs.count > 1,
-                   promptTokenIDs[0] == 2,
-                   promptTokenIDs[1] == 2 {
+                   let bosToken = context.tokenizer.bosToken,
+                   let bosTokenID = context.tokenizer.convertTokenToId(bosToken),
+                   promptTokenIDs[0] == bosTokenID,
+                   promptTokenIDs[1] == bosTokenID {
                     throw NSError(
                         domain: "InfernoMLX",
                         code: 2,
@@ -420,17 +432,21 @@ public func infernoMlxEngineGenerate(
                 var generationContext = context
                 generationContext.configuration.eosTokenIds = Set(request.stopTokenIds)
                 generationContext.configuration.stopStrings = []
+                // Started before generate(): the call is not lazy, so prompt
+                // processing must land inside elapsedSeconds to match the
+                // llama shim's measurement window.
+                let started = ContinuousClock.now
                 // The token-task path miscomputes Gemma 4 per-layer inputs
-                // during prefill; this overload is the exact path the proven
-                // native app streams through. Requested stop-token IDs are
-                // enforced by the library via the per-request context copy.
+                // during prefill; this overload is the streaming path proven
+                // on device against the pinned artifact. Requested stop-token
+                // IDs are enforced by the library via the per-request context
+                // copy.
                 let stream = try MLXLMCommon.generate(
                     input: input,
                     parameters: parameters,
                     context: generationContext
                 )
 
-                let started = ContinuousClock.now
                 var firstTokenAt: ContinuousClock.Instant?
                 var peakFootprint = physicalFootprintBytes()
                 var generatedChunkCount = 0

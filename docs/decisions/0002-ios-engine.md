@@ -29,8 +29,16 @@ Status: decided on `feat/3-inferno`
 shows llama's *allocated* memory is small and its weight pages are cleanly
 evictable under pressure; MLX's buffers are resident allocations.
 
-Reference baseline (deprecated native `golem-app/iOS`, same model class,
-MLX): 18–22 tok/s decode, 60–360 tok/s warm prompt, ~4.2 GB peak footprint.
+² Measurement-window caveat: at recording time the MLX shim started its
+elapsed/TTFT clock only after `MLXLMCommon.generate` returned (post-prefill),
+while the llama shim starts before prefill, so the per-engine windows are not
+strictly comparable; the shim has since been aligned to start before the
+call. TTFT also remains defined differently per engine (llama: decode start →
+first token; MLX: operation start → first chunk). Neither skew is large
+enough to change the conclusion — decode rates are library-reported and
+within ~5% — but re-record before citing these numbers beyond this
+decision.
+
 
 Both engines produced coherent, correct answers on all prompts, with
 near-identical phrasing — a qualitative echo of the token-level parity

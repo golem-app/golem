@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdio>
 #include <cstdint>
 #include <cstdlib>
@@ -27,6 +28,7 @@ using steady_clock = std::chrono::steady_clock;
 
 struct inferno_engine {
   std::mutex mutex;
+  std::condition_variable idle;
   std::thread worker;
   std::atomic<bool> cancel_requested{false};
   std::atomic<bool> busy{false};
@@ -120,7 +122,16 @@ bool read_gguf_header(const std::string &path,
 
 template <typename Work>
 int32_t start_worker(inferno_engine *engine, Work work) {
-  if (engine == nullptr || engine->busy.exchange(true)) return -1;
+  if (engine == nullptr) return -1;
+  std::unique_lock<std::mutex> guard(engine->mutex);
+  // Terminal events are emitted before the worker finishes unwinding, so a
+  // caller reacting to one can arrive while busy is still set. Give the
+  // outgoing worker a moment to clear instead of rejecting the follow-on
+  // call; only a genuinely concurrent operation still fails.
+  engine->idle.wait_for(guard, std::chrono::seconds(2), [engine] {
+    return !engine->busy.load();
+  });
+  if (engine->busy.exchange(true)) return -1;
   if (engine->worker.joinable()) engine->worker.join();
   engine->cancel_requested.store(false);
   try {
@@ -134,6 +145,7 @@ int32_t start_worker(inferno_engine *engine, Work work) {
       } catch (...) {
       }
       engine->busy.store(false);
+      engine->idle.notify_all();
     });
   } catch (...) {
     engine->busy.store(false);
@@ -440,8 +452,10 @@ int32_t inferno_engine_generate(inferno_engine *engine,
       llama_batch batch = llama_batch_get_one(
           const_cast<llama_token *>(prompt_tokens.data() + offset),
           static_cast<int32_t>(count));
-      if (llama_decode(context, batch) != 0) {
-        decode_failed = true;
+      // llama_decode returns 2 when the abort callback fired — that is the
+      // caller's own cancellation tripping mid-decode, not a failure.
+      if (const int32_t status = llama_decode(context, batch); status != 0) {
+        decode_failed = status != 2;
         break;
       }
       offset += count;
@@ -478,8 +492,8 @@ int32_t inferno_engine_generate(inferno_engine *engine,
           break;
         }
         llama_batch next = llama_batch_get_one(const_cast<llama_token *>(&token), 1);
-        if (llama_decode(context, next) != 0) {
-          decode_failed = true;
+        if (const int32_t status = llama_decode(context, next); status != 0) {
+          decode_failed = status != 2;
           break;
         }
       }
