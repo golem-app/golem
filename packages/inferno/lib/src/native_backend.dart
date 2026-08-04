@@ -332,14 +332,22 @@ final class _MlxNativeApi implements _NativeApi {
 }
 
 sealed class _PendingOperation {
-  _PendingOperation();
+  _PendingOperation(this.api);
+
+  /// The engine library that emits this operation's events; payload buffers
+  /// must be released through the same library that allocated them.
+  final _NativeApi api;
 }
 
 final class _PendingFuture extends _PendingOperation {
+  _PendingFuture(super.api);
+
   final Completer<void> completer = Completer<void>();
 }
 
 final class _PendingTokens extends _PendingOperation {
+  _PendingTokens(super.api);
+
   final Completer<List<int>> completer = Completer<List<int>>();
   List<int>? tokenIds;
 }
@@ -357,7 +365,7 @@ final class _GenerationTextSink implements Sink<String> {
 }
 
 final class _PendingGeneration extends _PendingOperation {
-  _PendingGeneration(this.controller) {
+  _PendingGeneration(super.api, this.controller) {
     _textDecoder = const Utf8Decoder(allowMalformed: true)
         .startChunkedConversion(
           StringConversionSink.from(_GenerationTextSink(controller)),
@@ -491,6 +499,7 @@ final class NativeInfernoBackend implements InfernoBackend {
     final path = modelPath.toNativeUtf8();
     try {
       await _startFuture(
+        api,
         (operationId) => api.load(
           _engine,
           path,
@@ -523,7 +532,7 @@ final class NativeInfernoBackend implements InfernoBackend {
       sync: true,
       onListen: () {
         final operationId = _nextOperationId++;
-        _operations[operationId] = _PendingGeneration(controller);
+        _operations[operationId] = _PendingGeneration(api, controller);
         final encoded = jsonEncode({
           'prompt': request.prompt,
           'maxTokens': request.sampling.maxTokens,
@@ -565,6 +574,7 @@ final class NativeInfernoBackend implements InfernoBackend {
     final api = _activeApi!;
     try {
       await _startFuture(
+        api,
         (operationId) =>
             api.unload(_engine, operationId, _callback.nativeFunction, nullptr),
       );
@@ -575,6 +585,16 @@ final class NativeInfernoBackend implements InfernoBackend {
     }
   }
 
+  @override
+  void dispose() {
+    if (_engine != nullptr) {
+      _activeApi?.destroy(_engine);
+      _engine = nullptr;
+      _activeApi = null;
+    }
+    _callback.close();
+  }
+
   /// Test/tooling-only access for asserting raw cross-engine token parity.
   Future<List<int>> tokenizeForTesting(String renderedPrompt) {
     if (_engine == nullptr) {
@@ -583,11 +603,12 @@ final class NativeInfernoBackend implements InfernoBackend {
         'No native model is loaded.',
       );
     }
+    final api = _activeApi!;
     final prompt = renderedPrompt.toNativeUtf8();
     final operationId = _nextOperationId++;
-    final operation = _PendingTokens();
+    final operation = _PendingTokens(api);
     _operations[operationId] = operation;
-    final result = _activeApi!.tokenize(
+    final result = api.tokenize(
       _engine,
       prompt,
       operationId,
@@ -602,9 +623,12 @@ final class NativeInfernoBackend implements InfernoBackend {
     return operation.completer.future;
   }
 
-  Future<void> _startFuture(int Function(int operationId) start) {
+  Future<void> _startFuture(
+    _NativeApi api,
+    int Function(int operationId) start,
+  ) {
     final operationId = _nextOperationId++;
-    final operation = _PendingFuture();
+    final operation = _PendingFuture(api);
     _operations[operationId] = operation;
     final result = start(operationId);
     if (result != 0) {
@@ -624,8 +648,15 @@ final class NativeInfernoBackend implements InfernoBackend {
     final copiedBytes = length == 0
         ? Uint8List(0)
         : Uint8List.fromList(bytes.asTypedList(length));
-    if (bytes != nullptr) _activeApi!.stringFree(bytes.cast<Utf8>());
     final operation = _operations[operationId];
+    if (bytes != nullptr) {
+      // Events can still be queued on the listener port after unload() nulls
+      // _activeApi; free through the operation's own engine library. Both
+      // shims allocate with the platform malloc, so the llama fallback frees
+      // correctly even for an already-forgotten operation.
+      final api = operation?.api ?? _activeApi ?? _llamaApi;
+      api.stringFree(bytes.cast<Utf8>());
+    }
     if (operation == null) return;
     if (eventKind == 1 && operation is _PendingGeneration) {
       operation.addTextBytes(copiedBytes);

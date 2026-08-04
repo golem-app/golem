@@ -154,6 +154,42 @@ void main() {
     await subscription.cancel();
   });
 
+  test('listening after an unload errors instead of wedging', () async {
+    final model = File('${temporary.path}/toy.gguf');
+    await model.writeAsBytes([0x47, 0x47, 0x55, 0x46]);
+    final inferno = Inferno.withBackend(MockInfernoBackend());
+    await inferno.load(
+      engine: InfernoEngineKind.llamaCpp,
+      modelPath: model.path,
+    );
+    // The stream is lazy: obtain it while loaded, listen only after the
+    // model is gone.
+    final stream = inferno.generate(
+      const InfernoGenerationRequest(prompt: 'late listener'),
+    );
+    await inferno.unload();
+    await expectLater(
+      stream,
+      emitsError(
+        isA<InfernoException>().having(
+          (error) => error.code,
+          'code',
+          InfernoErrorCode.invalidState,
+        ),
+      ),
+    );
+    // The runtime is still usable afterwards.
+    await inferno.load(
+      engine: InfernoEngineKind.llamaCpp,
+      modelPath: model.path,
+    );
+    final events = await inferno
+        .generate(const InfernoGenerationRequest(prompt: 'recovered'))
+        .toList();
+    expect(events.last, isA<InfernoGenerationCompleted>());
+    await inferno.unload();
+  });
+
   test('model and native inputs stay immutably pinned', () {
     expect(gemma4E2BMlx4Bit.revision, hasLength(40));
     expect(gemma4E2BMlx4Bit.files, hasLength(7));

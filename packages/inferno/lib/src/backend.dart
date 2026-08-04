@@ -14,4 +14,9 @@ abstract interface class InfernoBackend {
   Stream<InfernoGenerationEvent> generate(InfernoGenerationRequest request);
 
   Future<void> cancel();
+
+  /// Releases resources that outlive an unload, such as the native event
+  /// listener that otherwise keeps the isolate alive. The backend must not
+  /// be used afterwards.
+  void dispose();
 }

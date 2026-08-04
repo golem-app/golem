@@ -83,14 +83,17 @@ final class Inferno {
 
     late StreamController<InfernoGenerationEvent> controller;
     var completed = false;
+    var started = false;
+    StreamSubscription<InfernoGenerationEvent>? subscription;
     final done = Completer<void>();
-    _generationDone = done;
 
     void finish() {
       if (completed) return;
       completed = true;
-      _nativeSubscription = null;
-      _generationDone = null;
+      if (identical(_nativeSubscription, subscription)) {
+        _nativeSubscription = null;
+      }
+      if (identical(_generationDone, done)) _generationDone = null;
       if (_state == _RuntimeState.generating) _state = _RuntimeState.loaded;
       if (!done.isCompleted) done.complete();
       if (!controller.isClosed) unawaited(controller.close());
@@ -99,8 +102,24 @@ final class Inferno {
     controller = StreamController<InfernoGenerationEvent>(
       sync: true,
       onListen: () {
+        // The stream is lazy, so the lifecycle can move on between the
+        // generate() call and the first listener; re-validate here before
+        // touching the engine.
+        if (_state != _RuntimeState.loaded) {
+          completed = true;
+          controller.addError(
+            InfernoException(
+              InfernoErrorCode.invalidState,
+              'generate requires a loaded runtime (currently ${_state.name}).',
+            ),
+          );
+          unawaited(controller.close());
+          return;
+        }
+        started = true;
         _state = _RuntimeState.generating;
-        _nativeSubscription = _backend
+        _generationDone = done;
+        subscription = _backend
             .generate(request)
             .listen(
               controller.add,
@@ -118,12 +137,14 @@ final class Inferno {
               },
               onDone: finish,
             );
+        _nativeSubscription = subscription;
       },
-      onPause: () => _nativeSubscription?.pause(),
-      onResume: () => _nativeSubscription?.resume(),
+      onPause: () => subscription?.pause(),
+      onResume: () => subscription?.resume(),
       onCancel: () async {
+        if (!started) return;
         if (!completed) await _backend.cancel();
-        await _nativeSubscription?.cancel();
+        await subscription?.cancel();
         finish();
       },
     );
@@ -133,6 +154,13 @@ final class Inferno {
   Future<void> cancel() async {
     if (_state != _RuntimeState.generating) return;
     await _backend.cancel();
+  }
+
+  /// Unloads any resident model and releases the backend's native listener
+  /// so the isolate can exit. The runtime must not be used afterwards.
+  Future<void> dispose() async {
+    await unload();
+    _backend.dispose();
   }
 
   static Future<void> _validateModelPath(

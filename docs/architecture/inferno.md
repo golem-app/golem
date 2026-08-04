@@ -33,16 +33,18 @@ are parsed above the engine, including when either marker spans callbacks.
 Token parity is asserted over a checked-in conversation fixture. The recorded
 IDs are produced independently by llama.cpp and MLX Swift from the same
 rendered bytes. Any future deliberate divergence must update the fixture and
-this policy together; a duplicated leading token `2` is a hard failure.
+this policy together; a prompt whose two leading tokens are both the
+tokenizer's BOS is a hard failure.
 
 ## Native callbacks
 
 The C header is the source of truth for threading. Load, generation, and unload
 work run away from the Dart mutator thread. A callback can originate from any
 native worker thread, so Dart uses `NativeCallable.listener` and copies the
-callback bytes before returning. Operation IDs reject stale events. The
-binding closes the callable only after native completion, then releases model
-resources on unload.
+callback bytes before returning. Operation IDs reject stale events, and
+late events free their payloads through the engine library that allocated
+them. The listener deliberately outlives unload/load cycles; `dispose()`
+closes it once the runtime is finished so the isolate can exit.
 
 macOS is a convenient place to develop and compare both shims, but it carries
 no v0 smoke-test obligation.

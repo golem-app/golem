@@ -57,5 +57,5 @@ Future<void> main(List<String> arguments) async {
     }
   }
   stdout.writeln('OUTPUT: $buffer');
-  await inferno.unload();
+  await inferno.dispose();
 }
