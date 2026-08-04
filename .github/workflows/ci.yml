@@ -87,6 +87,9 @@ jobs:
       - name: Resolve workspace
         run: flutter pub get
         working-directory: app
+      - name: App suite with goldens enforced (macOS renders the goldens)
+        run: flutter test
+        working-directory: app
       - name: Mock and probe suites (builds both engine shims via build hooks)
         run: dart test
         working-directory: packages/inferno
