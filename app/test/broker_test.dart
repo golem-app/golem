@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 // The broker test is the one app test allowed to import Inferno: the ticket's
 // mock engine exists exactly to verify broker behavior without native
@@ -172,6 +173,54 @@ void main() {
     expect('<bos>'.allMatches(runtime.request!.prompt), hasLength(1));
     expect(runtime.request!.sampling.stopTokenIds, [1, 106]);
     expect(runtime.request!.sampling.stopSequences, ['<turn|>']);
+  });
+
+  test('a configured seed emits one reproducible INFERNO_PROBE line', () async {
+    final lines = <String>[];
+    final original = debugPrint;
+    debugPrint = (String? message, {int? wrapWidth}) {
+      if (message != null) lines.add(message);
+    };
+    addTearDown(() => debugPrint = original);
+
+    Future<List<String>> probeLines({required int? seed}) async {
+      lines.clear();
+      final repository = InfernoInferenceRepository(
+        _RecordingRuntime(),
+        engine: BrokerEngine.llamaCpp,
+        modelPath: '/local/model',
+        seed: seed,
+      );
+      await repository.prepare();
+      await repository
+          .generate(
+            context: const [
+              {'role': 'user', 'content': 'Hello'},
+            ],
+            reasoningEnabled: true,
+          )
+          .drain<void>();
+      return lines.where((line) => line.startsWith('INFERNO_PROBE')).toList();
+    }
+
+    final first = await probeLines(seed: 7);
+    final second = await probeLines(seed: 7);
+    expect(first, hasLength(1));
+    // The hash covers the raw pre-parser text, so identical streams from two
+    // runs (or two devices) produce byte-identical probe lines.
+    expect(second, first);
+    expect(
+      first.single,
+      matches(
+        RegExp(
+          r'^INFERNO_PROBE engine=llamaCpp seed=7 '
+          r'chars=\d+ fnv1a64=[0-9a-f]{16}$',
+        ),
+      ),
+    );
+
+    // Without a probe seed the line stays out of production logs entirely.
+    expect(await probeLines(seed: null), isEmpty);
   });
 
   test('late thought channel resets a premature answer', () {

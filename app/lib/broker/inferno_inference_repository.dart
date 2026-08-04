@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 
 import '../core/domain/models.dart';
@@ -54,6 +56,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
     final parser = ReasoningStreamParser();
     BrokerRuntimeMetrics? finalMetrics;
     var sawAnswer = false;
+    final probe = seed == null ? null : StringBuffer();
     await for (final event in _runtime.generate(
       BrokerGenerationRequest(
         prompt: Gemma4ChatTemplate.render(
@@ -77,6 +80,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
     )) {
       switch (event) {
         case BrokerTextDelta():
+          probe?.write(event.text);
           for (final domainEvent in _domainEvents(parser.consume(event.text))) {
             if (domainEvent is AnswerDelta) sawAnswer = true;
             if (domainEvent is AnswerResetEvent) sawAnswer = false;
@@ -95,6 +99,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
           );
         case BrokerGenerationCompleted():
           _logMetrics(finalMetrics, event.reason);
+          if (probe != null) _logProbe(probe.toString());
           for (final domainEvent in _domainEvents(parser.finish())) {
             if (domainEvent is AnswerDelta) sawAnswer = true;
             yield domainEvent;
@@ -125,6 +130,34 @@ final class InfernoInferenceRepository implements InferenceRepository {
       ' elapsedSeconds=${metrics.elapsedSeconds.toStringAsFixed(2)}'
       ' peakPhysicalFootprintBytes=${metrics.peakPhysicalFootprintBytes}',
     );
+  }
+
+  /// One greppable line per seeded generation, hashing the raw pre-parser
+  /// text so two devices can be compared for token-identical output without
+  /// shipping the transcript through logs. Only emitted when a fixed seed is
+  /// configured (`GOLEM_SAMPLING_SEED`), i.e. during determinism probes.
+  void _logProbe(String rawText) {
+    debugPrint(
+      'INFERNO_PROBE engine=${engine.name}'
+      ' seed=$seed'
+      ' chars=${rawText.length}'
+      ' fnv1a64=${_fnv1a64(rawText)}',
+    );
+  }
+
+  /// FNV-1a over the UTF-8 bytes, 64-bit, hex — dependency-free and stable
+  /// across platforms; equality is all the probe needs. Rendered as two
+  /// 32-bit halves because Dart's signed ints would otherwise print a
+  /// leading minus for hashes with the top bit set.
+  static String _fnv1a64(String text) {
+    var hash = 0xcbf29ce484222325;
+    for (final byte in utf8.encode(text)) {
+      hash ^= byte;
+      hash = hash * 0x100000001b3;
+    }
+    final high = (hash >>> 32).toRadixString(16).padLeft(8, '0');
+    final low = (hash & 0xffffffff).toRadixString(16).padLeft(8, '0');
+    return '$high$low';
   }
 
   static Iterable<InferenceEvent> _domainEvents(
