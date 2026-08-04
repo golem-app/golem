@@ -28,9 +28,10 @@ else()
   set(GGML_ACCELERATE OFF CACHE BOOL "" FORCE)
 endif()
 
-# Metal is an iPhone bake-off target. macOS stays CPU + Accelerate so package
-# tests do not pay shader compilation cost or hold Metal residency sets.
-if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+# Metal ships on every Apple target — iOS and the macOS desktop app alike —
+# with the shader library embedded in the dylib so no bundle staging exists.
+# Package tests on a Mac therefore exercise the same GPU path the apps run.
+if(APPLE)
   set(GGML_METAL ON CACHE BOOL "" FORCE)
   set(GGML_METAL_EMBED_LIBRARY ON CACHE BOOL "" FORCE)
 else()
@@ -43,7 +44,7 @@ add_library(inferno SHARED ../src/llama_shim.cpp)
 target_compile_features(inferno PRIVATE cxx_std_17)
 target_compile_definitions(inferno PRIVATE
   INFERNO_BUILD_LLAMA=1
-  $<$<STREQUAL:${CMAKE_SYSTEM_NAME},iOS>:INFERNO_USE_METAL=1>
+  $<$<BOOL:${APPLE}>:INFERNO_USE_METAL=1>
 )
 target_include_directories(inferno PRIVATE
   ../include
