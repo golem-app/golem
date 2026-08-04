@@ -1,9 +1,29 @@
 # Golem Flutter
 
-High-fidelity Flutter implementation of Golem. The iOS and Android
-application identifier is `app.golem.flutter`; the display name is
-**Golem Flutter**. It stores its own versioned JSON under its separate
-application-support container.
+High-fidelity Flutter implementation of Golem. The app ships as three
+coexisting build flavors with independent identities, containers, and
+launcher icons:
+
+| Flavor | Display name | Application ID | Icon | Role |
+| --- | --- | --- | --- | --- |
+| `production` | Golem | `app.golem` | Blue | Canonical release flavor |
+| `qa` | Golem QA | `app.golem.qa` | Red | Canonical automation/QA flavor |
+| `dev` | Golem Dev | `app.golem.dev` | Green | Developer iteration flavor |
+
+Select a flavor with the standard workflow — `flutter run --flavor qa`,
+`flutter build apk --release --flavor production`,
+`flutter build ios --simulator --flavor dev` — or omit `--flavor` to get
+`dev` (`default-flavor` in `pubspec.yaml`). Each flavor stores its own
+versioned JSON under its separate application-support container; only the
+launcher icon and identity differ — every in-app asset, theme, and
+behavior is shared. The flavorless legacy identity `app.golem.flutter`
+(**Golem Flutter**) remains reachable only through direct
+`xcodebuild -scheme Runner` builds.
+
+> **Physical iPhone caution:** never install the `production`
+> (`app.golem`) or `dev` (`app.golem.dev`) flavor on the physical iPhone —
+> those identifiers belong to the native app there. Simulator use is
+> unrestricted.
 
 ## Deterministic by default
 
@@ -101,6 +121,16 @@ Building or running with a real inference backend executes the Inferno build
 hooks and requires `flutter config --enable-native-assets` once per machine;
 the default fake-backend workflow does not need it.
 
+`dart run tool/prepare_launcher.dart` derives every flavor's Android
+launcher inputs from the tracked native artwork in `assets/source/`
+(`golem_icon_<flavor>_1024.png`), sampling each adaptive-icon gradient from
+the artwork itself. One `dart run flutter_launcher_icons` invocation then
+generates all three flavors from the `flutter_launcher_icons-<flavor>.yaml`
+configs (their presence makes the tool ignore any pubspec block): the
+`AppIcon-<flavor>.appiconset` catalogs on iOS and the
+`android/app/src/<flavor>/res` source sets on Android. The launch splash is
+deliberately identical for every flavor.
+
 The in-app splash uses mascot-only transparent artwork over a Glacier navy
 (`#0F1524`) surface, without an app-icon tile, frame, or backing panel. The
 native iOS launch screen is the hand-owned, solid-navy
@@ -135,12 +165,15 @@ export GOLEM_SIMULATOR_ID="$(xcrun simctl list devices | awk '/iPhone 17 .*Boote
 test -n "$GOLEM_SIMULATOR_ID"
 
 flutter test integration_test/app_journey_test.dart \
+  --flavor qa \
   --dart-define=GOLEM_STREAM_DELAY_MS=250 \
   -d "$GOLEM_SIMULATOR_ID"
-flutter build ios --simulator
+flutter build ios --simulator --flavor qa
 ```
 
-Install the build over the existing **Flutter** app (never touch `app.golem`):
+QA is the canonical flavor for automated integration and visual testing.
+Every flavor build lands at the same `Runner.app` path, so install each
+flavor right after building it; the three flavors coexist side by side:
 
 ```sh
 xcrun simctl install "$GOLEM_SIMULATOR_ID" build/ios/iphonesimulator/Runner.app

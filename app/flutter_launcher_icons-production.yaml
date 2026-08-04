@@ -1,0 +1,13 @@
+# Golem (production) launcher icons. One `dart run flutter_launcher_icons`
+# invocation processes every flutter_launcher_icons-<flavor>.yaml at once;
+# inputs are produced by tool/prepare_launcher.dart from the tracked native
+# artwork in assets/source/.
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/images/golem_launcher_production.png
+  image_path_ios: assets/source/golem_icon_production_1024.png
+  adaptive_icon_background: assets/images/golem_adaptive_background_production.png
+  adaptive_icon_foreground: assets/images/golem_adaptive_foreground.png
+  remove_alpha_ios: true
+  background_color_ios: "#0F1524"

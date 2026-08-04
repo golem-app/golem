@@ -16,6 +16,12 @@ Only [`app/lib/broker/`](app/lib/broker/) may import `package:inferno`;
 owns Gemma chat templating, reasoning-tag parsing, and stop-token policy —
 engines receive fully rendered prompts and emit raw text.
 
+The app ships as three coexisting build flavors — `production` (**Golem**,
+`app.golem`, blue icon), `qa` (**Golem QA**, `app.golem.qa`, red icon), and
+`dev` (**Golem Dev**, `app.golem.dev`, green icon) — selected with
+`--flavor` (plain commands default to `dev`). QA is the canonical flavor
+for automated testing; see [`app/README.md`](app/README.md).
+
 The simulated backend is the default in every build. A real local runtime
 is opt-in via build configuration:
 
