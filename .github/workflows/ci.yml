@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Flutter app
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: 3.44.8
+          channel: stable
+          cache: true
+      - name: Resolve workspace
+        run: flutter pub get
+        working-directory: app
+      - name: Format
+        run: dart format --output=none --set-exit-if-changed .
+      - name: Import boundary
+        run: dart run tool/check_inferno_imports.dart
+      - name: Analyze
+        run: flutter analyze
+        working-directory: app
+      - name: Test
+        run: flutter test
+        working-directory: app
+
+  inferno:
+    name: Inferno package
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: 3.44.8
+          channel: stable
+          cache: true
+      - name: Resolve workspace
+        run: flutter pub get
+        working-directory: app
+      - name: Analyze
+        run: dart analyze
+        working-directory: packages/inferno
+      - name: Mock and probe suites (builds llama.cpp CPU via build hooks)
+        run: dart test
+        working-directory: packages/inferno
+      - name: Fetch toy GGUF fixtures
+        # The fetch runs in its own assignment so an integrity failure fails
+        # this step instead of being masked by echo's exit code.
+        run: |
+          set -euo pipefail
+          toy_model=$(dart run tool/fetch_toy_model.dart | tail -1)
+          echo "INFERNO_TOY_GGUF=$toy_model" >> "$GITHUB_ENV"
+        working-directory: packages/inferno
+      - name: Native lifecycle, cancellation, and failure suites
+        run: dart test
+        working-directory: packages/inferno
+
+  inferno-apple:
+    # The C ABI is implemented twice; this job compiles the Swift/MLX side
+    # (llama.cpp Metal plus the MLX carrier) so signature drift cannot land
+    # green on a Linux-only pipeline.
+    name: Inferno package (macOS)
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: 3.44.8
+          channel: stable
+          cache: true
+      - name: Resolve workspace
+        run: flutter pub get
+        working-directory: app
+      - name: App suite with goldens enforced (macOS renders the goldens)
+        run: flutter test
+        working-directory: app
+      - name: Mock and probe suites (builds both engine shims via build hooks)
+        run: dart test
+        working-directory: packages/inferno
+      - name: Fetch toy GGUF fixtures
+        run: |
+          set -euo pipefail
+          toy_model=$(dart run tool/fetch_toy_model.dart | tail -1)
+          echo "INFERNO_TOY_GGUF=$toy_model" >> "$GITHUB_ENV"
+        working-directory: packages/inferno
+      - name: Native lifecycle, cancellation, and failure suites
+        run: dart test
+        working-directory: packages/inferno

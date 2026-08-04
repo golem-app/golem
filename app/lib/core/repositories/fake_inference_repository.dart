@@ -8,6 +8,7 @@ final class FakeInferenceRepository implements InferenceRepository {
   FakeInferenceRepository({this.eventDelay = const Duration(milliseconds: 34)});
   final Duration eventDelay;
   bool _prepared = true;
+  int _generationEpoch = 0;
 
   static const _reasoning = <String>[
     'I’ll identify the main idea. ',
@@ -26,7 +27,13 @@ final class FakeInferenceRepository implements InferenceRepository {
   }
 
   @override
-  Future<void> unload() async => _prepared = false;
+  Future<void> unload() async {
+    _generationEpoch++;
+    _prepared = false;
+  }
+
+  @override
+  Future<void> cancel() async => _generationEpoch++;
 
   @override
   Stream<InferenceEvent> generate({
@@ -34,6 +41,7 @@ final class FakeInferenceRepository implements InferenceRepository {
     required bool reasoningEnabled,
   }) async* {
     if (!_prepared) throw StateError('The simulated runtime is unloaded.');
+    final epoch = ++_generationEpoch;
     final prompt = context.lastOrNull?['content'] ?? '';
     if (prompt.contains('[fail]')) {
       if (reasoningEnabled) yield const ReasoningDelta('A partial thought…');
@@ -43,12 +51,20 @@ final class FakeInferenceRepository implements InferenceRepository {
     if (reasoningEnabled) {
       for (final part in _reasoning) {
         await Future<void>.delayed(eventDelay);
+        if (epoch != _generationEpoch) {
+          yield const CompletedEvent();
+          return;
+        }
         yield ReasoningDelta(part);
       }
     }
     var tokens = 0;
     for (final part in _answer) {
       await Future<void>.delayed(eventDelay);
+      if (epoch != _generationEpoch) {
+        yield const CompletedEvent();
+        return;
+      }
       tokens += part.split(RegExp(r'\s+')).length;
       yield AnswerDelta(part);
       yield MetricsEvent(

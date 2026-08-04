@@ -8,6 +8,7 @@ abstract interface class ChatHistoryRepository {
 abstract interface class InferenceRepository {
   Future<void> prepare();
   Future<void> unload();
+  Future<void> cancel();
   Stream<InferenceEvent> generate({
     required List<Map<String, String>> context,
     required bool reasoningEnabled,

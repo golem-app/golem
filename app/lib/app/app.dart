@@ -56,9 +56,9 @@ class _GolemAppState extends State<GolemApp> with WidgetsBindingObserver {
     theme: GolemTheme.theme(
       WidgetsBinding.instance.platformDispatcher.platformBrightness,
     ),
-    // User-facing copy is intentionally hardcoded English, matching the
-    // native app this port mirrors. The Cupertino global delegates are still
-    // required by the framework widgets themselves.
+    // User-facing copy is intentionally hardcoded English. The Cupertino
+    // global delegates are still required by the framework widgets
+    // themselves.
     localizationsDelegates: const [
       GlobalCupertinoLocalizations.delegate,
       GlobalWidgetsLocalizations.delegate,

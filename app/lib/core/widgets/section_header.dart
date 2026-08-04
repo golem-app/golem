@@ -27,8 +27,11 @@ class SectionHeader extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             subtitle!,
-            style: const TextStyle(
-              color: GolemTheme.mutedInk,
+            style: TextStyle(
+              color: CupertinoDynamicColor.resolve(
+                GolemTheme.mutedInk,
+                context,
+              ),
               fontSize: 14,
               height: 1.35,
             ),

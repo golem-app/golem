@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/domain/app_state.dart';
@@ -22,16 +23,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _focus = FocusNode();
   bool _drawerOpen = false;
   bool _showJump = false;
+  // Whether the view follows the streaming tail. Only a deliberate upward
+  // drag detaches it; growing content never does — distance-based detach
+  // made fast responses outrun the animation and stop following mid-answer.
+  bool _follow = true;
 
   @override
   void initState() {
     super.initState();
-    _scroll.addListener(() {
-      final show =
-          _scroll.hasClients &&
-          _scroll.position.maxScrollExtent - _scroll.offset > 240;
-      if (show != _showJump && mounted) setState(() => _showJump = show);
-    });
+    _scroll.addListener(_updateScrollState);
+  }
+
+  /// Recomputed on offset changes and on content growth: while detached, a
+  /// streaming response moves the tail away without any scroll offset
+  /// change, and the jump affordance must still appear.
+  void _updateScrollState() {
+    if (!_scroll.hasClients) return;
+    final distance = _scroll.position.maxScrollExtent - _scroll.offset;
+    if (distance < 48 && !_follow) _follow = true;
+    final show = distance > 240;
+    if (show != _showJump && mounted) setState(() => _showJump = show);
   }
 
   @override
@@ -44,14 +55,38 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _scrollToLatest() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scroll.hasClients) return;
-      _scroll.animateTo(
-        _scroll.position.maxScrollExtent,
+    _follow = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _animateToBottom());
+  }
+
+  Future<void> _animateToBottom() async {
+    // The list's maxScrollExtent is a lazy-layout estimate that grows as
+    // items build, so a single animation can undershoot; chase the extent
+    // until the tail is actually reached (or the user drags away).
+    for (var attempt = 0; attempt < 8; attempt++) {
+      if (!_scroll.hasClients || !_follow) return;
+      final target = _scroll.position.maxScrollExtent;
+      if ((target - _scroll.offset).abs() < 1) return;
+      await _scroll.animateTo(
+        target,
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeOutCubic,
       );
+    }
+  }
+
+  /// Streamed deltas arrive faster than a restarted animation can settle, so
+  /// the tail is followed with a post-frame jump to the fresh extent.
+  void _followTail() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scroll.hasClients || !_follow) return;
+      _scroll.jumpTo(_scroll.position.maxScrollExtent);
     });
+  }
+
+  void _onUserScroll(ScrollDirection direction) {
+    // Offset shrinking means the user is dragging toward older messages.
+    if (direction == ScrollDirection.forward) _follow = false;
   }
 
   @override
@@ -63,9 +98,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final nextValue = next.hasValue ? next.requireValue : null;
       final priorLength = priorValue?.active?.messages.length ?? 0;
       final nextLength = nextValue?.active?.messages.length ?? 0;
-      if (nextLength != priorLength ||
-          nextValue?.generation == GenerationPhase.streaming) {
-        if (!_showJump) _scrollToLatest();
+      if (nextLength != priorLength) {
+        _scrollToLatest();
+      } else if (!_follow) {
+        return;
+      } else if (nextValue?.generation == GenerationPhase.streaming) {
+        _followTail();
+      } else if (priorValue?.generation == GenerationPhase.streaming) {
+        // The last delta can extend the layout after the final jump; settle
+        // flush with the finished answer.
+        _scrollToLatest();
       }
     });
     final chat = ref.watch(chatControllerProvider);
@@ -83,17 +125,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget _buildShell(BuildContext context, ChatState chat) {
     final blocked =
         chat.generation != GenerationPhase.idle || chat.hasUnsavedAssistant;
+    // Canvas, not drawer navy: this is what shows behind the translucent
+    // keyboard in both appearances. The navy drawer backdrop is a fading
+    // layer inside the stack instead, present only while the drawer shows.
     return CupertinoPageScaffold(
-      backgroundColor: GolemTheme.drawer,
+      backgroundColor: GolemTheme.canvas,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // Matches native GolemTheme.Metrics.drawerWidth (330pt) so both
-          // apps leave the same tap-to-dismiss strip of chat visible.
+          // Capped at 330pt so a consistent tap-to-dismiss strip of chat
+          // stays visible on phone widths.
           final drawerWidth = (constraints.maxWidth * 0.9)
               .clamp(0, 330.0)
               .toDouble();
           return Stack(
             children: [
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: _drawerOpen ? 1 : 0,
+                    duration: const Duration(milliseconds: 360),
+                    curve: Curves.easeOutCubic,
+                    child: const ColoredBox(color: GolemTheme.drawer),
+                  ),
+                ),
+              ),
               Positioned.fill(
                 child: ExcludeSemantics(
                   excluding: _drawerOpen,
@@ -171,6 +226,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             focus: _focus,
                             scroll: _scroll,
                             scrollToLatest: _scrollToLatest,
+                            onUserScroll: _onUserScroll,
+                            onScrollMetrics: _updateScrollState,
                             showJump: _showJump,
                           ),
                         ),

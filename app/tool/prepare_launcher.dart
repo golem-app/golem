@@ -15,11 +15,11 @@ import 'package:image/image.dart' as image;
 /// is wider than Apple's real icon mask, so it showed as a dark ring around
 /// the framed artwork on the Home Screen.
 void main() {
-  final source = File('assets/source/golem_icon_native_1024.png');
+  final source = File('assets/source/golem_icon_1024.png');
   final output = File('assets/images/golem_launcher.png');
   final icon = image.decodePng(source.readAsBytesSync());
   if (icon == null || icon.width != 1024 || icon.height != 1024) {
-    throw StateError('Expected the tracked 1024×1024 native Golem icon.');
+    throw StateError('Expected the tracked 1024×1024 Golem icon.');
   }
 
   const exponent = 4.5;

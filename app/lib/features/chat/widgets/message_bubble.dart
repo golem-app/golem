@@ -66,7 +66,12 @@ class MessageBubble extends ConsumerWidget {
                   SelectableText(
                     message.text,
                     style: TextStyle(
-                      color: isUser ? CupertinoColors.white : GolemTheme.ink,
+                      color: isUser
+                          ? CupertinoColors.white
+                          : CupertinoDynamicColor.resolve(
+                              GolemTheme.ink,
+                              context,
+                            ),
                       height: 1.42,
                       fontSize: 16,
                     ),
@@ -238,8 +243,8 @@ class _MetricsPill extends StatelessWidget {
     ),
     child: Text(
       '${live ? 'LIVE · ' : ''}${metrics.decodeTokensPerSecond.toStringAsFixed(1)} tok/s  ·  ${metrics.tokenCount} tokens',
-      style: const TextStyle(
-        color: GolemTheme.accent,
+      style: TextStyle(
+        color: CupertinoDynamicColor.resolve(GolemTheme.accent, context),
         fontSize: 12,
         fontWeight: FontWeight.w600,
       ),

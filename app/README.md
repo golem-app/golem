@@ -1,17 +1,22 @@
 # Golem Flutter
 
-High-fidelity Flutter UI port of native Golem, built for workflow and visual
-evaluation without a model runtime. The iOS and Android application identifier is
-`app.golem.flutter`; the display name is **Golem Flutter**. It installs beside native
-Golem and stores its own versioned JSON under its separate application-support
-container.
+High-fidelity Flutter implementation of Golem. The iOS and Android
+application identifier is `app.golem.flutter`; the display name is
+**Golem Flutter**. It stores its own versioned JSON under its separate
+application-support container.
 
-## Fake-only boundary
+## Deterministic by default
 
-This project contains no HTTP client, Hugging Face integration, USB importer,
-model weights, MLX/TurboFieldfare runtime, or hardware performance measurement.
-Every model transition and generated token is deterministic simulation. Model
-screens say so in the UI. Benchmark exports contain both:
+Every build defaults to the simulated backend: no HTTP client, Hugging Face
+integration, USB importer, bundled model weights, or hardware performance
+measurement. Every model transition and generated token is deterministic
+simulation, and model screens say so in the UI. A real local runtime exists
+behind one explicit opt-in: `lib/broker/` adapts `package:inferno` (see the
+root README) and is selected only by building with
+`--dart-define=GOLEM_INFERENCE_BACKEND=llama|mlx` plus
+`--dart-define=GOLEM_MODEL_PATH=…`. No other app code may import Inferno;
+`../tool/check_inferno_imports.dart` and `test/inferno_import_boundary_test.dart`
+enforce that. Benchmark exports contain both:
 
 ```json
 {
@@ -20,7 +25,7 @@ screens say so in the UI. Benchmark exports contain both:
 }
 ```
 
-The Flutter app never migrates, opens, or otherwise reads native Golem data.
+The Flutter app never migrates, opens, or otherwise reads another app's data.
 
 ## Architecture
 
@@ -30,9 +35,10 @@ and generated Riverpod providers live under `lib/core/`.
 
 - `ChatHistoryRepository`: versioned, atomic JSON persistence plus an in-memory
   test implementation. It is the source of truth for chats and active selection.
-- `InferenceRepository`: prepare, unload, and cancellable streamed events.
-  `FakeInferenceRepository` is the only implementation; reasoning is never copied
-  into later prompt context.
+- `InferenceRepository`: prepare, unload, cancel, and cancellable streamed
+  events. `FakeInferenceRepository` is the default; the broker's
+  `InfernoInferenceRepository` is the opt-in real runtime. Reasoning is never
+  copied into later prompt context.
 - `ModelManagementRepository`: selected backend, MLX download/pause/resume/verify,
   TurboFieldfare import/verify, and runtime state, all persisted simulations.
 - `BenchmarkRepository`: deterministic result generation and JSON export, always
@@ -43,7 +49,7 @@ and generated Riverpod providers live under `lib/core/`.
 
 Riverpod 3.0.3 is pinned because it is the newest stable runtime/generator set that
 resolves with Flutter 3.44.8's pinned analyzer/test packages. Exact transitive
-versions are committed in `pubspec.lock`.
+versions are committed in the workspace lockfile at `../pubspec.lock`.
 
 ## Screens and identifiers
 
@@ -87,7 +93,13 @@ dart run tool/prepare_ios_launch.dart
 dart format --output=none --set-exit-if-changed .
 flutter analyze
 flutter test
+(cd .. && dart run tool/check_inferno_imports.dart)
+(cd ../packages/inferno && dart test)
 ```
+
+Building or running with a real inference backend executes the Inferno build
+hooks and requires `flutter config --enable-native-assets` once per machine;
+the default fake-backend workflow does not need it.
 
 The in-app splash uses mascot-only transparent artwork over a Glacier navy
 (`#0F1524`) surface, without an app-icon tile, frame, or backing panel. The
@@ -99,11 +111,11 @@ Flutter splash. `flutter_native_splash` runs with `ios: false` and
 `tool/prepare_ios_launch.dart` guards the wiring.
 `platform_assets_test.dart` guards the navy image-free storyboard, splash
 alpha, mascot transparency, the Android-only navy-matted launcher icon, and
-the unmodified native artwork used for the iOS icon. Both launcher sources
+the unmodified source artwork used for the iOS icon. Both launcher sources
 derive from the tracked artwork in `assets/source/`.
 
-User-facing copy is intentionally hardcoded English, matching the native app
-this port mirrors; there is no ARB/gen-l10n layer to keep half-wired. If a
+User-facing copy is intentionally hardcoded English; there is no
+ARB/gen-l10n layer to keep half-wired. If a
 second locale ever materializes, reintroduce `l10n.yaml` + `generate: true`
 and migrate the presentation strings then.
 
