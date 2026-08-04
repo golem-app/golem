@@ -144,7 +144,13 @@ int32_t start_worker(inferno_engine *engine, Work work) {
         (void)error;
       } catch (...) {
       }
-      engine->busy.store(false);
+      {
+        // Clearing busy under the mutex keeps the store from slipping
+        // between a waiter's predicate check and its condvar enqueue —
+        // a lost wakeup there costs the waiter the full timeout.
+        std::lock_guard<std::mutex> guard(engine->mutex);
+        engine->busy.store(false);
+      }
       engine->idle.notify_all();
     });
   } catch (...) {

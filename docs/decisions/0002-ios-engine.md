@@ -33,12 +33,18 @@ evictable under pressure; MLX's buffers are resident allocations.
 elapsed/TTFT clock only after `MLXLMCommon.generate` returned (post-prefill),
 while the llama shim starts before prefill, so the per-engine windows are not
 strictly comparable; the shim has since been aligned to start before the
-call. TTFT also remains defined differently per engine (llama: decode start →
-first token; MLX: operation start → first chunk). Neither skew is large
-enough to change the conclusion — decode rates are library-reported and
-within ~5% — but re-record before citing these numbers beyond this
-decision.
+call. TTFT has since been aligned as well (both engines now report decode
+start → first token; MLX subtracts its library-reported prompt time), but
+the recorded MLX TTFT values predate that alignment and include prefill.
+Neither skew is large enough to change the conclusion — decode rates are
+library-reported and within ~5% — but re-record before citing these
+numbers beyond this decision.
 
+
+The ticket's acceptance baseline for MLX on this model class and device
+tier: 18–22 tok/s decode, 60–360 tok/s warm prompt, ~4.2 GB peak
+footprint. The match-or-beat rule below is evaluated against these
+numbers.
 
 Both engines produced coherent, correct answers on all prompts, with
 near-identical phrasing — a qualitative echo of the token-level parity

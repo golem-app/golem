@@ -74,12 +74,19 @@ abstract final class Gemma4ChatTemplate {
   ];
 
   /// Pasted content must not be able to close the current turn or open a new
-  /// one, so every control marker is stripped before rendering.
+  /// one, so every control marker is stripped before rendering. Stripping
+  /// runs to a fixpoint: removing an inner marker can splice its neighbours
+  /// into a live one (`<|turn<turn|>>` → `<|turn>`), so one pass is not
+  /// enough.
   static String sanitize(String text) {
     var cleaned = text;
-    for (final marker in _controlMarkers) {
-      cleaned = cleaned.replaceAll(marker, '');
-    }
+    String previous;
+    do {
+      previous = cleaned;
+      for (final marker in _controlMarkers) {
+        cleaned = cleaned.replaceAll(marker, '');
+      }
+    } while (cleaned != previous);
     return cleaned;
   }
 

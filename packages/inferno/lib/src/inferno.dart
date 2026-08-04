@@ -159,8 +159,13 @@ final class Inferno {
   /// Unloads any resident model and releases the backend's native listener
   /// so the isolate can exit. The runtime must not be used afterwards.
   Future<void> dispose() async {
-    await unload();
-    _backend.dispose();
+    try {
+      await unload();
+    } finally {
+      // The listener must be released even when the unload fails, or the
+      // leak dispose() exists to prevent survives exactly the error path.
+      _backend.dispose();
+    }
   }
 
   static Future<void> _validateModelPath(

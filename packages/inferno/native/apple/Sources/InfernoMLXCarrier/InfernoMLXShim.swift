@@ -79,7 +79,6 @@ private final class InfernoMlxEngine: @unchecked Sendable {
     private let condition = NSCondition()
     private var busy = false
     private var operation: Task<Void, Never>?
-    private var generationTask: Task<Void, Never>?
     private var model: ModelContainer?
 
     func start(
@@ -111,7 +110,6 @@ private final class InfernoMlxEngine: @unchecked Sendable {
         condition.lock()
         busy = false
         operation = nil
-        generationTask = nil
         condition.broadcast()
         condition.unlock()
     }
@@ -119,15 +117,17 @@ private final class InfernoMlxEngine: @unchecked Sendable {
     func cancel() {
         condition.lock()
         let activeOperation = operation
-        let activeGeneration = generationTask
         condition.unlock()
-        activeGeneration?.cancel()
         activeOperation?.cancel()
     }
 
-    func setGenerationTask(_ task: Task<Void, Never>?) {
+    /// Blocks until the current operation task has fully unwound. Task
+    /// cancellation is cooperative, so destroy must wait here — the caller
+    /// frees the event trampoline right after, and a straggling task would
+    /// otherwise call into freed memory.
+    func awaitIdle() {
         condition.lock()
-        generationTask = task
+        while busy { condition.wait() }
         condition.unlock()
     }
 
@@ -510,10 +510,14 @@ public func infernoMlxEngineGenerate(
                 let decodeSeconds = completion?.generateTime ?? 0
                 let generatedCount = completion?.generationTokenCount
                     ?? generatedChunkCount
+                // TTFT matches the llama shim's window (decode start →
+                // first token): the wall clock to the first chunk includes
+                // prefill, so the library-reported prompt time comes off.
                 let firstTokenSeconds: Double? = firstTokenAt.map { first in
                     let duration = started.duration(to: first).components
-                    return Double(duration.seconds)
+                    let wallClock = Double(duration.seconds)
                         + Double(duration.attoseconds) / 1_000_000_000_000_000_000
+                    return max(0, wallClock - promptSeconds)
                 }
                 sink.emitJSON(EventKind.metrics, [
                     "decodeTokensPerSecond": decodeSeconds > 0
@@ -570,7 +574,9 @@ public func infernoMlxEngineDestroy(
 ) {
     guard let rawEngine else { return }
     let retained = Unmanaged<InfernoMlxEngine>.fromOpaque(rawEngine)
-    retained.takeUnretainedValue().cancel()
+    let engine = retained.takeUnretainedValue()
+    engine.cancel()
+    engine.awaitIdle()
     retained.release()
 }
 

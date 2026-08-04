@@ -588,9 +588,31 @@ final class NativeInfernoBackend implements InfernoBackend {
   @override
   void dispose() {
     if (_engine != nullptr) {
+      // destroy() blocks until the engine's operation worker has finished,
+      // so no native code can call the trampoline after this returns.
       _activeApi?.destroy(_engine);
       _engine = nullptr;
       _activeApi = null;
+    }
+    // Whatever was still in flight can no longer complete once the
+    // listener closes; fail it now instead of leaving callers wedged.
+    final pending = List.of(_operations.values);
+    _operations.clear();
+    const failure = InfernoException(
+      InfernoErrorCode.invalidState,
+      'The native backend was disposed.',
+    );
+    for (final operation in pending) {
+      switch (operation) {
+        case _PendingFuture():
+          operation.completer.completeError(failure);
+        case _PendingTokens():
+          operation.completer.completeError(failure);
+        case _PendingGeneration():
+          operation.closeText();
+          operation.controller.addError(failure);
+          unawaited(operation.controller.close());
+      }
     }
     _callback.close();
   }
