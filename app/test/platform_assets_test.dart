@@ -232,6 +232,141 @@ void main() {
     expect(plist, contains(r'<string>$(GOLEM_DISPLAY_NAME)</string>'));
   });
 
+  test('macOS build configurations map every flavor identity', () async {
+    final project = await File(
+      'macos/Runner.xcodeproj/project.pbxproj',
+    ).readAsString();
+    for (final flavor in _flavors) {
+      final name = flavor.identity.name;
+      for (final mode in ['Debug', 'Release', 'Profile']) {
+        expect(project, contains('name = "$mode-$name";'));
+      }
+      expect(
+        project,
+        contains(
+          'PRODUCT_BUNDLE_IDENTIFIER = ${flavor.identity.applicationId};',
+        ),
+      );
+      expect(
+        project,
+        contains('ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-$name";'),
+      );
+      expect(project, contains(flavor.displaySetting));
+
+      final scheme = await File(
+        'macos/Runner.xcodeproj/xcshareddata/xcschemes/$name.xcscheme',
+      ).readAsString();
+      expect(scheme, contains('buildConfiguration = "Debug-$name"'));
+      expect(scheme, contains('buildConfiguration = "Profile-$name"'));
+      expect(scheme, contains('buildConfiguration = "Release-$name"'));
+      expect(scheme, contains('macos_assemble.sh prepare'));
+    }
+
+    // The MLX Swift package declares macOS 14 and Apple silicon only; the
+    // Runner must never fall below that or build an x86_64 slice.
+    expect(project, contains('MACOSX_DEPLOYMENT_TARGET = 14.0;'));
+    expect(project, isNot(contains('MACOSX_DEPLOYMENT_TARGET = 10.15;')));
+    expect(project, contains('ARCHS = arm64;'));
+
+    // The staging phase feeds the MLX shader/tokenizer bundles into the app;
+    // without it MLX fails to resolve default.metallib at runtime.
+    expect(project, contains('/* Stage Inferno Apple Resources */'));
+    expect(
+      project,
+      contains(
+        'shellScript = '
+        '"\\"\${SRCROOT}/Flutter/stage_inferno_apple_resources.sh\\"\\n";',
+      ),
+    );
+    expect(
+      File('macos/Flutter/stage_inferno_apple_resources.sh').existsSync(),
+      isTrue,
+    );
+
+    // The flavorless legacy identity lives in AppInfo.xcconfig and stays for
+    // RunnerTests and direct xcodebuild use; the shared Info.plist resolves
+    // both name keys through the per-configuration variable.
+    expect(
+      await File('macos/Runner/Configs/AppInfo.xcconfig').readAsString(),
+      contains(
+        'PRODUCT_BUNDLE_IDENTIFIER = ${AppIdentity.flutter.applicationId}',
+      ),
+    );
+    expect(
+      project,
+      contains('GOLEM_DISPLAY_NAME = "${AppIdentity.flutter.displayName}";'),
+    );
+    final plist = await File('macos/Runner/Info.plist').readAsString();
+    expect(
+      RegExp(
+        r'<string>\$\(GOLEM_DISPLAY_NAME\)</string>',
+      ).allMatches(plist).length,
+      2,
+      reason: 'CFBundleDisplayName and CFBundleName both resolve the variable',
+    );
+  });
+
+  test('the macOS app sandbox is deliberately disabled', () async {
+    // A development target must read model files from arbitrary local paths;
+    // distribution hardening re-enables this later, deliberately.
+    for (final file in ['DebugProfile', 'Release']) {
+      final entitlements = await File(
+        'macos/Runner/$file.entitlements',
+      ).readAsString();
+      expect(
+        entitlements,
+        contains('<key>com.apple.security.app-sandbox</key>\n\t<false/>'),
+        reason: '$file.entitlements',
+      );
+    }
+  });
+
+  test(
+    'the macOS window opens iPad-shaped, resizable, with a minimum',
+    () async {
+      final window = await File(
+        'macos/Runner/MainFlutterWindow.swift',
+      ).readAsString();
+      expect(window, contains('NSSize(width: 834, height: 1194)'));
+      expect(window, contains('minimumContentSize'));
+      expect(window, contains('setFrameAutosaveName'));
+    },
+  );
+
+  test('macOS Dock iconsets carry the flavor artwork with Apple margins', () {
+    final catalogs = [
+      for (final flavor in _flavors)
+        (flavor: flavor, name: 'AppIcon-${flavor.identity.name}'),
+      // The flavorless catalog keeps real Golem artwork (production hue).
+      (flavor: _flavors.first, name: 'AppIcon'),
+    ];
+    for (final entry in catalogs) {
+      final path = 'macos/Runner/Assets.xcassets/${entry.name}.appiconset';
+      final icon = image.decodePng(
+        File('$path/app_icon_1024.png').readAsBytesSync(),
+      )!;
+      expect(icon.width, 1024);
+
+      // Transparent Apple margin outside the rounded square...
+      for (final corner in [
+        icon.getPixel(0, 0),
+        icon.getPixel(1023, 0),
+        icon.getPixel(0, 1023),
+        icon.getPixel(1023, 1023),
+        icon.getPixel(512, 40),
+      ]) {
+        expect(corner.a, 0);
+      }
+      // ...opaque artwork inside it, with the flavor hue leading.
+      expect(icon.getPixel(512, 512).a, 255);
+      _expectDominantChannel(icon.getPixel(512, 860), entry.flavor.dominant);
+      expect(
+        File('$path/Contents.json').readAsStringSync(),
+        contains('"filename" : "app_icon_512.png"'),
+      );
+    }
+  });
+
   test('plain flutter commands default to the dev flavor', () async {
     final pubspec = await File('pubspec.yaml').readAsString();
     expect(pubspec, contains('default-flavor: dev'));
