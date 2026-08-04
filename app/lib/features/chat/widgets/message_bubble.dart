@@ -243,8 +243,8 @@ class _MetricsPill extends StatelessWidget {
     ),
     child: Text(
       '${live ? 'LIVE · ' : ''}${metrics.decodeTokensPerSecond.toStringAsFixed(1)} tok/s  ·  ${metrics.tokenCount} tokens',
-      style: const TextStyle(
-        color: GolemTheme.accent,
+      style: TextStyle(
+        color: CupertinoDynamicColor.resolve(GolemTheme.accent, context),
         fontSize: 12,
         fontWeight: FontWeight.w600,
       ),

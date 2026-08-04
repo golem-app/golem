@@ -19,7 +19,9 @@ class LabeledRow extends StatelessWidget {
         child: Text(
           value,
           textAlign: TextAlign.right,
-          style: const TextStyle(color: GolemTheme.mutedInk),
+          style: TextStyle(
+            color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
+          ),
         ),
       ),
     ],

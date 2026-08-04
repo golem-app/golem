@@ -31,13 +31,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _scroll.addListener(() {
-      if (!_scroll.hasClients) return;
-      final distance = _scroll.position.maxScrollExtent - _scroll.offset;
-      if (distance < 48 && !_follow) _follow = true;
-      final show = distance > 240;
-      if (show != _showJump && mounted) setState(() => _showJump = show);
-    });
+    _scroll.addListener(_updateScrollState);
+  }
+
+  /// Recomputed on offset changes and on content growth: while detached, a
+  /// streaming response moves the tail away without any scroll offset
+  /// change, and the jump affordance must still appear.
+  void _updateScrollState() {
+    if (!_scroll.hasClients) return;
+    final distance = _scroll.position.maxScrollExtent - _scroll.offset;
+    if (distance < 48 && !_follow) _follow = true;
+    final show = distance > 240;
+    if (show != _showJump && mounted) setState(() => _showJump = show);
   }
 
   @override
@@ -127,8 +132,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       backgroundColor: GolemTheme.canvas,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // Matches native GolemTheme.Metrics.drawerWidth (330pt) so both
-          // apps leave the same tap-to-dismiss strip of chat visible.
+          // Capped at 330pt so a consistent tap-to-dismiss strip of chat
+          // stays visible on phone widths.
           final drawerWidth = (constraints.maxWidth * 0.9)
               .clamp(0, 330.0)
               .toDouble();
@@ -222,6 +227,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             scroll: _scroll,
                             scrollToLatest: _scrollToLatest,
                             onUserScroll: _onUserScroll,
+                            onScrollMetrics: _updateScrollState,
                             showJump: _showJump,
                           ),
                         ),
