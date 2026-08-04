@@ -46,6 +46,16 @@ void _expectDominantChannel(image.Pixel pixel, String channel) {
 }
 
 void main() {
+  test('every shipped flavor identity is covered by these assertions', () {
+    // AppIdentity also carries the flavorless legacy identity, which owns no
+    // flavor resources — hence its exclusion. A new enum member must either
+    // join _flavors or be exempted here deliberately.
+    expect(
+      _flavors.map((flavor) => flavor.identity).toSet(),
+      AppIdentity.values.toSet().difference({AppIdentity.flutter}),
+    );
+  });
+
   test(
     'native launch screen is a solid navy storyboard with no image',
     () async {
