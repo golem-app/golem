@@ -20,6 +20,11 @@ output text (chat template, sampling parameters `temperature: 1`,
 equality is the meaningful cross-device signal; token-level identity is not
 measured directly).
 
+The probe is a deliberate measurement instrument, not routine automation:
+run it against a freshly installed container (real model-load timing and
+persisted conversations add exactly the environmental variance that the
+fake-backend automation discipline exists to avoid), and keep it out of CI.
+
 Both runs used the `qa` flavor and the pinned Gemma 4 E2B artifacts from
 `packages/inferno/lib/src/model_manifest.dart` (GGUF Q4_K_XL for llama.cpp,
 4-bit MLX directory for MLX). The macOS llama build runs Metal
