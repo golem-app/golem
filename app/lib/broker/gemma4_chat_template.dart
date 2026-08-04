@@ -28,7 +28,7 @@ abstract final class Gemma4ChatTemplate {
       );
       if (reasoningEnabled) output.write('$thoughtControl\n');
       if (hasSystem) {
-        output.write(_content(messages.first));
+        output.write(sanitize(_content(messages.first)));
         start = 1;
       }
       output.write('$turnEnd\n');
@@ -44,12 +44,16 @@ abstract final class Gemma4ChatTemplate {
           'must be user or assistant after the optional leading system turn',
         ),
       };
+      // Model turns lose their reasoning channels before sanitizing, so the
+      // markers are still present to delimit what gets removed.
       output
         ..write('$turnStart$role\n')
         ..write(
-          role == 'model'
-              ? stripReasoningChannels(_content(message))
-              : _content(message),
+          sanitize(
+            role == 'model'
+                ? stripReasoningChannels(_content(message))
+                : _content(message),
+          ),
         )
         ..write('$turnEnd\n');
     }
@@ -58,6 +62,25 @@ abstract final class Gemma4ChatTemplate {
       'model\n',
     );
     return output.toString();
+  }
+
+  static const _controlMarkers = [
+    bos,
+    turnStart,
+    turnEnd,
+    thoughtControl,
+    ReasoningStreamParser.channelStart,
+    ReasoningStreamParser.channelEnd,
+  ];
+
+  /// Pasted content must not be able to close the current turn or open a new
+  /// one, so every control marker is stripped before rendering.
+  static String sanitize(String text) {
+    var cleaned = text;
+    for (final marker in _controlMarkers) {
+      cleaned = cleaned.replaceAll(marker, '');
+    }
+    return cleaned;
   }
 
   static String _content(Map<String, String> message) =>

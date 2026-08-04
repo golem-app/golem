@@ -18,12 +18,21 @@ final class InfernoInferenceRepository implements InferenceRepository {
   final String modelPath;
   final int? seed;
   bool _loaded = false;
+  Future<void>? _preparing;
 
   @override
-  Future<void> prepare() async {
-    if (_loaded) return;
-    await _runtime.load(engine: engine, modelPath: modelPath);
-    _loaded = true;
+  Future<void> prepare() {
+    if (_loaded) return Future.value();
+    // Loading takes seconds; a second caller must join the load in flight
+    // rather than trip the runtime's single-operation lifecycle.
+    return _preparing ??= () async {
+      try {
+        await _runtime.load(engine: engine, modelPath: modelPath);
+        _loaded = true;
+      } finally {
+        _preparing = null;
+      }
+    }();
   }
 
   @override
@@ -44,6 +53,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
     if (!_loaded) throw StateError('Inferno is not loaded.');
     final parser = ReasoningStreamParser();
     BrokerRuntimeMetrics? finalMetrics;
+    var sawAnswer = false;
     await for (final event in _runtime.generate(
       BrokerGenerationRequest(
         prompt: Gemma4ChatTemplate.render(
@@ -51,7 +61,9 @@ final class InfernoInferenceRepository implements InferenceRepository {
           reasoningEnabled: reasoningEnabled,
         ),
         sampling: BrokerSamplingParameters(
-          maxTokens: 512,
+          // Roomy enough that reasoning cannot silently starve the visible
+          // answer; a budget stop is still surfaced below, never swallowed.
+          maxTokens: 2048,
           temperature: 1,
           topP: 0.95,
           seed: seed,
@@ -66,6 +78,8 @@ final class InfernoInferenceRepository implements InferenceRepository {
       switch (event) {
         case BrokerTextDelta():
           for (final domainEvent in _domainEvents(parser.consume(event.text))) {
+            if (domainEvent is AnswerDelta) sawAnswer = true;
+            if (domainEvent is AnswerResetEvent) sawAnswer = false;
             yield domainEvent;
           }
         case BrokerMetricsDelta():
@@ -80,9 +94,16 @@ final class InfernoInferenceRepository implements InferenceRepository {
             ),
           );
         case BrokerGenerationCompleted():
-          _logMetrics(finalMetrics);
+          _logMetrics(finalMetrics, event.reason);
           for (final domainEvent in _domainEvents(parser.finish())) {
+            if (domainEvent is AnswerDelta) sawAnswer = true;
             yield domainEvent;
+          }
+          if (event.reason == BrokerStopReason.maxTokens && !sawAnswer) {
+            throw const BrokerRuntimeException(
+              'The response used its whole token budget before reaching an '
+              'answer. Try again, or turn reasoning off.',
+            );
           }
           yield const CompletedEvent();
       }
@@ -91,10 +112,11 @@ final class InfernoInferenceRepository implements InferenceRepository {
 
   /// One greppable line per completed generation; this is the capture channel
   /// for on-device measurement (the app contract carries only core metrics).
-  void _logMetrics(BrokerRuntimeMetrics? metrics) {
+  void _logMetrics(BrokerRuntimeMetrics? metrics, BrokerStopReason reason) {
     if (metrics == null) return;
     debugPrint(
       'INFERNO_METRICS engine=${engine.name}'
+      ' stopReason=${reason.name}'
       ' decodeTokensPerSecond=${metrics.decodeTokensPerSecond.toStringAsFixed(2)}'
       ' promptTokensPerSecond=${metrics.promptTokensPerSecond.toStringAsFixed(2)}'
       ' generatedTokenCount=${metrics.generatedTokenCount}'

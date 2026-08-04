@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../core/repositories/contracts.dart';
 import '../core/repositories/fake_inference_repository.dart';
 import 'inferno_inference_repository.dart';
@@ -8,15 +10,32 @@ import 'runtime.dart';
 InferenceRepository createConfiguredInferenceRepository({
   required Duration fakeStreamDelay,
   required String documentsDirectory,
-}) {
-  const backend = String.fromEnvironment(
+}) => selectInferenceRepository(
+  backend: const String.fromEnvironment(
     'GOLEM_INFERENCE_BACKEND',
     defaultValue: 'fake',
-  );
+  ),
+  modelPath: const String.fromEnvironment('GOLEM_MODEL_PATH'),
+  fakeStreamDelay: fakeStreamDelay,
+  documentsDirectory: documentsDirectory,
+  createRuntime: InfernoRuntimeAdapter.native,
+);
+
+/// The dart-define values arrive as compile-time constants, so the selection
+/// logic takes them as parameters to stay reachable from tests.
+@visibleForTesting
+InferenceRepository selectInferenceRepository({
+  required String backend,
+  required String modelPath,
+  required Duration fakeStreamDelay,
+  required String documentsDirectory,
+  required BrokerRuntime Function() createRuntime,
+}) {
   if (backend == 'fake') {
     return FakeInferenceRepository(eventDelay: fakeStreamDelay);
   }
-  const modelPath = String.fromEnvironment('GOLEM_MODEL_PATH');
+  // A misconfigured build must fail at launch, loudly; there is no UI state
+  // that could make a typo'd dart-define recoverable at runtime.
   if (modelPath.isEmpty) {
     throw StateError(
       'GOLEM_MODEL_PATH is required for the $backend inference backend.',
@@ -33,7 +52,7 @@ InferenceRepository createConfiguredInferenceRepository({
     ),
   };
   return InfernoInferenceRepository(
-    InfernoRuntimeAdapter.native(),
+    createRuntime(),
     engine: engine,
     modelPath: resolvedModelPath,
   );

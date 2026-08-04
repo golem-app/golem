@@ -66,8 +66,30 @@ final class BrokerMetricsDelta extends BrokerRuntimeEvent {
   final BrokerRuntimeMetrics metrics;
 }
 
+enum BrokerStopReason {
+  endOfSequence,
+  stopSequence,
+  stopToken,
+  maxTokens,
+  cancelled,
+}
+
 final class BrokerGenerationCompleted extends BrokerRuntimeEvent {
-  const BrokerGenerationCompleted();
+  const BrokerGenerationCompleted(this.reason);
+
+  final BrokerStopReason reason;
+}
+
+/// A runtime failure with user-presentable text; `toString` is the message
+/// so the recovery banner never shows a package exception verbatim.
+final class BrokerRuntimeException implements Exception {
+  const BrokerRuntimeException(this.message, {this.cause});
+
+  final String message;
+  final Object? cause;
+
+  @override
+  String toString() => message;
 }
 
 abstract interface class BrokerRuntime {
@@ -90,23 +112,25 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
   Future<void> load({
     required BrokerEngine engine,
     required String modelPath,
-  }) => _inferno.load(
-    engine: switch (engine) {
-      BrokerEngine.llamaCpp => InfernoEngineKind.llamaCpp,
-      BrokerEngine.mlx => InfernoEngineKind.mlx,
-    },
-    modelPath: modelPath,
+  }) => _translating(
+    () => _inferno.load(
+      engine: switch (engine) {
+        BrokerEngine.llamaCpp => InfernoEngineKind.llamaCpp,
+        BrokerEngine.mlx => InfernoEngineKind.mlx,
+      },
+      modelPath: modelPath,
+    ),
   );
 
   @override
-  Future<void> unload() => _inferno.unload();
+  Future<void> unload() => _translating(_inferno.unload);
 
   @override
-  Future<void> cancel() => _inferno.cancel();
+  Future<void> cancel() => _translating(_inferno.cancel);
 
   @override
   Stream<BrokerRuntimeEvent> generate(BrokerGenerationRequest request) async* {
-    await for (final event in _inferno.generate(
+    final events = _inferno.generate(
       InfernoGenerationRequest(
         prompt: request.prompt,
         sampling: InfernoSamplingParameters(
@@ -118,26 +142,62 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
           stopTokenIds: request.sampling.stopTokenIds,
         ),
       ),
-    )) {
-      switch (event) {
-        case InfernoTextDelta():
-          yield BrokerTextDelta(event.text);
-        case InfernoMetricsEvent():
-          final metrics = event.metrics;
-          yield BrokerMetricsDelta(
-            BrokerRuntimeMetrics(
-              decodeTokensPerSecond: metrics.decodeTokensPerSecond,
-              promptTokensPerSecond: metrics.promptTokensPerSecond,
-              generatedTokenCount: metrics.generatedTokenCount,
-              elapsedSeconds: metrics.elapsedSeconds,
-              promptTokenCount: metrics.promptTokenCount,
-              timeToFirstTokenSeconds: metrics.timeToFirstTokenSeconds,
-              peakPhysicalFootprintBytes: metrics.peakPhysicalFootprintBytes,
-            ),
-          );
-        case InfernoGenerationCompleted():
-          yield const BrokerGenerationCompleted();
+    );
+    try {
+      await for (final event in events) {
+        switch (event) {
+          case InfernoTextDelta():
+            yield BrokerTextDelta(event.text);
+          case InfernoMetricsEvent():
+            final metrics = event.metrics;
+            yield BrokerMetricsDelta(
+              BrokerRuntimeMetrics(
+                decodeTokensPerSecond: metrics.decodeTokensPerSecond,
+                promptTokensPerSecond: metrics.promptTokensPerSecond,
+                generatedTokenCount: metrics.generatedTokenCount,
+                elapsedSeconds: metrics.elapsedSeconds,
+                promptTokenCount: metrics.promptTokenCount,
+                timeToFirstTokenSeconds: metrics.timeToFirstTokenSeconds,
+                peakPhysicalFootprintBytes: metrics.peakPhysicalFootprintBytes,
+              ),
+            );
+          case InfernoGenerationCompleted():
+            yield BrokerGenerationCompleted(switch (event.reason) {
+              InfernoStopReason.endOfSequence => BrokerStopReason.endOfSequence,
+              InfernoStopReason.stopSequence => BrokerStopReason.stopSequence,
+              InfernoStopReason.stopToken => BrokerStopReason.stopToken,
+              InfernoStopReason.maxTokens => BrokerStopReason.maxTokens,
+              InfernoStopReason.cancelled => BrokerStopReason.cancelled,
+            });
+        }
       }
+    } on InfernoException catch (error) {
+      throw _translated(error);
     }
   }
+
+  static Future<T> _translating<T>(Future<T> Function() operation) async {
+    try {
+      return await operation();
+    } on InfernoException catch (error) {
+      throw _translated(error);
+    }
+  }
+
+  static BrokerRuntimeException _translated(InfernoException error) =>
+      BrokerRuntimeException(switch (error.code) {
+        InfernoErrorCode.invalidModelPath =>
+          'The model file could not be found on this device.',
+        InfernoErrorCode.corruptModel || InfernoErrorCode.incompatibleModel =>
+          'The model on this device is damaged or not compatible '
+              'with this build.',
+        InfernoErrorCode.loadFailed => 'The model could not be loaded.',
+        InfernoErrorCode.generationFailed =>
+          'The local engine failed while generating a response.',
+        InfernoErrorCode.cancelled => 'Generation was cancelled.',
+        InfernoErrorCode.nativeUnavailable ||
+        InfernoErrorCode.invalidState ||
+        InfernoErrorCode.internal =>
+          'The local inference runtime hit an internal error.',
+      }, cause: error);
 }
