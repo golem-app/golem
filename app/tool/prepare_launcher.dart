@@ -3,25 +3,36 @@ import 'dart:math' as math;
 
 import 'package:image/image.dart' as image;
 
-/// Produces the ANDROID launcher source from the tracked copy of the native
-/// production icon (assets/source/), flattening the pixels outside a slightly
-/// inset superellipse to Glacier navy so the square legacy-launcher tile has
-/// no white corners.
+/// Produces the ANDROID launcher sources for every build flavor from the
+/// tracked copies of the native icons (assets/source/), flattening the pixels
+/// outside a slightly inset superellipse to Glacier navy so the square
+/// legacy-launcher tiles have no white corners.
 ///
 /// iOS deliberately ships the unmodified native artwork instead
-/// (`image_path_ios` in pubspec.yaml): frame-by-frame recording of the
-/// iOS 26 launch zoom confirmed the solid-navy launch storyboard — not icon
-/// matting — is what prevents the historical white flash, and the navy matte
-/// is wider than Apple's real icon mask, so it showed as a dark ring around
-/// the framed artwork on the Home Screen.
+/// (`image_path_ios` in the `flutter_launcher_icons-<flavor>.yaml` files):
+/// frame-by-frame recording of the iOS 26 launch zoom confirmed the
+/// solid-navy launch storyboard — not icon matting — is what prevents the
+/// historical white flash, and the navy matte is wider than Apple's real icon
+/// mask, so it showed as a dark ring around the framed artwork on the Home
+/// Screen.
+const flavors = ['production', 'qa', 'dev'];
+
 void main() {
-  final source = File('assets/source/golem_icon_1024.png');
-  final output = File('assets/images/golem_launcher.png');
-  final icon = image.decodePng(source.readAsBytesSync());
-  if (icon == null || icon.width != 1024 || icon.height != 1024) {
-    throw StateError('Expected the tracked 1024×1024 Golem icon.');
+  for (final flavor in flavors) {
+    final source = File('assets/source/golem_icon_${flavor}_1024.png');
+    final icon = image.decodePng(source.readAsBytesSync());
+    if (icon == null || icon.width != 1024 || icon.height != 1024) {
+      throw StateError('Expected the tracked 1024×1024 $flavor Golem icon.');
+    }
+    _writeAdaptiveBackground(flavor, icon);
+    _writeMattedLauncher(flavor, icon);
   }
 
+  _writeAndroid12Splash();
+  _writeAdaptiveForeground();
+}
+
+void _writeMattedLauncher(String flavor, image.Image icon) {
   const exponent = 4.5;
   const matteInset = 12.0;
   const navy = (r: 15, g: 21, b: 36);
@@ -41,11 +52,9 @@ void main() {
     }
   }
 
-  output.writeAsBytesSync(image.encodePng(icon, level: 9));
-
-  _writeAndroid12Splash();
-  _writeAdaptiveForeground();
-  _writeAdaptiveBackground();
+  File(
+    'assets/images/golem_launcher_$flavor.png',
+  ).writeAsBytesSync(image.encodePng(icon, level: 9));
 }
 
 /// Android 12+ always reserves a centered icon slot on its system splash and
@@ -65,7 +74,8 @@ void _writeAndroid12Splash() {
 /// ~61% safe-zone guarantee for a bolder icon, accepting that spec-strict
 /// launcher masks may clip a couple of dp of the rounded head and feet tips
 /// (see the sizing comment below). The native icon's frame is deliberately
-/// absent — frames do not survive Android's adaptive masks.
+/// absent — frames do not survive Android's adaptive masks. The mascot is
+/// shared by every flavor; only the gradient background differs.
 void _writeAdaptiveForeground() {
   final mascot = image.decodePng(
     File('assets/images/golem_mascot.png').readAsBytesSync(),
@@ -101,11 +111,14 @@ void _writeAdaptiveForeground() {
   ).writeAsBytesSync(image.encodePng(canvas, level: 9));
 }
 
-/// Adaptive-icon background: the native icon's vertical blue gradient,
-/// sampled from inside its frame.
-void _writeAdaptiveBackground() {
-  const top = (r: 0x15, g: 0x71, b: 0xEA);
-  const bottom = (r: 0x0F, g: 0x4C, b: 0xD3);
+/// Adaptive-icon background: the flavor icon's vertical gradient, sampled
+/// from the artwork itself so each flavor keeps its native hue without a
+/// hand-maintained palette. The sample column is the icon's center; the
+/// sample rows sit inside the frame border yet clear of the mascot in all
+/// three sources.
+void _writeAdaptiveBackground(String flavor, image.Image icon) {
+  final top = icon.getPixel(512, 96);
+  final bottom = icon.getPixel(512, 928);
   const size = 1024;
   final canvas = image.Image(width: size, height: size);
   for (var y = 0; y < size; y++) {
@@ -118,6 +131,6 @@ void _writeAdaptiveBackground() {
     }
   }
   File(
-    'assets/images/golem_adaptive_background.png',
+    'assets/images/golem_adaptive_background_$flavor.png',
   ).writeAsBytesSync(image.encodePng(canvas, level: 9));
 }
