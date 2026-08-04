@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show SelectableText;
 import 'package:flutter/services.dart';
@@ -28,7 +30,9 @@ class MessageBubble extends ConsumerWidget {
           onLongPress: () => _showActions(context, ref),
           child: Container(
             constraints: BoxConstraints(
-              maxWidth: MediaQuery.sizeOf(context).width * 0.82,
+              // Proportional on phones; capped at a readable measure so a
+              // wide desktop window never stretches a bubble into one line.
+              maxWidth: math.min(MediaQuery.sizeOf(context).width * 0.82, 640),
             ),
             margin: const EdgeInsets.only(bottom: 14),
             padding: const EdgeInsets.all(18),
