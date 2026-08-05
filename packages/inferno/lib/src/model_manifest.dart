@@ -85,6 +85,71 @@ const gemma4E2BGgufQ4 = InfernoModelArtifact(
   ],
 );
 
+/// Text-only MLX snapshot of the QAT lean-4bit build; the only 4B QAT MLX
+/// variant published at pin time.
+const qwen35Mlx4Bit = InfernoModelArtifact(
+  repository: 'YoozLabs/Qwen3.5-4B-qat-lean-4bit-mlx',
+  revision: 'dc6b06e7ac5279a1d3ac716342644efe848dfcb7',
+  files: [
+    InfernoModelFile(
+      path: 'chat_template.jinja',
+      bytes: 7756,
+      sha256:
+          'a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715',
+    ),
+    InfernoModelFile(
+      path: 'config.json',
+      bytes: 2426,
+      sha256:
+          '4b8c4af0434e57f2b2c49b885d5deac288a0fd53d596cb3f6b87bb70aadb0d3e',
+    ),
+    InfernoModelFile(
+      path: 'generation_config.json',
+      bytes: 108,
+      sha256:
+          '757083276a24890fd6a94876bdaa460b3d1232cba3fa8b998c4188a0cea5764d',
+    ),
+    InfernoModelFile(
+      path: 'model.safetensors',
+      bytes: 2367237149,
+      sha256:
+          '36f7f2d16e6eac68e6638976de2c48372af22d77a46026e270af1fdf2566c909',
+    ),
+    InfernoModelFile(
+      path: 'model.safetensors.index.json',
+      bytes: 81008,
+      sha256:
+          '5a3779ecc1a94f395f26612fdc9a491c1884250eda9353d214322717564a69c7',
+    ),
+    InfernoModelFile(
+      path: 'tokenizer.json',
+      bytes: 19989325,
+      sha256:
+          '06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523',
+    ),
+    InfernoModelFile(
+      path: 'tokenizer_config.json',
+      bytes: 1161,
+      sha256:
+          '95c557768e6b88a7128befc7bfd3c7de50e5d51af9b8b33a9f4dee0e04f99679',
+    ),
+  ],
+);
+
+/// The only quantization published in the QAT GGUF repository at pin time.
+const qwen35GgufQ4 = InfernoModelArtifact(
+  repository: 'YoozLabs/Qwen3.5-4B-qat-GGUF',
+  revision: '2d52e26bd96b49be5f8d37f1c85b27673adaa7da',
+  files: [
+    InfernoModelFile(
+      path: 'Qwen3.5-4B-qat-Q4_0.gguf',
+      bytes: 2543899040,
+      sha256:
+          '1367a2b4f8dc63a1782aa1f4006767d5451b8e5d491cc241cb656fbf4b4b5e62',
+    ),
+  ],
+);
+
 /// Small random-weight model fetched only by native CI and local test tooling.
 const infernoToyGguf = InfernoModelArtifact(
   repository: 'aladar/tiny-random-LlamaForCausalLM-GGUF',

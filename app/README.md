@@ -36,7 +36,14 @@ simulation, and model screens say so in the UI. A real local runtime exists
 behind one explicit opt-in: `lib/broker/` adapts `package:inferno` (see the
 root README) and is selected only by building with
 `--dart-define=GOLEM_INFERENCE_BACKEND=llama|mlx` plus
-`--dart-define=GOLEM_MODEL_PATH=…`. No other app code may import Inferno;
+`--dart-define=GOLEM_MODEL_PATH=…`. **`GOLEM_MODEL_PATH` and
+`GOLEM_MODEL_PROFILE` are a matched pair**: the profile
+(`gemma4` default, `qwen35`; registry in `lib/broker/model_profile.dart`)
+supplies the chat template, stop policy, sampling defaults, and
+reasoning parsing, and nothing cross-checks it against the model file —
+pointing a Qwen artifact at the default Gemma profile silently renders
+the wrong template. Real-backend builds must set both. No other app code
+may import Inferno;
 `../tool/check_inferno_imports.dart` and `test/inferno_import_boundary_test.dart`
 enforce that. Benchmark exports contain both:
 
@@ -255,8 +262,10 @@ Both defines accept comma-separated lists (that is the quant-comparison
 mode); either may be omitted. `GOLEM_EVAL_OUT` overrides the report
 directory (default: the system temp dir — the exact paths are printed as
 `GOLEM_EVAL_REPORT` lines), and `GOLEM_EVAL_TEMPLATE` selects the model
-template (default `gemma4`; new models register in
-`integration_test/eval/eval_templates.dart`). The suite self-skips when
+profile (default `gemma4`; the harness consumes the broker's profile
+registry in `lib/broker/model_profile.dart` directly, so an evaluation
+exercises exactly the template, stop policy, sampling defaults, and parser
+the app ships). The suite self-skips when
 no artifact is requested, and it must never be wired into CI. Keep
 evidence worth citing (quant choices, pin bumps, ADRs) as committed
 reports under `../docs/evals/`. The spec's `anchor-jupiter` prompt

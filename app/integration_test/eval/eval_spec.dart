@@ -46,9 +46,9 @@ final class EvalPrompt {
     required this.messages,
     required this.checks,
     this.reasoningEnabled = false,
-    this.maxTokens = 2048,
-    this.temperature = 1,
-    this.topP = 0.95,
+    this.maxTokens,
+    this.temperature,
+    this.topP,
     this.seed = 7,
   });
 
@@ -56,9 +56,13 @@ final class EvalPrompt {
   final List<Map<String, String>> messages;
   final List<EvalCheck> checks;
   final bool reasoningEnabled;
-  final int maxTokens;
-  final double temperature;
-  final double topP;
+
+  /// Null means "use the profile's shipped default", so evaluations reflect
+  /// app behavior per model. Explicit values pin a prompt's sampling across
+  /// profiles — the determinism anchor relies on that.
+  final int? maxTokens;
+  final double? temperature;
+  final double? topP;
   final int seed;
 }
 
@@ -77,6 +81,11 @@ const defaultEvalPrompts = <EvalPrompt>[
         'content': 'Name the largest planet in the solar system.',
       },
     ],
+    // Pinned to the probe's exact sampling regardless of profile, so the
+    // hash stays comparable with docs/notes/determinism-probe.md.
+    maxTokens: 2048,
+    temperature: 1,
+    topP: 0.95,
     checks: [EvalCheck.contains('Jupiter')],
   ),
   EvalPrompt(

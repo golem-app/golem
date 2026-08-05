@@ -12,7 +12,9 @@ export 'package:inferno/inferno.dart'
         llamaCppRelease,
         llamaCppRevision,
         mlxSwiftLmVersion,
-        mlxSwiftVersion;
+        mlxSwiftVersion,
+        qwen35GgufQ4,
+        qwen35Mlx4Bit;
 
 enum BrokerEngine { llamaCpp, mlx }
 

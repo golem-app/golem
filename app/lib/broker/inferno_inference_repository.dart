@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart';
 
 import '../core/domain/models.dart';
 import '../core/repositories/contracts.dart';
-import 'gemma4_chat_template.dart';
 import 'hash.dart';
+import 'model_profile.dart';
 import 'runtime.dart';
 
 final class InfernoInferenceRepository implements InferenceRepository {
@@ -11,12 +11,14 @@ final class InfernoInferenceRepository implements InferenceRepository {
     this._runtime, {
     required this.engine,
     required this.modelPath,
+    required this.profile,
     this.seed,
   });
 
   final BrokerRuntime _runtime;
   final BrokerEngine engine;
   final String modelPath;
+  final ModelProfile profile;
   final int? seed;
   bool _loaded = false;
   Future<void>? _preparing;
@@ -52,28 +54,21 @@ final class InfernoInferenceRepository implements InferenceRepository {
     required bool reasoningEnabled,
   }) async* {
     if (!_loaded) throw StateError('Inferno is not loaded.');
-    final parser = ReasoningStreamParser();
+    final parser = profile.newParser(reasoningEnabled: reasoningEnabled);
+    final sampling = profile.sampling(reasoningEnabled: reasoningEnabled);
     BrokerRuntimeMetrics? finalMetrics;
     var sawAnswer = false;
     final probe = seed == null ? null : StringBuffer();
     await for (final event in _runtime.generate(
       BrokerGenerationRequest(
-        prompt: Gemma4ChatTemplate.render(
-          context,
-          reasoningEnabled: reasoningEnabled,
-        ),
+        prompt: profile.render(context, reasoningEnabled: reasoningEnabled),
         sampling: BrokerSamplingParameters(
-          // Roomy enough that reasoning cannot silently starve the visible
-          // answer; a budget stop is still surfaced below, never swallowed.
-          maxTokens: 2048,
-          temperature: 1,
-          topP: 0.95,
+          maxTokens: sampling.maxTokens,
+          temperature: sampling.temperature,
+          topP: sampling.topP,
           seed: seed,
-          stopSequences: const [Gemma4ChatTemplate.turnEnd],
-          stopTokenIds: const [
-            Gemma4ChatTemplate.eosTokenId,
-            Gemma4ChatTemplate.turnEndTokenId,
-          ],
+          stopSequences: profile.stopSequences,
+          stopTokenIds: profile.stopTokenIds,
         ),
       ),
     )) {

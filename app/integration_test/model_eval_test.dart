@@ -5,11 +5,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 import 'package:integration_test/integration_test.dart';
 
+import 'package:golem_flutter/broker/model_profile.dart';
+
 import 'eval/eval_matrix.dart';
 import 'eval/eval_report.dart';
 import 'eval/eval_runner.dart';
 import 'eval/eval_spec.dart';
-import 'eval/eval_templates.dart';
 
 /// The model-evaluation harness: runs the fixed prompt set against every
 /// requested artifact × engine combo on macOS and writes a machine- and
@@ -60,21 +61,36 @@ void main() {
     test(
       'evaluates ${combo.label} on ${combo.engine.name}',
       () async {
-        final template = evalTemplates[_templateKey];
+        final profile = modelProfiles[_templateKey];
         expect(
-          template,
+          profile,
           isNotNull,
           reason:
               'Unknown GOLEM_EVAL_TEMPLATE "$_templateKey"; '
-              'known: ${evalTemplates.keys.join(', ')}',
+              'known: ${modelProfiles.keys.join(', ')}',
         );
+        // A pin-cited artifact evaluated under another family's profile
+        // would produce numbers that describe nothing — refuse to record
+        // them. Unpinned artifacts cannot be family-checked and pass.
+        final pinnedFamily = profileKeyForPinnedRepository(
+          describeArtifact(combo).pinnedRepository,
+        );
+        if (pinnedFamily != null) {
+          expect(
+            pinnedFamily,
+            _templateKey,
+            reason:
+                '${combo.label} is a pinned $pinnedFamily artifact but '
+                'GOLEM_EVAL_TEMPLATE is "$_templateKey"',
+          );
+        }
         final adapter = InfernoRuntimeAdapter.native();
         EvalComboResult result;
         try {
           result = await runEvalCombo(
             runtime: adapter,
             combo: combo,
-            template: template!,
+            profile: profile!,
             prompts: defaultEvalPrompts,
             onProgress: debugPrint,
           );
@@ -107,6 +123,7 @@ void main() {
       // UTC in the evidence; the local stamp only names the run directory.
       createdAt: now.toUtc(),
       host: '${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
+      profile: modelProfiles[_templateKey]!,
       results: results,
       artifacts: {
         for (final combo in combos)
