@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:background_downloader/background_downloader.dart';
 
 /// Events emitted while one artifact file downloads.
@@ -54,6 +56,11 @@ abstract interface class ArtifactFileDownloader {
 /// plain downloads after ~9 minutes, and with allowPause the plugin
 /// auto-pauses and resumes to complete the file.
 final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
+  // FileDownloader().updates is single-subscription; every per-file await-for
+  // must tap one shared broadcast of it, created once per process.
+  static final Stream<TaskUpdate> _updates = FileDownloader().updates
+      .asBroadcastStream();
+
   final Map<String, DownloadTask> _pausedTasks = {};
   Task? _current;
 
@@ -66,63 +73,71 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
   }) async* {
     final pathKey = '$directory/$filename';
     final downloader = FileDownloader();
-    var task = _pausedTasks.remove(pathKey);
-    if (task != null && await downloader.taskCanResume(task)) {
-      _current = task;
-      if (!await downloader.resume(task)) {
+    // Buffer updates from before enqueue completes: a small file can reach
+    // its terminal status before a listener attached afterwards would see it.
+    final buffer = StreamController<TaskUpdate>();
+    final subscription = _updates.listen(buffer.add);
+    try {
+      var task = _pausedTasks.remove(pathKey);
+      if (task != null && await downloader.taskCanResume(task)) {
+        _current = task;
+        if (!await downloader.resume(task)) {
+          task = null;
+        }
+      } else {
         task = null;
       }
-    } else {
-      task = null;
-    }
-    if (task == null) {
-      task = DownloadTask(
-        url: url,
-        directory: directory,
-        filename: filename,
-        baseDirectory: BaseDirectory.applicationDocuments,
-        updates: Updates.statusAndProgress,
-        allowPause: true,
-        retries: 3,
-      );
-      _current = task;
-      if (!await downloader.enqueue(task)) {
-        yield const ArtifactFileFailed('Could not start the download.');
-        return;
+      if (task == null) {
+        task = DownloadTask(
+          url: url,
+          directory: directory,
+          filename: filename,
+          baseDirectory: BaseDirectory.applicationDocuments,
+          updates: Updates.statusAndProgress,
+          allowPause: true,
+          retries: 3,
+        );
+        _current = task;
+        if (!await downloader.enqueue(task)) {
+          yield const ArtifactFileFailed('Could not start the download.');
+          return;
+        }
       }
-    }
-    final taskId = task.taskId;
-    await for (final update in downloader.updates.where(
-      (update) => update.task.taskId == taskId,
-    )) {
-      switch (update) {
-        case TaskProgressUpdate(:final progress) when progress >= 0:
-          yield ArtifactFileProgress((progress * expectedBytes).round());
-        case TaskProgressUpdate():
-          break;
-        case TaskStatusUpdate(:final status, :final exception):
-          switch (status) {
-            case TaskStatus.complete:
-              yield const ArtifactFileComplete();
-              return;
-            case TaskStatus.paused:
-              _pausedTasks[pathKey] = task;
-              yield const ArtifactFilePaused();
-              return;
-            case TaskStatus.canceled:
-              yield const ArtifactFileCanceled();
-              return;
-            case TaskStatus.failed || TaskStatus.notFound:
-              yield ArtifactFileFailed(
-                exception?.description ?? 'The download failed.',
-              );
-              return;
-            case TaskStatus.enqueued ||
-                TaskStatus.running ||
-                TaskStatus.waitingToRetry:
-              break;
-          }
+      final taskId = task.taskId;
+      await for (final update in buffer.stream) {
+        if (update.task.taskId != taskId) continue;
+        switch (update) {
+          case TaskProgressUpdate(:final progress) when progress >= 0:
+            yield ArtifactFileProgress((progress * expectedBytes).round());
+          case TaskProgressUpdate():
+            break;
+          case TaskStatusUpdate(:final status, :final exception):
+            switch (status) {
+              case TaskStatus.complete:
+                yield const ArtifactFileComplete();
+                return;
+              case TaskStatus.paused:
+                _pausedTasks[pathKey] = task;
+                yield const ArtifactFilePaused();
+                return;
+              case TaskStatus.canceled:
+                yield const ArtifactFileCanceled();
+                return;
+              case TaskStatus.failed || TaskStatus.notFound:
+                yield ArtifactFileFailed(
+                  exception?.description ?? 'The download failed.',
+                );
+                return;
+              case TaskStatus.enqueued ||
+                  TaskStatus.running ||
+                  TaskStatus.waitingToRetry:
+                break;
+            }
+        }
       }
+    } finally {
+      await subscription.cancel();
+      await buffer.close();
     }
   }
 

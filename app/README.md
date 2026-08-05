@@ -29,10 +29,28 @@ QA or automation.
 
 ## Deterministic by default
 
-Every build defaults to the simulated backend: no HTTP client, Hugging Face
-integration, USB importer, bundled model weights, or hardware performance
-measurement. Every model transition and generated token is deterministic
-simulation, and model screens say so in the UI. A real local runtime exists
+Inference defaults to the simulated backend in every build: no bundled model
+weights or hardware performance measurement, and every generated token is
+deterministic simulation the UI labels as such. Model **downloads** are real
+in the `dev` and `production` flavors: Settings lists the pinned catalog
+(`lib/broker/model_catalog.dart`, mirroring the Inferno manifest) and
+downloads artifacts from Hugging Face with per-file SHA-256 verification,
+pause/resume, cancel, disk-space preflight, and delete. The `qa` flavor and
+flavorless test-harness builds keep the deterministic fake downloader, so
+goldens, journeys, and CI never touch the network. Downloads install under
+`Documents/models/<catalog-key>/` — resolvable as
+`documents:models/<catalog-key>/<file>` — and are excluded from platform
+backups (iOS/macOS `NSURLIsExcludedFromBackupKey`, Android
+`dataExtractionRules`).
+
+Cable-provisioned models keep working: any file pushed under `Documents/`
+(`ios fsync push`, `adb` + `run-as`) still loads through `GOLEM_MODEL_PATH`,
+and delete/cancel only ever remove the app-managed `models/<catalog-key>/`
+directories. Pushing an artifact's files into its `models/<catalog-key>/`
+layout and tapping Download verifies the pushed bytes and installs them with
+no network use (skip-if-valid) — an offline sideload path.
+
+A real local runtime exists
 behind one explicit opt-in: `lib/broker/` adapts `package:inferno` (see the
 root README) and is selected only by building with
 `--dart-define=GOLEM_INFERENCE_BACKEND=llama|mlx` plus
@@ -68,8 +86,12 @@ and generated Riverpod providers live under `lib/core/`.
   events. `FakeInferenceRepository` is the default; the broker's
   `InfernoInferenceRepository` is the opt-in real runtime. Reasoning is never
   copied into later prompt context.
-- `ModelManagementRepository`: selected backend, MLX download/pause/resume/verify,
-  TurboFieldfare import/verify, and runtime state, all persisted simulations.
+- `ModelManagementRepository`: per-artifact download/pause/cancel/delete over
+  the injected catalog plus runtime state, persisted as schema-v2 JSON. The
+  fake simulates the same catalog; `RealModelManagementRepository` downloads
+  via `background_downloader` behind the `ArtifactFileDownloader` seam, with
+  free-space probing and backup exclusion on the
+  `app.golem.flutter/storage` platform channel.
 - `BenchmarkRepository`: deterministic result generation and JSON export, always
   marked simulated.
 - Generated `AsyncNotifier` command controllers serialize chat/model mutations,
@@ -91,9 +113,10 @@ Stable keys/semantics preserve the native automation vocabulary. The most useful
 identifiers are `launch-splash`, `chat-composer`, `send-button`, `stop-button`,
 `reasoning-toggle`, `open-drawer`, `drawer-search`, `new-chat-drawer`,
 `conversation-<id>`, `conversation-menu-<id>`, `rename-sheet`, `rename-field`,
-`confirm-delete`, `open-settings`, `backend-option-mlx`,
-`backend-option-turbofieldfare`, `mlx-download-button`,
-`mlx-download-cancel-button`, `model-import-button`, `runtime-toggle-button`,
+`confirm-delete`, `open-settings`, `model-card-<key>`, `model-status-<key>`,
+`model-download-<key>`, `model-pause-<key>`, `model-cancel-<key>`,
+`model-delete-<key>`, `confirm-model-delete` (catalog keys: `gemma4-mlx`,
+`gemma4-gguf`, `qwen35-mlx`, `qwen35-gguf`), `runtime-toggle-button`,
 `open-benchmark`, `benchmark-case-picker`, `benchmark-phase-picker`,
 `benchmark-run-button`, `benchmark-stop-button`, and `benchmark-export-button`.
 
