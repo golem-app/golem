@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:golem_flutter/broker/inferno_inference_repository.dart'
-    show fnv1a64;
+import 'package:golem_flutter/broker/hash.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 
 import '../../integration_test/eval/eval_runner.dart';
@@ -200,6 +199,35 @@ void main() {
       expect(result.failures.single, contains('exploding'));
     },
   );
+
+  test('budget exhaustion surfaces as a failed informational check', () async {
+    final runtime = _ScriptedRuntime([
+      [
+        const BrokerTextDelta('Jupiter is the largest'),
+        const BrokerGenerationCompleted(BrokerStopReason.maxTokens),
+      ],
+    ]);
+    final result = await _run(runtime, const [
+      EvalPrompt(
+        id: 'truncated',
+        messages: [
+          {'role': 'user', 'content': 'Largest planet?'},
+        ],
+        checks: [EvalCheck.contains('Jupiter')],
+      ),
+    ]);
+
+    // The content check passes on the truncated text; the implicit budget
+    // check records the truncation in the check list without gating the run.
+    final row = result.promptResults.single;
+    expect(row.passed, isTrue);
+    expect(result.failures, isEmpty);
+    final budget = row.checkResults.singleWhere(
+      (check) => check.description.contains('token budget'),
+    );
+    expect(budget.required, isFalse);
+    expect(budget.passed, isFalse);
+  });
 
   test('the default spec is coherent', () {
     final ids = defaultEvalPrompts.map((prompt) => prompt.id).toList();

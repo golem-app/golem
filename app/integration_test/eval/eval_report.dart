@@ -5,13 +5,38 @@ import 'package:golem_flutter/broker/runtime.dart';
 
 import 'eval_runner.dart';
 
-/// The pinned artifacts the report can auto-cite. A GGUF matches when its
-/// file basename appears in a manifest entry; an MLX directory matches when
-/// its basename equals the pinned repository's basename.
+/// The pinned artifacts the report can auto-cite.
 const _knownArtifacts = <InfernoModelArtifact>[
   gemma4E2BGgufQ4,
   gemma4E2BMlx4Bit,
 ];
+
+/// Matches an on-disk artifact to a manifest pin. The name alone is not
+/// provenance — a requantized file with a pinned filename must not be cited
+/// as the pin — so a match requires the on-disk size to equal the pinned
+/// bytes too (the matched file's for a GGUF, the file sum for an MLX
+/// directory). Byte-identity still isn't proven; for that, re-fetch through
+/// `tool/fetch_model.dart`, which verifies SHA-256.
+InfernoModelArtifact? matchPinnedArtifact({
+  required String label,
+  required int? sizeBytes,
+  required BrokerEngine engine,
+}) {
+  if (sizeBytes == null) return null;
+  for (final artifact in _knownArtifacts) {
+    final matches = switch (engine) {
+      BrokerEngine.llamaCpp => artifact.files.any(
+        (file) => file.path.split('/').last == label && file.bytes == sizeBytes,
+      ),
+      BrokerEngine.mlx =>
+        artifact.repository.split('/').last == label &&
+            artifact.files.fold<int>(0, (sum, file) => sum + file.bytes) ==
+                sizeBytes,
+    };
+    if (matches) return artifact;
+  }
+  return null;
+}
 
 final class EvalArtifactRecord {
   const EvalArtifactRecord({
@@ -29,7 +54,7 @@ final class EvalArtifactRecord {
   final String? pinnedRevision;
 
   String get pinSummary => pinnedRepository == null
-      ? 'not a pinned artifact'
+      ? 'no pin match (name+size)'
       : '$pinnedRepository @ ${pinnedRevision!.substring(0, 8)}';
 }
 
@@ -45,19 +70,13 @@ EvalArtifactRecord describeArtifact(EvalCombo combo) {
     sizeBytes = entity
         .listSync(recursive: true)
         .whereType<File>()
-        .fold(0, (sum, file) => sum! + file.lengthSync());
+        .fold<int>(0, (sum, file) => sum + file.lengthSync());
   }
-  InfernoModelArtifact? pinned;
-  for (final artifact in _knownArtifacts) {
-    final repoBasename = artifact.repository.split('/').last;
-    final matchesFile = artifact.files.any(
-      (file) => file.path.split('/').last == combo.label,
-    );
-    if (matchesFile || repoBasename == combo.label) {
-      pinned = artifact;
-      break;
-    }
-  }
+  final pinned = matchPinnedArtifact(
+    label: combo.label,
+    sizeBytes: sizeBytes,
+    engine: combo.engine,
+  );
   return EvalArtifactRecord(
     label: combo.label,
     path: combo.path,
@@ -87,9 +106,10 @@ final class EvalRunReport {
     'mlxSwiftLmVersion': mlxSwiftLmVersion,
   };
 
-  /// The machine-readable evidence. Absolute paths are included only when
-  /// [includePaths] is set; the committed Markdown never carries them.
-  Map<String, Object?> toJson({required bool includePaths}) => {
+  /// The machine-readable evidence. Like the Markdown, it never carries
+  /// absolute paths — artifacts are identified by label, size, and pin — so
+  /// both outputs are committable as-is.
+  Map<String, Object?> toJson() => {
     'createdAt': createdAt.toIso8601String(),
     'host': host,
     'enginePins': _enginePins,
@@ -97,7 +117,6 @@ final class EvalRunReport {
       for (final record in artifacts.values)
         {
           'label': record.label,
-          if (includePaths) 'path': record.path,
           'sizeBytes': record.sizeBytes,
           'pinnedRepository': record.pinnedRepository,
           'pinnedRevision': record.pinnedRevision,
@@ -147,8 +166,7 @@ final class EvalRunReport {
     ],
   };
 
-  String toJsonString() =>
-      const JsonEncoder.withIndent('  ').convert(toJson(includePaths: true));
+  String toJsonString() => const JsonEncoder.withIndent('  ').convert(toJson());
 
   /// The human-readable evidence. Carries labels, never absolute paths, so
   /// a report can be committed under `docs/evals/` as-is.

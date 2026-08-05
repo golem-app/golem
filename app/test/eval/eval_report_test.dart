@@ -59,18 +59,17 @@ EvalRunReport _fixtureReport() => EvalRunReport(
 );
 
 void main() {
-  test('the JSON evidence is complete and paths are opt-in', () {
+  test('the JSON evidence is complete and never carries paths', () {
     final report = _fixtureReport();
-    final withPaths = report.toJson(includePaths: true);
-    final withoutPaths = report.toJson(includePaths: false);
+    final json = report.toJson();
 
-    final artifact = (withPaths['artifacts']! as List).single as Map;
-    expect(artifact['path'], '/private/somewhere/model.gguf');
-    final scrubbed = (withoutPaths['artifacts']! as List).single as Map;
-    expect(scrubbed.containsKey('path'), isFalse);
+    final artifact = (json['artifacts']! as List).single as Map;
+    expect(artifact['label'], 'model.gguf');
+    expect(artifact.containsKey('path'), isFalse);
+    expect('$json', isNot(contains('/private/somewhere')));
 
-    expect(withPaths['enginePins'], containsPair('llamaCppRelease', 'b10241'));
-    final result = (withPaths['results']! as List).single as Map;
+    expect(json['enginePins'], containsPair('llamaCppRelease', 'b10241'));
+    final result = (json['results']! as List).single as Map;
     expect(result['passed'], isFalse);
     final prompts = result['prompts']! as List;
     final passRow = prompts.first as Map;
@@ -96,9 +95,62 @@ void main() {
     expect(markdown, isNot(contains('/private/somewhere')));
   });
 
-  test('describeArtifact matches pinned artifacts by basename', () async {
+  test('a pin citation requires both the name and the pinned size', () {
+    final ggufBytes = gemma4E2BGgufQ4.files.single.bytes;
+    expect(
+      matchPinnedArtifact(
+        label: 'gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf',
+        sizeBytes: ggufBytes,
+        engine: BrokerEngine.llamaCpp,
+      )?.repository,
+      'unsloth/gemma-4-E2B-it-qat-GGUF',
+    );
+    // A requantized or patched file wearing the pinned filename must not be
+    // cited as the pin.
+    expect(
+      matchPinnedArtifact(
+        label: 'gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf',
+        sizeBytes: ggufBytes - 1,
+        engine: BrokerEngine.llamaCpp,
+      ),
+      isNull,
+    );
+    // Nor may a GGUF-named directory match through the MLX rule.
+    expect(
+      matchPinnedArtifact(
+        label: 'gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf',
+        sizeBytes: ggufBytes,
+        engine: BrokerEngine.mlx,
+      ),
+      isNull,
+    );
+
+    final mlxBytes = gemma4E2BMlx4Bit.files.fold<int>(
+      0,
+      (sum, file) => sum + file.bytes,
+    );
+    expect(
+      matchPinnedArtifact(
+        label: 'gemma-4-e2b-it-4bit',
+        sizeBytes: mlxBytes,
+        engine: BrokerEngine.mlx,
+      )?.repository,
+      'mlx-community/gemma-4-e2b-it-4bit',
+    );
+    expect(
+      matchPinnedArtifact(
+        label: 'gemma-4-e2b-it-4bit',
+        sizeBytes: mlxBytes + 1,
+        engine: BrokerEngine.mlx,
+      ),
+      isNull,
+    );
+  });
+
+  test('describeArtifact stats disk and degrades unverifiable pins', () async {
     final directory = await Directory.systemTemp.createTemp('golem-eval-test');
     addTearDown(() => directory.delete(recursive: true));
+    // Pinned filename, wrong size: cited as unverified, never as the pin.
     final gguf = File('${directory.path}/gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf')
       ..writeAsBytesSync([1, 2, 3]);
     final mlxDir = Directory('${directory.path}/gemma-4-e2b-it-4bit')
@@ -112,8 +164,9 @@ void main() {
         engine: BrokerEngine.llamaCpp,
       ),
     );
-    expect(ggufRecord.pinnedRepository, 'unsloth/gemma-4-E2B-it-qat-GGUF');
     expect(ggufRecord.sizeBytes, 3);
+    expect(ggufRecord.pinnedRepository, isNull);
+    expect(ggufRecord.pinSummary, 'no pin match (name+size)');
 
     final mlxRecord = describeArtifact(
       EvalCombo(
@@ -122,17 +175,17 @@ void main() {
         engine: BrokerEngine.mlx,
       ),
     );
-    expect(mlxRecord.pinnedRepository, 'mlx-community/gemma-4-e2b-it-4bit');
     expect(mlxRecord.sizeBytes, 4);
+    expect(mlxRecord.pinnedRepository, isNull);
 
-    final unknown = describeArtifact(
+    final missing = describeArtifact(
       EvalCombo(
         label: 'mystery.gguf',
         path: '${directory.path}/missing.gguf',
         engine: BrokerEngine.llamaCpp,
       ),
     );
-    expect(unknown.pinnedRepository, isNull);
-    expect(unknown.sizeBytes, isNull);
+    expect(missing.pinnedRepository, isNull);
+    expect(missing.sizeBytes, isNull);
   });
 }

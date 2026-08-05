@@ -1,5 +1,4 @@
-import 'package:golem_flutter/broker/inferno_inference_repository.dart'
-    show fnv1a64;
+import 'package:golem_flutter/broker/hash.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 
 import 'eval_spec.dart';
@@ -180,6 +179,15 @@ Future<EvalPromptResult> _runPrompt(
           required: check.required,
           passed: check.passes(answerText),
         ),
+      // Implicit on every prompt: a truncated answer can still satisfy its
+      // content checks, so budget exhaustion must be visible in the check
+      // list, not only in the stop column. Informational — evidence, not a
+      // gate.
+      EvalCheckResult(
+        description: 'stopped before the token budget [informational]',
+        required: false,
+        passed: stopReason != BrokerStopReason.maxTokens.name,
+      ),
     ],
   );
 }

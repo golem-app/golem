@@ -10,6 +10,7 @@ import 'package:inferno/inferno.dart';
 import 'package:inferno/testing.dart';
 
 import 'package:golem_flutter/broker/gemma4_chat_template.dart';
+import 'package:golem_flutter/broker/hash.dart';
 import 'package:golem_flutter/broker/inferno_inference_repository.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 import 'package:golem_flutter/core/domain/models.dart';
