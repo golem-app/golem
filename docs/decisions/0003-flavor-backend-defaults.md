@@ -16,6 +16,11 @@ Status: decided on `feat/19-generation-settings-flavor-defaults` (issue #19)
   qa/flavorless). `auto` on a qa build reproduces the exact production
   composition — the only real-path route on the physical iPhone, where the
   production and dev bundle ids belong to the native app.
+- Coherence corollary (caught in device QA): overriding a qa build to real
+  inference carries **model management** to the real implementation as
+  well. A real engine fed by the download simulation would "install"
+  files that do not exist and then fail on first load. Only inference
+  left on the fake keeps the fake downloader.
 
 Host `flutter test` runs as the `dev` flavor, but flavor policy resolves
 only in `main()`; the widget-visible backend signal

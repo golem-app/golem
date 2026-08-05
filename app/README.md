@@ -38,7 +38,10 @@ test-harness builds wire **all fakes** (inference, model management,
 benchmark), so goldens, journeys, and CI stay deterministic and never
 touch the network. `production` and `dev` wire the real implementations —
 the pinned Hugging Face downloader and, by default, real local inference.
-Explicit dart-defines override the flavor default in any build.
+Explicit dart-defines override the flavor default in any build; an
+override to real inference carries model management to the real
+implementation with it, so a real engine is never fed by the download
+simulation.
 
 Backend resolution (`lib/broker/backend_policy.dart`, decided in
 `../docs/decisions/0003-flavor-backend-defaults.md`):

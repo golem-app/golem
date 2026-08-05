@@ -31,14 +31,18 @@ Future<void> main() async {
   // wire all fakes (inference, model management, benchmark) so goldens,
   // journeys, and CI stay deterministic and offline; production and dev
   // wire the real implementations. Explicit dart-defines override the
-  // flavor default in any build.
+  // flavor default in any build — and an override to real inference
+  // carries model management to the real implementation with it: a real
+  // engine fed by a download simulation would "install" files that do
+  // not exist.
   final backendConfig = await resolveConfiguredBackend();
   final support = await getApplicationSupportDirectory();
   final documents = await getApplicationDocumentsDirectory();
   final stateFile = File('${support.path}/flutter-model-v2.json');
   final identity = AppIdentity.current;
   final useFakeModels =
-      identity == AppIdentity.qa || identity == AppIdentity.flutter;
+      (identity == AppIdentity.qa || identity == AppIdentity.flutter) &&
+      backendConfig.simulatedInference;
   final ModelManagementRepository modelManagement = useFakeModels
       ? FakeModelManagementRepository(stateFile, catalog: modelCatalog)
       : RealModelManagementRepository(
