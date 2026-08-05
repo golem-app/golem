@@ -1,5 +1,19 @@
 import 'package:inferno/inferno.dart';
 
+/// Pinned-artifact and engine-pin metadata, re-exported so evaluation and
+/// measurement code outside the broker can cite pins in evidence reports
+/// without importing package:inferno across the boundary.
+export 'package:inferno/inferno.dart'
+    show
+        InfernoModelArtifact,
+        InfernoModelFile,
+        gemma4E2BGgufQ4,
+        gemma4E2BMlx4Bit,
+        llamaCppRelease,
+        llamaCppRevision,
+        mlxSwiftLmVersion,
+        mlxSwiftVersion;
+
 enum BrokerEngine { llamaCpp, mlx }
 
 final class BrokerSamplingParameters {
@@ -127,6 +141,12 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
 
   @override
   Future<void> cancel() => _translating(_inferno.cancel);
+
+  /// Closes the underlying runtime, including its native-callback listener.
+  /// The app keeps one adapter alive for its whole lifetime and never calls
+  /// this; harness code that cycles engines in one process must, or the
+  /// listener keeps the isolate alive after the run.
+  Future<void> dispose() => _translating(_inferno.dispose);
 
   @override
   Stream<BrokerRuntimeEvent> generate(BrokerGenerationRequest request) async* {

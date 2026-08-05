@@ -1,0 +1,253 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:golem_flutter/broker/runtime.dart';
+
+import 'eval_runner.dart';
+
+/// The pinned artifacts the report can auto-cite. A GGUF matches when its
+/// file basename appears in a manifest entry; an MLX directory matches when
+/// its basename equals the pinned repository's basename.
+const _knownArtifacts = <InfernoModelArtifact>[
+  gemma4E2BGgufQ4,
+  gemma4E2BMlx4Bit,
+];
+
+final class EvalArtifactRecord {
+  const EvalArtifactRecord({
+    required this.label,
+    required this.path,
+    this.sizeBytes,
+    this.pinnedRepository,
+    this.pinnedRevision,
+  });
+
+  final String label;
+  final String path;
+  final int? sizeBytes;
+  final String? pinnedRepository;
+  final String? pinnedRevision;
+
+  String get pinSummary => pinnedRepository == null
+      ? 'not a pinned artifact'
+      : '$pinnedRepository @ ${pinnedRevision!.substring(0, 8)}';
+}
+
+/// Stats an artifact on disk and matches it against the manifest pins.
+EvalArtifactRecord describeArtifact(EvalCombo combo) {
+  final entity = FileSystemEntity.isDirectorySync(combo.path)
+      ? Directory(combo.path)
+      : File(combo.path);
+  int? sizeBytes;
+  if (entity is File && entity.existsSync()) {
+    sizeBytes = entity.lengthSync();
+  } else if (entity is Directory && entity.existsSync()) {
+    sizeBytes = entity
+        .listSync(recursive: true)
+        .whereType<File>()
+        .fold(0, (sum, file) => sum! + file.lengthSync());
+  }
+  InfernoModelArtifact? pinned;
+  for (final artifact in _knownArtifacts) {
+    final repoBasename = artifact.repository.split('/').last;
+    final matchesFile = artifact.files.any(
+      (file) => file.path.split('/').last == combo.label,
+    );
+    if (matchesFile || repoBasename == combo.label) {
+      pinned = artifact;
+      break;
+    }
+  }
+  return EvalArtifactRecord(
+    label: combo.label,
+    path: combo.path,
+    sizeBytes: sizeBytes,
+    pinnedRepository: pinned?.repository,
+    pinnedRevision: pinned?.revision,
+  );
+}
+
+final class EvalRunReport {
+  const EvalRunReport({
+    required this.createdAt,
+    required this.host,
+    required this.results,
+    required this.artifacts,
+  });
+
+  final DateTime createdAt;
+  final String host;
+  final List<EvalComboResult> results;
+  final Map<String, EvalArtifactRecord> artifacts;
+
+  static const _enginePins = <String, String>{
+    'llamaCppRelease': llamaCppRelease,
+    'llamaCppRevision': llamaCppRevision,
+    'mlxSwiftVersion': mlxSwiftVersion,
+    'mlxSwiftLmVersion': mlxSwiftLmVersion,
+  };
+
+  /// The machine-readable evidence. Absolute paths are included only when
+  /// [includePaths] is set; the committed Markdown never carries them.
+  Map<String, Object?> toJson({required bool includePaths}) => {
+    'createdAt': createdAt.toIso8601String(),
+    'host': host,
+    'enginePins': _enginePins,
+    'artifacts': [
+      for (final record in artifacts.values)
+        {
+          'label': record.label,
+          if (includePaths) 'path': record.path,
+          'sizeBytes': record.sizeBytes,
+          'pinnedRepository': record.pinnedRepository,
+          'pinnedRevision': record.pinnedRevision,
+        },
+    ],
+    'results': [
+      for (final combo in results)
+        {
+          'artifact': combo.combo.label,
+          'engine': combo.combo.engine.name,
+          'loadSeconds': combo.loadSeconds,
+          'passed': combo.failures.isEmpty,
+          'prompts': [
+            for (final result in combo.promptResults)
+              {
+                'id': result.promptId,
+                'passed': result.passed,
+                'answer': result.answer,
+                'reasoning': result.reasoning,
+                'stopReason': result.stopReason,
+                'fnv1a64': result.rawTextHash,
+                'rawTextLength': result.rawTextLength,
+                'error': result.error,
+                'metrics': switch (result.metrics) {
+                  null => null,
+                  final m => {
+                    'decodeTokensPerSecond': m.decodeTokensPerSecond,
+                    'promptTokensPerSecond': m.promptTokensPerSecond,
+                    'generatedTokenCount': m.generatedTokenCount,
+                    'promptTokenCount': m.promptTokenCount,
+                    'timeToFirstTokenSeconds': m.timeToFirstTokenSeconds,
+                    'elapsedSeconds': m.elapsedSeconds,
+                    'peakPhysicalFootprintBytes': m.peakPhysicalFootprintBytes,
+                  },
+                },
+                'checks': [
+                  for (final check in result.checkResults)
+                    {
+                      'description': check.description,
+                      'required': check.required,
+                      'passed': check.passed,
+                    },
+                ],
+              },
+          ],
+        },
+    ],
+  };
+
+  String toJsonString() =>
+      const JsonEncoder.withIndent('  ').convert(toJson(includePaths: true));
+
+  /// The human-readable evidence. Carries labels, never absolute paths, so
+  /// a report can be committed under `docs/evals/` as-is.
+  String renderMarkdown() {
+    final buffer = StringBuffer()
+      ..writeln(
+        '# Golem model evaluation — '
+        '${createdAt.toIso8601String().substring(0, 10)}',
+      )
+      ..writeln()
+      ..writeln('- Host: $host')
+      ..writeln(
+        '- Engine pins: llama.cpp $llamaCppRelease '
+        '(`${llamaCppRevision.substring(0, 8)}`), '
+        'MLX Swift $mlxSwiftVersion / MLX Swift LM $mlxSwiftLmVersion',
+      )
+      ..writeln(
+        '- Mac numbers serve answer quality and relative comparison only — '
+        'never quote them as mobile performance '
+        '(`docs/notes/determinism-probe.md`).',
+      );
+    for (final combo in results) {
+      final artifact = artifacts[combo.combo.label];
+      buffer
+        ..writeln()
+        ..writeln('## ${combo.combo.label} · ${combo.combo.engine.name}')
+        ..writeln()
+        ..writeln(
+          '- Artifact: ${combo.combo.label}'
+          '${artifact?.sizeBytes == null ? '' : ' (${_gib(artifact!.sizeBytes!)} GiB)'}'
+          ' — ${artifact?.pinSummary ?? 'unknown'}',
+        )
+        ..writeln('- Load: ${combo.loadSeconds.toStringAsFixed(1)} s')
+        ..writeln(
+          '- Result: ${combo.failures.isEmpty ? 'PASS' : 'FAIL'}'
+          '${combo.failures.isEmpty ? '' : ' — ${combo.failures.length} failure(s)'}',
+        )
+        ..writeln()
+        ..writeln(
+          '| prompt | ok | decode tok/s | prompt tok/s | ttft s | peak GiB '
+          '| tokens | stop | fnv1a64 |',
+        )
+        ..writeln('| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
+      for (final result in combo.promptResults) {
+        final m = result.metrics;
+        buffer.writeln(
+          '| ${result.promptId} '
+          '| ${result.error != null ? 'error' : (result.passed ? 'pass' : 'FAIL')} '
+          '| ${m?.decodeTokensPerSecond.toStringAsFixed(1) ?? '—'} '
+          '| ${m?.promptTokensPerSecond.toStringAsFixed(1) ?? '—'} '
+          '| ${m?.timeToFirstTokenSeconds?.toStringAsFixed(3) ?? '—'} '
+          '| ${m?.peakPhysicalFootprintBytes == null ? '—' : _gib(m!.peakPhysicalFootprintBytes!)} '
+          '| ${m?.generatedTokenCount ?? '—'} '
+          '| ${result.stopReason ?? '—'} '
+          '| ${result.rawTextHash == null ? '—' : '`${result.rawTextHash}`'} |',
+        );
+      }
+      buffer
+        ..writeln()
+        ..writeln('### Answers');
+      for (final result in combo.promptResults) {
+        buffer
+          ..writeln()
+          ..writeln(
+            '#### ${result.promptId} — '
+            '${result.error != null ? 'error' : (result.passed ? 'pass' : 'FAIL')}',
+          );
+        if (result.error != null) {
+          buffer.writeln('> ${result.error}');
+          continue;
+        }
+        for (final check in result.checkResults) {
+          buffer.writeln('- ${check.passed ? '✅' : '❌'} ${check.description}');
+        }
+        buffer
+          ..writeln()
+          ..writeln(_quote(result.answer));
+        if (result.reasoning.isNotEmpty) {
+          buffer
+            ..writeln()
+            ..writeln(
+              'Reasoning (${result.reasoning.length} chars): '
+              '${_truncate(result.reasoning, 400)}',
+            );
+        }
+      }
+    }
+    return buffer.toString();
+  }
+
+  static String _gib(int bytes) =>
+      (bytes / (1024 * 1024 * 1024)).toStringAsFixed(2);
+
+  static String _quote(String text) =>
+      text.split('\n').map((line) => '> $line').join('\n');
+
+  static String _truncate(String text, int max) {
+    final collapsed = text.replaceAll(RegExp(r'\s+'), ' ');
+    if (collapsed.length <= max) return collapsed;
+    return '${collapsed.substring(0, max)}…';
+  }
+}

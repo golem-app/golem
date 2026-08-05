@@ -231,3 +231,36 @@ logs one `INFERNO_PROBE` line hashing the raw pre-parser output, and
 `integration_test/real_backend_probe_test.dart` drives one seeded
 generation through the chat UI with a fixed prompt. Findings live in
 `../docs/notes/determinism-probe.md`.
+
+## Model evaluation harness (macOS)
+
+`integration_test/model_eval_test.dart` turns model and quantization
+decisions into recorded evidence: it runs the fixed prompt set in
+`integration_test/eval/eval_spec.dart` against every requested
+artifact × engine combo, scores the parsed answer channel with
+deterministic checks, captures full broker metrics (decode/prompt tok/s,
+TTFT, peak footprint) under fixed seeds, and writes `report.json` plus a
+committable `report.md` per run. Fetch the pinned artifacts first
+(from `../packages/inferno`: `dart run tool/fetch_model.dart gguf` and
+`dart run tool/fetch_model.dart mlx`), then one command evaluates both
+engines:
+
+```sh
+flutter test integration_test/model_eval_test.dart -d macos --flavor qa \
+  --dart-define=GOLEM_EVAL_GGUF=/abs/path/model.gguf \
+  --dart-define=GOLEM_EVAL_MLX=/abs/path/mlx-model-dir
+```
+
+Both defines accept comma-separated lists (that is the quant-comparison
+mode); either may be omitted. `GOLEM_EVAL_OUT` overrides the report
+directory (default: the system temp dir — the exact paths are printed as
+`GOLEM_EVAL_REPORT` lines), and `GOLEM_EVAL_TEMPLATE` selects the model
+template (default `gemma4`; new models register in
+`integration_test/eval/eval_templates.dart`). The suite self-skips when
+no artifact is requested, and it must never be wired into CI. Keep
+evidence worth citing (quant choices, pin bumps, ADRs) as committed
+reports under `../docs/evals/`. The spec's `anchor-jupiter` prompt
+reuses the determinism probe's exact prompt and sampling, so its
+`fnv1a64` hash cross-references `../docs/notes/determinism-probe.md`.
+Mac numbers serve answer quality and relative comparison only — never
+quote them as mobile performance.
