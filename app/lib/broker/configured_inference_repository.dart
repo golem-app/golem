@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../core/repositories/contracts.dart';
 import '../core/repositories/fake_inference_repository.dart';
 import 'inferno_inference_repository.dart';
+import 'model_profile.dart';
 import 'runtime.dart';
 
 /// Selects deterministic inference by default and a real local runtime only
@@ -16,6 +17,10 @@ InferenceRepository createConfiguredInferenceRepository({
     defaultValue: 'fake',
   ),
   modelPath: const String.fromEnvironment('GOLEM_MODEL_PATH'),
+  modelProfile: const String.fromEnvironment(
+    'GOLEM_MODEL_PROFILE',
+    defaultValue: 'gemma4',
+  ),
   // A fixed seed pins sampling for cross-device determinism probes; regular
   // builds leave it unset (0 sentinel -> engine-default seeding).
   samplingSeed: const int.fromEnvironment('GOLEM_SAMPLING_SEED'),
@@ -30,6 +35,7 @@ InferenceRepository createConfiguredInferenceRepository({
 InferenceRepository selectInferenceRepository({
   required String backend,
   required String modelPath,
+  required String modelProfile,
   required Duration fakeStreamDelay,
   required String documentsDirectory,
   required BrokerRuntime Function() createRuntime,
@@ -55,10 +61,17 @@ InferenceRepository selectInferenceRepository({
       'GOLEM_INFERENCE_BACKEND must be fake, llama, or mlx.',
     ),
   };
+  final profile = modelProfiles[modelProfile];
+  if (profile == null) {
+    throw StateError(
+      'GOLEM_MODEL_PROFILE must be one of: ${modelProfiles.keys.join(', ')}.',
+    );
+  }
   return InfernoInferenceRepository(
     createRuntime(),
     engine: engine,
     modelPath: resolvedModelPath,
+    profile: profile,
     seed: samplingSeed == 0 ? null : samplingSeed,
   );
 }

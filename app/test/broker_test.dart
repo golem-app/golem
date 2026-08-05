@@ -12,6 +12,7 @@ import 'package:inferno/testing.dart';
 import 'package:golem_flutter/broker/gemma4_chat_template.dart';
 import 'package:golem_flutter/broker/hash.dart';
 import 'package:golem_flutter/broker/inferno_inference_repository.dart';
+import 'package:golem_flutter/broker/model_profile.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 
@@ -141,6 +142,7 @@ void main() {
     final repository = InfernoInferenceRepository(
       runtime,
       engine: BrokerEngine.mlx,
+      profile: const Gemma4Profile(),
       modelPath: '/local/model',
       seed: 9,
     );
@@ -189,6 +191,7 @@ void main() {
       final repository = InfernoInferenceRepository(
         _RecordingRuntime(),
         engine: BrokerEngine.llamaCpp,
+        profile: const Gemma4Profile(),
         modelPath: '/local/model',
         seed: seed,
       );
@@ -289,6 +292,7 @@ void main() {
       final repository = InfernoInferenceRepository(
         _MetricsRuntime(),
         engine: BrokerEngine.llamaCpp,
+        profile: const Gemma4Profile(),
         modelPath: '/local/model.gguf',
       );
       await repository.prepare();
@@ -313,6 +317,7 @@ void main() {
     final repository = InfernoInferenceRepository(
       runtime,
       engine: BrokerEngine.llamaCpp,
+      profile: const Gemma4Profile(),
       modelPath: '/local/model.gguf',
     );
     await repository.prepare();
@@ -325,6 +330,7 @@ void main() {
     final repository = InfernoInferenceRepository(
       runtime,
       engine: BrokerEngine.llamaCpp,
+      profile: const Gemma4Profile(),
       modelPath: '/local/model.gguf',
     );
     await repository.prepare();
@@ -348,6 +354,7 @@ void main() {
     final repository = InfernoInferenceRepository(
       runtime,
       engine: BrokerEngine.llamaCpp,
+      profile: const Gemma4Profile(),
       modelPath: '/local/model.gguf',
     );
     final first = repository.prepare();
@@ -361,6 +368,7 @@ void main() {
     final repository = InfernoInferenceRepository(
       _TruncatedRuntime(const ['<|channel>thought\nendless reasoning']),
       engine: BrokerEngine.llamaCpp,
+      profile: const Gemma4Profile(),
       modelPath: '/local/model.gguf',
     );
     expect(
@@ -388,6 +396,7 @@ void main() {
     final repository = InfernoInferenceRepository(
       _TruncatedRuntime(const ['A partial but visible ans']),
       engine: BrokerEngine.llamaCpp,
+      profile: const Gemma4Profile(),
       modelPath: '/local/model.gguf',
     );
     await repository.prepare();

@@ -26,10 +26,12 @@ final class _StubRuntime implements BrokerRuntime {
 InferenceRepository _select({
   required String backend,
   String modelPath = '',
+  String modelProfile = 'gemma4',
   int samplingSeed = 0,
 }) => selectInferenceRepository(
   backend: backend,
   modelPath: modelPath,
+  modelProfile: modelProfile,
   samplingSeed: samplingSeed,
   fakeStreamDelay: Duration.zero,
   documentsDirectory: '/documents',
@@ -92,6 +94,27 @@ void main() {
           (error) => error.message,
           'message',
           contains('must be fake, llama, or mlx'),
+        ),
+      ),
+    );
+  });
+
+  test('the default profile is gemma4 and unknown profiles fail loudly', () {
+    final repository =
+        _select(backend: 'llama', modelPath: '/models/m')
+            as InfernoInferenceRepository;
+    expect(repository.profile.key, 'gemma4');
+    expect(
+      () => _select(
+        backend: 'llama',
+        modelPath: '/models/m',
+        modelProfile: 'gemma5',
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          contains('GOLEM_MODEL_PROFILE'),
         ),
       ),
     );
