@@ -10,6 +10,7 @@ import 'package:inferno/inferno.dart';
 import 'package:inferno/testing.dart';
 
 import 'package:golem_flutter/broker/gemma4_chat_template.dart';
+import 'package:golem_flutter/broker/hash.dart';
 import 'package:golem_flutter/broker/inferno_inference_repository.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 import 'package:golem_flutter/core/domain/models.dart';
@@ -221,6 +222,19 @@ void main() {
 
     // Without a probe seed the line stays out of production logs entirely.
     expect(await probeLines(seed: null), isEmpty);
+  });
+
+  test('fnv1a64 matches the published vectors and the recorded probe', () {
+    // Offset basis for the empty input, then the classic single-byte vector.
+    expect(fnv1a64(''), 'cbf29ce484222325');
+    expect(fnv1a64('a'), 'af63dc4c8601ec8c');
+    // The cross-device probe answer recorded in
+    // docs/notes/determinism-probe.md; a hash change here would silently
+    // invalidate every recorded evidence report.
+    expect(
+      fnv1a64('The largest planet in the solar system is **Jupiter**.'),
+      'd710455907eadf55',
+    );
   });
 
   test('late thought channel resets a premature answer', () {
