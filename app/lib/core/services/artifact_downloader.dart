@@ -17,11 +17,17 @@ final class ArtifactFileComplete extends ArtifactFileEvent {
 }
 
 final class ArtifactFilePaused extends ArtifactFileEvent {
-  const ArtifactFilePaused();
+  const ArtifactFilePaused({this.userInitiated = true});
+
+  /// False when the OS or plugin paused the task uncommanded (network loss,
+  /// Android's transfer-service timeout) — the repository must then persist
+  /// the paused state itself, since no out-of-band pause() call did.
+  final bool userInitiated;
 }
 
 final class ArtifactFileCanceled extends ArtifactFileEvent {
-  const ArtifactFileCanceled();
+  const ArtifactFileCanceled({this.userInitiated = true});
+  final bool userInitiated;
 }
 
 final class ArtifactFileFailed extends ArtifactFileEvent {
@@ -56,13 +62,27 @@ abstract interface class ArtifactFileDownloader {
 /// plain downloads after ~9 minutes, and with allowPause the plugin
 /// auto-pauses and resumes to complete the file.
 final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
+  BackgroundArtifactDownloader({
+    this.uncommandedPauseGrace = const Duration(seconds: 15),
+  });
+
   // FileDownloader().updates is single-subscription; every per-file await-for
   // must tap one shared broadcast of it, created once per process.
   static final Stream<TaskUpdate> _updates = FileDownloader().updates
       .asBroadcastStream();
 
+  /// How long an uncommanded pause may sit before it is surfaced as a real
+  /// pause. Android's ~9-minute transfer-service timeout pauses the task and
+  /// the plugin resumes it moments later; finalizing on the first pause
+  /// event would flip the card to "Paused" every cycle on slow connections.
+  final Duration uncommandedPauseGrace;
+
   final Map<String, DownloadTask> _pausedTasks = {};
   Task? _current;
+  bool _userPause = false;
+  bool _userCancel = false;
+
+  static const _finalizePause = Object();
 
   @override
   Stream<ArtifactFileEvent> download({
@@ -73,12 +93,16 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
   }) async* {
     final pathKey = '$directory/$filename';
     final downloader = FileDownloader();
+    _userPause = false;
+    _userCancel = false;
     // Buffer updates from before enqueue completes: a small file can reach
     // its terminal status before a listener attached afterwards would see it.
-    final buffer = StreamController<TaskUpdate>();
+    final buffer = StreamController<Object>();
     final subscription = _updates.listen(buffer.add);
+    Timer? pauseFinalize;
     try {
-      var task = _pausedTasks.remove(pathKey);
+      final stashed = _pausedTasks.remove(pathKey);
+      var task = stashed;
       if (task != null && await downloader.taskCanResume(task)) {
         _current = task;
         if (!await downloader.resume(task)) {
@@ -88,6 +112,12 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
         task = null;
       }
       if (task == null) {
+        // A stale stashed task that cannot resume may still be live inside
+        // the plugin (e.g. it auto-resumed after an uncommanded pause);
+        // cancel it so a fresh enqueue never races it on the same file.
+        if (stashed != null) {
+          await downloader.cancelTaskWithId(stashed.taskId);
+        }
         task = DownloadTask(
           url: url,
           directory: directory,
@@ -105,7 +135,16 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
       }
       final taskId = task.taskId;
       await for (final update in buffer.stream) {
-        if (update.task.taskId != taskId) continue;
+        if (identical(update, _finalizePause)) {
+          _pausedTasks[pathKey] = task;
+          yield const ArtifactFilePaused(userInitiated: false);
+          return;
+        }
+        if (update is! TaskUpdate || update.task.taskId != taskId) continue;
+        // Any real update for this task supersedes a pending uncommanded
+        // pause — the plugin resumed it on its own.
+        pauseFinalize?.cancel();
+        pauseFinalize = null;
         switch (update) {
           case TaskProgressUpdate(:final progress) when progress >= 0:
             yield ArtifactFileProgress((progress * expectedBytes).round());
@@ -117,11 +156,17 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
                 yield const ArtifactFileComplete();
                 return;
               case TaskStatus.paused:
-                _pausedTasks[pathKey] = task;
-                yield const ArtifactFilePaused();
-                return;
+                if (_userPause) {
+                  _pausedTasks[pathKey] = task;
+                  yield const ArtifactFilePaused();
+                  return;
+                }
+                pauseFinalize = Timer(
+                  uncommandedPauseGrace,
+                  () => buffer.add(_finalizePause),
+                );
               case TaskStatus.canceled:
-                yield const ArtifactFileCanceled();
+                yield ArtifactFileCanceled(userInitiated: _userCancel);
                 return;
               case TaskStatus.failed || TaskStatus.notFound:
                 yield ArtifactFileFailed(
@@ -136,6 +181,7 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
         }
       }
     } finally {
+      pauseFinalize?.cancel();
       await subscription.cancel();
       await buffer.close();
     }
@@ -145,6 +191,7 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
   Future<void> pause() async {
     final task = _current;
     if (task is DownloadTask) {
+      _userPause = true;
       await FileDownloader().pause(task);
     }
   }
@@ -153,6 +200,7 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
   Future<void> cancel() async {
     final task = _current;
     if (task != null) {
+      _userCancel = true;
       await FileDownloader().cancelTaskWithId(task.taskId);
     }
   }

@@ -169,14 +169,30 @@ final class FakeModelManagementRepository implements ModelManagementRepository {
   Future<ModelState> cancel(String artifactKey) async {
     _entry(artifactKey);
     _stopRequested.add(artifactKey);
-    return _persist(_state.withArtifact(artifactKey, const ArtifactStatus()));
+    return _persist(
+      _withoutArtifact(
+        artifactKey,
+      ).withArtifact(artifactKey, const ArtifactStatus()),
+    );
   }
 
   @override
   Future<ModelState> delete(String artifactKey) async {
     _entry(artifactKey);
-    return _persist(_state.withArtifact(artifactKey, const ArtifactStatus()));
+    _stopRequested.add(artifactKey);
+    return _persist(
+      _withoutArtifact(
+        artifactKey,
+      ).withArtifact(artifactKey, const ArtifactStatus()),
+    );
   }
+
+  /// Removing the active artifact invalidates a loaded simulated runtime.
+  ModelState _withoutArtifact(String artifactKey) =>
+      artifactKey == activeArtifactKey &&
+          _state.runtime != RuntimePhase.unloaded
+      ? _state.copyWith(runtime: RuntimePhase.unloaded, clearFailure: true)
+      : _state;
 
   @override
   Future<ModelState> loadRuntime() async {

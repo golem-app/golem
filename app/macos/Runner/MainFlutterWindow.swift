@@ -62,7 +62,12 @@ class MainFlutterWindow: NSWindow {
         let values = try URL(fileURLWithPath: path).resourceValues(
           forKeys: [.volumeAvailableCapacityForImportantUsageKey]
         )
-        result(Int(values.volumeAvailableCapacityForImportantUsage ?? 0))
+        // nil capacity means "unknown", which must not read as zero free.
+        if let capacity = values.volumeAvailableCapacityForImportantUsage {
+          result(Int(capacity))
+        } else {
+          result(nil)
+        }
       } catch {
         result(FlutterError(code: "free-bytes", message: error.localizedDescription, details: nil))
       }

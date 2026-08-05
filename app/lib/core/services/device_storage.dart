@@ -1,8 +1,10 @@
 import 'package:flutter/services.dart';
 
 /// Free space on the volume containing a path, for download preflight.
+/// Returns null when the platform cannot determine it — "unknown" must skip
+/// the preflight rather than masquerade as zero free bytes.
 abstract interface class DiskSpaceProbe {
-  Future<int> freeBytes(String path);
+  Future<int?> freeBytes(String path);
 }
 
 /// Marks a directory as excluded from platform backups. Downloaded models
@@ -19,8 +21,8 @@ final class DeviceStorageChannel implements DiskSpaceProbe, BackupExclusion {
   static const _channel = MethodChannel('app.golem.flutter/storage');
 
   @override
-  Future<int> freeBytes(String path) async =>
-      await _channel.invokeMethod<int>('freeBytes', {'path': path}) ?? 0;
+  Future<int?> freeBytes(String path) =>
+      _channel.invokeMethod<int>('freeBytes', {'path': path});
 
   @override
   Future<void> exclude(String path) =>

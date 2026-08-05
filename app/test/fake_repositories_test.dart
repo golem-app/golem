@@ -160,6 +160,25 @@ void main() {
     );
   });
 
+  test('deleting the active simulated model unloads the runtime', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'golem-model-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final repository = FakeModelManagementRepository(
+      File('${directory.path}/model.json'),
+      catalog: _catalog,
+      activeArtifactKey: 'test-mlx',
+      stepDelay: Duration.zero,
+    );
+    await repository.load();
+    await repository.download('test-mlx').drain<void>();
+    expect((await repository.loadRuntime()).runtime, RuntimePhase.loaded);
+    final deleted = await repository.delete('test-mlx');
+    expect(deleted.statusOf('test-mlx').phase, ArtifactPhase.notDownloaded);
+    expect(deleted.runtime, RuntimePhase.unloaded);
+  });
+
   test('a fail-keyed artifact fails deterministically and can retry', () async {
     final directory = await Directory.systemTemp.createTemp(
       'golem-model-test-',

@@ -79,9 +79,9 @@ final class _ScriptedDownloader implements ArtifactFileDownloader {
 
 final class _FixedDiskSpace implements DiskSpaceProbe {
   _FixedDiskSpace(this.free);
-  int free;
+  int? free;
   @override
-  Future<int> freeBytes(String path) async => free;
+  Future<int?> freeBytes(String path) async => free;
 }
 
 final class _RecordingBackupExclusion implements BackupExclusion {
@@ -248,6 +248,116 @@ void main() {
     // _fileTwo is still fully present on disk; _fileOne was removed above.
     expect(resumed.statusOf('test-mlx').downloadedBytes, _contentTwo.length);
     expect(resumed.runtime, RuntimePhase.unloaded);
+  });
+
+  test('right-length forgeries are hashed, rejected, and re-fetched', () async {
+    // Stage both files at their exact pinned sizes with wrong content and no
+    // verification receipt — the sparse-file spoof from review.
+    for (final (path, length) in [
+      (_fileOne, _contentOne.length),
+      (_fileTwo, _contentTwo.length),
+    ]) {
+      final file = File('${temp.path}/documents/models/test-mlx/$path');
+      file.parent.createSync(recursive: true);
+      file.writeAsStringSync('#' * length);
+    }
+    final repo = repository();
+    await repo.load();
+    final states = await repo.download('test-mlx').toList();
+    // Both forgeries were hashed, deleted, and downloaded for real.
+    expect(downloader.requestedUrls, hasLength(2));
+    expect(states.last.statusOf('test-mlx').phase, ArtifactPhase.installed);
+    expect(
+      File(
+        '${temp.path}/documents/models/test-mlx/.golem-verified.json',
+      ).existsSync(),
+      isTrue,
+    );
+  });
+
+  test('the verified fast path needs the receipt, not just sizes', () async {
+    final repo = repository();
+    await repo.load();
+    await repo.download('test-mlx').drain<void>();
+
+    // Receipt present: a lost state file re-earns installed with no
+    // network and no re-hash prompt to the user beyond one tap.
+    File('${temp.path}/state/flutter-model-v2.json').deleteSync();
+    final rebuilt = repository();
+    expect(
+      (await rebuilt.load()).statusOf('test-mlx').phase,
+      ArtifactPhase.notDownloaded,
+    );
+    downloader.requestedUrls.clear();
+    final states = await rebuilt.download('test-mlx').toList();
+    expect(downloader.requestedUrls, isEmpty);
+    expect(states.last.statusOf('test-mlx').phase, ArtifactPhase.installed);
+
+    // Receipt missing: "installed" is not re-earned by size alone on load…
+    File(
+      '${temp.path}/documents/models/test-mlx/.golem-verified.json',
+    ).deleteSync();
+    final demoted = await repository().load();
+    expect(demoted.statusOf('test-mlx').phase, ArtifactPhase.notDownloaded);
+    // …and a download hashes the files in place instead of trusting them.
+    downloader.requestedUrls.clear();
+    final rehashed = await repository().download('test-mlx').toList();
+    expect(downloader.requestedUrls, isEmpty);
+    expect(
+      rehashed.map((state) => state.statusOf('test-mlx').phase),
+      contains(ArtifactPhase.verifying),
+    );
+    expect(rehashed.last.statusOf('test-mlx').phase, ArtifactPhase.installed);
+  });
+
+  test(
+    'an uncommanded pause is persisted instead of stranding the card',
+    () async {
+      downloader.terminalEvents[_fileOne] = const ArtifactFilePaused(
+        userInitiated: false,
+      );
+      final repo = repository();
+      await repo.load();
+      final states = await repo.download('test-mlx').toList();
+      final status = states.last.statusOf('test-mlx');
+      expect(status.phase, ArtifactPhase.paused);
+      expect(downloader.pauseCalls, 0);
+    },
+  );
+
+  test(
+    'delete stops an in-flight download and resets an active runtime',
+    () async {
+      final repo = repository(activeKey: 'test-mlx');
+      await repo.load();
+      await repo.download('test-mlx').drain<void>();
+      expect((await repo.loadRuntime()).runtime, RuntimePhase.loaded);
+
+      final deleted = await repo.delete('test-mlx');
+      expect(deleted.statusOf('test-mlx').phase, ArtifactPhase.notDownloaded);
+      // Deleting the weights cannot leave a loaded runtime behind…
+      expect(deleted.runtime, RuntimePhase.unloaded);
+      // …and delete cancels the downloader like cancel does.
+      expect(downloader.cancelCalls, 1);
+
+      // Relaunch reconciliation applies the same rule to persisted state.
+      await repo.download('test-mlx').drain<void>();
+      await repo.loadRuntime();
+      Directory(
+        '${temp.path}/documents/models/test-mlx',
+      ).deleteSync(recursive: true);
+      final reloaded = await repository(activeKey: 'test-mlx').load();
+      expect(reloaded.statusOf('test-mlx').phase, ArtifactPhase.notDownloaded);
+      expect(reloaded.runtime, RuntimePhase.unloaded);
+    },
+  );
+
+  test('an unknown free-space reading skips the preflight', () async {
+    diskSpace.free = null;
+    final repo = repository();
+    await repo.load();
+    final states = await repo.download('test-mlx').toList();
+    expect(states.last.statusOf('test-mlx').phase, ArtifactPhase.installed);
   });
 
   test('runtime refuses to load without an installed active model', () async {
