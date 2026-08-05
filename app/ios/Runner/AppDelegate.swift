@@ -12,5 +12,48 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "GolemStorage") else {
+      return
+    }
+    let channel = FlutterMethodChannel(
+      name: "app.golem.flutter/storage",
+      binaryMessenger: registrar.messenger()
+    )
+    channel.setMethodCallHandler(Self.handleStorageCall)
+  }
+
+  private static func handleStorageCall(
+    _ call: FlutterMethodCall, result: @escaping FlutterResult
+  ) {
+    guard
+      let arguments = call.arguments as? [String: Any],
+      let path = arguments["path"] as? String
+    else {
+      result(FlutterError(code: "bad-args", message: "Expected a path argument", details: nil))
+      return
+    }
+    switch call.method {
+    case "freeBytes":
+      do {
+        let values = try URL(fileURLWithPath: path).resourceValues(
+          forKeys: [.volumeAvailableCapacityForImportantUsageKey]
+        )
+        result(Int(values.volumeAvailableCapacityForImportantUsage ?? 0))
+      } catch {
+        result(FlutterError(code: "free-bytes", message: error.localizedDescription, details: nil))
+      }
+    case "excludeFromBackup":
+      do {
+        var url = URL(fileURLWithPath: path)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try url.setResourceValues(values)
+        result(nil)
+      } catch {
+        result(FlutterError(code: "exclude-backup", message: error.localizedDescription, details: nil))
+      }
+    default:
+      result(FlutterMethodNotImplemented)
+    }
   }
 }
