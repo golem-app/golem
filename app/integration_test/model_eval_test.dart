@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 import 'package:integration_test/integration_test.dart';
 
+import 'eval/eval_matrix.dart';
 import 'eval/eval_report.dart';
 import 'eval/eval_runner.dart';
 import 'eval/eval_spec.dart';
@@ -37,72 +38,10 @@ const _templateKey = String.fromEnvironment(
   defaultValue: 'gemma4',
 );
 
-List<String> _paths(String define) => define
-    .split(',')
-    .map((path) => path.trim())
-    .where((path) => path.isNotEmpty)
-    .toList();
-
-List<String> _segments(String path) => path
-    .split(Platform.pathSeparator)
-    .where((segment) => segment.isNotEmpty)
-    .toList();
-
-String _basename(String path) => _segments(path).last;
-
-/// Quant comparisons may point at same-named artifacts in different
-/// directories; identical labels would silently merge their report rows, so
-/// colliding labels are prefixed with their parent directory (and numbered
-/// as a last resort).
-List<EvalCombo> _disambiguated(List<EvalCombo> combos) {
-  final counts = <String, int>{};
-  for (final combo in combos) {
-    counts.update(combo.label, (count) => count + 1, ifAbsent: () => 1);
-  }
-  final used = <String>{};
-  return [
-    for (final combo in combos)
-      EvalCombo(
-        label: _uniqueLabel(combo, counts, used),
-        path: combo.path,
-        engine: combo.engine,
-      ),
-  ];
-}
-
-String _uniqueLabel(
-  EvalCombo combo,
-  Map<String, int> counts,
-  Set<String> used,
-) {
-  var label = combo.label;
-  if (counts[combo.label]! > 1) {
-    final segments = _segments(combo.path);
-    if (segments.length > 1) {
-      label = '${segments[segments.length - 2]}/${combo.label}';
-    }
-  }
-  var candidate = label;
-  var suffix = 2;
-  while (!used.add(candidate)) {
-    candidate = '$label#${suffix++}';
-  }
-  return candidate;
-}
-
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  final combos = _disambiguated([
-    for (final path in _paths(_gguf))
-      EvalCombo(
-        label: _basename(path),
-        path: path,
-        engine: BrokerEngine.llamaCpp,
-      ),
-    for (final path in _paths(_mlx))
-      EvalCombo(label: _basename(path), path: path, engine: BrokerEngine.mlx),
-  ]);
+  final combos = evalMatrixFromDefines(ggufDefine: _gguf, mlxDefine: _mlx);
   // Self-skips when no artifact is requested, so a plain integration-test
   // run (and CI, which never sets the defines) cannot start a model run.
   if (combos.isEmpty) {

@@ -50,7 +50,6 @@ EvalRunReport _fixtureReport() => EvalRunReport(
   artifacts: {
     _combo.label: const EvalArtifactRecord(
       label: 'model.gguf',
-      path: '/private/somewhere/model.gguf',
       sizeBytes: 2620370976,
       pinnedRepository: 'unsloth/gemma-4-E2B-it-qat-GGUF',
       pinnedRevision: '66a399f68ddd113b06dff02fca9523e55465d11d',
@@ -125,22 +124,39 @@ void main() {
       isNull,
     );
 
-    final mlxBytes = gemma4E2BMlx4Bit.files.fold<int>(
-      0,
-      (sum, file) => sum + file.bytes,
-    );
+    final mlxSizes = {
+      for (final file in gemma4E2BMlx4Bit.files) file.path: file.bytes,
+    };
     expect(
       matchPinnedArtifact(
         label: 'gemma-4-e2b-it-4bit',
-        sizeBytes: mlxBytes,
+        fileSizes: mlxSizes,
         engine: BrokerEngine.mlx,
       )?.repository,
       'mlx-community/gemma-4-e2b-it-4bit',
     );
+    // Stray extras (a .DS_Store) must not drop the citation…
     expect(
       matchPinnedArtifact(
         label: 'gemma-4-e2b-it-4bit',
-        sizeBytes: mlxBytes + 1,
+        fileSizes: {...mlxSizes, '.DS_Store': 6148},
+        engine: BrokerEngine.mlx,
+      ),
+      isNotNull,
+    );
+    // …but a wrong-sized or missing pinned file must.
+    expect(
+      matchPinnedArtifact(
+        label: 'gemma-4-e2b-it-4bit',
+        fileSizes: {...mlxSizes, 'model.safetensors': 1},
+        engine: BrokerEngine.mlx,
+      ),
+      isNull,
+    );
+    expect(
+      matchPinnedArtifact(
+        label: 'gemma-4-e2b-it-4bit',
+        fileSizes: {...mlxSizes}..remove('tokenizer.json'),
         engine: BrokerEngine.mlx,
       ),
       isNull,

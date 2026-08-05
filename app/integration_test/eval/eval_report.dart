@@ -11,27 +11,31 @@ const _knownArtifacts = <InfernoModelArtifact>[
   gemma4E2BMlx4Bit,
 ];
 
-/// Matches an on-disk artifact to a manifest pin. The name alone is not
-/// provenance — a requantized file with a pinned filename must not be cited
-/// as the pin — so a match requires the on-disk size to equal the pinned
-/// bytes too (the matched file's for a GGUF, the file sum for an MLX
-/// directory). Byte-identity still isn't proven; for that, re-fetch through
-/// `tool/fetch_model.dart`, which verifies SHA-256.
+/// Matches an artifact to a manifest pin. The name alone is not provenance —
+/// a requantized file with a pinned filename must not be cited as the pin —
+/// so a GGUF must also carry the pinned byte size, and an MLX directory must
+/// hold every pinned file at its exact pinned size ([fileSizes] is the
+/// on-disk inventory keyed by manifest-relative path; stray extras like
+/// `.DS_Store` are ignored). Byte-identity still isn't proven; for that,
+/// re-fetch through `tool/fetch_model.dart`, which verifies SHA-256.
 InfernoModelArtifact? matchPinnedArtifact({
   required String label,
-  required int? sizeBytes,
   required BrokerEngine engine,
+  int? sizeBytes,
+  Map<String, int>? fileSizes,
 }) {
-  if (sizeBytes == null) return null;
   for (final artifact in _knownArtifacts) {
     final matches = switch (engine) {
-      BrokerEngine.llamaCpp => artifact.files.any(
-        (file) => file.path.split('/').last == label && file.bytes == sizeBytes,
-      ),
+      BrokerEngine.llamaCpp =>
+        sizeBytes != null &&
+            artifact.files.any(
+              (file) =>
+                  file.path.split('/').last == label && file.bytes == sizeBytes,
+            ),
       BrokerEngine.mlx =>
         artifact.repository.split('/').last == label &&
-            artifact.files.fold<int>(0, (sum, file) => sum + file.bytes) ==
-                sizeBytes,
+            fileSizes != null &&
+            artifact.files.every((file) => fileSizes[file.path] == file.bytes),
     };
     if (matches) return artifact;
   }
@@ -41,14 +45,12 @@ InfernoModelArtifact? matchPinnedArtifact({
 final class EvalArtifactRecord {
   const EvalArtifactRecord({
     required this.label,
-    required this.path,
     this.sizeBytes,
     this.pinnedRepository,
     this.pinnedRevision,
   });
 
   final String label;
-  final String path;
   final int? sizeBytes;
   final String? pinnedRepository;
   final String? pinnedRevision;
@@ -58,28 +60,45 @@ final class EvalArtifactRecord {
       : '$pinnedRepository @ ${pinnedRevision!.substring(0, 8)}';
 }
 
-/// Stats an artifact on disk and matches it against the manifest pins.
+/// Stats an artifact on disk and matches it against the manifest pins. The
+/// directory total is informational only — a stray unreadable subdirectory
+/// degrades it to null instead of aborting the report, and pin matching
+/// stats the pinned paths directly.
 EvalArtifactRecord describeArtifact(EvalCombo combo) {
   final entity = FileSystemEntity.isDirectorySync(combo.path)
       ? Directory(combo.path)
       : File(combo.path);
   int? sizeBytes;
+  Map<String, int>? fileSizes;
   if (entity is File && entity.existsSync()) {
     sizeBytes = entity.lengthSync();
   } else if (entity is Directory && entity.existsSync()) {
-    sizeBytes = entity
-        .listSync(recursive: true)
-        .whereType<File>()
-        .fold<int>(0, (sum, file) => sum + file.lengthSync());
+    try {
+      sizeBytes = entity
+          .listSync(recursive: true)
+          .whereType<File>()
+          .fold<int>(0, (sum, file) => sum + file.lengthSync());
+    } on FileSystemException {
+      sizeBytes = null;
+    }
+    fileSizes = {
+      for (final artifact in _knownArtifacts)
+        if (artifact.repository.split('/').last == combo.label)
+          for (final pinnedFile in artifact.files)
+            if (File('${combo.path}/${pinnedFile.path}').existsSync())
+              pinnedFile.path: File(
+                '${combo.path}/${pinnedFile.path}',
+              ).lengthSync(),
+    };
   }
   final pinned = matchPinnedArtifact(
     label: combo.label,
-    sizeBytes: sizeBytes,
     engine: combo.engine,
+    sizeBytes: sizeBytes,
+    fileSizes: fileSizes,
   );
   return EvalArtifactRecord(
     label: combo.label,
-    path: combo.path,
     sizeBytes: sizeBytes,
     pinnedRepository: pinned?.repository,
     pinnedRevision: pinned?.revision,
