@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'app/app.dart';
 import 'broker/configured_inference_repository.dart';
+import 'broker/model_catalog.dart';
 import 'core/providers/app_providers.dart';
 import 'core/repositories/fake_benchmark_repository.dart';
 import 'core/repositories/fake_model_management_repository.dart';
@@ -34,9 +35,11 @@ Future<void> main() async {
             documentsDirectory: documents.path,
           ),
         ),
+        modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
         modelManagementRepositoryProvider.overrideWithValue(
           FakeModelManagementRepository(
-            File('${support.path}/flutter-model-v1.json'),
+            File('${support.path}/flutter-model-v2.json'),
+            catalog: modelCatalog,
           ),
         ),
         benchmarkRepositoryProvider.overrideWithValue(

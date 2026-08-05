@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
@@ -10,6 +11,29 @@ import 'package:golem_flutter/core/repositories/fake_model_management_repository
 
 Future<String> _fixtureAsset(String key) async =>
     '[{"role": "user", "content": "${'x' * 400}"}]';
+
+const _catalog = [
+  ModelCatalogEntry(
+    key: 'test-mlx',
+    displayName: 'Test MLX',
+    engine: ModelEngine.mlx,
+    quantization: '4-bit',
+    repository: 'example/test-mlx',
+    revision: '0123456789abcdef',
+    files: [
+      ModelArtifactFile(path: 'model.safetensors', bytes: 1200, sha256: 'aa'),
+    ],
+  ),
+  ModelCatalogEntry(
+    key: 'test-gguf',
+    displayName: 'Test GGUF',
+    engine: ModelEngine.gguf,
+    quantization: 'Q4_0',
+    repository: 'example/test-gguf',
+    revision: 'fedcba9876543210',
+    files: [ModelArtifactFile(path: 'model.gguf', bytes: 600, sha256: 'bb')],
+  ),
+];
 
 void main() {
   test(
@@ -64,7 +88,7 @@ void main() {
   });
 
   test(
-    'model download pauses, resumes, verifies, imports, guards, and persists',
+    'model download pauses, resumes, verifies, guards, and persists',
     () async {
       final directory = await Directory.systemTemp.createTemp(
         'golem-model-test-',
@@ -73,26 +97,87 @@ void main() {
       final file = File('${directory.path}/model.json');
       final repository = FakeModelManagementRepository(
         file,
+        catalog: _catalog,
+        activeArtifactKey: 'test-mlx',
         stepDelay: const Duration(milliseconds: 2),
       );
-      await repository.load();
-      final selected = await repository.selectBackend(BackendId.mlx);
-      expect(selected.runtime, RuntimePhase.unloaded);
-      final subscription = repository.downloadMlx().listen((_) {});
+      final initial = await repository.load();
+      expect(initial.simulated, isTrue);
+      expect(initial.activeArtifactKey, 'test-mlx');
+      // The runtime refuses to load before the active artifact is installed.
+      final refused = await repository.loadRuntime();
+      expect(refused.runtime, RuntimePhase.failed);
+      expect(refused.failure, contains('simulated model'));
+      final subscription = repository.download('test-mlx').listen((_) {});
       await Future<void>.delayed(const Duration(milliseconds: 5));
-      final paused = await repository.pauseMlx();
+      final paused = await repository.pause('test-mlx');
       await subscription.cancel();
-      expect(paused.mlxPhase, DownloadPhase.paused);
-      final completed = await repository.downloadMlx().last;
-      expect(completed.mlxPhase, DownloadPhase.installed);
+      expect(paused.statusOf('test-mlx').phase, ArtifactPhase.paused);
+      final resumedFrom = paused.statusOf('test-mlx').downloadedBytes;
+      expect(resumedFrom, greaterThan(0));
+      expect(resumedFrom, lessThan(1200));
+      final completed = await repository.download('test-mlx').last;
+      expect(completed.statusOf('test-mlx').phase, ArtifactPhase.installed);
+      expect(completed.statusOf('test-mlx').downloadedBytes, 1200);
       expect((await repository.loadRuntime()).runtime, RuntimePhase.loaded);
       expect((await repository.unloadRuntime()).runtime, RuntimePhase.unloaded);
-      final imported = await repository.importTurboFieldfare().last;
-      expect(imported.turboInstalled, isTrue);
-      final reloaded = await FakeModelManagementRepository(file).load();
-      expect(reloaded.mlxPhase, DownloadPhase.installed);
+      final reloaded = await FakeModelManagementRepository(
+        file,
+        catalog: _catalog,
+        activeArtifactKey: 'test-mlx',
+      ).load();
+      expect(reloaded.statusOf('test-mlx').phase, ArtifactPhase.installed);
+      expect(reloaded.simulated, isTrue);
     },
   );
+
+  test('model cancel discards progress and delete uninstalls', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'golem-model-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File('${directory.path}/model.json');
+    final repository = FakeModelManagementRepository(
+      file,
+      catalog: _catalog,
+      stepDelay: const Duration(milliseconds: 2),
+    );
+    await repository.load();
+    final subscription = repository.download('test-gguf').listen((_) {});
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+    final cancelled = await repository.cancel('test-gguf');
+    await subscription.cancel();
+    expect(cancelled.statusOf('test-gguf').phase, ArtifactPhase.notDownloaded);
+    expect(cancelled.statusOf('test-gguf').downloadedBytes, 0);
+    final installed = await repository.download('test-gguf').last;
+    expect(installed.statusOf('test-gguf').phase, ArtifactPhase.installed);
+    final deleted = await repository.delete('test-gguf');
+    expect(deleted.statusOf('test-gguf').phase, ArtifactPhase.notDownloaded);
+    expect(deleted.statusOf('test-gguf').downloadedBytes, 0);
+    expect(
+      () => repository.download('unknown').first,
+      throwsA(isA<ArgumentError>()),
+    );
+  });
+
+  test('a fail-keyed artifact fails deterministically and can retry', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'golem-model-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final repository = FakeModelManagementRepository(
+      File('${directory.path}/model.json'),
+      catalog: _catalog,
+      stepDelay: const Duration(milliseconds: 2),
+      failKeys: const {'test-gguf'},
+    );
+    await repository.load();
+    final failed = await repository.download('test-gguf').last;
+    final status = failed.statusOf('test-gguf');
+    expect(status.phase, ArtifactPhase.failed);
+    expect(status.failure, contains('Simulated'));
+    expect(status.downloadedBytes, greaterThan(0));
+  });
 
   test('benchmark result and export are unambiguously simulated', () async {
     final directory = await Directory.systemTemp.createTemp(

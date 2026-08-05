@@ -114,48 +114,39 @@ void main() {
     await tester.tap(find.byKey(const Key('open-settings')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('simulation-banner')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('backend-option-mlx')));
     final settingsScrollable = find.descendant(
       of: find.byKey(const Key('settings-list')),
       matching: find.byType(Scrollable),
     );
     final modelCommands = container.read(modelControllerProvider.notifier);
     var model = container.read(modelControllerProvider).requireValue;
-    if (model.mlxPhase != DownloadPhase.installed) {
+    if (model.statusOf('gemma4-mlx').phase != ArtifactPhase.installed) {
       await tester.scrollUntilVisible(
-        find.byKey(const Key('mlx-download-button')),
+        find.byKey(const Key('model-download-gemma4-mlx')),
         240,
         scrollable: settingsScrollable,
       );
-      await tester.tap(find.byKey(const Key('mlx-download-button')));
+      await tester.tap(find.byKey(const Key('model-download-gemma4-mlx')));
       await _pumpUntilFound(
         tester,
-        find.byKey(const Key('mlx-download-cancel-button')),
+        find.byKey(const Key('model-pause-gemma4-mlx')),
       );
       await tester.pump(const Duration(milliseconds: 220));
-      await tester.tap(find.byKey(const Key('mlx-download-cancel-button')));
+      await tester.tap(find.byKey(const Key('model-pause-gemma4-mlx')));
       await tester.pumpAndSettle();
       expect(
-        container.read(modelControllerProvider).requireValue.mlxPhase,
-        DownloadPhase.paused,
+        container
+            .read(modelControllerProvider)
+            .requireValue
+            .statusOf('gemma4-mlx')
+            .phase,
+        ArtifactPhase.paused,
       );
-      await modelCommands.downloadOrResumeMlx();
+      await modelCommands.download('gemma4-mlx');
       await tester.pump();
       model = container.read(modelControllerProvider).requireValue;
-      expect(model.mlxPhase, DownloadPhase.installed);
+      expect(model.statusOf('gemma4-mlx').phase, ArtifactPhase.installed);
     }
-
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('model-import-button')),
-      260,
-      scrollable: settingsScrollable,
-    );
-    await modelCommands.importTurboFieldfare();
-    await tester.pump();
-    expect(
-      container.read(modelControllerProvider).requireValue.importProgress,
-      1,
-    );
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('runtime-toggle-button')),

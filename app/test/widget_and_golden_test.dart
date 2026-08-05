@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
@@ -107,11 +108,22 @@ void main() {
     await _pumpWithRepositories(
       tester,
       brightness: Brightness.dark,
+      // 42% of the pinned Gemma MLX artifact, mid-pause, with the Qwen GGUF
+      // installed — exercises progress, resume, and delete affordances.
       model: const ModelState(
-        backend: BackendId.mlx,
-        mlxPhase: DownloadPhase.paused,
-        mlxProgress: 0.42,
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(
+            phase: ArtifactPhase.paused,
+            downloadedBytes: 1505735776,
+          ),
+          'qwen35-gguf': ArtifactStatus(
+            phase: ArtifactPhase.installed,
+            downloadedBytes: 2543899040,
+          ),
+        },
         runtime: RuntimePhase.unloaded,
+        activeArtifactKey: 'gemma4-mlx',
+        simulated: true,
       ),
       child: const SettingsScreen(),
     );
@@ -249,6 +261,7 @@ ProviderContainer _container({
       inferenceRepositoryProvider.overrideWithValue(
         FakeInferenceRepository(eventDelay: Duration.zero),
       ),
+      modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
       modelManagementRepositoryProvider.overrideWithValue(_ModelFake(model)),
       benchmarkRepositoryProvider.overrideWithValue(
         FakeBenchmarkRepository(
@@ -341,13 +354,13 @@ final class _ModelFake implements ModelManagementRepository {
   @override
   Future<ModelState> loadRuntime() async => state;
   @override
-  Future<ModelState> pauseMlx() async => state;
-  @override
-  Future<ModelState> selectBackend(BackendId backend) async => state;
-  @override
   Future<ModelState> unloadRuntime() async => state;
   @override
-  Stream<ModelState> downloadMlx() => Stream.value(state);
+  Stream<ModelState> download(String artifactKey) => Stream.value(state);
   @override
-  Stream<ModelState> importTurboFieldfare() => Stream.value(state);
+  Future<ModelState> pause(String artifactKey) async => state;
+  @override
+  Future<ModelState> cancel(String artifactKey) async => state;
+  @override
+  Future<ModelState> delete(String artifactKey) async => state;
 }

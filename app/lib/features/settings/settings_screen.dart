@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_identity.dart';
+import '../../core/domain/model_catalog.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
@@ -25,9 +27,8 @@ class SettingsScreen extends ConsumerWidget {
         bottom: false,
         child: model.when(
           loading: () => const Center(child: CupertinoActivityIndicator()),
-          error: (error, stack) => Center(
-            child: Text('Could not load simulated model state: $error'),
-          ),
+          error: (error, stack) =>
+              Center(child: Text('Could not load model state: $error')),
           data: (value) => _SettingsBody(model: value),
         ),
       ),
@@ -43,201 +44,58 @@ class _SettingsBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final chatValue = ref.watch(chatControllerProvider);
     final chats = chatValue.hasValue ? chatValue.requireValue : null;
+    final catalog = ref.watch(modelCatalogEntriesProvider);
+    // Downloads are serial, so the one card in a downloading phase is the
+    // live one; deriving it from watched state keeps a single source of
+    // truth instead of mirroring a controller field.
+    final downloadingKey = model.artifacts.entries
+        .where((entry) => entry.value.phase == ArtifactPhase.downloading)
+        .map((entry) => entry.key)
+        .firstOrNull;
+    final active = catalog
+        .where((entry) => entry.key == model.activeArtifactKey)
+        .firstOrNull;
     return ListView(
       key: const Key('settings-list'),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
       children: [
-        const _SimulationBanner(),
-        const SizedBox(height: 28),
-        const SectionHeader(
-          'Inference backend',
-          subtitle:
-              'Choose which fake model state drives the UI. No model runtime is included.',
+        if (model.simulated) ...[
+          const _SimulationBanner(),
+          const SizedBox(height: 28),
+        ],
+        SectionHeader(
+          'Models',
+          subtitle: model.simulated
+              ? 'A deterministic download simulation of the pinned catalog; no network access exists.'
+              : 'Pinned Hugging Face artifacts; every file is verified against its recorded SHA-256.',
         ),
         const SizedBox(height: 8),
-        GolemCard(
-          child: Column(
-            children: [
-              _BackendOption(
-                key: const Key('backend-option-mlx'),
-                title: 'Gemma 4 E2B QAT',
-                subtitle: 'MLX Swift · ${_mlxStatus(model)}',
-                selected: model.backend == BackendId.mlx,
-                onTap: () => ref
-                    .read(modelControllerProvider.notifier)
-                    .selectBackend(BackendId.mlx),
-              ),
-              const SizedBox(height: 10),
-              _BackendOption(
-                key: const Key('backend-option-turbofieldfare'),
-                title: 'Gemma 4 · 26B-A4B',
-                subtitle:
-                    'TurboFieldfare · ${model.turboInstalled ? 'Installed' : 'Not installed'}',
-                selected: model.backend == BackendId.turboFieldfare,
-                onTap: () => ref
-                    .read(modelControllerProvider.notifier)
-                    .selectBackend(BackendId.turboFieldfare),
-              ),
-            ],
+        for (final entry in catalog) ...[
+          _ModelCard(
+            entry: entry,
+            status: model.statusOf(entry.key),
+            simulated: model.simulated,
+            active: entry.key == model.activeArtifactKey,
+            otherDownloadActive:
+                downloadingKey != null && downloadingKey != entry.key,
           ),
-        ),
-        const SizedBox(height: 28),
-        const SectionHeader(
-          'MLX model',
-          subtitle:
-              'A deterministic download simulation; no HTTP client or Hugging Face access exists.',
-        ),
-        const SizedBox(height: 8),
-        GolemCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Gemma 4 E2B QAT',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                'Simulated size: 4.3 GB · MLX 4-bit',
-                style: TextStyle(
-                  color: CupertinoDynamicColor.resolve(
-                    GolemTheme.mutedInk,
-                    context,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Semantics(
-                key: const Key('mlx-model-status'),
-                label: 'MLX model status',
-                value: _mlxStatus(model),
-                child: _Status(icon: _mlxIcon(model), label: _mlxStatus(model)),
-              ),
-              if (model.mlxPhase == DownloadPhase.downloading ||
-                  model.mlxPhase == DownloadPhase.paused) ...[
-                const SizedBox(height: 14),
-                _Progress(
-                  value: model.mlxProgress,
-                  label: 'Simulated download',
-                ),
-              ],
-              if (model.mlxPhase == DownloadPhase.verifying) ...[
-                const SizedBox(height: 14),
-                const Row(
-                  children: [
-                    CupertinoActivityIndicator(),
-                    SizedBox(width: 10),
-                    Text('Verifying simulated files…'),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 14),
-              if (model.mlxPhase != DownloadPhase.installed)
-                CupertinoButton.filled(
-                  key: Key(
-                    model.mlxPhase == DownloadPhase.downloading
-                        ? 'mlx-download-cancel-button'
-                        : 'mlx-download-button',
-                  ),
-                  minimumSize: const Size.fromHeight(48),
-                  onPressed: model.mlxPhase == DownloadPhase.downloading
-                      ? () => ref
-                            .read(modelControllerProvider.notifier)
-                            .pauseMlx()
-                      : () => ref
-                            .read(modelControllerProvider.notifier)
-                            .downloadOrResumeMlx(),
-                  child: Text(
-                    model.mlxPhase == DownloadPhase.downloading
-                        ? 'Pause Simulation'
-                        : model.mlxProgress > 0
-                        ? 'Resume Simulated Download'
-                        : 'Simulate Download',
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 28),
-        const SectionHeader(
-          'TurboFieldfare model',
-          subtitle:
-              'This build only animates the states of a USB import; nothing is transferred.',
-        ),
-        const SizedBox(height: 8),
-        GolemCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Gemma 4 · 26B-A4B',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                'Simulated size: 14.29 GB · 16-slot LFU + pread',
-                style: TextStyle(
-                  color: CupertinoDynamicColor.resolve(
-                    GolemTheme.mutedInk,
-                    context,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Semantics(
-                key: const Key('model-status'),
-                label: 'TurboFieldfare model status',
-                value: model.turboInstalled
-                    ? 'Installed and verified, simulated'
-                    : 'Not installed',
-                child: _Status(
-                  icon: model.turboInstalled
-                      ? CupertinoIcons.check_mark_circled_solid
-                      : CupertinoIcons.archivebox,
-                  label: model.turboInstalled
-                      ? 'Installed and verified · simulated'
-                      : 'Waiting for simulated import',
-                ),
-              ),
-              if (model.importProgress > 0 && model.importProgress < 1) ...[
-                const SizedBox(height: 14),
-                _Progress(
-                  value: model.importProgress,
-                  label: 'Simulated verification',
-                ),
-              ],
-              const SizedBox(height: 14),
-              CupertinoButton(
-                key: const Key('model-import-button'),
-                color: GolemTheme.accent,
-                minimumSize: const Size.fromHeight(48),
-                onPressed: () => ref
-                    .read(modelControllerProvider.notifier)
-                    .importTurboFieldfare(),
-                child: Text(
-                  model.turboInstalled
-                      ? 'Re-run Import Simulation'
-                      : 'Simulate Import and Verify',
-                  style: const TextStyle(color: CupertinoColors.white),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 28),
+          const SizedBox(height: 12),
+        ],
+        const SizedBox(height: 16),
         const SectionHeader('Runtime'),
         const SizedBox(height: 8),
         GolemCard(
           child: Column(
             children: [
               LabeledRow(
-                label: 'Selected model',
-                value: model.backend == BackendId.mlx
-                    ? 'Gemma 4 E2B QAT'
-                    : 'Gemma 4 26B-A4B',
+                label: 'Active model',
+                value: active?.displayName ?? 'None · fake inference',
               ),
               const SizedBox(height: 10),
-              LabeledRow(label: 'State', value: _runtimeLabel(model.runtime)),
+              LabeledRow(
+                label: 'State',
+                value: _runtimeLabel(model.runtime, model.simulated),
+              ),
               if (model.failure != null) ...[
                 const SizedBox(height: 10),
                 Text(
@@ -259,8 +117,8 @@ class _SettingsBody extends ConsumerWidget {
                           .toggleRuntime(),
                 child: Text(
                   model.runtime == RuntimePhase.loaded
-                      ? 'Unload Simulated Runtime'
-                      : 'Load Simulated Runtime',
+                      ? 'Unload ${model.simulated ? 'Simulated ' : ''}Runtime'
+                      : 'Load ${model.simulated ? 'Simulated ' : ''}Runtime',
                   style: TextStyle(
                     color: model.runtime == RuntimePhase.loaded
                         ? CupertinoDynamicColor.resolve(
@@ -340,7 +198,9 @@ class _SettingsBody extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'UI evaluation build. It reads no other app\'s data and includes no model weights, network downloader, inference engine, or hardware measurement.',
+                model.simulated
+                    ? 'UI evaluation build. It reads no other app\'s data and includes no model weights, network downloader, inference engine, or hardware measurement.'
+                    : 'Model downloads fetch the pinned artifacts above from Hugging Face over HTTPS. Inference remains a build-time opt-in; nothing else touches the network.',
                 style: TextStyle(
                   color: CupertinoDynamicColor.resolve(
                     GolemTheme.mutedInk,
@@ -355,6 +215,266 @@ class _SettingsBody extends ConsumerWidget {
       ],
     );
   }
+}
+
+class _ModelCard extends ConsumerWidget {
+  const _ModelCard({
+    required this.entry,
+    required this.status,
+    required this.simulated,
+    required this.active,
+    required this.otherDownloadActive,
+  });
+
+  final ModelCatalogEntry entry;
+  final ArtifactStatus status;
+  final bool simulated;
+  final bool active;
+  final bool otherDownloadActive;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final controller = ref.read(modelControllerProvider.notifier);
+    final suffix = simulated ? ' · simulated' : '';
+    final statusLabel = _statusLabel(suffix);
+    return GolemCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  entry.displayName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (active) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: CupertinoDynamicColor.resolve(
+                      GolemTheme.accentSoft,
+                      context,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'ACTIVE',
+                    style: TextStyle(
+                      color: CupertinoDynamicColor.resolve(
+                        GolemTheme.accent,
+                        context,
+                      ),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 5),
+          Text(
+            '${_engineLabel(entry.engine)} · ${entry.quantization}',
+            style: TextStyle(
+              color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Semantics(
+            key: Key('model-status-${entry.key}'),
+            label: '${entry.displayName} ${_engineLabel(entry.engine)} status',
+            value: statusLabel,
+            child: _Status(icon: _statusIcon(), label: statusLabel),
+          ),
+          if (status.phase == ArtifactPhase.downloading ||
+              status.phase == ArtifactPhase.paused) ...[
+            const SizedBox(height: 14),
+            _Progress(
+              value: entry.totalBytes == 0
+                  ? 0
+                  : (status.downloadedBytes / entry.totalBytes).clamp(0, 1),
+              label: 'Download$suffix',
+            ),
+          ],
+          if (status.phase == ArtifactPhase.verifying) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                const CupertinoActivityIndicator(),
+                const SizedBox(width: 10),
+                Text('Verifying files$suffix…'),
+              ],
+            ),
+          ],
+          if (status.phase == ArtifactPhase.failed &&
+              status.failure != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              status.failure!,
+              style: const TextStyle(color: GolemTheme.destructive),
+            ),
+          ],
+          const SizedBox(height: 14),
+          GestureDetector(
+            key: Key('model-repository-${entry.key}'),
+            behavior: HitTestBehavior.opaque,
+            onTap: () => launchUrl(entry.repositoryUrl),
+            child: Semantics(
+              button: true,
+              label: 'Open ${entry.repository} on Hugging Face',
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: LabeledRow(
+                        label: 'Repository',
+                        value: entry.repository,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      CupertinoIcons.arrow_up_right_square,
+                      size: 15,
+                      color: CupertinoDynamicColor.resolve(
+                        GolemTheme.mutedInk,
+                        context,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          LabeledRow(label: 'Revision', value: entry.revision.substring(0, 12)),
+          const SizedBox(height: 6),
+          LabeledRow(
+            label: 'Size',
+            value:
+                '${_gigabytes(entry.totalBytes)} · '
+                '${entry.files.length} ${entry.files.length == 1 ? 'file' : 'files'}',
+          ),
+          ..._buttons(context, controller),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buttons(BuildContext context, ModelController controller) {
+    final download = CupertinoButton.filled(
+      key: Key('model-download-${entry.key}'),
+      minimumSize: const Size.fromHeight(48),
+      onPressed: otherDownloadActive
+          ? null
+          : () => controller.download(entry.key),
+      child: Text(switch (status.phase) {
+        ArtifactPhase.paused => 'Resume Download',
+        ArtifactPhase.failed => 'Retry Download',
+        _ => 'Download',
+      }),
+    );
+    final cancel = CupertinoButton(
+      key: Key('model-cancel-${entry.key}'),
+      minimumSize: const Size.fromHeight(48),
+      onPressed: () => controller.cancel(entry.key),
+      child: const Text(
+        'Cancel and Discard',
+        style: TextStyle(color: GolemTheme.destructive),
+      ),
+    );
+    return switch (status.phase) {
+      ArtifactPhase.notDownloaded => [const SizedBox(height: 14), download],
+      ArtifactPhase.downloading => [
+        const SizedBox(height: 14),
+        CupertinoButton.filled(
+          key: Key('model-pause-${entry.key}'),
+          minimumSize: const Size.fromHeight(48),
+          onPressed: () => controller.pause(entry.key),
+          child: const Text('Pause'),
+        ),
+        cancel,
+      ],
+      ArtifactPhase.paused || ArtifactPhase.failed => [
+        const SizedBox(height: 14),
+        download,
+        cancel,
+      ],
+      ArtifactPhase.verifying => const [],
+      ArtifactPhase.installed => [
+        const SizedBox(height: 14),
+        CupertinoButton(
+          key: Key('model-delete-${entry.key}'),
+          minimumSize: const Size.fromHeight(48),
+          onPressed: () => _confirmDelete(context, controller),
+          child: const Text(
+            'Delete Download',
+            style: TextStyle(color: GolemTheme.destructive),
+          ),
+        ),
+      ],
+    };
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    ModelController controller,
+  ) => showCupertinoDialog<void>(
+    context: context,
+    builder: (dialogContext) => CupertinoAlertDialog(
+      key: const Key('model-delete-dialog'),
+      title: Text('Delete ${entry.displayName}?'),
+      content: Text(
+        'Removes ${_gigabytes(entry.totalBytes)} from this device. '
+        'The model can be downloaded again later.',
+      ),
+      actions: [
+        CupertinoDialogAction(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('Keep'),
+        ),
+        CupertinoDialogAction(
+          key: const Key('confirm-model-delete'),
+          isDestructiveAction: true,
+          onPressed: () {
+            Navigator.of(dialogContext).pop();
+            controller.delete(entry.key);
+          },
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+
+  String _statusLabel(String suffix) => switch (status.phase) {
+    ArtifactPhase.notDownloaded => 'Not downloaded',
+    ArtifactPhase.downloading =>
+      'Downloading ${_gigabytes(status.downloadedBytes)} of '
+          '${_gigabytes(entry.totalBytes)}$suffix',
+    ArtifactPhase.paused =>
+      'Paused at ${_gigabytes(status.downloadedBytes)}$suffix',
+    ArtifactPhase.verifying => 'Verifying$suffix',
+    ArtifactPhase.installed => 'Installed and verified$suffix',
+    ArtifactPhase.failed => 'Download failed',
+  };
+
+  IconData _statusIcon() => switch (status.phase) {
+    ArtifactPhase.notDownloaded => CupertinoIcons.cloud_download,
+    ArtifactPhase.downloading => CupertinoIcons.arrow_down_circle_fill,
+    ArtifactPhase.paused => CupertinoIcons.pause_circle_fill,
+    ArtifactPhase.verifying => CupertinoIcons.check_mark_circled,
+    ArtifactPhase.installed => CupertinoIcons.check_mark_circled_solid,
+    ArtifactPhase.failed => CupertinoIcons.exclamationmark_triangle_fill,
+  };
 }
 
 class _SimulationBanner extends StatelessWidget {
@@ -386,87 +506,6 @@ class _SimulationBanner extends StatelessWidget {
           ),
         ),
       ],
-    ),
-  );
-}
-
-class _BackendOption extends StatelessWidget {
-  const _BackendOption({
-    required this.title,
-    required this.subtitle,
-    required this.selected,
-    required this.onTap,
-    super.key,
-  });
-  final String title;
-  final String subtitle;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    selected: selected,
-    button: true,
-    label: title,
-    value: selected ? 'Selected' : subtitle,
-    child: CupertinoButton(
-      padding: const EdgeInsets.all(12),
-      minimumSize: const Size.fromHeight(62),
-      onPressed: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: CupertinoDynamicColor.resolve(
-              selected ? GolemTheme.accent : GolemTheme.divider,
-              context,
-            ),
-            width: selected ? 2 : 1,
-          ),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: CupertinoDynamicColor.resolve(
-                        GolemTheme.ink,
-                        context,
-                      ),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: CupertinoDynamicColor.resolve(
-                        GolemTheme.mutedInk,
-                        context,
-                      ),
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              selected
-                  ? CupertinoIcons.check_mark_circled_solid
-                  : CupertinoIcons.circle,
-              color: CupertinoDynamicColor.resolve(
-                selected ? GolemTheme.accent : GolemTheme.mutedInk,
-                context,
-              ),
-            ),
-          ],
-        ),
-      ),
     ),
   );
 }
@@ -520,27 +559,17 @@ class _Progress extends StatelessWidget {
   );
 }
 
-String _mlxStatus(ModelState model) => switch (model.mlxPhase) {
-  DownloadPhase.notDownloaded => 'Not downloaded',
-  DownloadPhase.downloading =>
-    'Downloading ${(model.mlxProgress * 100).round()}% · simulated',
-  DownloadPhase.paused =>
-    'Download paused ${(model.mlxProgress * 100).round()}% · simulated',
-  DownloadPhase.verifying => 'Verifying · simulated',
-  DownloadPhase.installed => 'Installed and verified · simulated',
+String _engineLabel(ModelEngine engine) => switch (engine) {
+  ModelEngine.mlx => 'MLX',
+  ModelEngine.gguf => 'GGUF · llama.cpp',
 };
 
-IconData _mlxIcon(ModelState model) => switch (model.mlxPhase) {
-  DownloadPhase.notDownloaded => CupertinoIcons.cloud_download,
-  DownloadPhase.downloading => CupertinoIcons.arrow_down_circle_fill,
-  DownloadPhase.paused => CupertinoIcons.pause_circle_fill,
-  DownloadPhase.verifying => CupertinoIcons.check_mark_circled,
-  DownloadPhase.installed => CupertinoIcons.check_mark_circled_solid,
-};
+String _gigabytes(int bytes) =>
+    '${(bytes / 1000000000).toStringAsFixed(2)} GB';
 
-String _runtimeLabel(RuntimePhase phase) => switch (phase) {
+String _runtimeLabel(RuntimePhase phase, bool simulated) => switch (phase) {
   RuntimePhase.unloaded => 'Unloaded',
-  RuntimePhase.loading => 'Loading simulation…',
-  RuntimePhase.loaded => 'Ready · simulated',
+  RuntimePhase.loading => simulated ? 'Loading simulation…' : 'Loading…',
+  RuntimePhase.loaded => simulated ? 'Ready · simulated' : 'Ready',
   RuntimePhase.failed => 'Stopped',
 };
