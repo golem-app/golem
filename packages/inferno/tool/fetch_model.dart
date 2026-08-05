@@ -3,19 +3,29 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:inferno/inferno.dart';
 
+/// The fetchable pinned artifacts. `mlx`/`gguf` keep their historical
+/// Gemma meaning; new models add a prefixed key.
+const _artifacts = <String, InfernoModelArtifact>{
+  'mlx': gemma4E2BMlx4Bit,
+  'gguf': gemma4E2BGgufQ4,
+  'qwen-mlx': qwen35Mlx4Bit,
+  'qwen-gguf': qwen35GgufQ4,
+};
+
 /// Downloads a pinned model artifact for local benching and device
-/// validation. Usage: `dart run tool/fetch_model.dart <mlx|gguf> [directory]`.
+/// validation. Usage: `dart run tool/fetch_model.dart <key> [directory]`.
 /// Weights never enter the repository; the default destination is the
 /// gitignored `build/models/`.
 Future<void> main(List<String> arguments) async {
-  if (arguments.isEmpty || !const {'mlx', 'gguf'}.contains(arguments.first)) {
-    stderr.writeln('Usage: dart run tool/fetch_model.dart <mlx|gguf> [dir]');
+  final artifact = arguments.isEmpty ? null : _artifacts[arguments.first];
+  if (artifact == null) {
+    stderr.writeln(
+      'Usage: dart run tool/fetch_model.dart '
+      '<${_artifacts.keys.join('|')}> [dir]',
+    );
     exitCode = 64;
     return;
   }
-  final artifact = arguments.first == 'mlx'
-      ? gemma4E2BMlx4Bit
-      : gemma4E2BGgufQ4;
   final root = Directory(arguments.length > 1 ? arguments[1] : 'build/models');
   final destination = Directory(
     '${root.path}/${artifact.repository.split('/').last}',
