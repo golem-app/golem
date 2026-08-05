@@ -131,6 +131,29 @@ void main() {
     ).readAsString();
     expect(manifest, contains('android:label="@string/app_name"'));
     expect(manifest, contains('android:icon="@mipmap/ic_launcher"'));
+    // Release builds download models; without the main-manifest INTERNET
+    // permission only debug/profile builds would have network access.
+    expect(
+      manifest,
+      contains('<uses-permission android:name="android.permission.INTERNET"/>'),
+    );
+    expect(
+      manifest,
+      contains('android:dataExtractionRules="@xml/data_extraction_rules"'),
+    );
+    expect(manifest, contains('android:fullBackupContent="@xml/backup_rules"'));
+    // Downloaded models are re-fetchable and must stay out of backups and
+    // device transfers on every rules surface.
+    for (final rules in [
+      'android/app/src/main/res/xml/backup_rules.xml',
+      'android/app/src/main/res/xml/data_extraction_rules.xml',
+    ]) {
+      expect(
+        await File(rules).readAsString(),
+        contains('<exclude domain="root" path="app_flutter/models"/>'),
+        reason: rules,
+      );
+    }
 
     final activity = await File(
       'android/app/src/main/kotlin/app/golem/flutter/MainActivity.kt',

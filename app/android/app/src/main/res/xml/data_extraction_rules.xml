@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ backup and device-transfer rules: downloaded model artifacts
+     are re-fetchable pinned content and must stay out of cloud backups and
+     device-to-device transfers. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="app_flutter/models"/>
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="app_flutter/models"/>
+    </device-transfer>
+</data-extraction-rules>

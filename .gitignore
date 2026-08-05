@@ -15,3 +15,5 @@ build/
 
 # Device-run identity material (private/public key blobs); never commit.
 selfIdentity.plist
+
+references/

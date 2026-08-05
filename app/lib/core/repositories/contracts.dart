@@ -15,12 +15,25 @@ abstract interface class InferenceRepository {
   });
 }
 
+/// Per-artifact model management. Keys address entries of the injected
+/// catalog; operational failures (network, disk, verification) surface as
+/// [ArtifactPhase.failed] snapshots with a message — never as thrown errors.
 abstract interface class ModelManagementRepository {
   Future<ModelState> load();
-  Future<ModelState> selectBackend(BackendId backend);
-  Stream<ModelState> downloadMlx();
-  Future<ModelState> pauseMlx();
-  Stream<ModelState> importTurboFieldfare();
+
+  /// Starts, resumes, or retries the download for [artifactKey], emitting
+  /// persisted snapshots until it installs, fails, pauses, or is cancelled.
+  Stream<ModelState> download(String artifactKey);
+
+  /// Out-of-band stop that keeps partial data for a later [download].
+  Future<ModelState> pause(String artifactKey);
+
+  /// Out-of-band stop that discards partial data.
+  Future<ModelState> cancel(String artifactKey);
+
+  /// Removes an installed artifact from disk.
+  Future<ModelState> delete(String artifactKey);
+
   Future<ModelState> loadRuntime();
   Future<ModelState> unloadRuntime();
 }

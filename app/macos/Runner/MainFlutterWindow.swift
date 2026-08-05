@@ -37,7 +37,53 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
+    let storageChannel = FlutterMethodChannel(
+      name: "app.golem.flutter/storage",
+      binaryMessenger: flutterViewController.engine.binaryMessenger
+    )
+    storageChannel.setMethodCallHandler(Self.handleStorageCall)
+
     super.awakeFromNib()
+  }
+
+  private static func handleStorageCall(
+    _ call: FlutterMethodCall, result: @escaping FlutterResult
+  ) {
+    guard
+      let arguments = call.arguments as? [String: Any],
+      let path = arguments["path"] as? String
+    else {
+      result(FlutterError(code: "bad-args", message: "Expected a path argument", details: nil))
+      return
+    }
+    switch call.method {
+    case "freeBytes":
+      do {
+        let values = try URL(fileURLWithPath: path).resourceValues(
+          forKeys: [.volumeAvailableCapacityForImportantUsageKey]
+        )
+        // nil capacity means "unknown", which must not read as zero free.
+        if let capacity = values.volumeAvailableCapacityForImportantUsage {
+          result(Int(capacity))
+        } else {
+          result(nil)
+        }
+      } catch {
+        result(FlutterError(code: "free-bytes", message: error.localizedDescription, details: nil))
+      }
+    case "excludeFromBackup":
+      do {
+        var url = URL(fileURLWithPath: path)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try url.setResourceValues(values)
+        result(nil)
+      } catch {
+        result(FlutterError(code: "exclude-backup", message: error.localizedDescription, details: nil))
+      }
+    default:
+      result(FlutterMethodNotImplemented)
+    }
   }
 
   private static func clampedDefaultContentSize(for screen: NSScreen?) -> NSSize {

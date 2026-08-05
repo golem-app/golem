@@ -201,6 +201,54 @@ final class BenchmarkRepositoryProvider
 String _$benchmarkRepositoryHash() =>
     r'c71d916e23996f845670a9ad8da54540b73dcdb7';
 
+@ProviderFor(modelCatalogEntries)
+const modelCatalogEntriesProvider = ModelCatalogEntriesProvider._();
+
+final class ModelCatalogEntriesProvider
+    extends
+        $FunctionalProvider<
+          List<ModelCatalogEntry>,
+          List<ModelCatalogEntry>,
+          List<ModelCatalogEntry>
+        >
+    with $Provider<List<ModelCatalogEntry>> {
+  const ModelCatalogEntriesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'modelCatalogEntriesProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$modelCatalogEntriesHash();
+
+  @$internal
+  @override
+  $ProviderElement<List<ModelCatalogEntry>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  List<ModelCatalogEntry> create(Ref ref) {
+    return modelCatalogEntries(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<ModelCatalogEntry> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<ModelCatalogEntry>>(value),
+    );
+  }
+}
+
+String _$modelCatalogEntriesHash() =>
+    r'12eee37f81325029df04be2d9a3f438baf556399';
+
 @ProviderFor(ChatController)
 const chatControllerProvider = ChatControllerProvider._();
 
@@ -225,7 +273,7 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'13c3bcbbdef3fb96725e62268bb536a8e02d4527';
+String _$chatControllerHash() => r'2321102ea332afba8b334715888c912ef43b2a41';
 
 abstract class _$ChatController extends $AsyncNotifier<ChatState> {
   FutureOr<ChatState> build();
@@ -270,7 +318,7 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'890a5b7e817de00a4e332a31eb1cd1a7b7d7bcad';
+String _$modelControllerHash() => r'cfc48cddd0fd21c47c1164eb73c217768df81aba';
 
 abstract class _$ModelController extends $AsyncNotifier<ModelState> {
   FutureOr<ModelState> build();

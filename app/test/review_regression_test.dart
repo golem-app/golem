@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
+import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
@@ -16,6 +17,39 @@ import 'support/in_memory_chat_history_repository.dart';
 
 Future<String> _fixtureAsset(String key) async =>
     '[{"role": "user", "content": "${'x' * 400}"}]';
+
+const _catalog = [
+  ModelCatalogEntry(
+    key: 'test-mlx',
+    displayName: 'Test MLX',
+    engine: ModelEngine.mlx,
+    quantization: '4-bit',
+    repository: 'example/test-mlx',
+    revision: '0123456789abcdef',
+    files: [
+      ModelArtifactFile(path: 'model.safetensors', bytes: 1200, sha256: 'aa'),
+    ],
+  ),
+  ModelCatalogEntry(
+    key: 'test-gguf',
+    displayName: 'Test GGUF',
+    engine: ModelEngine.gguf,
+    quantization: 'Q4_0',
+    repository: 'example/test-gguf',
+    revision: 'fedcba9876543210',
+    files: [ModelArtifactFile(path: 'model.gguf', bytes: 600, sha256: 'bb')],
+  ),
+];
+
+FakeModelManagementRepository _fakeModels(
+  File file, {
+  Duration stepDelay = Duration.zero,
+}) => FakeModelManagementRepository(
+  file,
+  catalog: _catalog,
+  activeArtifactKey: 'test-mlx',
+  stepDelay: stepDelay,
+);
 
 void main() {
   Directory tempDir() {
@@ -58,25 +92,20 @@ void main() {
 
   test('model failure survives relaunch; unknown schema recovers', () async {
     final file = File('${tempDir().path}/model.json');
-    final first = FakeModelManagementRepository(file, stepDelay: Duration.zero);
+    final first = _fakeModels(file);
     await first.load();
-    await first.selectBackend(BackendId.mlx);
     final failed = await first.loadRuntime();
     expect(failed.runtime, RuntimePhase.failed);
     expect(failed.failure, isNotNull);
 
-    final second = FakeModelManagementRepository(
-      file,
-      stepDelay: Duration.zero,
-    );
-    final reloaded = await second.load();
+    final reloaded = await _fakeModels(file).load();
     expect(reloaded.runtime, RuntimePhase.failed);
     expect(reloaded.failure, failed.failure);
 
-    await file.writeAsString('{"schemaVersion": 2}');
-    final third = FakeModelManagementRepository(file, stepDelay: Duration.zero);
-    final fresh = await third.load();
-    expect(fresh.backend, BackendId.turboFieldfare);
+    await file.writeAsString('{"schemaVersion": 99}');
+    final fresh = await _fakeModels(file).load();
+    expect(fresh.artifacts, isEmpty);
+    expect(fresh.runtime, RuntimePhase.unloaded);
     expect(File('${file.path}.corrupt').existsSync(), isTrue);
   });
 
@@ -144,7 +173,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         modelManagementRepositoryProvider.overrideWithValue(
-          FakeModelManagementRepository(
+          _fakeModels(
             File('${tempDir().path}/model.json'),
             stepDelay: const Duration(milliseconds: 5),
           ),
@@ -154,38 +183,41 @@ void main() {
     addTearDown(container.dispose);
     await container.read(modelControllerProvider.future);
     final controller = container.read(modelControllerProvider.notifier);
-    await controller.selectBackend(BackendId.mlx);
 
-    final download = controller.downloadOrResumeMlx();
+    final download = controller.download('test-mlx');
     await Future<void>.delayed(const Duration(milliseconds: 12));
-    await controller.pauseMlx();
+    await controller.pause('test-mlx');
     await download;
-    final state = container.read(modelControllerProvider).requireValue;
-    expect(state.mlxPhase, DownloadPhase.paused);
-    expect(state.mlxProgress, greaterThan(0));
-    expect(state.mlxProgress, lessThan(1));
+    final status = container
+        .read(modelControllerProvider)
+        .requireValue
+        .statusOf('test-mlx');
+    expect(status.phase, ArtifactPhase.paused);
+    expect(status.downloadedBytes, greaterThan(0));
+    expect(status.downloadedBytes, lessThan(1200));
   });
 
   test('interrupted download relaunches as paused, not downloading', () async {
     final file = File('${tempDir().path}/model.json');
     await file.writeAsString(
-      '{"schemaVersion": 1, "backend": "mlx", "mlxPhase": "downloading", '
-      '"mlxProgress": 0.4, "turboInstalled": true, "runtime": "unloaded"}',
+      '{"schemaVersion": 2, "runtime": "unloaded", "failure": null, '
+      '"artifacts": {'
+      '"test-mlx": {"phase": "downloading", "downloadedBytes": 480}, '
+      '"removed-model": {"phase": "installed", "downloadedBytes": 9}}}',
     );
-    final repository = FakeModelManagementRepository(
-      file,
-      stepDelay: Duration.zero,
-    );
-    final state = await repository.load();
-    expect(state.mlxPhase, DownloadPhase.paused);
-    expect(state.mlxProgress, 0.4);
+    final state = await _fakeModels(file).load();
+    expect(state.statusOf('test-mlx').phase, ArtifactPhase.paused);
+    expect(state.statusOf('test-mlx').downloadedBytes, 480);
+    // The catalog is authoritative; state for entries it no longer contains
+    // is dropped on load.
+    expect(state.artifacts.containsKey('removed-model'), isFalse);
   });
 
   test('runtime toggle publishes the loading phase', () async {
     final container = ProviderContainer(
       overrides: [
         modelManagementRepositoryProvider.overrideWithValue(
-          FakeModelManagementRepository(
+          _fakeModels(
             File('${tempDir().path}/model.json'),
             stepDelay: const Duration(milliseconds: 5),
           ),
@@ -195,6 +227,8 @@ void main() {
     addTearDown(container.dispose);
     await container.read(modelControllerProvider.future);
     final controller = container.read(modelControllerProvider.notifier);
+    // The runtime only loads once the active artifact is installed.
+    await controller.download('test-mlx');
 
     final phases = <RuntimePhase>[];
     final subscription = container.listen(modelControllerProvider, (
@@ -205,12 +239,12 @@ void main() {
     });
     addTearDown(subscription.close);
 
-    await controller.toggleRuntime(); // loaded -> unloaded
     await controller.toggleRuntime(); // unloaded -> loading -> loaded
+    await controller.toggleRuntime(); // loaded -> unloaded
     expect(phases, [
-      RuntimePhase.unloaded,
       RuntimePhase.loading,
       RuntimePhase.loaded,
+      RuntimePhase.unloaded,
     ]);
   });
 
@@ -218,7 +252,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         modelManagementRepositoryProvider.overrideWithValue(
-          FakeModelManagementRepository(
+          _fakeModels(
             File('${tempDir().path}/model.json'),
             stepDelay: const Duration(milliseconds: 5),
           ),
@@ -228,21 +262,29 @@ void main() {
     addTearDown(container.dispose);
     await container.read(modelControllerProvider.future);
     final controller = container.read(modelControllerProvider.notifier);
-    await controller.selectBackend(BackendId.mlx);
 
-    final download = controller.downloadOrResumeMlx();
+    final download = controller.download('test-mlx');
     await Future<void>.delayed(const Duration(milliseconds: 8));
     await controller.toggleRuntime();
     final during = container.read(modelControllerProvider).requireValue;
     expect(during.runtime, isNot(RuntimePhase.loading));
-    await controller.pauseMlx();
+    await controller.download('test-gguf');
+    expect(
+      container
+          .read(modelControllerProvider)
+          .requireValue
+          .statusOf('test-gguf')
+          .phase,
+      ArtifactPhase.notDownloaded,
+    );
+    await controller.pause('test-mlx');
     await download;
     final after = container.read(modelControllerProvider).requireValue;
-    expect(after.mlxPhase, DownloadPhase.paused);
+    expect(after.statusOf('test-mlx').phase, ArtifactPhase.paused);
   });
 
   test('pause mid-delay is not overwritten by a late download step', () async {
-    final repository = FakeModelManagementRepository(
+    final repository = _fakeModels(
       File('${tempDir().path}/model.json'),
       stepDelay: const Duration(milliseconds: 10),
     );
@@ -254,19 +296,18 @@ void main() {
     addTearDown(container.dispose);
     await container.read(modelControllerProvider.future);
     final controller = container.read(modelControllerProvider.notifier);
-    await controller.selectBackend(BackendId.mlx);
 
-    final download = controller.downloadOrResumeMlx();
+    final download = controller.download('test-mlx');
     // Land the pause inside a step delay, not at a loop boundary.
     await Future<void>.delayed(const Duration(milliseconds: 15));
-    await controller.pauseMlx();
+    await controller.pause('test-mlx');
     await download;
     // Give any late repository write a chance to land before checking.
     await Future<void>.delayed(const Duration(milliseconds: 30));
 
     // A subsequent repository operation must not resurrect "downloading".
-    final after = await repository.selectBackend(BackendId.mlx);
-    expect(after.mlxPhase, DownloadPhase.paused);
+    final after = await repository.unloadRuntime();
+    expect(after.statusOf('test-mlx').phase, ArtifactPhase.paused);
   });
 
   test('benchmark selection and reruns clear stale results', () async {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../domain/app_state.dart';
+import '../domain/model_catalog.dart';
 import '../domain/models.dart';
 import '../repositories/contracts.dart';
 import '../startup/startup_sequence.dart';
@@ -28,6 +29,10 @@ ModelManagementRepository modelManagementRepository(Ref ref) =>
 @Riverpod(keepAlive: true)
 BenchmarkRepository benchmarkRepository(Ref ref) =>
     throw UnimplementedError('Override benchmarkRepositoryProvider at startup');
+
+@Riverpod(keepAlive: true)
+List<ModelCatalogEntry> modelCatalogEntries(Ref ref) =>
+    throw UnimplementedError('Override modelCatalogEntriesProvider at startup');
 
 @Riverpod(keepAlive: true)
 class ChatController extends _$ChatController {
@@ -350,44 +355,15 @@ class ChatController extends _$ChatController {
 @Riverpod(keepAlive: true)
 class ModelController extends _$ModelController {
   int _operationEpoch = 0;
-  // One mutating model operation at a time. Pause stays exempt: it is the
-  // escape hatch that ends an in-flight download.
+  // One mutating model operation at a time. Pause and cancel stay exempt:
+  // they are the escape hatches that end an in-flight download.
   bool _busy = false;
 
   @override
   Future<ModelState> build() =>
       ref.read(modelManagementRepositoryProvider).load();
 
-  Future<void> selectBackend(BackendId backend) async {
-    if (_busy || state.requireValue.runtime == RuntimePhase.loading) return;
-    state = AsyncData(
-      await ref.read(modelManagementRepositoryProvider).selectBackend(backend),
-    );
-  }
-
-  Future<void> downloadOrResumeMlx() async {
-    if (_busy) return;
-    _busy = true;
-    try {
-      final epoch = ++_operationEpoch;
-      await for (final value
-          in ref.read(modelManagementRepositoryProvider).downloadMlx()) {
-        if (!ref.mounted || epoch != _operationEpoch) return;
-        state = AsyncData(value);
-      }
-    } finally {
-      _busy = false;
-    }
-  }
-
-  Future<void> pauseMlx() async {
-    _operationEpoch++;
-    final value = await ref.read(modelManagementRepositoryProvider).pauseMlx();
-    if (!ref.mounted) return;
-    state = AsyncData(value);
-  }
-
-  Future<void> importTurboFieldfare() async {
+  Future<void> download(String artifactKey) async {
     if (_busy) return;
     _busy = true;
     try {
@@ -395,13 +371,74 @@ class ModelController extends _$ModelController {
       await for (final value
           in ref
               .read(modelManagementRepositoryProvider)
-              .importTurboFieldfare()) {
+              .download(artifactKey)) {
         if (!ref.mounted || epoch != _operationEpoch) return;
         state = AsyncData(value);
       }
+    } catch (error) {
+      // Operational failures arrive as failed-phase snapshots; anything that
+      // still throws must land on the card, not blank the whole screen as an
+      // AsyncError.
+      _publishFailure(artifactKey, error);
     } finally {
       _busy = false;
     }
+  }
+
+  Future<void> pause(String artifactKey) async {
+    _operationEpoch++;
+    try {
+      final value = await ref
+          .read(modelManagementRepositoryProvider)
+          .pause(artifactKey);
+      if (!ref.mounted) return;
+      state = AsyncData(value);
+    } catch (error) {
+      _publishFailure(artifactKey, error);
+    }
+  }
+
+  Future<void> cancel(String artifactKey) async {
+    _operationEpoch++;
+    try {
+      final value = await ref
+          .read(modelManagementRepositoryProvider)
+          .cancel(artifactKey);
+      if (!ref.mounted) return;
+      state = AsyncData(value);
+    } catch (error) {
+      _publishFailure(artifactKey, error);
+    }
+  }
+
+  Future<void> delete(String artifactKey) async {
+    if (_busy) return;
+    _busy = true;
+    try {
+      final value = await ref
+          .read(modelManagementRepositoryProvider)
+          .delete(artifactKey);
+      if (!ref.mounted) return;
+      state = AsyncData(value);
+    } catch (error) {
+      _publishFailure(artifactKey, error);
+    } finally {
+      _busy = false;
+    }
+  }
+
+  void _publishFailure(String artifactKey, Object error) {
+    if (!ref.mounted) return;
+    final current = state.value;
+    if (current == null) return;
+    state = AsyncData(
+      current.withArtifact(
+        artifactKey,
+        current
+            .statusOf(artifactKey)
+            .copyWith(phase: ArtifactPhase.failed, failure: '$error'),
+      ),
+    );
   }
 
   Future<void> toggleRuntime() async {

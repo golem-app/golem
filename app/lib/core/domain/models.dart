@@ -2,9 +2,14 @@ import 'dart:convert';
 
 enum MessageRole { user, assistant }
 
-enum BackendId { mlx, turboFieldfare }
-
-enum DownloadPhase { notDownloaded, downloading, paused, verifying, installed }
+enum ArtifactPhase {
+  notDownloaded,
+  downloading,
+  paused,
+  verifying,
+  installed,
+  failed,
+}
 
 enum RuntimePhase { unloaded, loading, loaded, failed }
 
@@ -228,75 +233,125 @@ final class CompletedEvent extends InferenceEvent {
   const CompletedEvent();
 }
 
-final class ModelState {
-  const ModelState({
-    this.backend = BackendId.turboFieldfare,
-    this.mlxPhase = DownloadPhase.notDownloaded,
-    this.mlxProgress = 0,
-    this.turboInstalled = true,
-    this.importProgress = 0,
-    this.runtime = RuntimePhase.loaded,
+final class ArtifactStatus {
+  const ArtifactStatus({
+    this.phase = ArtifactPhase.notDownloaded,
+    this.downloadedBytes = 0,
     this.failure,
   });
 
-  final BackendId backend;
-  final DownloadPhase mlxPhase;
-  final double mlxProgress;
-  final bool turboInstalled;
-  final double importProgress;
+  final ArtifactPhase phase;
+
+  /// Verified-plus-in-flight bytes on disk; the UI derives fractions from the
+  /// catalog's total, so persistence never stores a stale percentage.
+  final int downloadedBytes;
+
+  /// Non-null only when [phase] is [ArtifactPhase.failed].
+  final String? failure;
+
+  ArtifactStatus copyWith({
+    ArtifactPhase? phase,
+    int? downloadedBytes,
+    String? failure,
+    bool clearFailure = false,
+  }) => ArtifactStatus(
+    phase: phase ?? this.phase,
+    downloadedBytes: downloadedBytes ?? this.downloadedBytes,
+    failure: clearFailure ? null : failure ?? this.failure,
+  );
+
+  Map<String, Object?> toJson() => {
+    'phase': phase.name,
+    'downloadedBytes': downloadedBytes,
+    'failure': failure,
+  };
+
+  factory ArtifactStatus.fromJson(Map<String, Object?> json) => ArtifactStatus(
+    phase: ArtifactPhase.values.byName(
+      json['phase'] as String? ?? 'notDownloaded',
+    ),
+    downloadedBytes: json['downloadedBytes'] as int? ?? 0,
+    failure: json['failure'] as String?,
+  );
+}
+
+final class ModelState {
+  const ModelState({
+    this.artifacts = const {},
+    this.runtime = RuntimePhase.unloaded,
+    this.failure,
+    this.activeArtifactKey,
+    this.simulated = false,
+  });
+
+  final Map<String, ArtifactStatus> artifacts;
   final RuntimePhase runtime;
   final String? failure;
 
-  bool get activeModelInstalled => backend == BackendId.mlx
-      ? mlxPhase == DownloadPhase.installed
-      : turboInstalled;
+  /// Stamped by the repository from its configuration; never persisted.
+  final String? activeArtifactKey;
+
+  /// True when the backing repository simulates downloads; drives every
+  /// "simulated" label in the UI so honesty follows the wiring.
+  final bool simulated;
+
+  ArtifactStatus statusOf(String key) =>
+      artifacts[key] ?? const ArtifactStatus();
+
+  bool get activeModelInstalled =>
+      activeArtifactKey != null &&
+      statusOf(activeArtifactKey!).phase == ArtifactPhase.installed;
 
   ModelState copyWith({
-    BackendId? backend,
-    DownloadPhase? mlxPhase,
-    double? mlxProgress,
-    bool? turboInstalled,
-    double? importProgress,
+    Map<String, ArtifactStatus>? artifacts,
     RuntimePhase? runtime,
     String? failure,
     bool clearFailure = false,
   }) => ModelState(
-    backend: backend ?? this.backend,
-    mlxPhase: mlxPhase ?? this.mlxPhase,
-    mlxProgress: mlxProgress ?? this.mlxProgress,
-    turboInstalled: turboInstalled ?? this.turboInstalled,
-    importProgress: importProgress ?? this.importProgress,
+    artifacts: artifacts ?? this.artifacts,
     runtime: runtime ?? this.runtime,
     failure: clearFailure ? null : failure ?? this.failure,
+    activeArtifactKey: activeArtifactKey,
+    simulated: simulated,
   );
 
-  // importProgress is deliberately not serialized: an import cannot survive
-  // a relaunch, so persisted in-flight progress would only render a stuck bar.
+  ModelState withArtifact(String key, ArtifactStatus status) =>
+      copyWith(artifacts: {...artifacts, key: status});
+
+  /// Applies repository wiring to a freshly deserialized state; [copyWith]
+  /// then carries the stamps through every subsequent transition.
+  ModelState stamp({String? activeArtifactKey, required bool simulated}) =>
+      ModelState(
+        artifacts: artifacts,
+        runtime: runtime,
+        failure: failure,
+        activeArtifactKey: activeArtifactKey,
+        simulated: simulated,
+      );
+
+  // activeArtifactKey and simulated are stamped from repository wiring on
+  // every load, so persisting them would only let stale configuration lie.
   Map<String, Object?> toJson() => {
-    'schemaVersion': 1,
-    'backend': backend.name,
-    'mlxPhase': mlxPhase.name,
-    'mlxProgress': mlxProgress,
-    'turboInstalled': turboInstalled,
+    'schemaVersion': 2,
     'runtime': runtime.name,
     'failure': failure,
+    'artifacts': artifacts.map((key, status) => MapEntry(key, status.toJson())),
   };
 
   factory ModelState.fromJson(Map<String, Object?> json) {
-    if (json['schemaVersion'] != 1) {
+    if (json['schemaVersion'] != 2) {
       throw const FormatException('Unsupported model state schema');
     }
+    final artifacts = (json['artifacts'] as Map? ?? const {}).map(
+      (key, value) => MapEntry(
+        key as String,
+        ArtifactStatus.fromJson(Map<String, Object?>.from(value as Map)),
+      ),
+    );
     return ModelState(
-      backend: BackendId.values.byName(
-        json['backend'] as String? ?? 'turboFieldfare',
-      ),
-      mlxPhase: DownloadPhase.values.byName(
-        json['mlxPhase'] as String? ?? 'notDownloaded',
-      ),
-      mlxProgress: (json['mlxProgress'] as num? ?? 0).toDouble(),
-      turboInstalled: json['turboInstalled'] as bool? ?? true,
+      artifacts: artifacts,
       runtime: RuntimePhase.values.byName(
-        json['runtime'] as String? ?? 'loaded',
+        json['runtime'] as String? ?? 'unloaded',
       ),
       failure: json['failure'] as String?,
     );

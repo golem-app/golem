@@ -1,19 +1,34 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
+import '../domain/model_catalog.dart';
 import '../domain/models.dart';
 import 'contracts.dart';
 
 final class FakeModelManagementRepository implements ModelManagementRepository {
   FakeModelManagementRepository(
     this.file, {
+    required this.catalog,
     this.stepDelay = const Duration(milliseconds: 90),
-  });
+    this.activeArtifactKey = 'gemma4-mlx',
+    this.failKeys = const {},
+  }) {
+    _state = ModelState(activeArtifactKey: activeArtifactKey, simulated: true);
+  }
+
   final File file;
+  final List<ModelCatalogEntry> catalog;
   final Duration stepDelay;
-  ModelState _state = const ModelState();
-  bool _pauseRequested = false;
+  final String activeArtifactKey;
+
+  /// Keys whose simulated download fails deterministically at the halfway
+  /// point — the test hook for the failed phase.
+  final Set<String> failKeys;
+
+  late ModelState _state;
+  final Set<String> _stopRequested = {};
   Future<void> _writes = Future.value();
 
   Future<ModelState> _persist(ModelState value) async {
@@ -31,11 +46,21 @@ final class FakeModelManagementRepository implements ModelManagementRepository {
     return value;
   }
 
+  ModelCatalogEntry _entry(String artifactKey) => catalog.firstWhere(
+    (entry) => entry.key == artifactKey,
+    orElse: () => throw ArgumentError.value(
+      artifactKey,
+      'artifactKey',
+      'Unknown catalog entry',
+    ),
+  );
+
   @override
   Future<ModelState> load() async {
     if (await file.exists()) {
+      var loaded = const ModelState();
       try {
-        _state = ModelState.fromJson(
+        loaded = ModelState.fromJson(
           Map<String, Object?>.from(
             jsonDecode(await file.readAsString()) as Map,
           ),
@@ -44,71 +69,130 @@ final class FakeModelManagementRepository implements ModelManagementRepository {
         // Preserve an unreadable or unknown-schema file and fall back to the
         // default simulated state rather than failing startup.
         await file.rename('${file.path}.corrupt');
-        _state = const ModelState();
       }
+      _state = loaded.stamp(
+        activeArtifactKey: activeArtifactKey,
+        simulated: true,
+      );
       if (_state.runtime == RuntimePhase.loading) {
         _state = _state.copyWith(runtime: RuntimePhase.unloaded);
       }
-      // Nothing drives a persisted "downloading"/"verifying" phase after a
-      // relaunch; normalize it to paused so the user resumes from the saved
-      // progress instead of staring at a stuck live state.
-      if (_state.mlxPhase == DownloadPhase.downloading ||
-          _state.mlxPhase == DownloadPhase.verifying) {
-        _state = _state.copyWith(mlxPhase: DownloadPhase.paused);
-      }
+      // The catalog is authoritative: drop keys it no longer contains, and
+      // normalize live phases — nothing drives a persisted "downloading" or
+      // "verifying" after a relaunch, so they become paused at the saved
+      // byte count instead of staring at a stuck live state.
+      final known = {for (final entry in catalog) entry.key};
+      _state = _state.copyWith(
+        artifacts: {
+          for (final MapEntry(:key, :value) in _state.artifacts.entries)
+            if (known.contains(key))
+              key: switch (value.phase) {
+                ArtifactPhase.downloading || ArtifactPhase.verifying =>
+                  value.copyWith(phase: ArtifactPhase.paused),
+                _ => value,
+              },
+        },
+      );
     }
     return _state;
   }
 
   @override
-  Future<ModelState> selectBackend(BackendId backend) => _persist(
-    _state.copyWith(backend: backend, runtime: RuntimePhase.unloaded),
-  );
-
-  @override
-  Stream<ModelState> downloadMlx() async* {
-    _pauseRequested = false;
-    var progress = _state.mlxProgress;
-    while (progress < 1 && !_pauseRequested) {
+  Stream<ModelState> download(String artifactKey) async* {
+    final entry = _entry(artifactKey);
+    _stopRequested.remove(artifactKey);
+    var bytes = _state.statusOf(artifactKey).downloadedBytes;
+    final step = max(entry.totalBytes ~/ 12, 1);
+    final failAt = failKeys.contains(artifactKey) ? entry.totalBytes ~/ 2 : -1;
+    while (bytes < entry.totalBytes) {
       await Future<void>.delayed(stepDelay);
-      // Re-check after the delay: a pause that arrived mid-delay must not be
-      // overwritten by one more downloading step, or the repository would
-      // disagree with the paused state the UI already shows.
-      if (_pauseRequested) break;
-      progress = (progress + 0.08).clamp(0, 1);
+      // Re-check after the delay: a pause or cancel that arrived mid-delay
+      // must not be overwritten by one more downloading step, or the
+      // repository would disagree with the state the UI already shows.
+      if (_stopRequested.contains(artifactKey)) return;
+      bytes = min(bytes + step, entry.totalBytes);
+      if (failAt >= 0 && bytes >= failAt) {
+        yield await _persist(
+          _state.withArtifact(
+            artifactKey,
+            ArtifactStatus(
+              phase: ArtifactPhase.failed,
+              downloadedBytes: bytes,
+              failure: 'Simulated download failure.',
+            ),
+          ),
+        );
+        return;
+      }
       yield await _persist(
-        _state.copyWith(
-          mlxPhase: DownloadPhase.downloading,
-          mlxProgress: progress,
+        _state.withArtifact(
+          artifactKey,
+          ArtifactStatus(
+            phase: ArtifactPhase.downloading,
+            downloadedBytes: bytes,
+          ),
         ),
       );
     }
-    if (_pauseRequested) {
-      yield await _persist(_state.copyWith(mlxPhase: DownloadPhase.paused));
-      return;
-    }
-    yield await _persist(_state.copyWith(mlxPhase: DownloadPhase.verifying));
-    await Future<void>.delayed(stepDelay * 2);
     yield await _persist(
-      _state.copyWith(mlxPhase: DownloadPhase.installed, mlxProgress: 1),
+      _state.withArtifact(
+        artifactKey,
+        ArtifactStatus(phase: ArtifactPhase.verifying, downloadedBytes: bytes),
+      ),
+    );
+    await Future<void>.delayed(stepDelay * 2);
+    if (_stopRequested.contains(artifactKey)) return;
+    yield await _persist(
+      _state.withArtifact(
+        artifactKey,
+        ArtifactStatus(
+          phase: ArtifactPhase.installed,
+          downloadedBytes: entry.totalBytes,
+        ),
+      ),
     );
   }
 
   @override
-  Future<ModelState> pauseMlx() async {
-    _pauseRequested = true;
-    return _persist(_state.copyWith(mlxPhase: DownloadPhase.paused));
+  Future<ModelState> pause(String artifactKey) async {
+    _entry(artifactKey);
+    _stopRequested.add(artifactKey);
+    return _persist(
+      _state.withArtifact(
+        artifactKey,
+        _state.statusOf(artifactKey).copyWith(phase: ArtifactPhase.paused),
+      ),
+    );
   }
 
   @override
-  Stream<ModelState> importTurboFieldfare() async* {
-    for (var step = 1; step <= 10; step++) {
-      await Future<void>.delayed(stepDelay);
-      yield await _persist(
-        _state.copyWith(importProgress: step / 10, turboInstalled: step == 10),
-      );
-    }
+  Future<ModelState> cancel(String artifactKey) async {
+    _entry(artifactKey);
+    _stopRequested.add(artifactKey);
+    return _persist(
+      _withoutArtifact(
+        artifactKey,
+      ).withArtifact(artifactKey, const ArtifactStatus()),
+    );
   }
+
+  @override
+  Future<ModelState> delete(String artifactKey) async {
+    _entry(artifactKey);
+    _stopRequested.add(artifactKey);
+    return _persist(
+      _withoutArtifact(
+        artifactKey,
+      ).withArtifact(artifactKey, const ArtifactStatus()),
+    );
+  }
+
+  /// Removing the active artifact invalidates a loaded simulated runtime.
+  ModelState _withoutArtifact(String artifactKey) =>
+      artifactKey == activeArtifactKey &&
+          _state.runtime != RuntimePhase.unloaded
+      ? _state.copyWith(runtime: RuntimePhase.unloaded, clearFailure: true)
+      : _state;
 
   @override
   Future<ModelState> loadRuntime() async {
