@@ -9,6 +9,8 @@ import 'eval_runner.dart';
 const _knownArtifacts = <InfernoModelArtifact>[
   gemma4E2BGgufQ4,
   gemma4E2BMlx4Bit,
+  qwen35GgufQ4,
+  qwen35Mlx4Bit,
 ];
 
 /// Matches an artifact to a manifest pin. The name alone is not provenance —

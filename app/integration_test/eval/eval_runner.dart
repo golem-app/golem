@@ -1,8 +1,8 @@
 import 'package:golem_flutter/broker/hash.dart';
+import 'package:golem_flutter/broker/model_profile.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 
 import 'eval_spec.dart';
-import 'eval_templates.dart';
 
 /// One artifact × engine cell of the evaluation matrix.
 final class EvalCombo {
@@ -89,7 +89,7 @@ final class EvalComboResult {
 Future<EvalComboResult> runEvalCombo({
   required BrokerRuntime runtime,
   required EvalCombo combo,
-  required EvalTemplate template,
+  required ModelProfile profile,
   required List<EvalPrompt> prompts,
   void Function(String message)? onProgress,
 }) async {
@@ -102,7 +102,7 @@ Future<EvalComboResult> runEvalCombo({
       '[${combo.label} · ${combo.engine.name}] ${prompt.id} '
       '(${results.length + 1}/${prompts.length})',
     );
-    results.add(await _runPrompt(runtime, template, prompt));
+    results.add(await _runPrompt(runtime, profile, prompt));
   }
   await runtime.unload();
   return EvalComboResult(
@@ -114,10 +114,10 @@ Future<EvalComboResult> runEvalCombo({
 
 Future<EvalPromptResult> _runPrompt(
   BrokerRuntime runtime,
-  EvalTemplate template,
+  ModelProfile profile,
   EvalPrompt prompt,
 ) async {
-  final parser = template.newParser();
+  final parser = profile.newParser(reasoningEnabled: prompt.reasoningEnabled);
   final raw = StringBuffer();
   final answer = StringBuffer();
   final reasoning = StringBuffer();
@@ -133,18 +133,26 @@ Future<EvalPromptResult> _runPrompt(
   try {
     final events = runtime.generate(
       BrokerGenerationRequest(
-        prompt: template.render(
+        prompt: profile.render(
           prompt.messages,
           reasoningEnabled: prompt.reasoningEnabled,
         ),
-        sampling: BrokerSamplingParameters(
-          maxTokens: prompt.maxTokens,
-          temperature: prompt.temperature,
-          topP: prompt.topP,
-          seed: prompt.seed,
-          stopSequences: template.stopSequences,
-          stopTokenIds: template.stopTokenIds,
-        ),
+        // Per-prompt sampling overrides pin evidence (the determinism
+        // anchor); everything else evaluates at the profile's shipped
+        // mode-specific defaults, so the report reflects app behavior.
+        sampling: () {
+          final defaults = profile.sampling(
+            reasoningEnabled: prompt.reasoningEnabled,
+          );
+          return BrokerSamplingParameters(
+            maxTokens: prompt.maxTokens ?? defaults.maxTokens,
+            temperature: prompt.temperature ?? defaults.temperature,
+            topP: prompt.topP ?? defaults.topP,
+            seed: prompt.seed,
+            stopSequences: profile.stopSequences,
+            stopTokenIds: profile.stopTokenIds,
+          );
+        }(),
       ),
     );
     await for (final event in events) {

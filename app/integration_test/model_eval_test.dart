@@ -5,11 +5,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 import 'package:integration_test/integration_test.dart';
 
+import 'package:golem_flutter/broker/model_profile.dart';
+
 import 'eval/eval_matrix.dart';
 import 'eval/eval_report.dart';
 import 'eval/eval_runner.dart';
 import 'eval/eval_spec.dart';
-import 'eval/eval_templates.dart';
 
 /// The model-evaluation harness: runs the fixed prompt set against every
 /// requested artifact × engine combo on macOS and writes a machine- and
@@ -60,13 +61,13 @@ void main() {
     test(
       'evaluates ${combo.label} on ${combo.engine.name}',
       () async {
-        final template = evalTemplates[_templateKey];
+        final profile = modelProfiles[_templateKey];
         expect(
-          template,
+          profile,
           isNotNull,
           reason:
               'Unknown GOLEM_EVAL_TEMPLATE "$_templateKey"; '
-              'known: ${evalTemplates.keys.join(', ')}',
+              'known: ${modelProfiles.keys.join(', ')}',
         );
         final adapter = InfernoRuntimeAdapter.native();
         EvalComboResult result;
@@ -74,7 +75,7 @@ void main() {
           result = await runEvalCombo(
             runtime: adapter,
             combo: combo,
-            template: template!,
+            profile: profile!,
             prompts: defaultEvalPrompts,
             onProgress: debugPrint,
           );

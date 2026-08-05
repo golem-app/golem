@@ -2,9 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/hash.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 
+import 'package:golem_flutter/broker/model_profile.dart';
+
 import '../../integration_test/eval/eval_runner.dart';
 import '../../integration_test/eval/eval_spec.dart';
-import '../../integration_test/eval/eval_templates.dart';
 
 /// Replays one scripted event list per generate call, recording lifecycle
 /// calls and rendered prompts, so runner behavior is testable without models.
@@ -69,7 +70,7 @@ Future<EvalComboResult> _run(
 ) => runEvalCombo(
   runtime: runtime,
   combo: _combo,
-  template: const Gemma4EvalTemplate(),
+  profile: const Gemma4Profile(),
   prompts: prompts,
 );
 
@@ -254,7 +255,7 @@ void main() {
       anchor.messages.single['content'],
       'Name the largest planet in the solar system.',
     );
-    // The registry serves the default template key.
-    expect(evalTemplates, contains('gemma4'));
+    // The broker's profile registry serves the harness template keys.
+    expect(modelProfiles.keys, containsAll(['gemma4', 'qwen35']));
   });
 }

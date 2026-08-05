@@ -255,8 +255,10 @@ Both defines accept comma-separated lists (that is the quant-comparison
 mode); either may be omitted. `GOLEM_EVAL_OUT` overrides the report
 directory (default: the system temp dir — the exact paths are printed as
 `GOLEM_EVAL_REPORT` lines), and `GOLEM_EVAL_TEMPLATE` selects the model
-template (default `gemma4`; new models register in
-`integration_test/eval/eval_templates.dart`). The suite self-skips when
+profile (default `gemma4`; the harness consumes the broker's profile
+registry in `lib/broker/model_profile.dart` directly, so an evaluation
+exercises exactly the template, stop policy, sampling defaults, and parser
+the app ships). The suite self-skips when
 no artifact is requested, and it must never be wired into CI. Keep
 evidence worth citing (quant choices, pin bumps, ADRs) as committed
 reports under `../docs/evals/`. The spec's `anchor-jupiter` prompt
