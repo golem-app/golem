@@ -47,6 +47,12 @@ class _SettingsBody extends ConsumerWidget {
     final chatValue = ref.watch(chatControllerProvider);
     final chats = chatValue.hasValue ? chatValue.requireValue : null;
     final catalog = ref.watch(modelCatalogEntriesProvider);
+    // Two independent honesty axes: model.simulated covers the download
+    // surface, the backend signal covers inference. A dev build can run
+    // real downloads with fake inference — each label keys on its own axis.
+    final simulatedInference = ref
+        .watch(inferenceBackendProvider)
+        .simulatedInference;
     // Downloads are serial, so the one card in a downloading phase is the
     // live one; deriving it from watched state keeps a single source of
     // truth instead of mirroring a controller field.
@@ -61,7 +67,7 @@ class _SettingsBody extends ConsumerWidget {
       key: const Key('settings-list'),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
       children: [
-        if (model.simulated) ...[
+        if (simulatedInference) ...[
           const _SimulationBanner(),
           const SizedBox(height: 28),
         ],
@@ -104,12 +110,16 @@ class _SettingsBody extends ConsumerWidget {
             children: [
               LabeledRow(
                 label: 'Active model',
-                value: active?.displayName ?? 'None · fake inference',
+                value:
+                    active?.displayName ??
+                    (simulatedInference
+                        ? 'None · simulated inference'
+                        : 'None'),
               ),
               const SizedBox(height: 10),
               LabeledRow(
                 label: 'State',
-                value: _runtimeLabel(model.runtime, model.simulated),
+                value: _runtimeLabel(model.runtime, simulatedInference),
               ),
               if (model.failure != null) ...[
                 const SizedBox(height: 10),
@@ -132,8 +142,8 @@ class _SettingsBody extends ConsumerWidget {
                           .toggleRuntime(),
                 child: Text(
                   model.runtime == RuntimePhase.loaded
-                      ? 'Unload ${model.simulated ? 'Simulated ' : ''}Runtime'
-                      : 'Load ${model.simulated ? 'Simulated ' : ''}Runtime',
+                      ? 'Unload ${simulatedInference ? 'Simulated ' : ''}Runtime'
+                      : 'Load ${simulatedInference ? 'Simulated ' : ''}Runtime',
                   style: TextStyle(
                     color: model.runtime == RuntimePhase.loaded
                         ? CupertinoDynamicColor.resolve(
@@ -213,9 +223,17 @@ class _SettingsBody extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                model.simulated
-                    ? 'UI evaluation build. It reads no other app\'s data and includes no model weights, network downloader, inference engine, or hardware measurement.'
-                    : 'Model downloads fetch the pinned artifacts above from Hugging Face over HTTPS. Inference remains a build-time opt-in; nothing else touches the network.',
+                [
+                  if (model.simulated)
+                    'Model downloads are a deterministic simulation of the pinned catalog; no network access exists.'
+                  else
+                    'Model downloads fetch the pinned artifacts above from Hugging Face over HTTPS.',
+                  if (simulatedInference)
+                    'Inference is a deterministic UI simulation — no model weights, engine, or hardware measurement is included.'
+                  else
+                    'Inference runs the local engine on this device with the active model.',
+                  'Nothing else touches the network, and Golem reads no other app\'s data.',
+                ].join(' '),
                 style: TextStyle(
                   color: CupertinoDynamicColor.resolve(
                     GolemTheme.mutedInk,
@@ -512,7 +530,7 @@ class _SimulationBanner extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: Text(
-            'SIMULATED BACKENDS · No hardware validation',
+            'SIMULATED INFERENCE · No hardware validation',
             style: TextStyle(
               color: CupertinoDynamicColor.resolve(GolemTheme.accent, context),
               fontWeight: FontWeight.w600,

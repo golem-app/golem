@@ -31,15 +31,19 @@ void main() {
   testWidgets('splash golden', (tester) async {
     _setViewport(tester);
     await tester.pumpWidget(
-      _app(
-        brightness: Brightness.light,
-        child: SplashScreen(
-          state: const StartupState(
-            phase: StartupPhase.preloading,
-            progress: 0.72,
+      // The splash now reads the backend signal for honest copy; the
+      // default scope resolves to the fake, matching the recorded golden.
+      ProviderScope(
+        child: _app(
+          brightness: Brightness.light,
+          child: SplashScreen(
+            state: const StartupState(
+              phase: StartupPhase.preloading,
+              progress: 0.72,
+            ),
+            isLoading: true,
+            retry: () {},
           ),
-          isLoading: true,
-          retry: () {},
         ),
       ),
     );

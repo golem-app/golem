@@ -303,6 +303,10 @@ class _ResultCard extends ConsumerWidget {
   }
 }
 
+/// Unconditionally "simulated", even in real-engine builds: the only
+/// benchmark implementation is the deterministic fake, so sweeping this
+/// copy onto the backend signal would make it dishonest
+/// (docs/decisions/0003-flavor-backend-defaults.md).
 class _SimulatedNotice extends StatelessWidget {
   const _SimulatedNotice();
 

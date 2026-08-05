@@ -372,6 +372,10 @@ final class BenchmarkRecord {
   final InferenceMetrics metrics;
   final String output;
 
+  // Deliberately hardcoded even in real-engine builds: the only benchmark
+  // implementation is the deterministic fake, so this labeling stays
+  // honest until a real benchmark exists
+  // (docs/decisions/0003-flavor-backend-defaults.md).
   Map<String, Object?> toJson() => {
     'schemaVersion': 1,
     'simulated': true,
