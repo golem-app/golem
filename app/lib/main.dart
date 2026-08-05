@@ -14,6 +14,7 @@ import 'core/repositories/contracts.dart';
 import 'core/repositories/fake_benchmark_repository.dart';
 import 'core/repositories/fake_model_management_repository.dart';
 import 'core/repositories/file_chat_history_repository.dart';
+import 'core/repositories/file_settings_repository.dart';
 import 'core/repositories/real_model_management_repository.dart';
 import 'core/services/artifact_downloader.dart';
 import 'core/services/device_storage.dart';
@@ -62,6 +63,9 @@ Future<void> main() async {
           FileChatHistoryRepository(
             File('${support.path}/flutter-chat-v1.json'),
           ),
+        ),
+        settingsRepositoryProvider.overrideWithValue(
+          FileSettingsRepository(File('${support.path}/flutter-prefs-v1.json')),
         ),
         inferenceRepositoryProvider.overrideWithValue(
           createConfiguredInferenceRepository(

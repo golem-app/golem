@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../domain/app_state.dart';
+import '../domain/generation_settings.dart';
 import '../domain/model_catalog.dart';
 import '../domain/models.dart';
 import '../repositories/contracts.dart';
@@ -33,6 +34,34 @@ BenchmarkRepository benchmarkRepository(Ref ref) =>
 @Riverpod(keepAlive: true)
 List<ModelCatalogEntry> modelCatalogEntries(Ref ref) =>
     throw UnimplementedError('Override modelCatalogEntriesProvider at startup');
+
+@Riverpod(keepAlive: true)
+SettingsRepository settingsRepository(Ref ref) =>
+    throw UnimplementedError('Override settingsRepositoryProvider at startup');
+
+/// Persisted per-model generation settings. Reads resolve against the
+/// broker profile's recommended defaults at the consumer, never here —
+/// only user-set values are stored.
+@Riverpod(keepAlive: true)
+class SettingsController extends _$SettingsController {
+  @override
+  Future<GenerationSettings> build() =>
+      ref.read(settingsRepositoryProvider).load();
+
+  GenerationSettings get _value => state.requireValue;
+
+  Future<void> updateModel(
+    String profileKey,
+    SamplingOverrides overrides,
+  ) async {
+    final next = _value.withModel(profileKey, overrides);
+    state = AsyncData(next);
+    await ref.read(settingsRepositoryProvider).save(next);
+  }
+
+  Future<void> resetModel(String profileKey) =>
+      updateModel(profileKey, const SamplingOverrides());
+}
 
 @Riverpod(keepAlive: true)
 class ChatController extends _$ChatController {

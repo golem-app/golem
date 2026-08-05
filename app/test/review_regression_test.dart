@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
+import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
@@ -11,6 +12,7 @@ import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_model_management_repository.dart';
 import 'package:golem_flutter/core/repositories/file_chat_history_repository.dart';
+import 'package:golem_flutter/core/repositories/file_settings_repository.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
 
 import 'support/in_memory_chat_history_repository.dart';
@@ -87,6 +89,23 @@ void main() {
     ]);
     final loaded = await repository.load();
     expect(loaded.conversations.single.id, 'c11');
+    expect(File('${file.path}.tmp').existsSync(), isFalse);
+  });
+
+  test('concurrent settings saves serialize; the last snapshot wins', () async {
+    final file = File('${tempDir().path}/prefs.json');
+    final repository = FileSettingsRepository(file);
+    await Future.wait([
+      for (var i = 1; i <= 12; i++)
+        repository.save(
+          const GenerationSettings().withModel(
+            'gemma4',
+            SamplingOverrides(maxTokens: i * 32),
+          ),
+        ),
+    ]);
+    final loaded = await repository.load();
+    expect(loaded.overridesFor('gemma4').maxTokens, 12 * 32);
     expect(File('${file.path}.tmp').existsSync(), isFalse);
   });
 

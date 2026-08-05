@@ -3,11 +3,13 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 import 'support/in_memory_chat_history_repository.dart';
+import 'support/in_memory_settings_repository.dart';
 
 Future<String> _fixtureAsset(String key) async =>
     '[{"role": "user", "content": "${'x' * 400}"}]';
@@ -107,4 +109,44 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 40));
     expect(container.read(benchmarkControllerProvider).result, isNull);
   });
+
+  test(
+    'settings controller persists updates and reset drops the entry',
+    () async {
+      final repository = InMemorySettingsRepository();
+      final container = ProviderContainer(
+        overrides: [settingsRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      await container.read(settingsControllerProvider.future);
+      final controller = container.read(settingsControllerProvider.notifier);
+
+      await controller.updateModel(
+        'gemma4',
+        const SamplingOverrides(maxTokens: 64, temperature: 1.4),
+      );
+      // Optimistic state and the persisted snapshot agree.
+      expect(
+        container
+            .read(settingsControllerProvider)
+            .requireValue
+            .overridesFor('gemma4')
+            .maxTokens,
+        64,
+      );
+      expect(repository.settings.overridesFor('gemma4').temperature, 1.4);
+      expect(repository.saves, 1);
+
+      await controller.resetModel('gemma4');
+      expect(repository.settings.models, isEmpty);
+      expect(
+        container
+            .read(settingsControllerProvider)
+            .requireValue
+            .overridesFor('gemma4')
+            .isEmpty,
+        isTrue,
+      );
+    },
+  );
 }
