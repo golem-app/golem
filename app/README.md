@@ -72,9 +72,11 @@ context length) live in Settings' Generation section, persist sparsely to
 in the broker profiles), and merge onto the profile defaults at
 generation time — provable from the effective sampling fields on each
 `INFERNO_METRICS` line. Qwen's thinking-mode sampling is pinned against
-overrides (recorded eval evidence); token budgets apply to both modes,
-and the UI clamps max tokens to the context length (default cap 8192 for
-both models).
+overrides (off-spec thinking looped during the #33 bring-up); token
+budgets apply to both modes,
+and the UI keeps max tokens at least a 512-token prompt reserve below
+the context length, clamped across both reasoning modes (default cap
+8192 for both models).
 
 Cable-provisioned models keep working: any file pushed under `Documents/`
 (`ios fsync push`, `adb` + `run-as`) still loads through `GOLEM_MODEL_PATH`,

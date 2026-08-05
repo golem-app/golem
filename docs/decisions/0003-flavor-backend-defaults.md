@@ -70,13 +70,17 @@ caps at the model's trained context; MLX has no cap of its own, so the
 budget is its only bound). The default and UI maximum is **8192 tokens
 for both models** — far under Gemma's trained context and Qwen's 256k
 upstream context, but sized so worst-case KV memory stays in the low
-hundreds of megabytes on an 8 GB phone. The settings UI clamps
-`maxTokens ≤ contextLength` so a budget can never be unsatisfiable by
-construction.
+hundreds of megabytes on an 8 GB phone. The settings UI keeps every
+mode's effective budget at least a 512-token prompt reserve below the
+context (`maxTokens ≤ contextLength − 512`, clamped across both reasoning
+modes), so a budget can never be unsatisfiable by construction; very long
+chats can still exhaust the reserve and surface the engines' budget
+error.
 
 Qwen's thinking-mode sampling (temperature 0.6 / top-p 0.95) is pinned
-against user overrides: the recorded evals show off-spec thinking sampling
-looping until the token budget. Token budgets remain overridable in both
+against user overrides: off-spec thinking sampling reproduced
+endless-think repetition loops during the #33 bring-up (the committed
+evals in `docs/evals/` record the fixed configuration passing). Token budgets remain overridable in both
 modes. Top-k ships plumbed through both engines but off by default, so
 recorded eval baselines and determinism probes stay bit-identical.
 

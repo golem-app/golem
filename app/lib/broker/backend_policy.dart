@@ -79,6 +79,7 @@ Future<InferenceBackendConfig> resolveBackendPolicy({
         modelPath: modelPathDefine.isNotEmpty
             ? modelPathDefine
             : primaryModelPathFor(artifactKey),
+        modelPathFromCatalog: modelPathDefine.isEmpty,
       );
     default:
       throw StateError(

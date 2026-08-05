@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
+import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
@@ -201,6 +202,78 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a real backend renders honest copy on every surface', (
+    tester,
+  ) async {
+    // The five simulated-copy surfaces branch on the backend signal; this
+    // pumps the direction that ships to users (real inference, with the
+    // download simulation still active — the two axes are independent).
+    const backend = InferenceBackendConfig(
+      kind: InferenceBackendKind.llama,
+      profileKey: 'gemma4',
+      artifactKey: 'gemma4-gguf',
+      modelPath: 'documents:models/gemma4-gguf/model.gguf',
+      modelPathFromCatalog: true,
+    );
+
+    await _pumpWithRepositories(
+      tester,
+      backend: backend,
+      // Simulated downloads with real inference: the mixed state a dev
+      // build can genuinely be in.
+      model: const ModelState(simulated: true),
+      child: const SettingsScreen(),
+    );
+    expect(find.byKey(const Key('simulation-banner')), findsNothing);
+    expect(find.textContaining('SIMULATED'), findsNothing);
+    // The download axis stays honestly simulated under the fake
+    // repository; asserted before scrolling because the ListView
+    // virtualizes the header away.
+    expect(
+      find.textContaining('deterministic download simulation'),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('runtime-toggle-button')),
+      260,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('settings-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Load Runtime'), findsOneWidget);
+    expect(find.textContaining('Simulated Runtime'), findsNothing);
+
+    await _pumpWithRepositories(
+      tester,
+      backend: backend,
+      child: const ChatScreen(),
+    );
+    expect(
+      find.textContaining('generates with a local on-device model'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('simulated model'), findsNothing);
+
+    await _pumpWithRepositories(
+      tester,
+      backend: backend,
+      child: SplashScreen(
+        state: const StartupState(
+          phase: StartupPhase.preloading,
+          progress: 0.72,
+        ),
+        isLoading: true,
+        retry: () {},
+      ),
+    );
+    expect(find.text('Loading model on this device'), findsOneWidget);
+    expect(find.textContaining('simulated'), findsNothing);
+  });
+
   testWidgets('the disabled composer keeps a transparent field', (
     tester,
   ) async {
@@ -272,10 +345,12 @@ Widget _app({
 ProviderContainer _container({
   ChatHistorySnapshot? history,
   ModelState model = const ModelState(),
+  InferenceBackendConfig? backend,
 }) {
   final directory = Directory.systemTemp.createTempSync('golem-widget-test-');
   return ProviderContainer(
     overrides: [
+      if (backend != null) inferenceBackendProvider.overrideWithValue(backend),
       chatHistoryRepositoryProvider.overrideWithValue(
         InMemoryChatHistoryRepository(
           history ?? const ChatHistorySnapshot(conversations: []),
@@ -306,9 +381,14 @@ Future<void> _pumpWithRepositories(
   Brightness brightness = Brightness.light,
   ChatHistorySnapshot? history,
   ModelState model = const ModelState(),
+  InferenceBackendConfig? backend,
 }) async {
   _setViewport(tester);
-  final container = _container(history: history, model: model);
+  final container = _container(
+    history: history,
+    model: model,
+    backend: backend,
+  );
   addTearDown(container.dispose);
   await tester.pumpWidget(
     UncontrolledProviderScope(

@@ -14,13 +14,15 @@ final class InferenceBackendConfig {
     required this.profileKey,
     this.artifactKey,
     this.modelPath,
+    this.modelPathFromCatalog = false,
   });
 
   const InferenceBackendConfig.fake()
     : kind = InferenceBackendKind.fake,
       profileKey = 'gemma4',
       artifactKey = null,
-      modelPath = null;
+      modelPath = null,
+      modelPathFromCatalog = false;
 
   final InferenceBackendKind kind;
 
@@ -36,6 +38,12 @@ final class InferenceBackendConfig {
   /// backend. Empty means a real backend was requested without a path —
   /// the repository factory fails loudly on it at launch.
   final String? modelPath;
+
+  /// True only when the policy derived [modelPath] from the catalog's
+  /// install location. An operator-supplied `GOLEM_MODEL_PATH` (sideloads,
+  /// the determinism probe) is the operator's responsibility: the
+  /// missing-model download gate must not stand in front of it.
+  final bool modelPathFromCatalog;
 
   bool get simulatedInference => kind == InferenceBackendKind.fake;
 }

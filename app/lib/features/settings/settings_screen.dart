@@ -1,8 +1,13 @@
+import 'dart:math';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+// Deliberate layering note: features may consume the broker's model
+// knowledge (profiles carry no Inferno import); the Inferno boundary is
+// unchanged — only lib/broker/ touches package:inferno.
 import '../../broker/model_profile.dart';
 import '../../core/app_identity.dart';
 import '../../core/domain/generation_settings.dart';
@@ -95,7 +100,8 @@ class _SettingsBody extends ConsumerWidget {
           subtitle:
               'Per-model sampling and budget controls. Recommended defaults '
               'come from the model profile; changes reach generation on the '
-              'real engine only.',
+              'real engine only. Token budgets always leave 512 context '
+              'tokens for the prompt.',
         ),
         const SizedBox(height: 8),
         for (final profileKey in modelProfiles.keys) ...[
@@ -610,6 +616,13 @@ String _runtimeLabel(RuntimePhase phase, bool simulated) => switch (phase) {
 /// registry is the source of which sections exist.
 const _profileDisplayNames = {'gemma4': 'Gemma 4 E2B', 'qwen35': 'Qwen 3.5 4B'};
 
+/// Context tokens the budget controls must always leave for the rendered
+/// prompt: the engines reject any request whose prompt plus budget exceeds
+/// the context, so a budget equal to the context would fail every send.
+/// The reserve keeps short prompts working by construction; very long
+/// chats can still exhaust it and surface the engines' budget error.
+const _promptReserveTokens = 512;
+
 class _GenerationCard extends ConsumerWidget {
   const _GenerationCard({required this.profileKey});
 
@@ -621,12 +634,19 @@ class _GenerationCard extends ConsumerWidget {
     // The direct-mode defaults are the editable surface; thinking-mode
     // sampling can be pinned by the profile (see the footnote).
     final defaults = profile.sampling(reasoningEnabled: false);
-    final thinkingPinned = profile.sampling(reasoningEnabled: true).pinned;
+    final thinking = profile.sampling(reasoningEnabled: true);
+    final thinkingPinned = thinking.pinned;
     final overrides =
         ref.watch(settingsControllerProvider).value?.overridesFor(profileKey) ??
         const SamplingOverrides();
     final maxTokens = overrides.maxTokens ?? defaults.maxTokens;
     final contextLength = overrides.contextLength ?? defaults.contextLength;
+    // A maxTokens override applies to both reasoning modes, but with no
+    // override each mode keeps its own default — the clamp below must
+    // satisfy the largest of them (Qwen's thinking budget is 4096 while
+    // its direct budget is 2048).
+    final effectiveBudget =
+        overrides.maxTokens ?? max(defaults.maxTokens, thinking.maxTokens);
 
     Future<void> update(SamplingOverrides next) => ref
         .read(settingsControllerProvider.notifier)
@@ -694,20 +714,21 @@ class _GenerationCard extends ConsumerWidget {
           ),
           const SizedBox(height: 6),
           _StepperRow(
-            stepperKey: Key('gen-max-tokens-$profileKey'),
+            stepperKey: ValueKey<String>('gen-max-tokens-$profileKey'),
             label: 'Max tokens',
             value: maxTokens,
             isDefault: overrides.maxTokens == null,
             step: 256,
             min: 256,
-            // A budget above the context cap could never finish a prompt.
-            max: contextLength,
+            // The engines reject prompt + budget over the context, so the
+            // budget must leave the prompt reserve free.
+            max: contextLength - _promptReserveTokens,
             onCommit: (value) =>
                 update(overrides.copyWith(maxTokens: () => value)),
           ),
           const SizedBox(height: 6),
           _StepperRow(
-            stepperKey: Key('gen-context-$profileKey'),
+            stepperKey: ValueKey<String>('gen-context-$profileKey'),
             label: 'Context length',
             value: contextLength,
             isDefault: overrides.contextLength == null,
@@ -717,9 +738,12 @@ class _GenerationCard extends ConsumerWidget {
             onCommit: (value) => update(
               overrides.copyWith(
                 contextLength: () => value,
-                // Shrinking the context below the token budget would make
-                // every generation fail its budget check; clamp together.
-                maxTokens: maxTokens > value ? () => value : null,
+                // Shrinking the context must keep every mode's effective
+                // budget under it, prompt reserve included, or generation
+                // in that mode would fail its budget check on every send.
+                maxTokens: effectiveBudget > value - _promptReserveTokens
+                    ? () => value - _promptReserveTokens
+                    : null,
               ),
             ),
           ),
@@ -825,7 +849,7 @@ class _StepperRow extends StatelessWidget {
     required this.onCommit,
   });
 
-  final Key stepperKey;
+  final ValueKey<String> stepperKey;
   final String label;
   final int value;
   final bool isDefault;
@@ -844,7 +868,7 @@ class _StepperRow extends StatelessWidget {
       children: [
         Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
         CupertinoButton(
-          key: Key('${(stepperKey as ValueKey<String>).value}-minus'),
+          key: Key('${stepperKey.value}-minus'),
           padding: EdgeInsets.zero,
           minimumSize: const Size(38, 30),
           onPressed: value <= min
@@ -863,7 +887,7 @@ class _StepperRow extends StatelessWidget {
           ),
         ),
         CupertinoButton(
-          key: Key('${(stepperKey as ValueKey<String>).value}-plus'),
+          key: Key('${stepperKey.value}-plus'),
           padding: EdgeInsets.zero,
           minimumSize: const Size(38, 30),
           onPressed: value >= max

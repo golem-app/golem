@@ -117,7 +117,9 @@ void main() {
       findsNothing,
     );
 
-    // Shrinking the context below the budget clamps the budget with it.
+    // Shrinking the context clamps the budget with it, keeping the prompt
+    // reserve free — the engines reject prompt + budget over the context,
+    // so budget == context would fail every send.
     final container = ProviderScope.containerOf(
       tester.element(find.byType(SettingsScreen)),
     );
@@ -127,7 +129,7 @@ void main() {
           'gemma4',
           settings.settings
               .overridesFor('gemma4')
-              .copyWith(maxTokens: () => 8192),
+              .copyWith(maxTokens: () => 7680),
         );
     await tester.pumpAndSettle();
     await reveal(tester, const Key('gen-context-gemma4'));
@@ -135,12 +137,55 @@ void main() {
     await tester.pumpAndSettle();
     final overrides = settings.settings.overridesFor('gemma4');
     expect(overrides.contextLength, 7168);
-    expect(overrides.maxTokens, 7168);
+    expect(overrides.maxTokens, 7168 - 512);
 
     await reveal(tester, const Key('gen-reset-gemma4'));
     await tester.tap(find.byKey(const Key('gen-reset-gemma4')));
     await tester.pumpAndSettle();
     expect(settings.settings.models, isEmpty);
+  });
+
+  testWidgets('the budget stepper cannot reach the context ceiling', (
+    tester,
+  ) async {
+    await pumpSettings(tester);
+    await reveal(tester, const Key('gen-max-tokens-gemma4'));
+    // Default context 8192: the plus button must stop at 8192 - 512, never
+    // at a value the engines would reject on every send.
+    final plus = find.byKey(const Key('gen-max-tokens-gemma4-plus'));
+    for (var i = 0; i < 30; i++) {
+      final button = tester.widget<CupertinoButton>(plus);
+      if (button.onPressed == null) break;
+      await tester.tap(plus);
+      await tester.pumpAndSettle();
+    }
+    expect(settings.settings.overridesFor('gemma4').maxTokens, 8192 - 512);
+    expect(
+      tester.widget<CupertinoButton>(plus).onPressed,
+      isNull,
+      reason: 'the ceiling reserves prompt tokens by construction',
+    );
+  });
+
+  testWidgets('shrinking Qwen context clamps its thinking budget too', (
+    tester,
+  ) async {
+    await pumpSettings(tester);
+    await reveal(tester, const Key('gen-context-qwen35'));
+    // No maxTokens override: direct mode defaults to 2048 but thinking
+    // mode to 4096, and the clamp must satisfy the larger of the two.
+    final minus = find.byKey(const Key('gen-context-qwen35-minus'));
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(minus);
+      await tester.pumpAndSettle();
+    }
+    final overrides = settings.settings.overridesFor('qwen35');
+    expect(overrides.contextLength, 4096);
+    expect(
+      overrides.maxTokens,
+      4096 - 512,
+      reason: 'a 4096 thinking budget in a 4096 context would always fail',
+    );
   });
 
   testWidgets('the temperature slider commits on drag end', (tester) async {

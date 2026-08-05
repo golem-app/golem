@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/backend_policy.dart';
@@ -52,6 +54,7 @@ void main() {
           config.modelPath,
           'documents:models/gemma4-gguf/gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf',
         );
+        expect(config.modelPathFromCatalog, isTrue);
       }
     },
   );
@@ -77,7 +80,9 @@ void main() {
     for (final probe in <Future<int?> Function()>[
       () async => null,
       () async => throw StateError('probe failed'),
-      () => Future.delayed(const Duration(seconds: 5), () => 16 * _gib),
+      // Never completes: exercises the timeout without arming a real
+      // delayed timer that would outlive the test.
+      () => Completer<int?>().future,
     ]) {
       final config = await _resolve(probe: probe);
       expect(config.profileKey, 'qwen35', reason: 'probe: $probe');
@@ -114,6 +119,7 @@ void main() {
     expect(llama.profileKey, 'gemma4');
     expect(llama.artifactKey, 'gemma4-gguf');
     expect(llama.modelPath, 'documents:models/x.gguf');
+    expect(llama.modelPathFromCatalog, isFalse);
 
     final mlx = await _resolve(
       backend: 'mlx',
@@ -135,6 +141,8 @@ void main() {
     expect(config.profileKey, 'qwen35');
     expect(config.artifactKey, 'qwen35-gguf');
     expect(config.modelPath, 'documents:models/sideloaded.gguf');
+    // Operator-supplied paths are never install-gated.
+    expect(config.modelPathFromCatalog, isFalse);
   });
 
   test('an unknown backend value fails loudly', () async {

@@ -41,10 +41,14 @@ void main() {
   // and every test runs against the resident model. The `real-model` tag's
   // budget in dart_test.yaml covers the load.
   group('pinned MLX artifact', () {
-    final inferno = Inferno.native();
+    // Constructed in setUpAll: a group body always executes at collection
+    // time, even when the whole group is skipped, and the native runtime
+    // must not spin up on skip.
+    late final Inferno inferno;
 
     setUpAll(() async {
       if (Platform.isMacOS) _stageMetallibForCliRun();
+      inferno = Inferno.native();
       await inferno.load(engine: InfernoEngineKind.mlx, modelPath: mlxPath!);
     });
 

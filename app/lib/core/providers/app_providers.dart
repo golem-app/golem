@@ -66,6 +66,9 @@ class SettingsController extends _$SettingsController {
     String profileKey,
     SamplingOverrides overrides,
   ) async {
+    // A tap can land in the cold-start load window; dropping it beats
+    // throwing on requireValue while the store is still reading.
+    if (!state.hasValue) return;
     final next = _value.withModel(profileKey, overrides);
     state = AsyncData(next);
     await ref.read(settingsRepositoryProvider).save(next);
@@ -237,9 +240,13 @@ class ChatController extends _$ChatController {
     // Real backend with the active artifact not installed: fail fast into
     // the banner's download CTA before touching the engine — prepare()
     // would only produce a cryptic missing-file error after a hang-like
-    // pause.
+    // pause. Only for catalog-derived paths: an operator-supplied
+    // GOLEM_MODEL_PATH (sideloads, the determinism probe) must reach
+    // prepare() untouched, which stays the loud failure path.
     final backend = ref.read(inferenceBackendProvider);
-    if (!backend.simulatedInference && backend.artifactKey != null) {
+    if (!backend.simulatedInference &&
+        backend.artifactKey != null &&
+        backend.modelPathFromCatalog) {
       final installed = await _activeModelInstalled();
       if (!ref.mounted || epoch != _generationEpoch) return;
       if (installed == false) {
@@ -275,6 +282,16 @@ class ChatController extends _$ChatController {
     try {
       await ref.read(inferenceRepositoryProvider).prepare();
       if (!ref.mounted || epoch != _generationEpoch) return;
+      // The lazy load must keep the persisted RuntimePhase honest in both
+      // directions: after this prepare() the engine holds weights, so
+      // Settings may not keep claiming "Unloaded" (the mirror image of the
+      // toggle's honesty fix). Awaited: it is one small persist after a
+      // load measured in seconds, and a recorded phase must not race the
+      // stream it describes.
+      if (!backend.simulatedInference) {
+        await ref.read(modelControllerProvider.notifier).reflectEngineLoaded();
+        if (!ref.mounted || epoch != _generationEpoch) return;
+      }
       state = AsyncData(_value.copyWith(generation: GenerationPhase.streaming));
       final context = active.promptContext;
       final overrides = await _samplingOverrides();
@@ -520,6 +537,33 @@ class ModelController extends _$ModelController {
       state = AsyncData(value);
     } catch (error) {
       _publishFailure(artifactKey, error);
+    } finally {
+      _busy = false;
+    }
+  }
+
+  /// Records that the engine holds weights after ChatController's lazy
+  /// prepare(), so the persisted phase stays honest in the load direction
+  /// too. No-ops when the phase already says loaded, when model state is
+  /// unavailable, or when the active artifact is not installed (sideloaded
+  /// paths are outside the catalog's phase tracking).
+  Future<void> reflectEngineLoaded() async {
+    if (_busy) return;
+    final current = state.value;
+    if (current == null ||
+        current.runtime == RuntimePhase.loaded ||
+        !current.activeModelInstalled) {
+      return;
+    }
+    _busy = true;
+    try {
+      final value = await ref
+          .read(modelManagementRepositoryProvider)
+          .loadRuntime();
+      if (!ref.mounted) return;
+      state = AsyncData(value);
+    } catch (_) {
+      // Phase bookkeeping must never disturb an in-flight generation.
     } finally {
       _busy = false;
     }

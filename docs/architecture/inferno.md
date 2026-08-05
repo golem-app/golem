@@ -41,9 +41,9 @@ tokenizer's BOS is a hard failure.
 Generation requests cross the C ABI as one JSON payload: `prompt`,
 `maxTokens`, `temperature`, `topP`, `topK`, `contextLength`, `seed`,
 `stopSequences`, and `stopTokenIds`. `topK` and `contextLength` are
-absent-or-null when unset; both shims treat that as "top-k filtering off"
-and "no caller budget", so older payloads keep today's behavior bit for
-bit. When `topK` is set, each engine applies its own upstream filter order
+absent-or-null when unset; both shims treat that — and an explicit zero —
+as "top-k filtering off" and "no caller budget", so older payloads keep
+today's behavior bit for bit. Negative values are invalid on both engines. When `topK` is set, each engine applies its own upstream filter order
 (llama.cpp chains top-k → top-p; MLX applies top-p → min-p → top-k), a
 deliberate divergence — token-level sampling parity across engines is not
 asserted. `contextLength` is a caller budget over prompt plus `maxTokens`,

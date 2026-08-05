@@ -19,9 +19,13 @@ Future<String> _fixtureAsset(String key) async =>
     '[{"role": "user", "content": "${'x' * 400}"}]';
 
 final class _RecordingInferenceRepository implements InferenceRepository {
-  _RecordingInferenceRepository({this.failPrepare = false});
+  _RecordingInferenceRepository({
+    this.failPrepare = false,
+    this.failUnload = false,
+  });
 
   final bool failPrepare;
+  final bool failUnload;
   SamplingOverrides? lastOverrides;
   int prepares = 0;
   int unloads = 0;
@@ -33,7 +37,10 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   }
 
   @override
-  Future<void> unload() async => unloads++;
+  Future<void> unload() async {
+    unloads++;
+    if (failUnload) throw StateError('injected unload failure');
+  }
 
   @override
   Future<void> cancel() async {}
@@ -154,13 +161,24 @@ void main() {
           InMemoryChatHistoryRepository(),
         ),
         inferenceRepositoryProvider.overrideWithValue(inference),
+        // A non-default profile key, so this test can only pass if the
+        // controller looks the profile up through the backend signal —
+        // seeding the fake default's gemma4 would pass with a hardcoded
+        // key. Fake kind keeps the lazy-load reflection out of scope here.
+        inferenceBackendProvider.overrideWithValue(
+          const InferenceBackendConfig(
+            kind: InferenceBackendKind.fake,
+            profileKey: 'qwen35',
+          ),
+        ),
         settingsRepositoryProvider.overrideWithValue(
           InMemorySettingsRepository(
-            const GenerationSettings().withModel(
-              // The default backend signal's profile key.
-              'gemma4',
-              const SamplingOverrides(maxTokens: 64, temperature: 1.4),
-            ),
+            const GenerationSettings()
+                .withModel(
+                  'qwen35',
+                  const SamplingOverrides(maxTokens: 64, temperature: 1.4),
+                )
+                .withModel('gemma4', const SamplingOverrides(maxTokens: 999)),
           ),
         ),
       ],
@@ -226,6 +244,7 @@ void main() {
             profileKey: 'gemma4',
             artifactKey: 'test-mlx',
             modelPath: 'documents:models/test-mlx',
+            modelPathFromCatalog: true,
           ),
         ),
         modelManagementRepositoryProvider.overrideWithValue(
@@ -336,6 +355,155 @@ void main() {
           .phase,
       ArtifactPhase.notDownloaded,
     );
+  });
+
+  test('an operator-supplied model path is never install-gated', () async {
+    final directory = Directory.systemTemp.createTempSync('golem-side-test-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final inference = _RecordingInferenceRepository();
+    final container = ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        // Explicit GOLEM_MODEL_PATH composition: artifact key present for
+        // the Settings ACTIVE badge, but the path is the operator's.
+        inferenceBackendProvider.overrideWithValue(
+          const InferenceBackendConfig(
+            kind: InferenceBackendKind.llama,
+            profileKey: 'gemma4',
+            artifactKey: 'test-mlx',
+            modelPath: '/sideloaded/model.gguf',
+          ),
+        ),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(chatControllerProvider.future);
+    await container.read(chatControllerProvider.notifier).send('Hello');
+    final state = container.read(chatControllerProvider).requireValue;
+    // The send reached the engine (the probe/sideload contract) instead of
+    // dead-ending on a download it never asked for.
+    expect(inference.prepares, 1);
+    expect(state.missingModelArtifactKey, isNull);
+    expect(state.generation, GenerationPhase.idle);
+  });
+
+  test('lazy engine load reflects into the persisted runtime phase', () async {
+    final directory = Directory.systemTemp.createTempSync('golem-lazy-test-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final inference = _RecordingInferenceRepository();
+    final container = ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        inferenceBackendProvider.overrideWithValue(
+          const InferenceBackendConfig(
+            kind: InferenceBackendKind.llama,
+            profileKey: 'gemma4',
+            artifactKey: 'test-mlx',
+            modelPath: 'documents:models/test-mlx',
+            modelPathFromCatalog: true,
+          ),
+        ),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await installActiveModel(container);
+    await container.read(chatControllerProvider.future);
+    await container.read(chatControllerProvider.notifier).send('Hello');
+    // Settings may not claim "Unloaded" while the engine holds weights:
+    // the lazy prepare() records the loaded phase like the toggle does.
+    expect(inference.prepares, 1);
+    expect(
+      container.read(modelControllerProvider).requireValue.runtime,
+      RuntimePhase.loaded,
+    );
+  });
+
+  test('runtime toggle refuses without the model, engine untouched', () async {
+    final directory = Directory.systemTemp.createTempSync('golem-refuse-test-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final inference = _RecordingInferenceRepository();
+    final container = ProviderContainer(
+      overrides: [
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(modelControllerProvider.future);
+    await container.read(modelControllerProvider.notifier).toggleRuntime();
+
+    final state = container.read(modelControllerProvider).requireValue;
+    expect(state.runtime, RuntimePhase.failed);
+    expect(state.failure, isNotNull);
+    expect(inference.prepares, 0, reason: 'the engine is never touched');
+  });
+
+  test('an unload failure surfaces and keeps loaded truthful', () async {
+    final directory = Directory.systemTemp.createTempSync('golem-unfail-test-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final inference = _RecordingInferenceRepository(failUnload: true);
+    final container = ProviderContainer(
+      overrides: [
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await installActiveModel(container);
+    final controller = container.read(modelControllerProvider.notifier);
+    await controller.toggleRuntime();
+    expect(
+      container.read(modelControllerProvider).requireValue.runtime,
+      RuntimePhase.loaded,
+    );
+
+    await controller.toggleRuntime();
+    final state = container.read(modelControllerProvider).requireValue;
+    expect(state.runtime, RuntimePhase.failed);
+    expect(state.failure, contains('unload failure'));
+    // unloaded was never recorded for an engine still holding weights.
+    final relaunched = await fakeModels(directory).load();
+    expect(relaunched.runtime, isNot(RuntimePhase.unloaded));
+  });
+
+  test('a failed unload aborts deleting the active artifact', () async {
+    final directory = Directory.systemTemp.createTempSync('golem-abort-test-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final inference = _RecordingInferenceRepository(failUnload: true);
+    final container = ProviderContainer(
+      overrides: [
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await installActiveModel(container);
+    await container.read(modelControllerProvider.notifier).delete('test-mlx');
+
+    final state = container.read(modelControllerProvider).requireValue;
+    expect(inference.unloads, 1);
+    // Never delete a file the engine may still have mapped: the artifact
+    // survives and the failure lands on its card.
+    expect(state.statusOf('test-mlx').phase, ArtifactPhase.failed);
+    expect(state.statusOf('test-mlx').failure, contains('unload failure'));
   });
 
   test(

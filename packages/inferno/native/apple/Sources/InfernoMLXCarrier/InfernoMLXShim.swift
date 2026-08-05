@@ -382,13 +382,15 @@ public func infernoMlxEngineGenerate(
     let request: GenerationRequest
     do {
         request = try JSONDecoder().decode(GenerationRequest.self, from: encoded)
+        // Zero matches the llama shim: top-k filtering off, context
+        // unbudgeted. Only negatives are invalid.
         guard !request.prompt.isEmpty,
               request.maxTokens > 0,
               request.temperature >= 0,
               request.topP > 0,
               request.topP <= 1,
-              request.topK ?? 1 > 0,
-              request.contextLength ?? 1 > 0
+              request.topK ?? 0 >= 0,
+              request.contextLength ?? 0 >= 0
         else {
             sink.fail(code: "generation_failed", message: "The generation request is invalid.")
             return 0
@@ -431,6 +433,7 @@ public func infernoMlxEngineGenerate(
                 // only bound, checked post-tokenization to fail exactly like
                 // the llama shim's pre-allocation check.
                 if let contextBudget = request.contextLength,
+                   contextBudget > 0,
                    promptTokenIDs.count + request.maxTokens > contextBudget {
                     throw NSError(
                         domain: "InfernoMLX",
