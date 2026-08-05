@@ -69,6 +69,12 @@ class Composer extends ConsumerWidget {
                   controller: controller,
                   focusNode: focus,
                   enabled: !generating,
+                  // A borderless field with no decoration paints Flutter's
+                  // built-in disabled fill (near-black in dark mode) over
+                  // the Glass pill while generating; an explicit empty
+                  // decoration keeps the disabled state transparent. The
+                  // stop button already communicates that input is closed.
+                  decoration: const BoxDecoration(),
                   minLines: 1,
                   maxLines: 6,
                   placeholder: 'Message Golem…',

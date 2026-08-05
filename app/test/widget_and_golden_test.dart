@@ -13,6 +13,7 @@ import 'support/in_memory_chat_history_repository.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/benchmark/benchmark_screen.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
+import 'package:golem_flutter/features/chat/widgets/composer.dart';
 import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';
 import 'package:golem_flutter/features/splash/splash_screen.dart';
@@ -163,6 +164,33 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the disabled composer keeps a transparent field', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: _app(
+          brightness: Brightness.dark,
+          child: Composer(
+            controller: TextEditingController(),
+            focus: FocusNode(),
+            reasoningEnabled: false,
+            generation: GenerationPhase.streaming,
+          ),
+        ),
+      ),
+    );
+    final field = tester.widget<CupertinoTextField>(
+      find.byKey(const Key('chat-composer')),
+    );
+    // decoration == null makes a disabled borderless field paint Flutter's
+    // built-in near-black fill over the Glass pill (issue #34); the explicit
+    // empty decoration keeps it transparent.
+    expect(field.enabled, isFalse);
+    expect(field.decoration, isNotNull);
+    expect(field.decoration!.color, isNull);
   });
 
   testWidgets('an empty failed assistant message renders no ghost bubble', (
