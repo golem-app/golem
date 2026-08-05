@@ -352,6 +352,21 @@ void main() {
     },
   );
 
+  test('a persisted loaded phase never survives a relaunch', () async {
+    final repo = repository(activeKey: 'test-mlx');
+    await repo.load();
+    await repo.download('test-mlx').drain<void>();
+    expect((await repo.loadRuntime()).runtime, RuntimePhase.loaded);
+
+    // The engine died with the process even though the install still
+    // verifies: loaded is a claim about the engine and must reconcile to
+    // unloaded on every fresh load(), or Settings reads "Ready" over a
+    // cold engine.
+    final relaunched = await repository(activeKey: 'test-mlx').load();
+    expect(relaunched.statusOf('test-mlx').phase, ArtifactPhase.installed);
+    expect(relaunched.runtime, RuntimePhase.unloaded);
+  });
+
   test('an unknown free-space reading skips the preflight', () async {
     diskSpace.free = null;
     final repo = repository();

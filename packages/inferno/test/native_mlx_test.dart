@@ -43,22 +43,23 @@ void main() {
   group('pinned MLX artifact', () {
     // Constructed in setUpAll: a group body always executes at collection
     // time, even when the whole group is skipped, and the native runtime
-    // must not spin up on skip.
-    late final Inferno inferno;
+    // must not spin up on skip. Nullable so a setUpAll failure before the
+    // assignment cannot turn tearDownAll into a LateInitializationError.
+    Inferno? inferno;
 
     setUpAll(() async {
       if (Platform.isMacOS) _stageMetallibForCliRun();
       inferno = Inferno.native();
-      await inferno.load(engine: InfernoEngineKind.mlx, modelPath: mlxPath!);
+      await inferno!.load(engine: InfernoEngineKind.mlx, modelPath: mlxPath!);
     });
 
     tearDownAll(() async {
-      await inferno.unload();
-      await inferno.dispose();
+      await inferno?.unload();
+      await inferno?.dispose();
     });
 
     test('streams deltas and reports metrics', () async {
-      final events = await inferno.generate(request).toList();
+      final events = await inferno!.generate(request).toList();
       expect(events.whereType<InfernoTextDelta>(), isNotEmpty);
       final metrics = events.whereType<InfernoMetricsEvent>().single.metrics;
       expect(metrics.generatedTokenCount, greaterThan(0));
@@ -70,7 +71,7 @@ void main() {
       'a context budget below prompt plus max tokens fails clearly',
       () async {
         await expectLater(
-          inferno
+          inferno!
               .generate(
                 const InfernoGenerationRequest(
                   prompt: '<bos><|turn>user\nSay hello.<turn|>\n<|turn>model\n',
@@ -101,9 +102,9 @@ void main() {
     );
 
     test('survives an unload and reload in one process', () async {
-      await inferno.unload();
-      await inferno.load(engine: InfernoEngineKind.mlx, modelPath: mlxPath!);
-      final events = await inferno.generate(request).toList();
+      await inferno!.unload();
+      await inferno!.load(engine: InfernoEngineKind.mlx, modelPath: mlxPath!);
+      final events = await inferno!.generate(request).toList();
       expect(events.whereType<InfernoTextDelta>(), isNotEmpty);
       expect(events.last, isA<InfernoGenerationCompleted>());
     });

@@ -96,7 +96,12 @@ final class RealModelManagementRepository implements ModelManagementRepository {
         simulated: false,
       );
     }
-    if (_state.runtime == RuntimePhase.loading) {
+    // Since #19 the loaded phase is a claim about the engine, and no
+    // engine survives its process: a fresh load() always starts unloaded,
+    // whatever the previous run persisted. Failed stays — the last
+    // attempt's outcome remains accurate across a relaunch.
+    if (_state.runtime == RuntimePhase.loading ||
+        _state.runtime == RuntimePhase.loaded) {
       _state = _state.copyWith(runtime: RuntimePhase.unloaded);
     }
     // Disk is truth: persisted phases are reconciled against the files
@@ -123,10 +128,6 @@ final class RealModelManagementRepository implements ModelManagementRepository {
       }
     }
     _state = _state.copyWith(artifacts: artifacts);
-    // A runtime cannot stay loaded when its weights no longer qualify.
-    if (_state.runtime == RuntimePhase.loaded && !_state.activeModelInstalled) {
-      _state = _state.copyWith(runtime: RuntimePhase.unloaded);
-    }
     return _persist(_state);
   }
 

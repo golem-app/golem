@@ -246,6 +246,30 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Load Runtime'), findsOneWidget);
     expect(find.textContaining('Simulated Runtime'), findsNothing);
+    // The runtime rows: an honest bare state and no simulated qualifier
+    // on the empty active-model row.
+    expect(find.text('Unloaded'), findsOneWidget);
+    expect(find.text('None'), findsOneWidget);
+    expect(find.textContaining('None · simulated'), findsNothing);
+
+    await tester.scrollUntilVisible(
+      find.textContaining('Inference runs the local engine'),
+      260,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('settings-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    // About composes per-axis honesty: real inference sentence next to
+    // the simulated-downloads sentence.
+    expect(
+      find.textContaining('deterministic simulation of the pinned catalog'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('UI evaluation build'), findsNothing);
 
     await _pumpWithRepositories(
       tester,

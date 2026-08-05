@@ -134,11 +134,12 @@ final class Qwen35Profile implements ModelProfile {
   // The pinned repository publishes no sampling recommendation
   // (generation_config carries only eos ids), so these are the Qwen3-family
   // published mode-specific defaults. The split matters: thinking sampled
-  // at the non-thinking settings loops mid-think until the token budget on
-  // the Q4_0 build (docs/evals evidence, 2026-08-05). Qwen's thinking also
-  // runs far longer than Gemma's reasoning channel, hence the 4096 budget.
-  // Thinking-mode sampling is pinned: overriding it reintroduces the
-  // endless-think repetition loop recorded in docs/evals (2026-08-05).
+  // at the non-thinking settings looped mid-think until the token budget on
+  // the Q4_0 build during the #33 bring-up (docs/evals, 2026-08-05, records
+  // the fixed configuration passing). Qwen's thinking also runs far longer
+  // than Gemma's reasoning channel, hence the 4096 budget.
+  // Thinking-mode sampling is pinned: overriding it reintroduces that
+  // endless-think repetition loop.
   @override
   ProfileSampling sampling({required bool reasoningEnabled}) => reasoningEnabled
       ? const ProfileSampling(

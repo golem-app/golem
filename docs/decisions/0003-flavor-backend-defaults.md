@@ -80,9 +80,10 @@ error.
 Qwen's thinking-mode sampling (temperature 0.6 / top-p 0.95) is pinned
 against user overrides: off-spec thinking sampling reproduced
 endless-think repetition loops during the #33 bring-up (the committed
-evals in `docs/evals/` record the fixed configuration passing). Token budgets remain overridable in both
-modes. Top-k ships plumbed through both engines but off by default, so
-recorded eval baselines and determinism probes stay bit-identical.
+evals in `docs/evals/` record the fixed configuration passing). Token
+budgets remain overridable in both modes. Top-k ships plumbed through
+both engines but off by default, so recorded eval baselines and
+determinism probes stay bit-identical.
 
 ## Benchmark copy stays simulated
 

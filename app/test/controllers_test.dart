@@ -477,7 +477,10 @@ void main() {
     final state = container.read(modelControllerProvider).requireValue;
     expect(state.runtime, RuntimePhase.failed);
     expect(state.failure, contains('unload failure'));
-    // unloaded was never recorded for an engine still holding weights.
+    // The persist layer never recorded unloaded for an engine still
+    // holding weights. (This is the fake's simulated phase; the real
+    // repository additionally reconciles any persisted loaded back to
+    // unloaded on relaunch — covered in its own suite.)
     final relaunched = await fakeModels(directory).load();
     expect(relaunched.runtime, isNot(RuntimePhase.unloaded));
   });

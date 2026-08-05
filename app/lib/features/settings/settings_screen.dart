@@ -639,8 +639,15 @@ class _GenerationCard extends ConsumerWidget {
     final overrides =
         ref.watch(settingsControllerProvider).value?.overridesFor(profileKey) ??
         const SamplingOverrides();
-    final maxTokens = overrides.maxTokens ?? defaults.maxTokens;
-    final contextLength = overrides.contextLength ?? defaults.contextLength;
+    // Persisted values are sanitized into the controls' ranges before
+    // rendering: the store's leaves are deliberately tolerant, and a
+    // hand-edited file must not be able to make the steppers throw.
+    final contextLength = (overrides.contextLength ?? defaults.contextLength)
+        .clamp(1024, 8192);
+    final maxTokens = (overrides.maxTokens ?? defaults.maxTokens).clamp(
+      256,
+      contextLength - _promptReserveTokens,
+    );
     // A maxTokens override applies to both reasoning modes, but with no
     // override each mode keeps its own default — the clamp below must
     // satisfy the largest of them (Qwen's thinking budget is 4096 while
@@ -741,8 +748,12 @@ class _GenerationCard extends ConsumerWidget {
                 // Shrinking the context must keep every mode's effective
                 // budget under it, prompt reserve included, or generation
                 // in that mode would fail its budget check on every send.
+                // The written value never exceeds the number on screen: a
+                // clamp may lower the visible budget, never quietly raise
+                // it (Qwen's hidden 4096 thinking default clamps down to
+                // the displayed direct budget instead).
                 maxTokens: effectiveBudget > value - _promptReserveTokens
-                    ? () => value - _promptReserveTokens
+                    ? () => min(maxTokens, value - _promptReserveTokens)
                     : null,
               ),
             ),

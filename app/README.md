@@ -53,7 +53,9 @@ below or when memory is unknown — deriving the model path, broker
 profile, and active catalog artifact together. A fresh real-backend
 install downloads its model **on first need behind an explicit consent
 tap** in the chat failure banner; nothing multi-gigabyte ever starts
-silently. `GOLEM_DEVICE_MEMORY_BYTES` is a test-only override for
+silently. Builds with an operator-supplied `GOLEM_MODEL_PATH` bypass that
+gate entirely — sideloaded paths are the operator's responsibility and go
+straight to the engine. `GOLEM_DEVICE_MEMORY_BYTES` is a test-only override for
 exercising both policy branches on hardware.
 
 Model **downloads** are real in the `dev` and `production` flavors:
@@ -73,10 +75,9 @@ in the broker profiles), and merge onto the profile defaults at
 generation time — provable from the effective sampling fields on each
 `INFERNO_METRICS` line. Qwen's thinking-mode sampling is pinned against
 overrides (off-spec thinking looped during the #33 bring-up); token
-budgets apply to both modes,
-and the UI keeps max tokens at least a 512-token prompt reserve below
-the context length, clamped across both reasoning modes (default cap
-8192 for both models).
+budgets apply to both modes, and the UI keeps max tokens at least a
+512-token prompt reserve below the context length, clamped across both
+reasoning modes (default cap 8192 for both models).
 
 Cable-provisioned models keep working: any file pushed under `Documents/`
 (`ios fsync push`, `adb` + `run-as`) still loads through `GOLEM_MODEL_PATH`,

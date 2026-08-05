@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
+import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
@@ -42,12 +43,15 @@ final class _StaticModels implements ModelManagementRepository {
 void main() {
   late InMemorySettingsRepository settings;
 
-  Future<void> pumpSettings(WidgetTester tester) async {
+  Future<void> pumpSettings(
+    WidgetTester tester, {
+    GenerationSettings seed = const GenerationSettings(),
+  }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(402, 874);
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
-    settings = InMemorySettingsRepository();
+    settings = InMemorySettingsRepository(seed);
     final container = ProviderContainer(
       overrides: [
         chatHistoryRepositoryProvider.overrideWithValue(
@@ -183,9 +187,29 @@ void main() {
     expect(overrides.contextLength, 4096);
     expect(
       overrides.maxTokens,
-      4096 - 512,
-      reason: 'a 4096 thinking budget in a 4096 context would always fail',
+      2048,
+      reason:
+          'the hidden 4096 thinking default must clamp (it would always '
+          'fail in a 4096 context), but never above the displayed 2048 — '
+          'a clamp may lower the visible budget, not quietly raise it',
     );
+  });
+
+  testWidgets('hand-edited out-of-range settings render without throwing', (
+    tester,
+  ) async {
+    await pumpSettings(
+      tester,
+      seed: const GenerationSettings().withModel(
+        'gemma4',
+        // Below every legal range: the tolerant store accepts it, and the
+        // controls must sanitize instead of throwing on clamp bounds.
+        const SamplingOverrides(maxTokens: 64, contextLength: 512),
+      ),
+    );
+    await reveal(tester, const Key('gen-context-gemma4'));
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('gen-max-tokens-gemma4')), findsOneWidget);
   });
 
   testWidgets('the temperature slider commits on drag end', (tester) async {
