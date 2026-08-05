@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../domain/generation_settings.dart';
 import '../domain/models.dart';
 import 'contracts.dart';
 
@@ -39,6 +40,8 @@ final class FakeInferenceRepository implements InferenceRepository {
   Stream<InferenceEvent> generate({
     required List<Map<String, String>> context,
     required bool reasoningEnabled,
+    // Deliberately unused: deterministic simulation has no sampling.
+    SamplingOverrides? overrides,
   }) async* {
     if (!_prepared) throw StateError('The simulated runtime is unloaded.');
     final epoch = ++_generationEpoch;

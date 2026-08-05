@@ -131,10 +131,13 @@ void main() {
     expect(thinking.temperature, 0.6);
     expect(thinking.topP, 0.95);
     expect(thinking.maxTokens, 4096);
+    // Pinned: user sampling overrides must not reach thinking mode.
+    expect(thinking.pinned, isTrue);
     final direct = profile.sampling(reasoningEnabled: false);
     expect(direct.temperature, 0.7);
     expect(direct.topP, 0.8);
     expect(direct.maxTokens, 2048);
+    expect(direct.pinned, isFalse);
     expect(modelProfiles['qwen35'], isA<Qwen35Profile>());
   });
 }
