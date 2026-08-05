@@ -538,6 +538,8 @@ final class NativeInfernoBackend implements InfernoBackend {
           'maxTokens': request.sampling.maxTokens,
           'temperature': request.sampling.temperature,
           'topP': request.sampling.topP,
+          'topK': request.sampling.topK,
+          'contextLength': request.sampling.contextLength,
           'seed': request.sampling.seed,
           'stopSequences': request.sampling.stopSequences,
           'stopTokenIds': request.sampling.stopTokenIds,

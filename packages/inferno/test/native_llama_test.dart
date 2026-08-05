@@ -105,6 +105,85 @@ void main() {
     skip: skipReason,
   );
 
+  test('topK 1 collapses sampling to greedy regardless of seed', () async {
+    final inferno = Inferno.native();
+    await inferno.load(
+      engine: InfernoEngineKind.llamaCpp,
+      modelPath: modelPath!,
+    );
+    Future<String> generateText(int seed) async {
+      final events = await inferno
+          .generate(
+            InfernoGenerationRequest(
+              prompt: 'Hello',
+              sampling: InfernoSamplingParameters(
+                maxTokens: 8,
+                temperature: 1,
+                topK: 1,
+                seed: seed,
+              ),
+            ),
+          )
+          .toList();
+      return events.whereType<InfernoTextDelta>().map((e) => e.text).join();
+    }
+
+    // With a single surviving candidate the seed cannot matter: two runs
+    // under different seeds must decode the same tokens.
+    expect(await generateText(3), await generateText(1009));
+    await inferno.unload();
+  }, skip: skipReason);
+
+  test(
+    'a context budget below prompt plus max tokens fails clearly',
+    () async {
+      final inferno = Inferno.native();
+      await inferno.load(
+        engine: InfernoEngineKind.llamaCpp,
+        modelPath: modelPath!,
+      );
+      await expectLater(
+        inferno
+            .generate(
+              const InfernoGenerationRequest(
+                prompt: 'Hello',
+                sampling: InfernoSamplingParameters(
+                  maxTokens: 16,
+                  contextLength: 8,
+                  seed: 7,
+                ),
+              ),
+            )
+            .toList(),
+        throwsA(
+          isA<InfernoException>()
+              .having(
+                (error) => error.code,
+                'code',
+                InfernoErrorCode.generationFailed,
+              )
+              .having(
+                (error) => error.message,
+                'message',
+                contains('context budget'),
+              ),
+        ),
+      );
+      // The runtime must stay usable after the rejected request.
+      final events = await inferno
+          .generate(
+            const InfernoGenerationRequest(
+              prompt: 'Hello',
+              sampling: InfernoSamplingParameters(maxTokens: 4, seed: 7),
+            ),
+          )
+          .toList();
+      expect(events.last, isA<InfernoGenerationCompleted>());
+      await inferno.unload();
+    },
+    skip: skipReason,
+  );
+
   test('damaged GGUF variants fail as catchable Dart errors', () async {
     final fixtureDirectory = File(modelPath!).parent.path;
     for (final fixture in {

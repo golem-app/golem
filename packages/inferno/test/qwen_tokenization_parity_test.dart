@@ -1,3 +1,6 @@
+@Tags(['real-model'])
+library;
+
 import 'dart:io';
 
 import 'package:inferno/inferno.dart';
@@ -34,44 +37,36 @@ void main() {
     if (Platform.isMacOS) _stageMetallibForCliRun();
   });
 
-  test(
-    'llama.cpp and MLX produce identical Qwen prompt token IDs',
-    () async {
-      final llama = NativeInfernoTestHarness();
-      await llama.load(
-        engine: InfernoEngineKind.llamaCpp,
-        modelPath: ggufPath!,
-      );
-      final llamaTokens = await llama.tokenize(_renderedConversation);
-      await llama.unload();
+  test('llama.cpp and MLX produce identical Qwen prompt token IDs', () async {
+    final llama = NativeInfernoTestHarness();
+    await llama.load(engine: InfernoEngineKind.llamaCpp, modelPath: ggufPath!);
+    final llamaTokens = await llama.tokenize(_renderedConversation);
+    await llama.unload();
 
-      final mlx = NativeInfernoTestHarness();
-      await mlx.load(engine: InfernoEngineKind.mlx, modelPath: mlxPath!);
-      final mlxTokens = await mlx.tokenize(_renderedConversation);
-      await mlx.unload();
+    final mlx = NativeInfernoTestHarness();
+    await mlx.load(engine: InfernoEngineKind.mlx, modelPath: mlxPath!);
+    final mlxTokens = await mlx.tokenize(_renderedConversation);
+    await mlx.unload();
 
-      expect(
-        llamaTokens.first,
-        248045,
-        reason:
-            'the rendered <|im_start|> is token 248045 and Qwen has no BOS — '
-            'nothing may be auto-inserted before it',
-      );
-      expect(
-        llamaTokens,
-        contains(248068),
-        reason: 'the primer <think> must tokenize as its special token',
-      );
-      expect(
-        llamaTokens,
-        contains(248046),
-        reason:
-            'the rendered <|im_end|> is the stop token the broker supplies — '
-            'a drift here means generation never stops',
-      );
-      expect(mlxTokens, llamaTokens);
-    },
-    skip: skipReason,
-    timeout: const Timeout(Duration(minutes: 5)),
-  );
+    expect(
+      llamaTokens.first,
+      248045,
+      reason:
+          'the rendered <|im_start|> is token 248045 and Qwen has no BOS — '
+          'nothing may be auto-inserted before it',
+    );
+    expect(
+      llamaTokens,
+      contains(248068),
+      reason: 'the primer <think> must tokenize as its special token',
+    );
+    expect(
+      llamaTokens,
+      contains(248046),
+      reason:
+          'the rendered <|im_end|> is the stop token the broker supplies — '
+          'a drift here means generation never stops',
+    );
+    expect(mlxTokens, llamaTokens);
+  }, skip: skipReason);
 }

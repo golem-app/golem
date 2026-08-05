@@ -377,6 +377,16 @@ int32_t inferno_engine_generate(inferno_engine *engine,
     const int32_t max_tokens = request.value("maxTokens", 0);
     const float temperature = request.value("temperature", 1.0F);
     const float top_p = request.value("topP", 0.95F);
+    // topK and contextLength are absent-or-null when unset: 0 disables the
+    // top-k sampler / falls back to the model's trained context window.
+    const int32_t top_k =
+        (!request.contains("topK") || request["topK"].is_null())
+            ? 0
+            : request["topK"].get<int32_t>();
+    const int64_t context_length =
+        (!request.contains("contextLength") || request["contextLength"].is_null())
+            ? 0
+            : request["contextLength"].get<int64_t>();
     const uint32_t seed = request["seed"].is_null()
                               ? LLAMA_DEFAULT_SEED
                               : request.value("seed", LLAMA_DEFAULT_SEED);
@@ -384,7 +394,8 @@ int32_t inferno_engine_generate(inferno_engine *engine,
     const auto stop_ids_vector = request.value("stopTokenIds", std::vector<llama_token>{});
     const std::unordered_set<llama_token> stop_ids(stop_ids_vector.begin(),
                                                    stop_ids_vector.end());
-    if (prompt.empty() || max_tokens <= 0 || temperature < 0 || top_p <= 0 || top_p > 1) {
+    if (prompt.empty() || max_tokens <= 0 || temperature < 0 || top_p <= 0 || top_p > 1 ||
+        top_k < 0 || context_length < 0) {
       emit_error(callback,
                  operation_id,
                  "generation_failed",
@@ -413,13 +424,19 @@ int32_t inferno_engine_generate(inferno_engine *engine,
       return;
     }
     const int32_t model_context = llama_model_n_ctx_train(engine->model);
+    // The caller's context budget can only tighten the trained window, never
+    // widen it; the same budget check runs in the MLX shim so a too-small
+    // budget fails identically on both engines.
+    const int64_t context_budget =
+        context_length > 0 ? std::min<int64_t>(context_length, model_context)
+                           : model_context;
     const int64_t requested_context =
         static_cast<int64_t>(prompt_tokens.size()) + max_tokens;
-    if (requested_context > model_context) {
+    if (requested_context > context_budget) {
       emit_error(callback,
                  operation_id,
                  "generation_failed",
-                 "The rendered prompt and max tokens exceed the model context.",
+                 "The rendered prompt and max tokens exceed the context budget.",
                  user_data);
       return;
     }
@@ -445,6 +462,9 @@ int32_t inferno_engine_generate(inferno_engine *engine,
     }
 
     llama_sampler *sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
+    if (top_k > 0) {
+      llama_sampler_chain_add(sampler, llama_sampler_init_top_k(top_k));
+    }
     llama_sampler_chain_add(sampler, llama_sampler_init_top_p(top_p, 1));
     llama_sampler_chain_add(sampler, llama_sampler_init_temp(temperature));
     llama_sampler_chain_add(sampler, llama_sampler_init_dist(seed));

@@ -1,3 +1,6 @@
+@Tags(['real-model'])
+library;
+
 import 'dart:io';
 
 import 'package:inferno/inferno.dart';
