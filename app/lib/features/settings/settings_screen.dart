@@ -285,7 +285,10 @@ class _ModelCard extends ConsumerWidget {
           Text(
             '${_engineLabel(entry.engine)} · ${entry.quantization}',
             style: TextStyle(
-              color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
+              color: CupertinoDynamicColor.resolve(
+                GolemTheme.mutedInk,
+                context,
+              ),
             ),
           ),
           const SizedBox(height: 14),
@@ -404,11 +407,8 @@ class _ModelCard extends ConsumerWidget {
         ),
         cancel,
       ],
-      ArtifactPhase.paused || ArtifactPhase.failed => [
-        const SizedBox(height: 14),
-        download,
-        cancel,
-      ],
+      ArtifactPhase.paused ||
+      ArtifactPhase.failed => [const SizedBox(height: 14), download, cancel],
       ArtifactPhase.verifying => const [],
       ArtifactPhase.installed => [
         const SizedBox(height: 14),
@@ -564,8 +564,7 @@ String _engineLabel(ModelEngine engine) => switch (engine) {
   ModelEngine.gguf => 'GGUF · llama.cpp',
 };
 
-String _gigabytes(int bytes) =>
-    '${(bytes / 1000000000).toStringAsFixed(2)} GB';
+String _gigabytes(int bytes) => '${(bytes / 1000000000).toStringAsFixed(2)} GB';
 
 String _runtimeLabel(RuntimePhase phase, bool simulated) => switch (phase) {
   RuntimePhase.unloaded => 'Unloaded',

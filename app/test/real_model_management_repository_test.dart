@@ -60,8 +60,7 @@ final class _ScriptedDownloader implements ArtifactFileDownloader {
   }) async* {
     requestedUrls.add(url);
     yield ArtifactFileProgress(expectedBytes ~/ 2);
-    final terminal =
-        terminalEvents[filename] ?? const ArtifactFileComplete();
+    final terminal = terminalEvents[filename] ?? const ArtifactFileComplete();
     if (terminal is ArtifactFileComplete) {
       final file = File('$documentsDirectory/$directory/$filename');
       await file.parent.create(recursive: true);
@@ -142,9 +141,7 @@ void main() {
     expect(backup.excluded, ['${temp.path}/documents/models']);
     // The nested file landed inside the artifact directory.
     expect(
-      File(
-        '${temp.path}/documents/models/test-mlx/$_fileTwo',
-      ).existsSync(),
+      File('${temp.path}/documents/models/test-mlx/$_fileTwo').existsSync(),
       isTrue,
     );
     // Installed and active: the runtime now loads.
@@ -249,10 +246,7 @@ void main() {
     final resumed = await repository().load();
     expect(resumed.statusOf('test-mlx').phase, ArtifactPhase.paused);
     // _fileTwo is still fully present on disk; _fileOne was removed above.
-    expect(
-      resumed.statusOf('test-mlx').downloadedBytes,
-      _contentTwo.length,
-    );
+    expect(resumed.statusOf('test-mlx').downloadedBytes, _contentTwo.length);
     expect(resumed.runtime, RuntimePhase.unloaded);
   });
 

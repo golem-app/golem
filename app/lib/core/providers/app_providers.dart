@@ -369,9 +369,9 @@ class ModelController extends _$ModelController {
     try {
       final epoch = ++_operationEpoch;
       await for (final value
-          in ref.read(modelManagementRepositoryProvider).download(
-            artifactKey,
-          )) {
+          in ref
+              .read(modelManagementRepositoryProvider)
+              .download(artifactKey)) {
         if (!ref.mounted || epoch != _operationEpoch) return;
         state = AsyncData(value);
       }

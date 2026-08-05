@@ -83,18 +83,13 @@ void main() {
 
       // Skip-if-valid: a second run re-downloads nothing and stays installed.
       final again = await repository.download(entry.key).toList();
-      expect(
-        again.last.statusOf(entry.key).phase,
-        ArtifactPhase.installed,
-      );
+      expect(again.last.statusOf(entry.key).phase, ArtifactPhase.installed);
 
       // Delete removes the smoke directory this test created.
       final deleted = await repository.delete(entry.key);
       expect(deleted.statusOf(entry.key).phase, ArtifactPhase.notDownloaded);
       expect(
-        await Directory(
-          '${documents.path}/${entry.installDirectory}',
-        ).exists(),
+        await Directory('${documents.path}/${entry.installDirectory}').exists(),
         isFalse,
       );
     },

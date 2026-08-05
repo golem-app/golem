@@ -320,18 +320,14 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     _stopRequested.add(artifactKey);
     await downloader.cancel();
     await _deleteArtifactFiles(entry);
-    return _persist(
-      _state.withArtifact(artifactKey, const ArtifactStatus()),
-    );
+    return _persist(_state.withArtifact(artifactKey, const ArtifactStatus()));
   }
 
   @override
   Future<ModelState> delete(String artifactKey) async {
     final entry = _entry(artifactKey);
     await _deleteArtifactFiles(entry);
-    return _persist(
-      _state.withArtifact(artifactKey, const ArtifactStatus()),
-    );
+    return _persist(_state.withArtifact(artifactKey, const ArtifactStatus()));
   }
 
   Future<void> _deleteArtifactFiles(ModelCatalogEntry entry) async {
@@ -364,5 +360,4 @@ final class RealModelManagementRepository implements ModelManagementRepository {
       _persist(_state.copyWith(runtime: RuntimePhase.unloaded));
 }
 
-String _gigabytes(int bytes) =>
-    '${(bytes / 1000000000).toStringAsFixed(2)} GB';
+String _gigabytes(int bytes) => '${(bytes / 1000000000).toStringAsFixed(2)} GB';

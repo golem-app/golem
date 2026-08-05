@@ -135,9 +135,7 @@ void main() {
     // permission only debug/profile builds would have network access.
     expect(
       manifest,
-      contains(
-        '<uses-permission android:name="android.permission.INTERNET"/>',
-      ),
+      contains('<uses-permission android:name="android.permission.INTERNET"/>'),
     );
     expect(
       manifest,

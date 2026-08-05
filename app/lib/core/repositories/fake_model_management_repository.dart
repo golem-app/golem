@@ -82,17 +82,17 @@ final class FakeModelManagementRepository implements ModelManagementRepository {
       // "verifying" after a relaunch, so they become paused at the saved
       // byte count instead of staring at a stuck live state.
       final known = {for (final entry in catalog) entry.key};
-      _state = _state.copyWith(artifacts: {
-        for (final MapEntry(:key, :value) in _state.artifacts.entries)
-          if (known.contains(key))
-            key: switch (value.phase) {
-              ArtifactPhase.downloading ||
-              ArtifactPhase.verifying => value.copyWith(
-                phase: ArtifactPhase.paused,
-              ),
-              _ => value,
-            },
-      });
+      _state = _state.copyWith(
+        artifacts: {
+          for (final MapEntry(:key, :value) in _state.artifacts.entries)
+            if (known.contains(key))
+              key: switch (value.phase) {
+                ArtifactPhase.downloading || ArtifactPhase.verifying =>
+                  value.copyWith(phase: ArtifactPhase.paused),
+                _ => value,
+              },
+        },
+      );
     }
     return _state;
   }
@@ -169,17 +169,13 @@ final class FakeModelManagementRepository implements ModelManagementRepository {
   Future<ModelState> cancel(String artifactKey) async {
     _entry(artifactKey);
     _stopRequested.add(artifactKey);
-    return _persist(
-      _state.withArtifact(artifactKey, const ArtifactStatus()),
-    );
+    return _persist(_state.withArtifact(artifactKey, const ArtifactStatus()));
   }
 
   @override
   Future<ModelState> delete(String artifactKey) async {
     _entry(artifactKey);
-    return _persist(
-      _state.withArtifact(artifactKey, const ArtifactStatus()),
-    );
+    return _persist(_state.withArtifact(artifactKey, const ArtifactStatus()));
   }
 
   @override
