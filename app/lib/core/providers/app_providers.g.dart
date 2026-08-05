@@ -297,6 +297,76 @@ final class SettingsRepositoryProvider
 String _$settingsRepositoryHash() =>
     r'7f08be7173b537a7eccd726a624b784cc87b3fa3';
 
+/// The resolved inference backend for this process. Deliberately a fake
+/// default value rather than a throwing seam — a documented exception to
+/// the repository-provider discipline: this is a value signal that dozens
+/// of widgets read for honest "simulated" labeling, and host tests (which
+/// run as the dev flavor) must see the fake without every container
+/// overriding it. main() always overrides it with the resolved config;
+/// a regression test pins the fake default.
+
+@ProviderFor(inferenceBackend)
+const inferenceBackendProvider = InferenceBackendProvider._();
+
+/// The resolved inference backend for this process. Deliberately a fake
+/// default value rather than a throwing seam — a documented exception to
+/// the repository-provider discipline: this is a value signal that dozens
+/// of widgets read for honest "simulated" labeling, and host tests (which
+/// run as the dev flavor) must see the fake without every container
+/// overriding it. main() always overrides it with the resolved config;
+/// a regression test pins the fake default.
+
+final class InferenceBackendProvider
+    extends
+        $FunctionalProvider<
+          InferenceBackendConfig,
+          InferenceBackendConfig,
+          InferenceBackendConfig
+        >
+    with $Provider<InferenceBackendConfig> {
+  /// The resolved inference backend for this process. Deliberately a fake
+  /// default value rather than a throwing seam — a documented exception to
+  /// the repository-provider discipline: this is a value signal that dozens
+  /// of widgets read for honest "simulated" labeling, and host tests (which
+  /// run as the dev flavor) must see the fake without every container
+  /// overriding it. main() always overrides it with the resolved config;
+  /// a regression test pins the fake default.
+  const InferenceBackendProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'inferenceBackendProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$inferenceBackendHash();
+
+  @$internal
+  @override
+  $ProviderElement<InferenceBackendConfig> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  InferenceBackendConfig create(Ref ref) {
+    return inferenceBackend(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(InferenceBackendConfig value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<InferenceBackendConfig>(value),
+    );
+  }
+}
+
+String _$inferenceBackendHash() => r'679d3dfd7f9bdcc675a964fdfe9368052cc0b632';
+
 /// Persisted per-model generation settings. Reads resolve against the
 /// broker profile's recommended defaults at the consumer, never here —
 /// only user-set values are stored.
@@ -382,7 +452,7 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'2321102ea332afba8b334715888c912ef43b2a41';
+String _$chatControllerHash() => r'293795790439a6637528c4ccf236ad068b6bd5ab';
 
 abstract class _$ChatController extends $AsyncNotifier<ChatState> {
   FutureOr<ChatState> build();

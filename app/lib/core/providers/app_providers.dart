@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../domain/app_state.dart';
 import '../domain/generation_settings.dart';
+import '../domain/inference_backend.dart';
 import '../domain/model_catalog.dart';
 import '../domain/models.dart';
 import '../repositories/contracts.dart';
@@ -38,6 +39,17 @@ List<ModelCatalogEntry> modelCatalogEntries(Ref ref) =>
 @Riverpod(keepAlive: true)
 SettingsRepository settingsRepository(Ref ref) =>
     throw UnimplementedError('Override settingsRepositoryProvider at startup');
+
+/// The resolved inference backend for this process. Deliberately a fake
+/// default value rather than a throwing seam — a documented exception to
+/// the repository-provider discipline: this is a value signal that dozens
+/// of widgets read for honest "simulated" labeling, and host tests (which
+/// run as the dev flavor) must see the fake without every container
+/// overriding it. main() always overrides it with the resolved config;
+/// a regression test pins the fake default.
+@Riverpod(keepAlive: true)
+InferenceBackendConfig inferenceBackend(Ref ref) =>
+    const InferenceBackendConfig.fake();
 
 /// Persisted per-model generation settings. Reads resolve against the
 /// broker profile's recommended defaults at the consumer, never here —
@@ -244,12 +256,15 @@ class ChatController extends _$ChatController {
       if (!ref.mounted || epoch != _generationEpoch) return;
       state = AsyncData(_value.copyWith(generation: GenerationPhase.streaming));
       final context = active.promptContext;
+      final overrides = await _samplingOverrides();
+      if (!ref.mounted || epoch != _generationEpoch) return;
       await for (final event
           in ref
               .read(inferenceRepositoryProvider)
               .generate(
                 context: context,
                 reasoningEnabled: active.reasoningEnabled,
+                overrides: overrides,
               )) {
         if (!ref.mounted || epoch != _generationEpoch) return;
         if (event is CompletedEvent) break;
@@ -292,6 +307,21 @@ class ChatController extends _$ChatController {
           ),
         );
       }
+    }
+  }
+
+  /// The persisted overrides for the active model profile. Settings that
+  /// fail to surface must never block chat — the fake ignores overrides
+  /// anyway, and the repository already folds corrupt files into defaults —
+  /// so an unavailable settings store degrades to profile defaults.
+  Future<SamplingOverrides?> _samplingOverrides() async {
+    try {
+      final settings = await ref.read(settingsControllerProvider.future);
+      return settings.overridesFor(
+        ref.read(inferenceBackendProvider).profileKey,
+      );
+    } catch (_) {
+      return null;
     }
   }
 

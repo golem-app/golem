@@ -25,20 +25,17 @@ Future<void> main() async {
     'GOLEM_STREAM_DELAY_MS',
     defaultValue: 34,
   );
-  const inferenceBackend = String.fromEnvironment(
-    'GOLEM_INFERENCE_BACKEND',
-    defaultValue: 'fake',
-  );
-  const modelProfile = String.fromEnvironment(
-    'GOLEM_MODEL_PROFILE',
-    defaultValue: 'gemma4',
-  );
+  // One resolution feeds the inference repository, the active artifact,
+  // and the backend signal provider, so they can never disagree. The
+  // composition rule, stated once: qa and the flavorless test identity
+  // wire all fakes (inference, model management, benchmark) so goldens,
+  // journeys, and CI stay deterministic and offline; production and dev
+  // wire the real implementations. Explicit dart-defines override the
+  // flavor default in any build.
+  final backendConfig = await resolveConfiguredBackend();
   final support = await getApplicationSupportDirectory();
   final documents = await getApplicationDocumentsDirectory();
   final stateFile = File('${support.path}/flutter-model-v2.json');
-  // The qa flavor and flavorless test harness stay on the deterministic
-  // fake so goldens, journeys, and CI never touch the network; dev and
-  // production builds download for real.
   final identity = AppIdentity.current;
   final useFakeModels =
       identity == AppIdentity.qa || identity == AppIdentity.flutter;
@@ -51,10 +48,7 @@ Future<void> main() async {
           downloader: BackgroundArtifactDownloader(),
           diskSpace: const DeviceStorageChannel(),
           backupExclusion: const DeviceStorageChannel(),
-          activeArtifactKey: activeArtifactKeyFor(
-            backend: inferenceBackend,
-            modelProfile: modelProfile,
-          ),
+          activeArtifactKey: backendConfig.artifactKey,
         );
   runApp(
     ProviderScope(
@@ -67,8 +61,10 @@ Future<void> main() async {
         settingsRepositoryProvider.overrideWithValue(
           FileSettingsRepository(File('${support.path}/flutter-prefs-v1.json')),
         ),
+        inferenceBackendProvider.overrideWithValue(backendConfig),
         inferenceRepositoryProvider.overrideWithValue(
           createConfiguredInferenceRepository(
+            config: backendConfig,
             fakeStreamDelay: Duration(milliseconds: streamDelayMilliseconds),
             documentsDirectory: documents.path,
           ),

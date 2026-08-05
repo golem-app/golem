@@ -25,6 +25,10 @@ import UIKit
   private static func handleStorageCall(
     _ call: FlutterMethodCall, result: @escaping FlutterResult
   ) {
+    if call.method == "physicalMemoryBytes" {
+      result(Int(ProcessInfo.processInfo.physicalMemory))
+      return
+    }
     guard
       let arguments = call.arguments as? [String: Any],
       let path = arguments["path"] as? String

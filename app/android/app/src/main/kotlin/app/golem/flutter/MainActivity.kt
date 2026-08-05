@@ -1,5 +1,7 @@
 package app.golem.flutter
 
+import android.app.ActivityManager
+import android.content.Context
 import android.os.StatFs
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -12,6 +14,16 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             "app.golem.flutter/storage"
         ).setMethodCallHandler { call, result ->
+            if (call.method == "physicalMemoryBytes") {
+                // totalMem reports net of kernel/firmware reservations, so a
+                // nominal 8 GB device reads ~7.5 GB — the policy threshold
+                // accounts for that.
+                val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                val info = ActivityManager.MemoryInfo()
+                manager.getMemoryInfo(info)
+                result.success(info.totalMem)
+                return@setMethodCallHandler
+            }
             val path = call.argument<String>("path")
             if (path == null) {
                 result.error("bad-args", "Expected a path argument", null)
