@@ -241,6 +241,11 @@ void main() {
             stepDelay: const Duration(milliseconds: 5),
           ),
         ),
+        // The toggle now drives the engine for real (prepare/unload), so
+        // the container must supply an inference repository.
+        inferenceRepositoryProvider.overrideWithValue(
+          FakeInferenceRepository(eventDelay: Duration.zero),
+        ),
       ],
     );
     addTearDown(container.dispose);

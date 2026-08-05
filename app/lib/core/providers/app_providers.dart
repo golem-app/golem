@@ -234,6 +234,27 @@ class ChatController extends _$ChatController {
       return;
     }
     final epoch = ++_generationEpoch;
+    // Real backend with the active artifact not installed: fail fast into
+    // the banner's download CTA before touching the engine — prepare()
+    // would only produce a cryptic missing-file error after a hang-like
+    // pause.
+    final backend = ref.read(inferenceBackendProvider);
+    if (!backend.simulatedInference && backend.artifactKey != null) {
+      final installed = await _activeModelInstalled();
+      if (!ref.mounted || epoch != _generationEpoch) return;
+      if (installed == false) {
+        state = AsyncData(
+          _value.copyWith(
+            generation: GenerationPhase.failed,
+            failure:
+                'The local model is not downloaded on this device yet. '
+                'Download it to start chatting.',
+            missingModelArtifactKey: backend.artifactKey,
+          ),
+        );
+        return;
+      }
+    }
     final assistant = ChatMessage(
       id: newId(),
       role: MessageRole.assistant,
@@ -307,6 +328,18 @@ class ChatController extends _$ChatController {
           ),
         );
       }
+    }
+  }
+
+  /// Whether the active artifact is installed, or null when model state is
+  /// unavailable — then generation proceeds and prepare() stays the loud
+  /// failure path rather than this controller inventing a verdict.
+  Future<bool?> _activeModelInstalled() async {
+    try {
+      final models = await ref.read(modelControllerProvider.future);
+      return models.activeModelInstalled;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -474,6 +507,12 @@ class ModelController extends _$ModelController {
     if (_busy) return;
     _busy = true;
     try {
+      // Never delete weights the engine may still have mapped: releasing
+      // the runtime comes first, and an unload failure aborts the delete.
+      if (artifactKey == state.value?.activeArtifactKey) {
+        await ref.read(inferenceRepositoryProvider).unload();
+        if (!ref.mounted) return;
+      }
       final value = await ref
           .read(modelManagementRepositoryProvider)
           .delete(artifactKey);
@@ -500,6 +539,11 @@ class ModelController extends _$ModelController {
     );
   }
 
+  /// The persisted RuntimePhase must reflect the engine, not bookkeeping:
+  /// Load drives a real `prepare()` before `loaded` is recorded, Unload a
+  /// real `unload()` before `unloaded` — the deferred #37 finding. Engine
+  /// failures stay in-memory as a failed phase with the message; the
+  /// repository's stale-`loading` reconciliation already covers crashes.
   Future<void> toggleRuntime() async {
     if (_busy) return;
     _busy = true;
@@ -507,15 +551,43 @@ class ModelController extends _$ModelController {
       final repository = ref.read(modelManagementRepositoryProvider);
       final current = state.requireValue;
       if (current.runtime == RuntimePhase.loaded) {
+        try {
+          await ref.read(inferenceRepositoryProvider).unload();
+        } catch (error) {
+          if (!ref.mounted) return;
+          state = AsyncData(
+            current.copyWith(runtime: RuntimePhase.failed, failure: '$error'),
+          );
+          return;
+        }
+        if (!ref.mounted) return;
         final value = await repository.unloadRuntime();
         if (!ref.mounted) return;
         state = AsyncData(value);
       } else {
         // Publish the loading phase immediately so the UI can disable the
-        // toggle; the repository only records it internally.
+        // toggle while the engine loads.
         state = AsyncData(
           current.copyWith(runtime: RuntimePhase.loading, clearFailure: true),
         );
+        if (!current.activeModelInstalled) {
+          // The repository refuses with a persisted failed phase and a
+          // clear message; the engine is never touched.
+          final value = await repository.loadRuntime();
+          if (!ref.mounted) return;
+          state = AsyncData(value);
+          return;
+        }
+        try {
+          await ref.read(inferenceRepositoryProvider).prepare();
+        } catch (error) {
+          if (!ref.mounted) return;
+          state = AsyncData(
+            current.copyWith(runtime: RuntimePhase.failed, failure: '$error'),
+          );
+          return;
+        }
+        if (!ref.mounted) return;
         final value = await repository.loadRuntime();
         if (!ref.mounted) return;
         state = AsyncData(value);

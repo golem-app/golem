@@ -116,7 +116,9 @@ identifiers are `launch-splash`, `chat-composer`, `send-button`, `stop-button`,
 `confirm-delete`, `open-settings`, `model-card-<key>`, `model-status-<key>`,
 `model-download-<key>`, `model-pause-<key>`, `model-cancel-<key>`,
 `model-delete-<key>`, `confirm-model-delete` (catalog keys: `gemma4-mlx`,
-`gemma4-gguf`, `qwen35-mlx`, `qwen35-gguf`), `runtime-toggle-button`,
+`gemma4-gguf`, `qwen35-mlx`, `qwen35-gguf`), `download-active-model` (the
+chat failure banner's consent CTA when a real backend's model is not
+downloaded yet), `runtime-toggle-button`,
 `open-benchmark`, `benchmark-case-picker`, `benchmark-phase-picker`,
 `benchmark-run-button`, `benchmark-stop-button`, and `benchmark-export-button`.
 
