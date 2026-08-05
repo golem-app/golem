@@ -169,28 +169,35 @@ void main() {
   testWidgets('the disabled composer keeps a transparent field', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        child: _app(
-          brightness: Brightness.dark,
-          child: Composer(
-            controller: TextEditingController(),
-            focus: FocusNode(),
-            reasoningEnabled: false,
-            generation: GenerationPhase.streaming,
+    final controller = TextEditingController();
+    final focus = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focus.dispose);
+    // Every non-idle phase disables the field, so each one would repaint
+    // Flutter's built-in near-black fill over the Glass pill without the
+    // explicit empty decoration (issue #34).
+    for (final phase in GenerationPhase.values) {
+      if (phase == GenerationPhase.idle) continue;
+      await tester.pumpWidget(
+        ProviderScope(
+          child: _app(
+            brightness: Brightness.dark,
+            child: Composer(
+              controller: controller,
+              focus: focus,
+              reasoningEnabled: false,
+              generation: phase,
+            ),
           ),
         ),
-      ),
-    );
-    final field = tester.widget<CupertinoTextField>(
-      find.byKey(const Key('chat-composer')),
-    );
-    // decoration == null makes a disabled borderless field paint Flutter's
-    // built-in near-black fill over the Glass pill (issue #34); the explicit
-    // empty decoration keeps it transparent.
-    expect(field.enabled, isFalse);
-    expect(field.decoration, isNotNull);
-    expect(field.decoration!.color, isNull);
+      );
+      final field = tester.widget<CupertinoTextField>(
+        find.byKey(const Key('chat-composer')),
+      );
+      expect(field.enabled, isFalse, reason: phase.name);
+      expect(field.decoration, isNotNull, reason: phase.name);
+      expect(field.decoration!.color, isNull, reason: phase.name);
+    }
   });
 
   testWidgets('an empty failed assistant message renders no ghost bubble', (
