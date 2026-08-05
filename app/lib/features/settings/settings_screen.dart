@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../broker/model_profile.dart';
 import '../../core/app_identity.dart';
+import '../../core/domain/generation_settings.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
@@ -79,6 +81,19 @@ class _SettingsBody extends ConsumerWidget {
             otherDownloadActive:
                 downloadingKey != null && downloadingKey != entry.key,
           ),
+          const SizedBox(height: 12),
+        ],
+        const SizedBox(height: 16),
+        const SectionHeader(
+          'Generation',
+          subtitle:
+              'Per-model sampling and budget controls. Recommended defaults '
+              'come from the model profile; changes reach generation on the '
+              'real engine only.',
+        ),
+        const SizedBox(height: 8),
+        for (final profileKey in modelProfiles.keys) ...[
+          _GenerationCard(profileKey: profileKey),
           const SizedBox(height: 12),
         ],
         const SizedBox(height: 16),
@@ -572,3 +587,273 @@ String _runtimeLabel(RuntimePhase phase, bool simulated) => switch (phase) {
   RuntimePhase.loaded => simulated ? 'Ready · simulated' : 'Ready',
   RuntimePhase.failed => 'Stopped',
 };
+
+/// Display names for the profile-keyed generation sections; the profile
+/// registry is the source of which sections exist.
+const _profileDisplayNames = {'gemma4': 'Gemma 4 E2B', 'qwen35': 'Qwen 3.5 4B'};
+
+class _GenerationCard extends ConsumerWidget {
+  const _GenerationCard({required this.profileKey});
+
+  final String profileKey;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = modelProfiles[profileKey]!;
+    // The direct-mode defaults are the editable surface; thinking-mode
+    // sampling can be pinned by the profile (see the footnote).
+    final defaults = profile.sampling(reasoningEnabled: false);
+    final thinkingPinned = profile.sampling(reasoningEnabled: true).pinned;
+    final overrides =
+        ref.watch(settingsControllerProvider).value?.overridesFor(profileKey) ??
+        const SamplingOverrides();
+    final maxTokens = overrides.maxTokens ?? defaults.maxTokens;
+    final contextLength = overrides.contextLength ?? defaults.contextLength;
+
+    Future<void> update(SamplingOverrides next) => ref
+        .read(settingsControllerProvider.notifier)
+        .updateModel(profileKey, next);
+
+    return GolemCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _profileDisplayNames[profileKey] ?? profileKey,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              if (!overrides.isEmpty)
+                CupertinoButton(
+                  key: Key('gen-reset-$profileKey'),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(44, 30),
+                  onPressed: () => ref
+                      .read(settingsControllerProvider.notifier)
+                      .resetModel(profileKey),
+                  child: const Text('Reset', style: TextStyle(fontSize: 14)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          _SliderRow(
+            sliderKey: Key('gen-temperature-$profileKey'),
+            label: 'Temperature',
+            value: overrides.temperature ?? defaults.temperature,
+            isDefault: overrides.temperature == null,
+            min: 0,
+            max: 2,
+            display: (value) => value.toStringAsFixed(2),
+            onCommit: (value) =>
+                update(overrides.copyWith(temperature: () => value)),
+          ),
+          _SliderRow(
+            sliderKey: Key('gen-top-p-$profileKey'),
+            label: 'Top-p',
+            value: overrides.topP ?? defaults.topP,
+            isDefault: overrides.topP == null,
+            min: 0.05,
+            max: 1,
+            display: (value) => value.toStringAsFixed(2),
+            onCommit: (value) => update(overrides.copyWith(topP: () => value)),
+          ),
+          _SliderRow(
+            sliderKey: Key('gen-top-k-$profileKey'),
+            label: 'Top-k',
+            value: (overrides.topK ?? defaults.topK ?? 0).toDouble(),
+            isDefault: overrides.topK == null,
+            min: 0,
+            max: 100,
+            display: (value) => value.round() == 0 ? 'Off' : '${value.round()}',
+            onCommit: (value) => update(
+              overrides.copyWith(
+                topK: () => value.round() == 0 ? null : value.round(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          _StepperRow(
+            stepperKey: Key('gen-max-tokens-$profileKey'),
+            label: 'Max tokens',
+            value: maxTokens,
+            isDefault: overrides.maxTokens == null,
+            step: 256,
+            min: 256,
+            // A budget above the context cap could never finish a prompt.
+            max: contextLength,
+            onCommit: (value) =>
+                update(overrides.copyWith(maxTokens: () => value)),
+          ),
+          const SizedBox(height: 6),
+          _StepperRow(
+            stepperKey: Key('gen-context-$profileKey'),
+            label: 'Context length',
+            value: contextLength,
+            isDefault: overrides.contextLength == null,
+            step: 1024,
+            min: 1024,
+            max: 8192,
+            onCommit: (value) => update(
+              overrides.copyWith(
+                contextLength: () => value,
+                // Shrinking the context below the token budget would make
+                // every generation fail its budget check; clamp together.
+                maxTokens: maxTokens > value ? () => value : null,
+              ),
+            ),
+          ),
+          if (thinkingPinned) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Thinking mode keeps this model\'s pinned sampling '
+              '(temperature 0.6 · top-p 0.95); token budgets apply to both '
+              'modes.',
+              style: TextStyle(
+                color: CupertinoDynamicColor.resolve(
+                  GolemTheme.mutedInk,
+                  context,
+                ),
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A labeled slider whose value commits on drag end; the drag position is
+/// widget-local state so a drag never spams persisted saves.
+class _SliderRow extends StatefulWidget {
+  const _SliderRow({
+    required this.sliderKey,
+    required this.label,
+    required this.value,
+    required this.isDefault,
+    required this.min,
+    required this.max,
+    required this.display,
+    required this.onCommit,
+  });
+
+  final Key sliderKey;
+  final String label;
+  final double value;
+  final bool isDefault;
+  final double min;
+  final double max;
+  final String Function(double value) display;
+  final ValueChanged<double> onCommit;
+
+  @override
+  State<_SliderRow> createState() => _SliderRowState();
+}
+
+class _SliderRowState extends State<_SliderRow> {
+  double? _drag;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = (_drag ?? widget.value).clamp(widget.min, widget.max);
+    final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(widget.label, style: const TextStyle(fontSize: 14)),
+            ),
+            Text(widget.display(value), style: const TextStyle(fontSize: 14)),
+            if (widget.isDefault && _drag == null)
+              Text(' · default', style: TextStyle(fontSize: 14, color: muted)),
+          ],
+        ),
+        SizedBox(
+          height: 34,
+          child: CupertinoSlider(
+            key: widget.sliderKey,
+            value: value,
+            min: widget.min,
+            max: widget.max,
+            onChanged: (next) => setState(() => _drag = next),
+            onChangeEnd: (next) {
+              setState(() => _drag = null);
+              widget.onCommit(next);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A labeled stepped value with minus/plus buttons; steps snap to the
+/// nearest multiple so a default like 2048 stays on the grid.
+class _StepperRow extends StatelessWidget {
+  const _StepperRow({
+    required this.stepperKey,
+    required this.label,
+    required this.value,
+    required this.isDefault,
+    required this.step,
+    required this.min,
+    required this.max,
+    required this.onCommit,
+  });
+
+  final Key stepperKey;
+  final String label;
+  final int value;
+  final bool isDefault;
+  final int step;
+  final int min;
+  final int max;
+  final ValueChanged<int> onCommit;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
+    final lower = ((value - step) ~/ step) * step;
+    final higher = ((value + step) ~/ step) * step;
+    return Row(
+      key: stepperKey,
+      children: [
+        Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
+        CupertinoButton(
+          key: Key('${(stepperKey as ValueKey<String>).value}-minus'),
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(38, 30),
+          onPressed: value <= min
+              ? null
+              : () => onCommit(lower.clamp(min, max)),
+          child: const Icon(CupertinoIcons.minus_circle, size: 22),
+        ),
+        SizedBox(
+          width: 64,
+          child: Column(
+            children: [
+              Text('$value', style: const TextStyle(fontSize: 14)),
+              if (isDefault)
+                Text('default', style: TextStyle(fontSize: 11, color: muted)),
+            ],
+          ),
+        ),
+        CupertinoButton(
+          key: Key('${(stepperKey as ValueKey<String>).value}-plus'),
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(38, 30),
+          onPressed: value >= max
+              ? null
+              : () => onCommit(higher.clamp(min, max)),
+          child: const Icon(CupertinoIcons.plus_circle, size: 22),
+        ),
+      ],
+    );
+  }
+}

@@ -11,6 +11,7 @@ import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 import 'support/in_memory_chat_history_repository.dart';
+import 'support/in_memory_settings_repository.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/benchmark/benchmark_screen.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
@@ -130,6 +131,24 @@ void main() {
     await expectLater(
       find.byType(SettingsScreen),
       matchesGoldenFile('goldens/settings-dark.png'),
+    );
+
+    // The generation section lives below the fold; capture it scrolled
+    // into view so the per-model controls keep visual coverage.
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('gen-context-gemma4')),
+      260,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('settings-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    await expectLater(
+      find.byType(SettingsScreen),
+      matchesGoldenFile('goldens/settings-generation-dark.png'),
     );
   });
 
@@ -260,6 +279,9 @@ ProviderContainer _container({
       ),
       inferenceRepositoryProvider.overrideWithValue(
         FakeInferenceRepository(eventDelay: Duration.zero),
+      ),
+      settingsRepositoryProvider.overrideWithValue(
+        InMemorySettingsRepository(),
       ),
       modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
       modelManagementRepositoryProvider.overrideWithValue(_ModelFake(model)),
