@@ -13,6 +13,7 @@ import 'support/in_memory_chat_history_repository.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/benchmark/benchmark_screen.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
+import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';
 import 'package:golem_flutter/features/splash/splash_screen.dart';
 
@@ -162,6 +163,30 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('an empty failed assistant message renders no ghost bubble', (
+    tester,
+  ) async {
+    Widget wrap(ChatMessage message) => ProviderScope(
+      child: _app(child: MessageBubble(message: message, canRegenerate: false)),
+    );
+    final ghost = ChatMessage(
+      id: 'assistant-ghost',
+      role: MessageRole.assistant,
+      text: '',
+      createdAt: DateTime.utc(2026, 8, 5),
+    );
+    // A failure can strand an assistant message with no text, reasoning, or
+    // metrics; it must vanish instead of painting an empty bubble shell.
+    await tester.pumpWidget(wrap(ghost));
+    expect(find.byKey(const Key('message-assistant-ghost')), findsNothing);
+
+    // While streaming, the same empty message is the typing indicator and
+    // must stay visible.
+    await tester.pumpWidget(wrap(ghost.copyWith(isStreaming: true)));
+    expect(find.byKey(const Key('message-assistant-ghost')), findsOneWidget);
+    expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
   });
 }
 

@@ -25,6 +25,17 @@ class MessageBubble extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isUser = message.role == MessageRole.user;
+    // A failed or cancelled generation can leave an assistant message with
+    // no text, reasoning, or metrics behind; rendering it would paint an
+    // empty bubble shell next to the recovery banner. While streaming, the
+    // bubble stays visible as the typing indicator.
+    final hasContent =
+        message.text.isNotEmpty ||
+        (message.reasoning?.isNotEmpty ?? false) ||
+        message.metrics != null;
+    if (!isUser && !hasContent && !message.isStreaming) {
+      return const SizedBox.shrink();
+    }
     return Semantics(
       key: Key('message-${message.id}'),
       label: isUser ? 'You: ${message.text}' : 'Golem: ${message.text}',
