@@ -47,6 +47,15 @@ dart run tool/check_inferno_imports.dart
 cd packages/inferno && dart test
 ```
 
+The GitHub Actions workflow (`.github/workflows/ci.yml`) is deliberately
+**disabled while this repository is private**: the org is on the free plan,
+macOS runner minutes bill at 10×, and the workflow would exhaust the included
+quota mid-month (#31). While it is off, the verification suite above — plus
+the golden comparisons that only run on macOS — is the merge gate, and PR
+descriptions state that it was run. When the repository goes public, Actions
+minutes stop being metered: re-enable with `gh workflow enable ci.yml` and
+retire this note.
+
 See [`app/README.md`](app/README.md) for the app architecture, the asset
 and splash pipeline, screen/automation identifiers, and the iPhone 17
 simulator verification workflow.
