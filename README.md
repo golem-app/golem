@@ -3,9 +3,10 @@
 High-fidelity Flutter implementation of Golem. The repository is a pub
 workspace with two members:
 
-- [`app/`](app/) — the Flutter application. By default every model
-  transition and generated token is a deterministic simulation; the app
-  ships no model weights and no network client.
+- [`app/`](app/) — the Flutter application. The `qa` flavor and test
+  builds are fully deterministic simulations; `production` and `dev`
+  default to real on-device inference with pinned, verified model
+  downloads. The app ships no model weights.
 - [`packages/inferno/`](packages/inferno/) — the on-device inference
   package: a pure Dart FFI boundary over llama.cpp and MLX Swift shims.
   See [`docs/architecture/inferno.md`](docs/architecture/inferno.md) and
@@ -26,17 +27,24 @@ as an iPad-shaped resizable window, runs both real engines GPU-accelerated
 (llama.cpp-Metal and MLX), and deliberately disables the App Sandbox for
 development; Mac results validate correctness, never mobile performance.
 
-The simulated backend is the default in every build. A real local runtime
-is opt-in via build configuration:
+Backend selection is flavor-coupled with dart-define overrides
+(`docs/decisions/0003-flavor-backend-defaults.md`): `qa` and test builds
+keep the deterministic fake, while `production` and `dev` default to
+`auto` — real llama.cpp inference with the device-policy model (Gemma 4
+E2B at ≥ 7 GiB reported memory, Qwen 3.5 4B below), downloaded on first
+need behind an explicit consent tap. An explicit define always wins in
+any flavor:
 
 ```sh
 flutter run --release \
-  --dart-define=GOLEM_INFERENCE_BACKEND=llama \  # or: mlx
+  --dart-define=GOLEM_INFERENCE_BACKEND=llama \  # or: mlx, fake, auto
   --dart-define=GOLEM_MODEL_PATH=documents:models/gemma.gguf
 ```
 
 `GOLEM_MODEL_PATH` is an absolute path, or `documents:<relative>` resolved
-against the app documents directory. Building with hooks requires
+against the app documents directory; `auto` derives it from the catalog.
+Building any flavor with a real backend (including the `dev` default)
+executes the Inferno build hooks and requires
 `flutter config --enable-native-assets` once per machine.
 
 Verify (from the repo root):
