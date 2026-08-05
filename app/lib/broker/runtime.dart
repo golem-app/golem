@@ -23,6 +23,8 @@ final class BrokerSamplingParameters {
     required this.maxTokens,
     required this.temperature,
     required this.topP,
+    this.topK,
+    this.contextLength,
     required this.seed,
     required this.stopSequences,
     required this.stopTokenIds,
@@ -31,6 +33,14 @@ final class BrokerSamplingParameters {
   final int maxTokens;
   final double temperature;
   final double topP;
+
+  /// Null keeps top-k filtering out of the engine's sampler chain.
+  final int? topK;
+
+  /// Token budget over prompt plus generation, enforced by the engines;
+  /// null falls back to the engine's own bound (llama's trained context).
+  final int? contextLength;
+
   final int? seed;
   final List<String> stopSequences;
   final List<int> stopTokenIds;
@@ -159,6 +169,8 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
           maxTokens: request.sampling.maxTokens,
           temperature: request.sampling.temperature,
           topP: request.sampling.topP,
+          topK: request.sampling.topK,
+          contextLength: request.sampling.contextLength,
           seed: request.sampling.seed,
           stopSequences: request.sampling.stopSequences,
           stopTokenIds: request.sampling.stopTokenIds,

@@ -6,6 +6,7 @@ final class ChatState {
     this.activeId,
     this.generation = GenerationPhase.idle,
     this.failure,
+    this.missingModelArtifactKey,
     this.hasUnsavedAssistant = false,
   });
 
@@ -13,6 +14,14 @@ final class ChatState {
   final String? activeId;
   final GenerationPhase generation;
   final String? failure;
+
+  /// Typed marker for the one recoverable failure the banner can fix
+  /// itself: generation was attempted on a real backend whose active
+  /// artifact is not installed. Carries the catalog key so the banner can
+  /// offer the download without string-matching the failure text. Cleared
+  /// together with [failure].
+  final String? missingModelArtifactKey;
+
   final bool hasUnsavedAssistant;
 
   ChatConversation? get active => conversations
@@ -24,6 +33,7 @@ final class ChatState {
     String? activeId,
     GenerationPhase? generation,
     String? failure,
+    String? missingModelArtifactKey,
     bool clearFailure = false,
     bool? hasUnsavedAssistant,
   }) => ChatState(
@@ -31,6 +41,9 @@ final class ChatState {
     activeId: activeId ?? this.activeId,
     generation: generation ?? this.generation,
     failure: clearFailure ? null : failure ?? this.failure,
+    missingModelArtifactKey: clearFailure
+        ? null
+        : missingModelArtifactKey ?? this.missingModelArtifactKey,
     hasUnsavedAssistant: hasUnsavedAssistant ?? this.hasUnsavedAssistant,
   );
 }

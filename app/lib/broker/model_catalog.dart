@@ -48,6 +48,32 @@ String? activeArtifactKeyFor({
   _ => null,
 };
 
+/// The `documents:`-relative model path Inferno loads for an installed
+/// catalog entry: the single `.gguf` file for llama, the install directory
+/// for MLX. Derived from the pinned manifest so the path, profile, and
+/// artifact can never disagree.
+String primaryModelPathFor(String key) {
+  final entry = modelCatalog.firstWhere(
+    (item) => item.key == key,
+    orElse: () => throw ArgumentError.value(key, 'key', 'Unknown catalog key'),
+  );
+  switch (entry.engine) {
+    case ModelEngine.gguf:
+      final weights = entry.files
+          .where((file) => file.path.endsWith('.gguf'))
+          .toList();
+      if (weights.length != 1) {
+        throw StateError(
+          'Catalog entry $key must pin exactly one .gguf file, '
+          'found ${weights.length}.',
+        );
+      }
+      return 'documents:${entry.installDirectory}/${weights.single.path}';
+    case ModelEngine.mlx:
+      return 'documents:${entry.installDirectory}';
+  }
+}
+
 ModelCatalogEntry _entry({
   required String key,
   required String displayName,

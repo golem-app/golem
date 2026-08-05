@@ -36,6 +36,26 @@ rendered bytes. Any future deliberate divergence must update the fixture and
 this policy together; a prompt whose two leading tokens are both the
 tokenizer's BOS is a hard failure.
 
+## Sampling contract
+
+Generation requests cross the C ABI as one JSON payload: `prompt`,
+`maxTokens`, `temperature`, `topP`, `topK`, `contextLength`, `seed`,
+`stopSequences`, and `stopTokenIds`. `topK` and `contextLength` are
+absent-or-null when unset; both shims treat that — and, defensively, an
+explicit zero — as "top-k filtering off" and "no caller budget", so older
+payloads keep today's behavior bit for bit. The Dart API itself never
+encodes zero (it requires null-or-positive); the shim tolerance exists so
+the two engines cannot diverge on a malformed payload. Negative values
+are invalid on both engines. When `topK` is set, each engine applies its
+own upstream filter order
+(llama.cpp chains top-k → top-p; MLX applies top-p → min-p → top-k), a
+deliberate divergence — token-level sampling parity across engines is not
+asserted. `contextLength` is a caller budget over prompt plus `maxTokens`,
+checked before decoding on both engines: llama.cpp caps it at the model's
+trained context, MLX (whose KV cache is otherwise unbounded) enforces it as
+the only bound. Exceeding the budget fails with the same
+"context budget" generation error on both engines.
+
 ## Native callbacks
 
 The C header is the source of truth for threading. Load, generation, and unload

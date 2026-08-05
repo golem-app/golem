@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../core/domain/generation_settings.dart';
 import '../core/domain/models.dart';
 import '../core/repositories/contracts.dart';
 import 'hash.dart';
@@ -52,24 +53,21 @@ final class InfernoInferenceRepository implements InferenceRepository {
   Stream<InferenceEvent> generate({
     required List<Map<String, String>> context,
     required bool reasoningEnabled,
+    SamplingOverrides? overrides,
   }) async* {
     if (!_loaded) throw StateError('Inferno is not loaded.');
     final parser = profile.newParser(reasoningEnabled: reasoningEnabled);
-    final sampling = profile.sampling(reasoningEnabled: reasoningEnabled);
+    final (sampling, overridesApplied) = _effectiveSampling(
+      profile.sampling(reasoningEnabled: reasoningEnabled),
+      overrides,
+    );
     BrokerRuntimeMetrics? finalMetrics;
     var sawAnswer = false;
     final probe = seed == null ? null : StringBuffer();
     await for (final event in _runtime.generate(
       BrokerGenerationRequest(
         prompt: profile.render(context, reasoningEnabled: reasoningEnabled),
-        sampling: BrokerSamplingParameters(
-          maxTokens: sampling.maxTokens,
-          temperature: sampling.temperature,
-          topP: sampling.topP,
-          seed: seed,
-          stopSequences: profile.stopSequences,
-          stopTokenIds: profile.stopTokenIds,
-        ),
+        sampling: sampling,
       ),
     )) {
       switch (event) {
@@ -92,7 +90,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
             ),
           );
         case BrokerGenerationCompleted():
-          _logMetrics(finalMetrics, event.reason);
+          _logMetrics(finalMetrics, event.reason, sampling, overridesApplied);
           if (probe != null) _logProbe(probe.toString());
           for (final domainEvent in _domainEvents(parser.finish())) {
             if (domainEvent is AnswerDelta) sawAnswer = true;
@@ -109,9 +107,54 @@ final class InfernoInferenceRepository implements InferenceRepository {
     }
   }
 
+  /// Merges the user's sparse overrides onto the profile's defaults.
+  /// Pinned modes keep their sampling fields (a correctness constraint —
+  /// see the profile); token budgets stay the user's to size. Returns the
+  /// effective parameters and whether any override was actually consumed.
+  (BrokerSamplingParameters, bool) _effectiveSampling(
+    ProfileSampling defaults,
+    SamplingOverrides? overrides,
+  ) {
+    final user = overrides ?? const SamplingOverrides();
+    final samplingOverridable = !defaults.pinned;
+    final applied =
+        user.maxTokens != null ||
+        user.contextLength != null ||
+        (samplingOverridable &&
+            (user.temperature != null ||
+                user.topP != null ||
+                user.topK != null));
+    return (
+      BrokerSamplingParameters(
+        maxTokens: user.maxTokens ?? defaults.maxTokens,
+        temperature: samplingOverridable
+            ? (user.temperature ?? defaults.temperature)
+            : defaults.temperature,
+        topP: samplingOverridable
+            ? (user.topP ?? defaults.topP)
+            : defaults.topP,
+        topK: samplingOverridable
+            ? (user.topK ?? defaults.topK)
+            : defaults.topK,
+        contextLength: user.contextLength ?? defaults.contextLength,
+        seed: seed,
+        stopSequences: profile.stopSequences,
+        stopTokenIds: profile.stopTokenIds,
+      ),
+      applied,
+    );
+  }
+
   /// One greppable line per completed generation; this is the capture channel
   /// for on-device measurement (the app contract carries only core metrics).
-  void _logMetrics(BrokerRuntimeMetrics? metrics, BrokerStopReason reason) {
+  /// The effective sampling fields are the evidence that a settings change
+  /// actually reached the engine.
+  void _logMetrics(
+    BrokerRuntimeMetrics? metrics,
+    BrokerStopReason reason,
+    BrokerSamplingParameters sampling,
+    bool overridesApplied,
+  ) {
     if (metrics == null) return;
     debugPrint(
       'INFERNO_METRICS engine=${engine.name}'
@@ -122,7 +165,14 @@ final class InfernoInferenceRepository implements InferenceRepository {
       ' promptTokenCount=${metrics.promptTokenCount}'
       ' timeToFirstTokenSeconds=${metrics.timeToFirstTokenSeconds?.toStringAsFixed(3)}'
       ' elapsedSeconds=${metrics.elapsedSeconds.toStringAsFixed(2)}'
-      ' peakPhysicalFootprintBytes=${metrics.peakPhysicalFootprintBytes}',
+      ' peakPhysicalFootprintBytes=${metrics.peakPhysicalFootprintBytes}'
+      ' temperature=${sampling.temperature}'
+      ' topP=${sampling.topP}'
+      ' topK=${sampling.topK}'
+      ' maxTokens=${sampling.maxTokens}'
+      ' contextLength=${sampling.contextLength}'
+      ' seed=${sampling.seed}'
+      ' overridesApplied=$overridesApplied',
     );
   }
 

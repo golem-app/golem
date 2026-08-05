@@ -16,8 +16,12 @@ Select a flavor with the standard workflow — `flutter run --flavor qa`,
 `flutter build macos --flavor qa` — or omit `--flavor` to get
 `dev` (`default-flavor` in `pubspec.yaml`). The same three flavors exist on
 iOS, Android, and macOS. Each flavor stores its own versioned JSON under its
-separate application-support container; only the launcher icon and identity
-differ — every in-app asset, theme, and behavior is shared. The flavorless
+separate application-support container. Flavors share every in-app asset and
+theme but differ in identity **and default backend wiring**: `qa` (and the
+flavorless test identity) wires all fakes, while `production` and `dev`
+wire the real downloader and default to real inference (see "Deterministic
+where it matters" below and
+`../docs/decisions/0003-flavor-backend-defaults.md`). The flavorless
 legacy identity `app.golem.flutter` (**Golem Flutter**) remains reachable
 only through direct `xcodebuild -scheme Runner` builds and is never used for
 QA or automation.
@@ -27,21 +31,53 @@ QA or automation.
 > those identifiers belong to the native app there. Simulator use is
 > unrestricted.
 
-## Deterministic by default
+## Deterministic where it matters
 
-Inference defaults to the simulated backend in every build: no bundled model
-weights or hardware performance measurement, and every generated token is
-deterministic simulation the UI labels as such. Model **downloads** are real
-in the `dev` and `production` flavors: Settings lists the pinned catalog
-(`lib/broker/model_catalog.dart`, mirroring the Inferno manifest) and
-downloads artifacts from Hugging Face with per-file SHA-256 verification,
-pause/resume, cancel, disk-space preflight, and delete. The `qa` flavor and
-flavorless test-harness builds keep the deterministic fake downloader, so
-goldens, journeys, and CI never touch the network. Downloads install under
+The composition rule, stated once: the `qa` flavor and flavorless
+test-harness builds wire **all fakes** (inference, model management,
+benchmark), so goldens, journeys, and CI stay deterministic and never
+touch the network. `production` and `dev` wire the real implementations —
+the pinned Hugging Face downloader and, by default, real local inference.
+Explicit dart-defines override the flavor default in any build; an
+override to real inference carries model management to the real
+implementation with it, so a real engine is never fed by the download
+simulation.
+
+Backend resolution (`lib/broker/backend_policy.dart`, decided in
+`../docs/decisions/0003-flavor-backend-defaults.md`):
+`GOLEM_INFERENCE_BACKEND` accepts `fake`, `llama`, `mlx`, and `auto`;
+unset falls to the flavor default (`auto` on production/dev, `fake` on
+qa). `auto` composes the llama/GGUF artifact of the device-policy model —
+Gemma 4 E2B at ≥ 7 GiB reported physical memory, the lighter Qwen 3.5 4B
+below or when memory is unknown — deriving the model path, broker
+profile, and active catalog artifact together. A fresh real-backend
+install downloads its model **on first need behind an explicit consent
+tap** in the chat failure banner; nothing multi-gigabyte ever starts
+silently. Builds with an operator-supplied `GOLEM_MODEL_PATH` bypass that
+gate entirely — sideloaded paths are the operator's responsibility and go
+straight to the engine. `GOLEM_DEVICE_MEMORY_BYTES` is a test-only override for
+exercising both policy branches on hardware.
+
+Model **downloads** are real in the `dev` and `production` flavors:
+Settings lists the pinned catalog (`lib/broker/model_catalog.dart`,
+mirroring the Inferno manifest) and downloads artifacts from Hugging Face
+with per-file SHA-256 verification, pause/resume, cancel, disk-space
+preflight, and delete. Downloads install under
 `Documents/models/<catalog-key>/` — resolvable as
 `documents:models/<catalog-key>/<file>` — and are excluded from platform
 backups (iOS/macOS `NSURLIsExcludedFromBackupKey`, Android
 `dataExtractionRules`).
+
+Per-model **generation settings** (temperature, top-p, top-k, max tokens,
+context length) live in Settings' Generation section, persist sparsely to
+`flutter-prefs-v1.json` (only user-set values; recommended defaults stay
+in the broker profiles), and merge onto the profile defaults at
+generation time — provable from the effective sampling fields on each
+`INFERNO_METRICS` line. Qwen's thinking-mode sampling is pinned against
+overrides (off-spec thinking looped during the #33 bring-up); token
+budgets apply to both modes, and the UI keeps max tokens at least a
+512-token prompt reserve below the context length, clamped across both
+reasoning modes (default cap 8192 for both models).
 
 Cable-provisioned models keep working: any file pushed under `Documents/`
 (`ios fsync push`, `adb` + `run-as`) still loads through `GOLEM_MODEL_PATH`,
@@ -50,18 +86,17 @@ directories. Pushing an artifact's files into its `models/<catalog-key>/`
 layout and tapping Download verifies the pushed bytes and installs them with
 no network use (skip-if-valid) — an offline sideload path.
 
-A real local runtime exists
-behind one explicit opt-in: `lib/broker/` adapts `package:inferno` (see the
-root README) and is selected only by building with
-`--dart-define=GOLEM_INFERENCE_BACKEND=llama|mlx` plus
-`--dart-define=GOLEM_MODEL_PATH=…`. **`GOLEM_MODEL_PATH` and
-`GOLEM_MODEL_PROFILE` are a matched pair**: the profile
+The real local runtime lives in `lib/broker/`, which adapts
+`package:inferno` (see the root README). Under `auto` the model path,
+profile, and artifact resolve together and cannot disagree. The explicit
+`llama|mlx` opt-in keeps today's contract: **`GOLEM_MODEL_PATH` and
+`GOLEM_MODEL_PROFILE` are a matched pair** — the profile
 (`gemma4` default, `qwen35`; registry in `lib/broker/model_profile.dart`)
 supplies the chat template, stop policy, sampling defaults, and
 reasoning parsing, and nothing cross-checks it against the model file —
 pointing a Qwen artifact at the default Gemma profile silently renders
-the wrong template. Real-backend builds must set both. No other app code
-may import Inferno;
+the wrong template. Explicit real-backend builds must set both. No other
+app code may import Inferno;
 `../tool/check_inferno_imports.dart` and `test/inferno_import_boundary_test.dart`
 enforce that. Benchmark exports contain both:
 
@@ -83,9 +118,12 @@ and generated Riverpod providers live under `lib/core/`.
 - `ChatHistoryRepository`: versioned, atomic JSON persistence plus an in-memory
   test implementation. It is the source of truth for chats and active selection.
 - `InferenceRepository`: prepare, unload, cancel, and cancellable streamed
-  events. `FakeInferenceRepository` is the default; the broker's
-  `InfernoInferenceRepository` is the opt-in real runtime. Reasoning is never
-  copied into later prompt context.
+  events with optional per-model sampling overrides.
+  `FakeInferenceRepository` backs qa/test builds; the broker's
+  `InfernoInferenceRepository` is the production/dev default (flavor
+  policy above). Reasoning is never copied into later prompt context.
+- `SettingsRepository`: sparse per-model generation overrides, persisted
+  as schema-v1 JSON with the same atomic-write discipline.
 - `ModelManagementRepository`: per-artifact download/pause/cancel/delete over
   the injected catalog plus runtime state, persisted as schema-v2 JSON. The
   fake simulates the same catalog; `RealModelManagementRepository` downloads
@@ -116,7 +154,13 @@ identifiers are `launch-splash`, `chat-composer`, `send-button`, `stop-button`,
 `confirm-delete`, `open-settings`, `model-card-<key>`, `model-status-<key>`,
 `model-download-<key>`, `model-pause-<key>`, `model-cancel-<key>`,
 `model-delete-<key>`, `confirm-model-delete` (catalog keys: `gemma4-mlx`,
-`gemma4-gguf`, `qwen35-mlx`, `qwen35-gguf`), `runtime-toggle-button`,
+`gemma4-gguf`, `qwen35-mlx`, `qwen35-gguf`), `download-active-model` (the
+chat failure banner's consent CTA when a real backend's model is not
+downloaded yet), `gen-temperature-<profile>`, `gen-top-p-<profile>`,
+`gen-top-k-<profile>`, `gen-max-tokens-<profile>` and
+`gen-context-<profile>` (steppers expose `-minus`/`-plus` suffixed
+buttons), `gen-reset-<profile>` (profile keys: `gemma4`, `qwen35`),
+`runtime-toggle-button`,
 `open-benchmark`, `benchmark-case-picker`, `benchmark-phase-picker`,
 `benchmark-run-button`, `benchmark-stop-button`, and `benchmark-export-button`.
 
@@ -150,8 +194,10 @@ flutter test
 ```
 
 Building or running with a real inference backend executes the Inferno build
-hooks and requires `flutter config --enable-native-assets` once per machine;
-the default fake-backend workflow does not need it.
+hooks and requires `flutter config --enable-native-assets` once per machine.
+That now includes plain `flutter run`/`flutter build` (the `dev` flavor
+defaults to `auto`); only qa-flavor builds and host `flutter test` stay on
+the hook-free fake path.
 
 `dart run tool/prepare_launcher.dart` derives every flavor's Android
 launcher inputs from the tracked native artwork in `assets/source/`

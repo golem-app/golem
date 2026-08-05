@@ -17,6 +17,9 @@ final class ProfileSampling {
     required this.maxTokens,
     required this.temperature,
     required this.topP,
+    this.topK,
+    this.contextLength = 8192,
+    this.pinned = false,
   });
 
   /// Roomy enough that reasoning cannot silently starve the visible answer;
@@ -24,6 +27,21 @@ final class ProfileSampling {
   final int maxTokens;
   final double temperature;
   final double topP;
+
+  /// Null keeps top-k filtering off — the recorded eval baselines and the
+  /// determinism probe were measured without it.
+  final int? topK;
+
+  /// On-device token budget over prompt plus generation. 8192 sits far
+  /// under Gemma's trained context and Qwen's 256k paper context but keeps
+  /// worst-case KV memory in the low hundreds of megabytes on an 8 GB
+  /// phone (rationale: docs/decisions/0003-flavor-backend-defaults.md).
+  final int contextLength;
+
+  /// True when this mode's sampling fields (temperature/topP/topK) are a
+  /// correctness constraint user overrides must not touch; token budgets
+  /// stay overridable. See Qwen35Profile.sampling.
+  final bool pinned;
 }
 
 /// Everything model-specific the broker applies around a model-blind engine:
@@ -116,12 +134,20 @@ final class Qwen35Profile implements ModelProfile {
   // The pinned repository publishes no sampling recommendation
   // (generation_config carries only eos ids), so these are the Qwen3-family
   // published mode-specific defaults. The split matters: thinking sampled
-  // at the non-thinking settings loops mid-think until the token budget on
-  // the Q4_0 build (docs/evals evidence, 2026-08-05). Qwen's thinking also
-  // runs far longer than Gemma's reasoning channel, hence the 4096 budget.
+  // at the non-thinking settings looped mid-think until the token budget on
+  // the Q4_0 build during the #33 bring-up (docs/evals, 2026-08-05, records
+  // the fixed configuration passing). Qwen's thinking also runs far longer
+  // than Gemma's reasoning channel, hence the 4096 budget.
+  // Thinking-mode sampling is pinned: overriding it reintroduces that
+  // endless-think repetition loop.
   @override
   ProfileSampling sampling({required bool reasoningEnabled}) => reasoningEnabled
-      ? const ProfileSampling(maxTokens: 4096, temperature: 0.6, topP: 0.95)
+      ? const ProfileSampling(
+          maxTokens: 4096,
+          temperature: 0.6,
+          topP: 0.95,
+          pinned: true,
+        )
       : const ProfileSampling(maxTokens: 2048, temperature: 0.7, topP: 0.8);
 
   /// Qwen's primer decides the starting channel, so the parser must know

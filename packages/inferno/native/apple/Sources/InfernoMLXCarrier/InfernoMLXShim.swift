@@ -70,6 +70,10 @@ private struct GenerationRequest: Decodable, Sendable {
     let maxTokens: Int
     let temperature: Float
     let topP: Float
+    // Absent-or-null when unset: nil keeps top-k filtering off and leaves
+    // the context unbudgeted, preserving pre-existing behavior.
+    let topK: Int?
+    let contextLength: Int?
     let seed: Int64?
     let stopSequences: [String]
     let stopTokenIds: [Int]
@@ -378,11 +382,15 @@ public func infernoMlxEngineGenerate(
     let request: GenerationRequest
     do {
         request = try JSONDecoder().decode(GenerationRequest.self, from: encoded)
+        // Zero matches the llama shim: top-k filtering off, context
+        // unbudgeted. Only negatives are invalid.
         guard !request.prompt.isEmpty,
               request.maxTokens > 0,
               request.temperature >= 0,
               request.topP > 0,
-              request.topP <= 1
+              request.topP <= 1,
+              request.topK ?? 0 >= 0,
+              request.contextLength ?? 0 >= 0
         else {
             sink.fail(code: "generation_failed", message: "The generation request is invalid.")
             return 0
@@ -420,6 +428,23 @@ public func infernoMlxEngineGenerate(
                     )
                 }
 
+                // MLX has no trained-context cap of its own — the KV cache
+                // grows unbounded — so the caller's context budget is the
+                // only bound, checked post-tokenization to fail exactly like
+                // the llama shim's pre-allocation check.
+                if let contextBudget = request.contextLength,
+                   contextBudget > 0,
+                   promptTokenIDs.count + request.maxTokens > contextBudget {
+                    throw NSError(
+                        domain: "InfernoMLX",
+                        code: 3,
+                        userInfo: [
+                            NSLocalizedDescriptionKey:
+                                "The rendered prompt and max tokens exceed the context budget."
+                        ]
+                    )
+                }
+
                 // Tokens stay 1-D: the iterator adds the batch dimension,
                 // and a pre-batched array reaches the model double-batched.
                 let input = LMInput(tokens: MLXArray(promptTokenIDs))
@@ -427,6 +452,8 @@ public func infernoMlxEngineGenerate(
                     maxTokens: request.maxTokens,
                     temperature: request.temperature,
                     topP: request.topP,
+                    // 0 keeps the library's top-k filter disabled.
+                    topK: request.topK ?? 0,
                     seed: request.seed.map { UInt64(bitPattern: $0) }
                 )
                 var generationContext = context

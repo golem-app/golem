@@ -32,16 +32,31 @@ final class InfernoSamplingParameters {
     this.maxTokens = 512,
     this.temperature = 1,
     this.topP = 0.95,
+    this.topK,
+    this.contextLength,
     this.seed,
     this.stopSequences = const [],
     this.stopTokenIds = const [],
   }) : assert(maxTokens > 0),
        assert(temperature >= 0),
-       assert(topP > 0 && topP <= 1);
+       assert(topP > 0 && topP <= 1),
+       assert(topK == null || topK > 0),
+       assert(contextLength == null || contextLength > 0);
 
   final int maxTokens;
   final double temperature;
   final double topP;
+
+  /// Top-k sampling cutoff; null keeps the sampler out of the chain entirely,
+  /// preserving pre-existing behavior bit for bit.
+  final int? topK;
+
+  /// Token budget over prompt plus generation, enforced by every engine
+  /// before decoding starts. Engines with a trained context window cap the
+  /// budget at that window; engines without one (MLX) enforce the budget as
+  /// their only bound.
+  final int? contextLength;
+
   final int? seed;
   final List<String> stopSequences;
   final List<int> stopTokenIds;

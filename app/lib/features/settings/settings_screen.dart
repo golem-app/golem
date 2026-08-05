@@ -1,9 +1,16 @@
+import 'dart:math';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+// Deliberate layering note: features may consume the broker's model
+// knowledge (profiles carry no Inferno import); the Inferno boundary is
+// unchanged — only lib/broker/ touches package:inferno.
+import '../../broker/model_profile.dart';
 import '../../core/app_identity.dart';
+import '../../core/domain/generation_settings.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
@@ -45,6 +52,12 @@ class _SettingsBody extends ConsumerWidget {
     final chatValue = ref.watch(chatControllerProvider);
     final chats = chatValue.hasValue ? chatValue.requireValue : null;
     final catalog = ref.watch(modelCatalogEntriesProvider);
+    // Two independent honesty axes: model.simulated covers the download
+    // surface, the backend signal covers inference. A dev build can run
+    // real downloads with fake inference — each label keys on its own axis.
+    final simulatedInference = ref
+        .watch(inferenceBackendProvider)
+        .simulatedInference;
     // Downloads are serial, so the one card in a downloading phase is the
     // live one; deriving it from watched state keeps a single source of
     // truth instead of mirroring a controller field.
@@ -59,7 +72,7 @@ class _SettingsBody extends ConsumerWidget {
       key: const Key('settings-list'),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
       children: [
-        if (model.simulated) ...[
+        if (simulatedInference) ...[
           const _SimulationBanner(),
           const SizedBox(height: 28),
         ],
@@ -82,6 +95,20 @@ class _SettingsBody extends ConsumerWidget {
           const SizedBox(height: 12),
         ],
         const SizedBox(height: 16),
+        const SectionHeader(
+          'Generation',
+          subtitle:
+              'Per-model sampling and budget controls. Recommended defaults '
+              'come from the model profile; changes reach generation on the '
+              'real engine only. Token budgets always leave 512 context '
+              'tokens for the prompt.',
+        ),
+        const SizedBox(height: 8),
+        for (final profileKey in modelProfiles.keys) ...[
+          _GenerationCard(profileKey: profileKey),
+          const SizedBox(height: 12),
+        ],
+        const SizedBox(height: 16),
         const SectionHeader('Runtime'),
         const SizedBox(height: 8),
         GolemCard(
@@ -89,12 +116,16 @@ class _SettingsBody extends ConsumerWidget {
             children: [
               LabeledRow(
                 label: 'Active model',
-                value: active?.displayName ?? 'None · fake inference',
+                value:
+                    active?.displayName ??
+                    (simulatedInference
+                        ? 'None · simulated inference'
+                        : 'None'),
               ),
               const SizedBox(height: 10),
               LabeledRow(
                 label: 'State',
-                value: _runtimeLabel(model.runtime, model.simulated),
+                value: _runtimeLabel(model.runtime, simulatedInference),
               ),
               if (model.failure != null) ...[
                 const SizedBox(height: 10),
@@ -117,8 +148,8 @@ class _SettingsBody extends ConsumerWidget {
                           .toggleRuntime(),
                 child: Text(
                   model.runtime == RuntimePhase.loaded
-                      ? 'Unload ${model.simulated ? 'Simulated ' : ''}Runtime'
-                      : 'Load ${model.simulated ? 'Simulated ' : ''}Runtime',
+                      ? 'Unload ${simulatedInference ? 'Simulated ' : ''}Runtime'
+                      : 'Load ${simulatedInference ? 'Simulated ' : ''}Runtime',
                   style: TextStyle(
                     color: model.runtime == RuntimePhase.loaded
                         ? CupertinoDynamicColor.resolve(
@@ -198,9 +229,17 @@ class _SettingsBody extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                model.simulated
-                    ? 'UI evaluation build. It reads no other app\'s data and includes no model weights, network downloader, inference engine, or hardware measurement.'
-                    : 'Model downloads fetch the pinned artifacts above from Hugging Face over HTTPS. Inference remains a build-time opt-in; nothing else touches the network.',
+                [
+                  if (model.simulated)
+                    'Model downloads are a deterministic simulation of the pinned catalog; no network access exists.'
+                  else
+                    'Model downloads fetch the pinned artifacts above from Hugging Face over HTTPS.',
+                  if (simulatedInference)
+                    'Inference is a deterministic UI simulation — no model weights, engine, or hardware measurement is included.'
+                  else
+                    'Inference runs the local engine on this device with the active model.',
+                  'Nothing else touches the network, and Golem reads no other app\'s data.',
+                ].join(' '),
                 style: TextStyle(
                   color: CupertinoDynamicColor.resolve(
                     GolemTheme.mutedInk,
@@ -497,7 +536,7 @@ class _SimulationBanner extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: Text(
-            'SIMULATED BACKENDS · No hardware validation',
+            'SIMULATED INFERENCE · No hardware validation',
             style: TextStyle(
               color: CupertinoDynamicColor.resolve(GolemTheme.accent, context),
               fontWeight: FontWeight.w600,
@@ -572,3 +611,302 @@ String _runtimeLabel(RuntimePhase phase, bool simulated) => switch (phase) {
   RuntimePhase.loaded => simulated ? 'Ready · simulated' : 'Ready',
   RuntimePhase.failed => 'Stopped',
 };
+
+/// Display names for the profile-keyed generation sections; the profile
+/// registry is the source of which sections exist.
+const _profileDisplayNames = {'gemma4': 'Gemma 4 E2B', 'qwen35': 'Qwen 3.5 4B'};
+
+/// Context tokens the budget controls must always leave for the rendered
+/// prompt: the engines reject any request whose prompt plus budget exceeds
+/// the context, so a budget equal to the context would fail every send.
+/// The reserve keeps short prompts working by construction; very long
+/// chats can still exhaust it and surface the engines' budget error.
+const _promptReserveTokens = 512;
+
+class _GenerationCard extends ConsumerWidget {
+  const _GenerationCard({required this.profileKey});
+
+  final String profileKey;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = modelProfiles[profileKey]!;
+    // The direct-mode defaults are the editable surface; thinking-mode
+    // sampling can be pinned by the profile (see the footnote).
+    final defaults = profile.sampling(reasoningEnabled: false);
+    final thinking = profile.sampling(reasoningEnabled: true);
+    final thinkingPinned = thinking.pinned;
+    final overrides =
+        ref.watch(settingsControllerProvider).value?.overridesFor(profileKey) ??
+        const SamplingOverrides();
+    // Persisted values are sanitized into the controls' ranges before
+    // rendering: the store's leaves are deliberately tolerant, and a
+    // hand-edited file must not be able to make the steppers throw.
+    final contextLength = (overrides.contextLength ?? defaults.contextLength)
+        .clamp(1024, 8192);
+    final maxTokens = (overrides.maxTokens ?? defaults.maxTokens).clamp(
+      256,
+      contextLength - _promptReserveTokens,
+    );
+    // A maxTokens override applies to both reasoning modes, but with no
+    // override each mode keeps its own default — the clamp below must
+    // satisfy the largest of them (Qwen's thinking budget is 4096 while
+    // its direct budget is 2048).
+    final effectiveBudget =
+        overrides.maxTokens ?? max(defaults.maxTokens, thinking.maxTokens);
+
+    Future<void> update(SamplingOverrides next) => ref
+        .read(settingsControllerProvider.notifier)
+        .updateModel(profileKey, next);
+
+    return GolemCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _profileDisplayNames[profileKey] ?? profileKey,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              if (!overrides.isEmpty)
+                CupertinoButton(
+                  key: Key('gen-reset-$profileKey'),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(44, 30),
+                  onPressed: () => ref
+                      .read(settingsControllerProvider.notifier)
+                      .resetModel(profileKey),
+                  child: const Text('Reset', style: TextStyle(fontSize: 14)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          _SliderRow(
+            sliderKey: Key('gen-temperature-$profileKey'),
+            label: 'Temperature',
+            value: overrides.temperature ?? defaults.temperature,
+            isDefault: overrides.temperature == null,
+            min: 0,
+            max: 2,
+            display: (value) => value.toStringAsFixed(2),
+            onCommit: (value) =>
+                update(overrides.copyWith(temperature: () => value)),
+          ),
+          _SliderRow(
+            sliderKey: Key('gen-top-p-$profileKey'),
+            label: 'Top-p',
+            value: overrides.topP ?? defaults.topP,
+            isDefault: overrides.topP == null,
+            min: 0.05,
+            max: 1,
+            display: (value) => value.toStringAsFixed(2),
+            onCommit: (value) => update(overrides.copyWith(topP: () => value)),
+          ),
+          _SliderRow(
+            sliderKey: Key('gen-top-k-$profileKey'),
+            label: 'Top-k',
+            value: (overrides.topK ?? defaults.topK ?? 0).toDouble(),
+            isDefault: overrides.topK == null,
+            min: 0,
+            max: 100,
+            display: (value) => value.round() == 0 ? 'Off' : '${value.round()}',
+            onCommit: (value) => update(
+              overrides.copyWith(
+                topK: () => value.round() == 0 ? null : value.round(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          _StepperRow(
+            stepperKey: ValueKey<String>('gen-max-tokens-$profileKey'),
+            label: 'Max tokens',
+            value: maxTokens,
+            isDefault: overrides.maxTokens == null,
+            step: 256,
+            min: 256,
+            // The engines reject prompt + budget over the context, so the
+            // budget must leave the prompt reserve free.
+            max: contextLength - _promptReserveTokens,
+            onCommit: (value) =>
+                update(overrides.copyWith(maxTokens: () => value)),
+          ),
+          const SizedBox(height: 6),
+          _StepperRow(
+            stepperKey: ValueKey<String>('gen-context-$profileKey'),
+            label: 'Context length',
+            value: contextLength,
+            isDefault: overrides.contextLength == null,
+            step: 1024,
+            min: 1024,
+            max: 8192,
+            onCommit: (value) => update(
+              overrides.copyWith(
+                contextLength: () => value,
+                // Shrinking the context must keep every mode's effective
+                // budget under it, prompt reserve included, or generation
+                // in that mode would fail its budget check on every send.
+                // The written value never exceeds the number on screen: a
+                // clamp may lower the visible budget, never quietly raise
+                // it (Qwen's hidden 4096 thinking default clamps down to
+                // the displayed direct budget instead).
+                maxTokens: effectiveBudget > value - _promptReserveTokens
+                    ? () => min(maxTokens, value - _promptReserveTokens)
+                    : null,
+              ),
+            ),
+          ),
+          if (thinkingPinned) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Thinking mode keeps this model\'s pinned sampling '
+              '(temperature 0.6 · top-p 0.95); token budgets apply to both '
+              'modes.',
+              style: TextStyle(
+                color: CupertinoDynamicColor.resolve(
+                  GolemTheme.mutedInk,
+                  context,
+                ),
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A labeled slider whose value commits on drag end; the drag position is
+/// widget-local state so a drag never spams persisted saves.
+class _SliderRow extends StatefulWidget {
+  const _SliderRow({
+    required this.sliderKey,
+    required this.label,
+    required this.value,
+    required this.isDefault,
+    required this.min,
+    required this.max,
+    required this.display,
+    required this.onCommit,
+  });
+
+  final Key sliderKey;
+  final String label;
+  final double value;
+  final bool isDefault;
+  final double min;
+  final double max;
+  final String Function(double value) display;
+  final ValueChanged<double> onCommit;
+
+  @override
+  State<_SliderRow> createState() => _SliderRowState();
+}
+
+class _SliderRowState extends State<_SliderRow> {
+  double? _drag;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = (_drag ?? widget.value).clamp(widget.min, widget.max);
+    final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(widget.label, style: const TextStyle(fontSize: 14)),
+            ),
+            Text(widget.display(value), style: const TextStyle(fontSize: 14)),
+            if (widget.isDefault && _drag == null)
+              Text(' · default', style: TextStyle(fontSize: 14, color: muted)),
+          ],
+        ),
+        SizedBox(
+          height: 34,
+          child: CupertinoSlider(
+            key: widget.sliderKey,
+            value: value,
+            min: widget.min,
+            max: widget.max,
+            onChanged: (next) => setState(() => _drag = next),
+            onChangeEnd: (next) {
+              setState(() => _drag = null);
+              widget.onCommit(next);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A labeled stepped value with minus/plus buttons; steps snap to the
+/// nearest multiple so a default like 2048 stays on the grid.
+class _StepperRow extends StatelessWidget {
+  const _StepperRow({
+    required this.stepperKey,
+    required this.label,
+    required this.value,
+    required this.isDefault,
+    required this.step,
+    required this.min,
+    required this.max,
+    required this.onCommit,
+  });
+
+  final ValueKey<String> stepperKey;
+  final String label;
+  final int value;
+  final bool isDefault;
+  final int step;
+  final int min;
+  final int max;
+  final ValueChanged<int> onCommit;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
+    final lower = ((value - step) ~/ step) * step;
+    final higher = ((value + step) ~/ step) * step;
+    return Row(
+      key: stepperKey,
+      children: [
+        Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
+        CupertinoButton(
+          key: Key('${stepperKey.value}-minus'),
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(38, 30),
+          onPressed: value <= min
+              ? null
+              : () => onCommit(lower.clamp(min, max)),
+          child: const Icon(CupertinoIcons.minus_circle, size: 22),
+        ),
+        SizedBox(
+          width: 64,
+          child: Column(
+            children: [
+              Text('$value', style: const TextStyle(fontSize: 14)),
+              if (isDefault)
+                Text('default', style: TextStyle(fontSize: 11, color: muted)),
+            ],
+          ),
+        ),
+        CupertinoButton(
+          key: Key('${stepperKey.value}-plus'),
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(38, 30),
+          onPressed: value >= max
+              ? null
+              : () => onCommit(higher.clamp(min, max)),
+          child: const Icon(CupertinoIcons.plus_circle, size: 22),
+        ),
+      ],
+    );
+  }
+}

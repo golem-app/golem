@@ -1,26 +1,44 @@
 import 'package:flutter/foundation.dart';
 
+import '../core/app_identity.dart';
+import '../core/domain/inference_backend.dart';
 import '../core/repositories/contracts.dart';
 import '../core/repositories/fake_inference_repository.dart';
+import '../core/services/device_storage.dart';
+import 'backend_policy.dart';
 import 'inferno_inference_repository.dart';
 import 'model_profile.dart';
 import 'runtime.dart';
 
-/// Selects deterministic inference by default and a real local runtime only
-/// when an explicit build configuration supplies both engine and model path.
+/// Resolves this process's effective backend from the dart-defines, the
+/// flavor policy, and (only on the `auto` path) the device-memory probe.
+/// Called once in main(); the result is the single source of truth for the
+/// inference repository, the active artifact, and the backend signal
+/// provider.
+Future<InferenceBackendConfig> resolveConfiguredBackend() =>
+    resolveBackendPolicy(
+      backendDefine: const String.fromEnvironment('GOLEM_INFERENCE_BACKEND'),
+      profileDefine: const String.fromEnvironment('GOLEM_MODEL_PROFILE'),
+      modelPathDefine: const String.fromEnvironment('GOLEM_MODEL_PATH'),
+      identity: AppIdentity.current,
+      // Test-only escape hatch: forces the device-policy branch (both test
+      // phones report over 8 GB, so the Qwen branch is unreachable
+      // otherwise). 0 sentinel = unset.
+      memoryOverrideBytes: const int.fromEnvironment(
+        'GOLEM_DEVICE_MEMORY_BYTES',
+      ),
+      physicalMemoryBytes: const DeviceStorageChannel().physicalMemoryBytes,
+    );
+
+/// Builds the inference repository for a resolved backend config.
 InferenceRepository createConfiguredInferenceRepository({
+  required InferenceBackendConfig config,
   required Duration fakeStreamDelay,
   required String documentsDirectory,
 }) => selectInferenceRepository(
-  backend: const String.fromEnvironment(
-    'GOLEM_INFERENCE_BACKEND',
-    defaultValue: 'fake',
-  ),
-  modelPath: const String.fromEnvironment('GOLEM_MODEL_PATH'),
-  modelProfile: const String.fromEnvironment(
-    'GOLEM_MODEL_PROFILE',
-    defaultValue: 'gemma4',
-  ),
+  backend: config.kind.name,
+  modelPath: config.modelPath ?? '',
+  modelProfile: config.profileKey,
   // A fixed seed pins sampling for cross-device determinism probes; regular
   // builds leave it unset (0 sentinel -> engine-default seeding).
   samplingSeed: const int.fromEnvironment('GOLEM_SAMPLING_SEED'),

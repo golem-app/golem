@@ -100,7 +100,11 @@ class ChatCanvas extends ConsumerWidget {
             ],
           ),
         ),
-        if (chat.failure != null) RecoveryBanner(message: chat.failure!),
+        if (chat.failure != null)
+          RecoveryBanner(
+            message: chat.failure!,
+            missingModelArtifactKey: chat.missingModelArtifactKey,
+          ),
         Composer(
           controller: composer,
           focus: focus,

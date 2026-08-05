@@ -33,6 +33,8 @@ void main() {
               maxTokens: 16,
               temperature: 0.2,
               topP: 0.9,
+              topK: 40,
+              contextLength: 4096,
               seed: 7,
               stopSequences: ['<turn|>'],
               stopTokenIds: [1, 106],
@@ -48,6 +50,8 @@ void main() {
     expect(events.whereType<InfernoMetricsEvent>(), hasLength(1));
     expect(events.last, isA<InfernoGenerationCompleted>());
     expect(backend.lastRequest!.sampling.stopTokenIds, [1, 106]);
+    expect(backend.lastRequest!.sampling.topK, 40);
+    expect(backend.lastRequest!.sampling.contextLength, 4096);
     await inferno.unload();
   });
 

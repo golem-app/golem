@@ -1,3 +1,4 @@
+import '../domain/generation_settings.dart';
 import '../domain/models.dart';
 
 abstract interface class ChatHistoryRepository {
@@ -9,10 +10,22 @@ abstract interface class InferenceRepository {
   Future<void> prepare();
   Future<void> unload();
   Future<void> cancel();
+
+  /// [overrides] are the user's sparse per-model settings; a real backend
+  /// merges them onto its profile's recommended defaults, the fake ignores
+  /// them (simulated output has no sampling to steer).
   Stream<InferenceEvent> generate({
     required List<Map<String, String>> context,
     required bool reasoningEnabled,
+    SamplingOverrides? overrides,
   });
+}
+
+/// Persisted user preferences (currently per-model generation settings),
+/// stored with the same versioned atomic-JSON discipline as chat history.
+abstract interface class SettingsRepository {
+  Future<GenerationSettings> load();
+  Future<void> save(GenerationSettings settings);
 }
 
 /// Per-artifact model management. Keys address entries of the injected

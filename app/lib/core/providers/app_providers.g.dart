@@ -249,6 +249,185 @@ final class ModelCatalogEntriesProvider
 String _$modelCatalogEntriesHash() =>
     r'12eee37f81325029df04be2d9a3f438baf556399';
 
+@ProviderFor(settingsRepository)
+const settingsRepositoryProvider = SettingsRepositoryProvider._();
+
+final class SettingsRepositoryProvider
+    extends
+        $FunctionalProvider<
+          SettingsRepository,
+          SettingsRepository,
+          SettingsRepository
+        >
+    with $Provider<SettingsRepository> {
+  const SettingsRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'settingsRepositoryProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$settingsRepositoryHash();
+
+  @$internal
+  @override
+  $ProviderElement<SettingsRepository> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SettingsRepository create(Ref ref) {
+    return settingsRepository(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SettingsRepository value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SettingsRepository>(value),
+    );
+  }
+}
+
+String _$settingsRepositoryHash() =>
+    r'7f08be7173b537a7eccd726a624b784cc87b3fa3';
+
+/// The resolved inference backend for this process. Deliberately a fake
+/// default value rather than a throwing seam — a documented exception to
+/// the repository-provider discipline: this is a value signal that dozens
+/// of widgets read for honest "simulated" labeling, and host tests (which
+/// run as the dev flavor) must see the fake without every container
+/// overriding it. main() always overrides it with the resolved config;
+/// a regression test pins the fake default.
+
+@ProviderFor(inferenceBackend)
+const inferenceBackendProvider = InferenceBackendProvider._();
+
+/// The resolved inference backend for this process. Deliberately a fake
+/// default value rather than a throwing seam — a documented exception to
+/// the repository-provider discipline: this is a value signal that dozens
+/// of widgets read for honest "simulated" labeling, and host tests (which
+/// run as the dev flavor) must see the fake without every container
+/// overriding it. main() always overrides it with the resolved config;
+/// a regression test pins the fake default.
+
+final class InferenceBackendProvider
+    extends
+        $FunctionalProvider<
+          InferenceBackendConfig,
+          InferenceBackendConfig,
+          InferenceBackendConfig
+        >
+    with $Provider<InferenceBackendConfig> {
+  /// The resolved inference backend for this process. Deliberately a fake
+  /// default value rather than a throwing seam — a documented exception to
+  /// the repository-provider discipline: this is a value signal that dozens
+  /// of widgets read for honest "simulated" labeling, and host tests (which
+  /// run as the dev flavor) must see the fake without every container
+  /// overriding it. main() always overrides it with the resolved config;
+  /// a regression test pins the fake default.
+  const InferenceBackendProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'inferenceBackendProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$inferenceBackendHash();
+
+  @$internal
+  @override
+  $ProviderElement<InferenceBackendConfig> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  InferenceBackendConfig create(Ref ref) {
+    return inferenceBackend(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(InferenceBackendConfig value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<InferenceBackendConfig>(value),
+    );
+  }
+}
+
+String _$inferenceBackendHash() => r'679d3dfd7f9bdcc675a964fdfe9368052cc0b632';
+
+/// Persisted per-model generation settings. Reads resolve against the
+/// broker profile's recommended defaults at the consumer, never here —
+/// only user-set values are stored.
+
+@ProviderFor(SettingsController)
+const settingsControllerProvider = SettingsControllerProvider._();
+
+/// Persisted per-model generation settings. Reads resolve against the
+/// broker profile's recommended defaults at the consumer, never here —
+/// only user-set values are stored.
+final class SettingsControllerProvider
+    extends $AsyncNotifierProvider<SettingsController, GenerationSettings> {
+  /// Persisted per-model generation settings. Reads resolve against the
+  /// broker profile's recommended defaults at the consumer, never here —
+  /// only user-set values are stored.
+  const SettingsControllerProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'settingsControllerProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$settingsControllerHash();
+
+  @$internal
+  @override
+  SettingsController create() => SettingsController();
+}
+
+String _$settingsControllerHash() =>
+    r'd88cf25eb3a423e29e409537a0882c7747400e70';
+
+/// Persisted per-model generation settings. Reads resolve against the
+/// broker profile's recommended defaults at the consumer, never here —
+/// only user-set values are stored.
+
+abstract class _$SettingsController extends $AsyncNotifier<GenerationSettings> {
+  FutureOr<GenerationSettings> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final created = build();
+    final ref =
+        this.ref as $Ref<AsyncValue<GenerationSettings>, GenerationSettings>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<GenerationSettings>, GenerationSettings>,
+              AsyncValue<GenerationSettings>,
+              Object?,
+              Object?
+            >;
+    element.handleValue(ref, created);
+  }
+}
+
 @ProviderFor(ChatController)
 const chatControllerProvider = ChatControllerProvider._();
 
@@ -273,7 +452,7 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'2321102ea332afba8b334715888c912ef43b2a41';
+String _$chatControllerHash() => r'293795790439a6637528c4ccf236ad068b6bd5ab';
 
 abstract class _$ChatController extends $AsyncNotifier<ChatState> {
   FutureOr<ChatState> build();
@@ -318,7 +497,7 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'cfc48cddd0fd21c47c1164eb73c217768df81aba';
+String _$modelControllerHash() => r'2474110a35d5d5c861ba7f969216b444d54e1e7a';
 
 abstract class _$ModelController extends $AsyncNotifier<ModelState> {
   FutureOr<ModelState> build();

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../domain/app_state.dart';
+import '../domain/generation_settings.dart';
+import '../domain/inference_backend.dart';
 import '../domain/model_catalog.dart';
 import '../domain/models.dart';
 import '../repositories/contracts.dart';
@@ -33,6 +35,48 @@ BenchmarkRepository benchmarkRepository(Ref ref) =>
 @Riverpod(keepAlive: true)
 List<ModelCatalogEntry> modelCatalogEntries(Ref ref) =>
     throw UnimplementedError('Override modelCatalogEntriesProvider at startup');
+
+@Riverpod(keepAlive: true)
+SettingsRepository settingsRepository(Ref ref) =>
+    throw UnimplementedError('Override settingsRepositoryProvider at startup');
+
+/// The resolved inference backend for this process. Deliberately a fake
+/// default value rather than a throwing seam — a documented exception to
+/// the repository-provider discipline: this is a value signal that dozens
+/// of widgets read for honest "simulated" labeling, and host tests (which
+/// run as the dev flavor) must see the fake without every container
+/// overriding it. main() always overrides it with the resolved config;
+/// a regression test pins the fake default.
+@Riverpod(keepAlive: true)
+InferenceBackendConfig inferenceBackend(Ref ref) =>
+    const InferenceBackendConfig.fake();
+
+/// Persisted per-model generation settings. Reads resolve against the
+/// broker profile's recommended defaults at the consumer, never here —
+/// only user-set values are stored.
+@Riverpod(keepAlive: true)
+class SettingsController extends _$SettingsController {
+  @override
+  Future<GenerationSettings> build() =>
+      ref.read(settingsRepositoryProvider).load();
+
+  GenerationSettings get _value => state.requireValue;
+
+  Future<void> updateModel(
+    String profileKey,
+    SamplingOverrides overrides,
+  ) async {
+    // A tap can land in the cold-start load window; dropping it beats
+    // throwing on requireValue while the store is still reading.
+    if (!state.hasValue) return;
+    final next = _value.withModel(profileKey, overrides);
+    state = AsyncData(next);
+    await ref.read(settingsRepositoryProvider).save(next);
+  }
+
+  Future<void> resetModel(String profileKey) =>
+      updateModel(profileKey, const SamplingOverrides());
+}
 
 @Riverpod(keepAlive: true)
 class ChatController extends _$ChatController {
@@ -193,6 +237,31 @@ class ChatController extends _$ChatController {
       return;
     }
     final epoch = ++_generationEpoch;
+    // Real backend with the active artifact not installed: fail fast into
+    // the banner's download CTA before touching the engine — prepare()
+    // would only produce a cryptic missing-file error after a hang-like
+    // pause. Only for catalog-derived paths: an operator-supplied
+    // GOLEM_MODEL_PATH (sideloads, the determinism probe) must reach
+    // prepare() untouched, which stays the loud failure path.
+    final backend = ref.read(inferenceBackendProvider);
+    if (!backend.simulatedInference &&
+        backend.artifactKey != null &&
+        backend.modelPathFromCatalog) {
+      final installed = await _activeModelInstalled();
+      if (!ref.mounted || epoch != _generationEpoch) return;
+      if (installed == false) {
+        state = AsyncData(
+          _value.copyWith(
+            generation: GenerationPhase.failed,
+            failure:
+                'The local model is not downloaded on this device yet. '
+                'Download it to start chatting.',
+            missingModelArtifactKey: backend.artifactKey,
+          ),
+        );
+        return;
+      }
+    }
     final assistant = ChatMessage(
       id: newId(),
       role: MessageRole.assistant,
@@ -213,14 +282,27 @@ class ChatController extends _$ChatController {
     try {
       await ref.read(inferenceRepositoryProvider).prepare();
       if (!ref.mounted || epoch != _generationEpoch) return;
+      // The lazy load must keep the persisted RuntimePhase honest in both
+      // directions: after this prepare() the engine holds weights, so
+      // Settings may not keep claiming "Unloaded" (the mirror image of the
+      // toggle's honesty fix). Awaited: it is one small persist after a
+      // load measured in seconds, and a recorded phase must not race the
+      // stream it describes.
+      if (!backend.simulatedInference) {
+        await ref.read(modelControllerProvider.notifier).reflectEngineLoaded();
+        if (!ref.mounted || epoch != _generationEpoch) return;
+      }
       state = AsyncData(_value.copyWith(generation: GenerationPhase.streaming));
       final context = active.promptContext;
+      final overrides = await _samplingOverrides();
+      if (!ref.mounted || epoch != _generationEpoch) return;
       await for (final event
           in ref
               .read(inferenceRepositoryProvider)
               .generate(
                 context: context,
                 reasoningEnabled: active.reasoningEnabled,
+                overrides: overrides,
               )) {
         if (!ref.mounted || epoch != _generationEpoch) return;
         if (event is CompletedEvent) break;
@@ -263,6 +345,33 @@ class ChatController extends _$ChatController {
           ),
         );
       }
+    }
+  }
+
+  /// Whether the active artifact is installed, or null when model state is
+  /// unavailable — then generation proceeds and prepare() stays the loud
+  /// failure path rather than this controller inventing a verdict.
+  Future<bool?> _activeModelInstalled() async {
+    try {
+      final models = await ref.read(modelControllerProvider.future);
+      return models.activeModelInstalled;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The persisted overrides for the active model profile. Settings that
+  /// fail to surface must never block chat — the fake ignores overrides
+  /// anyway, and the repository already folds corrupt files into defaults —
+  /// so an unavailable settings store degrades to profile defaults.
+  Future<SamplingOverrides?> _samplingOverrides() async {
+    try {
+      final settings = await ref.read(settingsControllerProvider.future);
+      return settings.overridesFor(
+        ref.read(inferenceBackendProvider).profileKey,
+      );
+    } catch (_) {
+      return null;
     }
   }
 
@@ -415,6 +524,12 @@ class ModelController extends _$ModelController {
     if (_busy) return;
     _busy = true;
     try {
+      // Never delete weights the engine may still have mapped: releasing
+      // the runtime comes first, and an unload failure aborts the delete.
+      if (artifactKey == state.value?.activeArtifactKey) {
+        await ref.read(inferenceRepositoryProvider).unload();
+        if (!ref.mounted) return;
+      }
       final value = await ref
           .read(modelManagementRepositoryProvider)
           .delete(artifactKey);
@@ -422,6 +537,33 @@ class ModelController extends _$ModelController {
       state = AsyncData(value);
     } catch (error) {
       _publishFailure(artifactKey, error);
+    } finally {
+      _busy = false;
+    }
+  }
+
+  /// Records that the engine holds weights after ChatController's lazy
+  /// prepare(), so the persisted phase stays honest in the load direction
+  /// too. No-ops when the phase already says loaded, when model state is
+  /// unavailable, or when the active artifact is not installed (sideloaded
+  /// paths are outside the catalog's phase tracking).
+  Future<void> reflectEngineLoaded() async {
+    if (_busy) return;
+    final current = state.value;
+    if (current == null ||
+        current.runtime == RuntimePhase.loaded ||
+        !current.activeModelInstalled) {
+      return;
+    }
+    _busy = true;
+    try {
+      final value = await ref
+          .read(modelManagementRepositoryProvider)
+          .loadRuntime();
+      if (!ref.mounted) return;
+      state = AsyncData(value);
+    } catch (_) {
+      // Phase bookkeeping must never disturb an in-flight generation.
     } finally {
       _busy = false;
     }
@@ -441,6 +583,11 @@ class ModelController extends _$ModelController {
     );
   }
 
+  /// The persisted RuntimePhase must reflect the engine, not bookkeeping:
+  /// Load drives a real `prepare()` before `loaded` is recorded, Unload a
+  /// real `unload()` before `unloaded` — the deferred #37 finding. Engine
+  /// failures stay in-memory as a failed phase with the message; the
+  /// repository's stale-`loading` reconciliation already covers crashes.
   Future<void> toggleRuntime() async {
     if (_busy) return;
     _busy = true;
@@ -448,15 +595,43 @@ class ModelController extends _$ModelController {
       final repository = ref.read(modelManagementRepositoryProvider);
       final current = state.requireValue;
       if (current.runtime == RuntimePhase.loaded) {
+        try {
+          await ref.read(inferenceRepositoryProvider).unload();
+        } catch (error) {
+          if (!ref.mounted) return;
+          state = AsyncData(
+            current.copyWith(runtime: RuntimePhase.failed, failure: '$error'),
+          );
+          return;
+        }
+        if (!ref.mounted) return;
         final value = await repository.unloadRuntime();
         if (!ref.mounted) return;
         state = AsyncData(value);
       } else {
         // Publish the loading phase immediately so the UI can disable the
-        // toggle; the repository only records it internally.
+        // toggle while the engine loads.
         state = AsyncData(
           current.copyWith(runtime: RuntimePhase.loading, clearFailure: true),
         );
+        if (!current.activeModelInstalled) {
+          // The repository refuses with a persisted failed phase and a
+          // clear message; the engine is never touched.
+          final value = await repository.loadRuntime();
+          if (!ref.mounted) return;
+          state = AsyncData(value);
+          return;
+        }
+        try {
+          await ref.read(inferenceRepositoryProvider).prepare();
+        } catch (error) {
+          if (!ref.mounted) return;
+          state = AsyncData(
+            current.copyWith(runtime: RuntimePhase.failed, failure: '$error'),
+          );
+          return;
+        }
+        if (!ref.mounted) return;
         final value = await repository.loadRuntime();
         if (!ref.mounted) return;
         state = AsyncData(value);

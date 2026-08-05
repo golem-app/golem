@@ -14,6 +14,7 @@ import 'package:golem_flutter/broker/hash.dart';
 import 'package:golem_flutter/broker/inferno_inference_repository.dart';
 import 'package:golem_flutter/broker/model_profile.dart';
 import 'package:golem_flutter/broker/runtime.dart';
+import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 
 final class _RecordingRuntime implements BrokerRuntime {
@@ -225,6 +226,165 @@ void main() {
 
     // Without a probe seed the line stays out of production logs entirely.
     expect(await probeLines(seed: null), isEmpty);
+  });
+
+  test(
+    'user overrides merge onto profile defaults and reach the engine',
+    () async {
+      final runtime = _RecordingRuntime();
+      final repository = InfernoInferenceRepository(
+        runtime,
+        engine: BrokerEngine.llamaCpp,
+        profile: const Gemma4Profile(),
+        modelPath: '/local/model',
+      );
+      await repository.prepare();
+      await repository
+          .generate(
+            context: const [
+              {'role': 'user', 'content': 'Hello'},
+            ],
+            reasoningEnabled: false,
+            overrides: const SamplingOverrides(
+              temperature: 1.4,
+              topP: 0.7,
+              topK: 40,
+              maxTokens: 64,
+              contextLength: 2048,
+            ),
+          )
+          .drain<void>();
+      final sampling = runtime.request!.sampling;
+      expect(sampling.temperature, 1.4);
+      expect(sampling.topP, 0.7);
+      expect(sampling.topK, 40);
+      expect(sampling.maxTokens, 64);
+      expect(sampling.contextLength, 2048);
+      // Stop policy is never the user's to change.
+      expect(sampling.stopTokenIds, [1, 106]);
+    },
+  );
+
+  test('absent overrides leave the profile defaults untouched', () async {
+    final runtime = _RecordingRuntime();
+    final repository = InfernoInferenceRepository(
+      runtime,
+      engine: BrokerEngine.llamaCpp,
+      profile: const Gemma4Profile(),
+      modelPath: '/local/model',
+    );
+    await repository.prepare();
+    await repository
+        .generate(
+          context: const [
+            {'role': 'user', 'content': 'Hello'},
+          ],
+          reasoningEnabled: false,
+        )
+        .drain<void>();
+    final sampling = runtime.request!.sampling;
+    expect(sampling.temperature, 1);
+    expect(sampling.topP, 0.95);
+    expect(sampling.topK, isNull);
+    expect(sampling.maxTokens, 2048);
+    expect(sampling.contextLength, 8192);
+  });
+
+  test(
+    'Qwen thinking keeps pinned sampling while budgets stay overridable',
+    () async {
+      const overrides = SamplingOverrides(
+        temperature: 1.9,
+        topP: 0.5,
+        topK: 5,
+        maxTokens: 128,
+        contextLength: 1024,
+      );
+      Future<BrokerSamplingParameters> effective({
+        required bool reasoningEnabled,
+      }) async {
+        final runtime = _RecordingRuntime();
+        final repository = InfernoInferenceRepository(
+          runtime,
+          engine: BrokerEngine.llamaCpp,
+          profile: const Qwen35Profile(),
+          modelPath: '/local/model',
+        );
+        await repository.prepare();
+        await repository
+            .generate(
+              context: const [
+                {'role': 'user', 'content': 'Hello'},
+              ],
+              reasoningEnabled: reasoningEnabled,
+              overrides: overrides,
+            )
+            .drain<void>();
+        return runtime.request!.sampling;
+      }
+
+      // Thinking mode: sampling fields are a correctness constraint
+      // (off-spec values loop mid-think — docs/evals evidence); only the
+      // token budgets follow the user.
+      final thinking = await effective(reasoningEnabled: true);
+      expect(thinking.temperature, 0.6);
+      expect(thinking.topP, 0.95);
+      expect(thinking.topK, isNull);
+      expect(thinking.maxTokens, 128);
+      expect(thinking.contextLength, 1024);
+
+      // Direct mode takes every override.
+      final direct = await effective(reasoningEnabled: false);
+      expect(direct.temperature, 1.9);
+      expect(direct.topP, 0.5);
+      expect(direct.topK, 5);
+      expect(direct.maxTokens, 128);
+      expect(direct.contextLength, 1024);
+    },
+  );
+
+  test('the metrics line records the effective sampling', () async {
+    final lines = <String>[];
+    final original = debugPrint;
+    debugPrint = (String? message, {int? wrapWidth}) {
+      if (message != null) lines.add(message);
+    };
+    addTearDown(() => debugPrint = original);
+
+    Future<String> metricsLine({SamplingOverrides? overrides}) async {
+      lines.clear();
+      final repository = InfernoInferenceRepository(
+        _RecordingRuntime(),
+        engine: BrokerEngine.llamaCpp,
+        profile: const Gemma4Profile(),
+        modelPath: '/local/model',
+      );
+      await repository.prepare();
+      await repository
+          .generate(
+            context: const [
+              {'role': 'user', 'content': 'Hello'},
+            ],
+            reasoningEnabled: false,
+            overrides: overrides,
+          )
+          .drain<void>();
+      return lines.singleWhere((line) => line.startsWith('INFERNO_METRICS'));
+    }
+
+    final defaults = await metricsLine();
+    expect(defaults, contains(' temperature=1.0'));
+    expect(defaults, contains(' topK=null'));
+    expect(defaults, contains(' maxTokens=2048'));
+    expect(defaults, contains(' contextLength=8192'));
+    expect(defaults, contains(' overridesApplied=false'));
+
+    final overridden = await metricsLine(
+      overrides: const SamplingOverrides(temperature: 1.4, maxTokens: 32),
+    );
+    expect(overridden, contains(' temperature=1.4'));
+    expect(overridden, contains(' maxTokens=32'));
+    expect(overridden, contains(' overridesApplied=true'));
   });
 
   test('fnv1a64 matches the published vectors and the recorded probe', () {

@@ -31,7 +31,7 @@ class StartupGate extends ConsumerWidget {
   }
 }
 
-class SplashScreen extends StatelessWidget {
+class SplashScreen extends ConsumerWidget {
   const SplashScreen({
     required this.state,
     required this.isLoading,
@@ -43,17 +43,21 @@ class SplashScreen extends StatelessWidget {
   final VoidCallback retry;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final failed = state.phase == StartupPhase.failed;
     final missing = state.phase == StartupPhase.missingModel;
+    // Honest in both directions: only a simulated backend may claim to be
+    // one, and a real-engine build must never say "simulated".
+    final simulated = ref.watch(inferenceBackendProvider).simulatedInference;
+    final model = simulated ? 'simulated model' : 'model';
     return Semantics(
       key: const Key('launch-splash'),
       label: 'Golem',
       value: failed
-          ? 'Simulated loading failed'
+          ? (simulated ? 'Simulated loading failed' : 'Loading failed')
           : missing
-          ? 'No simulated model selected; preparing setup'
-          : 'Loading simulated model on this device',
+          ? 'No $model selected; preparing setup'
+          : 'Loading $model on this device',
       liveRegion: true,
       child: ColoredBox(
         color: GolemTheme.splash,
@@ -116,10 +120,10 @@ class SplashScreen extends StatelessWidget {
                     const SizedBox(height: 12),
                     Text(
                       failed
-                          ? 'The simulated model could not be prepared'
+                          ? 'The $model could not be prepared'
                           : missing
-                          ? 'Preparing simulated model setup'
-                          : 'Loading simulated model on this device',
+                          ? 'Preparing $model setup'
+                          : 'Loading $model on this device',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: GolemTheme.mutedOnDark,
