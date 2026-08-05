@@ -62,6 +62,13 @@ void main() {
         contains(248068),
         reason: 'the primer <think> must tokenize as its special token',
       );
+      expect(
+        llamaTokens,
+        contains(248046),
+        reason:
+            'the rendered <|im_end|> is the stop token the broker supplies — '
+            'a drift here means generation never stops',
+      );
       expect(mlxTokens, llamaTokens);
     },
     skip: skipReason,

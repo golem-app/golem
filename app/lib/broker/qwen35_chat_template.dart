@@ -73,8 +73,13 @@ final class Qwen35ChatTemplate {
 
   /// Removes complete `<think>…</think>` spans; stray unmatched markers are
   /// left for [sanitize].
-  static String stripThinkBlocks(String text) =>
-      text.replaceAll(RegExp('$thinkStart.*?$thinkEnd', dotAll: true), '');
+  static String stripThinkBlocks(String text) => text.replaceAll(
+    RegExp(
+      '${RegExp.escape(thinkStart)}.*?${RegExp.escape(thinkEnd)}',
+      dotAll: true,
+    ),
+    '',
+  );
 }
 
 /// Splits a streamed Qwen generation into reasoning and answer channels.

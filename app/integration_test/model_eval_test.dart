@@ -69,6 +69,21 @@ void main() {
               'Unknown GOLEM_EVAL_TEMPLATE "$_templateKey"; '
               'known: ${modelProfiles.keys.join(', ')}',
         );
+        // A pin-cited artifact evaluated under another family's profile
+        // would produce numbers that describe nothing — refuse to record
+        // them. Unpinned artifacts cannot be family-checked and pass.
+        final pinnedFamily = profileKeyForPinnedRepository(
+          describeArtifact(combo).pinnedRepository,
+        );
+        if (pinnedFamily != null) {
+          expect(
+            pinnedFamily,
+            _templateKey,
+            reason:
+                '${combo.label} is a pinned $pinnedFamily artifact but '
+                'GOLEM_EVAL_TEMPLATE is "$_templateKey"',
+          );
+        }
         final adapter = InfernoRuntimeAdapter.native();
         EvalComboResult result;
         try {
@@ -108,6 +123,7 @@ void main() {
       // UTC in the evidence; the local stamp only names the run directory.
       createdAt: now.toUtc(),
       host: '${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
+      profile: modelProfiles[_templateKey]!,
       results: results,
       artifacts: {
         for (final combo in combos)

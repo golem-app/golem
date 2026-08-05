@@ -36,7 +36,14 @@ simulation, and model screens say so in the UI. A real local runtime exists
 behind one explicit opt-in: `lib/broker/` adapts `package:inferno` (see the
 root README) and is selected only by building with
 `--dart-define=GOLEM_INFERENCE_BACKEND=llama|mlx` plus
-`--dart-define=GOLEM_MODEL_PATH=…`. No other app code may import Inferno;
+`--dart-define=GOLEM_MODEL_PATH=…`. **`GOLEM_MODEL_PATH` and
+`GOLEM_MODEL_PROFILE` are a matched pair**: the profile
+(`gemma4` default, `qwen35`; registry in `lib/broker/model_profile.dart`)
+supplies the chat template, stop policy, sampling defaults, and
+reasoning parsing, and nothing cross-checks it against the model file —
+pointing a Qwen artifact at the default Gemma profile silently renders
+the wrong template. Real-backend builds must set both. No other app code
+may import Inferno;
 `../tool/check_inferno_imports.dart` and `test/inferno_import_boundary_test.dart`
 enforce that. Benchmark exports contain both:
 

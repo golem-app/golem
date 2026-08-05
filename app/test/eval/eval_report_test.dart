@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/broker/model_profile.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 
 import '../../integration_test/eval/eval_report.dart';
@@ -15,6 +16,7 @@ const _combo = EvalCombo(
 EvalRunReport _fixtureReport() => EvalRunReport(
   createdAt: DateTime.utc(2026, 8, 5, 12),
   host: 'macOS test-host',
+  profile: const Gemma4Profile(),
   results: [
     EvalComboResult(
       combo: _combo,
@@ -67,6 +69,15 @@ void main() {
     expect(artifact.containsKey('path'), isFalse);
     expect('$json', isNot(contains('/private/somewhere')));
 
+    // The profile is an experimental variable; the evidence must carry it.
+    final profile = json['profile']! as Map;
+    expect(profile['key'], 'gemma4');
+    expect(profile['stopTokenIds'], [1, 106]);
+    expect(
+      (profile['sampling']! as Map)['direct'],
+      containsPair('temperature', 1),
+    );
+
     expect(json['enginePins'], containsPair('llamaCppRelease', 'b10241'));
     final result = (json['results']! as List).single as Map;
     expect(result['passed'], isFalse);
@@ -86,12 +97,35 @@ void main() {
     final markdown = _fixtureReport().renderMarkdown();
     expect(markdown, contains('# Golem model evaluation — 2026-08-05'));
     expect(markdown, contains('## model.gguf · llamaCpp'));
+    expect(markdown, contains('- Profile: `gemma4`'));
     expect(markdown, contains('llama.cpp b10241'));
     expect(markdown, contains('unsloth/gemma-4-E2B-it-qat-GGUF @ 66a399f6'));
     expect(markdown, contains('`d710455907eadf55`'));
     expect(markdown, contains('never quote them as mobile performance'));
     expect(markdown, contains('> engine exploded'));
     expect(markdown, isNot(contains('/private/somewhere')));
+  });
+
+  test('pinned repositories map to their profile family', () {
+    expect(
+      profileKeyForPinnedRepository('YoozLabs/Qwen3.5-4B-qat-GGUF'),
+      'qwen35',
+    );
+    expect(
+      profileKeyForPinnedRepository('YoozLabs/Qwen3.5-4B-qat-lean-4bit-mlx'),
+      'qwen35',
+    );
+    expect(
+      profileKeyForPinnedRepository('unsloth/gemma-4-E2B-it-qat-GGUF'),
+      'gemma4',
+    );
+    expect(
+      profileKeyForPinnedRepository('mlx-community/gemma-4-e2b-it-4bit'),
+      'gemma4',
+    );
+    // Unpinned artifacts cannot be family-checked.
+    expect(profileKeyForPinnedRepository(null), isNull);
+    expect(profileKeyForPinnedRepository('someone/custom-quant'), isNull);
   });
 
   test('a pin citation requires both the name and the pinned size', () {

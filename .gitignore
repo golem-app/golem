@@ -12,3 +12,6 @@ build/
 # upstream source trees nor compiled libraries belong in git.
 .build/
 .swiftpm/
+
+# Device-run identity material (private/public key blobs); never commit.
+selfIdentity.plist

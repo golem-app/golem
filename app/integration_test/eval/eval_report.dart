@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:golem_flutter/broker/model_profile.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 
 import 'eval_runner.dart';
@@ -12,6 +13,22 @@ const _knownArtifacts = <InfernoModelArtifact>[
   qwen35GgufQ4,
   qwen35Mlx4Bit,
 ];
+
+/// Which profile each pinned repository belongs to. The profile decides the
+/// template, stop policy, and sampling — evaluating a pinned artifact under
+/// another family's profile produces numbers that describe nothing, so the
+/// driver fails loudly on a mismatch instead of recording them.
+const _pinnedProfileKeys = <String, String>{
+  'unsloth/gemma-4-E2B-it-qat-GGUF': 'gemma4',
+  'mlx-community/gemma-4-e2b-it-4bit': 'gemma4',
+  'YoozLabs/Qwen3.5-4B-qat-GGUF': 'qwen35',
+  'YoozLabs/Qwen3.5-4B-qat-lean-4bit-mlx': 'qwen35',
+};
+
+/// The profile family of a pin-cited artifact, or null when the artifact is
+/// not a verified pin (unpinned quants cannot be family-checked).
+String? profileKeyForPinnedRepository(String? repository) =>
+    repository == null ? null : _pinnedProfileKeys[repository];
 
 /// Matches an artifact to a manifest pin. The name alone is not provenance —
 /// a requantized file with a pinned filename must not be cited as the pin —
@@ -111,12 +128,18 @@ final class EvalRunReport {
   const EvalRunReport({
     required this.createdAt,
     required this.host,
+    required this.profile,
     required this.results,
     required this.artifacts,
   });
 
   final DateTime createdAt;
   final String host;
+
+  /// The profile is an experimental variable — mode-specific sampling alone
+  /// swings a run between an answer and a budget-exhausted think loop — so
+  /// the evidence must record it.
+  final ModelProfile profile;
   final List<EvalComboResult> results;
   final Map<String, EvalArtifactRecord> artifacts;
 
@@ -133,6 +156,22 @@ final class EvalRunReport {
   Map<String, Object?> toJson() => {
     'createdAt': createdAt.toIso8601String(),
     'host': host,
+    'profile': {
+      'key': profile.key,
+      'stopSequences': profile.stopSequences,
+      'stopTokenIds': profile.stopTokenIds,
+      'sampling': {
+        for (final MapEntry(:key, :value) in {
+          'thinking': profile.sampling(reasoningEnabled: true),
+          'direct': profile.sampling(reasoningEnabled: false),
+        }.entries)
+          key: {
+            'maxTokens': value.maxTokens,
+            'temperature': value.temperature,
+            'topP': value.topP,
+          },
+      },
+    },
     'enginePins': _enginePins,
     'artifacts': [
       for (final record in artifacts.values)
@@ -199,6 +238,13 @@ final class EvalRunReport {
       )
       ..writeln()
       ..writeln('- Host: $host')
+      ..writeln(
+        '- Profile: `${profile.key}` — '
+        'thinking ${_sampling(profile.sampling(reasoningEnabled: true))}, '
+        'direct ${_sampling(profile.sampling(reasoningEnabled: false))}; '
+        'stop `${profile.stopSequences.join(' ')}` '
+        '${profile.stopTokenIds}',
+      )
       ..writeln(
         '- Engine pins: llama.cpp $llamaCppRelease '
         '(`${llamaCppRevision.substring(0, 8)}`), '
@@ -277,6 +323,9 @@ final class EvalRunReport {
     }
     return buffer.toString();
   }
+
+  static String _sampling(ProfileSampling sampling) =>
+      '${sampling.maxTokens}/${sampling.temperature}/${sampling.topP}';
 
   static String _gib(int bytes) =>
       (bytes / (1024 * 1024 * 1024)).toStringAsFixed(2);
