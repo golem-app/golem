@@ -316,10 +316,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Rename chat',
-                style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
-              ),
+              const Text('Rename chat', style: GolemText.cardTitle),
               const SizedBox(height: 16),
               CupertinoTextField(
                 key: const Key('rename-field'),
