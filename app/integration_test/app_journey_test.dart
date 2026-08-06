@@ -211,13 +211,22 @@ void main() {
         .read(modelControllerProvider)
         .requireValue
         .runtime;
+    final runtimeAfter = runtimeBefore == RuntimePhase.loaded
+        ? RuntimePhase.unloaded
+        : RuntimePhase.loaded;
     await tester.tap(find.byKey(const Key('runtime-toggle-button')));
-    await tester.pumpAndSettle();
+    // The fake load's delay is timer- not frame-driven, so settle alone
+    // can return mid-`loading`; poll the controller until it lands.
+    for (var i = 0; i < 50; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (container.read(modelControllerProvider).requireValue.runtime ==
+          runtimeAfter) {
+        break;
+      }
+    }
     expect(
       container.read(modelControllerProvider).requireValue.runtime,
-      runtimeBefore == RuntimePhase.loaded
-          ? RuntimePhase.unloaded
-          : RuntimePhase.loaded,
+      runtimeAfter,
     );
     await tester.pageBack();
     await tester.pumpAndSettle();
