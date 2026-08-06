@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/chrome/golem_menu.dart';
 import '../../../core/domain/app_state.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
@@ -231,39 +232,24 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                                     ),
                                   ),
                                 ),
-                                CupertinoMenuAnchor(
-                                  key: Key('conversation-menu-${item.id}'),
-                                  menuChildren: [
-                                    CupertinoMenuItem(
-                                      leading: const Icon(
-                                        CupertinoIcons.pencil,
-                                      ),
+                                GolemMenu(
+                                  anchorKey: Key('conversation-menu-${item.id}'),
+                                  enabled: !widget.blocked,
+                                  triggerColor: GolemTheme.mutedOnDark,
+                                  triggerSemanticLabel: 'Conversation actions',
+                                  items: [
+                                    GolemMenuItem(
+                                      label: 'Rename',
+                                      icon: CupertinoIcons.pencil,
                                       onPressed: () => _rename(context, item),
-                                      child: const Text('Rename'),
                                     ),
-                                    CupertinoMenuItem(
-                                      leading: const Icon(CupertinoIcons.trash),
-                                      isDestructiveAction: true,
+                                    GolemMenuItem(
+                                      label: 'Delete',
+                                      icon: CupertinoIcons.trash,
+                                      isDestructive: true,
                                       onPressed: () => _delete(context, item),
-                                      child: const Text('Delete'),
                                     ),
                                   ],
-                                  builder: (context, controller, child) =>
-                                      CupertinoButton(
-                                        padding: EdgeInsets.zero,
-                                        minimumSize: const Size(44, 44),
-                                        onPressed: widget.blocked
-                                            ? null
-                                            : () => controller.isOpen
-                                                  ? controller.close()
-                                                  : controller.open(),
-                                        child: const Icon(
-                                          CupertinoIcons.ellipsis,
-                                          semanticLabel: 'Conversation actions',
-                                          color: GolemTheme.mutedOnDark,
-                                          size: 20,
-                                        ),
-                                      ),
                                 ),
                               ],
                             ),
