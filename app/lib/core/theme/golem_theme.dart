@@ -90,6 +90,18 @@ abstract final class GolemTheme {
   static const scrim = Color(0x66000000);
   static const drawerShadow = Color(0x59000000);
   static const splashGlow = Color(0x801763EE);
+  // The code card is deliberately dark in both themes (handoff: fixed
+  // #0B1220 card with white-alpha header chrome and a fixed syntax
+  // palette), so none of these are dynamic.
+  static const codeSurface = Color(0xFF0B1220);
+  static const codeHeader = Color(0x0DFFFFFF);
+  static const codeHeaderInk = Color(0x6BFFFFFF);
+  static const codeChip = Color(0x12FFFFFF);
+  static const codeChipInk = Color(0xB8FFFFFF);
+  static const codeInk = Color(0xFFDCE6F7);
+  static const codeKeyword = Color(0xFF6F86AD);
+  static const codeCallable = Color(0xFF7FB3FF);
+  static const codeString = Color(0xFF8FD3A8);
   static const errorSurface = CupertinoDynamicColor.withBrightness(
     color: Color(0xFFFFEDF0),
     darkColor: Color(0xFF33161C),

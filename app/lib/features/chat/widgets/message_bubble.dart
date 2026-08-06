@@ -1,24 +1,37 @@
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show SelectableText;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/chrome/golem_alert.dart';
+import '../../../core/chrome/golem_menu.dart';
 import '../../../core/chrome/golem_sheet.dart';
+import '../../../core/chrome/golem_toast.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
+import 'markdown/golem_markdown.dart';
 
 class MessageBubble extends ConsumerWidget {
   const MessageBubble({
     required this.message,
     required this.canRegenerate,
+    required this.idle,
+    this.stoppedTokens,
     super.key,
   });
   final ChatMessage message;
   final bool canRegenerate;
+
+  /// Whether generation is idle; actions render only on a settled chat.
+  final bool idle;
+
+  /// Token count of a failed generation's partial answer; non-null only
+  /// on the message the failure banner refers to. Ephemeral by design —
+  /// nothing persists a failure marker.
+  final int? stoppedTokens;
 
   /// Readable measure for a bubble on wide desktop windows; phone layouts
   /// never reach it (88% of a phone viewport stays below the cap).
@@ -38,89 +51,219 @@ class MessageBubble extends ConsumerWidget {
     if (!isUser && !hasContent && !message.isStreaming) {
       return const SizedBox.shrink();
     }
+    final bubble = GestureDetector(
+      onLongPress: () => _showActions(context, ref),
+      child: Container(
+        constraints: BoxConstraints(
+          maxWidth: math.min(
+            MediaQuery.sizeOf(context).width * GolemSize.bubbleMaxFraction,
+            _maxBubbleWidth,
+          ),
+        ),
+        padding: const EdgeInsets.all(18),
+        // Every corner equally round — no tails, per the handoff.
+        decoration: BoxDecoration(
+          color: isUser
+              ? GolemTheme.userBubble
+              : CupertinoDynamicColor.resolve(
+                  GolemTheme.assistantBubble,
+                  context,
+                ),
+          borderRadius: BorderRadius.circular(
+            isUser ? GolemRadius.bubble : GolemRadius.bubbleAssistant,
+          ),
+          border: isUser
+              ? null
+              : Border.all(
+                  color: CupertinoDynamicColor.resolve(
+                    GolemTheme.divider,
+                    context,
+                  ),
+                ),
+          boxShadow: isUser ? null : GolemShadow.card(context),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!isUser && (message.reasoning?.isNotEmpty ?? false))
+              _ReasoningCard(
+                text: message.reasoning!,
+                streaming: message.isStreaming && message.text.isEmpty,
+              ),
+            if (isUser)
+              Text(
+                message.text,
+                style: GolemText.body.copyWith(color: GolemTheme.textOnDark),
+              )
+            else if (message.text.isNotEmpty || message.isStreaming)
+              DefaultTextStyle.merge(
+                style: GolemText.body.copyWith(
+                  color: CupertinoDynamicColor.resolve(GolemTheme.ink, context),
+                ),
+                child: GolemMarkdown(
+                  text: message.text,
+                  streaming: message.isStreaming,
+                ),
+              ),
+            if (stoppedTokens != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Stopped after $stoppedTokens tokens',
+                key: const Key('stopped-caption'),
+                style: GolemText.caption.copyWith(
+                  color: CupertinoDynamicColor.resolve(
+                    GolemTheme.mutedInk,
+                    context,
+                  ),
+                ),
+              ),
+            ],
+            if (!isUser && message.metrics != null) ...[
+              const SizedBox(height: 12),
+              if (message.isStreaming)
+                _GeneratingPill(metrics: message.metrics!)
+              else
+                _MetricsPill(metrics: message.metrics!),
+            ],
+          ],
+        ),
+      ),
+    );
     return Semantics(
       key: Key('message-${message.id}'),
       label: isUser ? 'You: ${message.text}' : 'Golem: ${message.text}',
-      child: Align(
-        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-        child: GestureDetector(
-          onLongPress: () => _showActions(context, ref),
-          child: Container(
-            constraints: BoxConstraints(
-              maxWidth: math.min(
-                MediaQuery.sizeOf(context).width * GolemSize.bubbleMaxFraction,
-                _maxBubbleWidth,
-              ),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: Column(
+          crossAxisAlignment: isUser
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
+          children: [
+            Align(
+              alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+              child: bubble,
             ),
-            margin: const EdgeInsets.only(bottom: 14),
-            padding: const EdgeInsets.all(18),
-            // Every corner equally round — no tails, per the handoff.
-            decoration: BoxDecoration(
-              color: isUser
-                  ? GolemTheme.userBubble
-                  : CupertinoDynamicColor.resolve(
-                      GolemTheme.assistantBubble,
-                      context,
-                    ),
-              borderRadius: BorderRadius.circular(
-                isUser ? GolemRadius.bubble : GolemRadius.bubbleAssistant,
-              ),
-              border: isUser
-                  ? null
-                  : Border.all(
-                      color: CupertinoDynamicColor.resolve(
-                        GolemTheme.divider,
-                        context,
-                      ),
-                    ),
-              boxShadow: isUser ? null : GolemShadow.card(context),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (!isUser && (message.reasoning?.isNotEmpty ?? false))
-                  _ReasoningCard(
-                    text: message.reasoning!,
-                    streaming: message.isStreaming,
-                  ),
-                if (message.text.isNotEmpty)
-                  SelectableText(
-                    message.text,
-                    style: GolemText.body.copyWith(
-                      color: isUser
-                          ? GolemTheme.textOnDark
-                          : CupertinoDynamicColor.resolve(
-                              GolemTheme.ink,
-                              context,
-                            ),
-                    ),
-                  ),
-                if (message.isStreaming) ...[
-                  const SizedBox(height: 10),
-                  const CupertinoActivityIndicator(radius: 8),
-                ],
-                if (!isUser && message.metrics != null) ...[
-                  const SizedBox(height: 12),
-                  _MetricsPill(
-                    metrics: message.metrics!,
-                    live: message.isStreaming,
-                  ),
-                ],
-              ],
-            ),
-          ),
+            if (!isUser && idle && hasContent) _actionRow(context, ref),
+          ],
         ),
       ),
     );
   }
 
+  /// The ghost action row under a settled assistant message: copy,
+  /// regenerate (tail only), share, and the anchored overflow menu.
+  Widget _actionRow(BuildContext context, WidgetRef ref) {
+    final tint = CupertinoDynamicColor.resolve(GolemTheme.tertiaryInk, context);
+    Widget action({
+      required Key key,
+      required IconData icon,
+      required String label,
+      required VoidCallback onPressed,
+    }) => CupertinoButton(
+      key: key,
+      padding: EdgeInsets.zero,
+      minimumSize: const Size(44, 44),
+      onPressed: onPressed,
+      child: Icon(icon, size: 18, color: tint, semanticLabel: label),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          action(
+            key: Key('message-copy-${message.id}'),
+            icon: CupertinoIcons.doc_on_doc,
+            label: 'Copy message',
+            onPressed: () => _copy(context),
+          ),
+          if (canRegenerate)
+            action(
+              key: Key('message-regenerate-${message.id}'),
+              icon: CupertinoIcons.arrow_clockwise,
+              label: 'Regenerate response',
+              onPressed: () =>
+                  ref.read(chatControllerProvider.notifier).regenerate(),
+            ),
+          action(
+            key: Key('message-share-${message.id}'),
+            icon: CupertinoIcons.square_arrow_up,
+            label: 'Share message',
+            onPressed: () => _share(context),
+          ),
+          GolemMenu(
+            anchorKey: Key('message-menu-${message.id}'),
+            triggerSemanticLabel: 'Message actions',
+            triggerColor: tint,
+            items: _menuItems(context, ref),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<GolemMenuItem> _menuItems(BuildContext context, WidgetRef ref) => [
+    GolemMenuItem(
+      itemKey: const Key('menu-message-copy'),
+      label: 'Copy',
+      icon: CupertinoIcons.doc_on_doc,
+      onPressed: () => _copy(context),
+    ),
+    if (canRegenerate)
+      GolemMenuItem(
+        itemKey: const Key('menu-message-regenerate'),
+        label: 'Regenerate',
+        icon: CupertinoIcons.arrow_clockwise,
+        onPressed: () => ref.read(chatControllerProvider.notifier).regenerate(),
+      ),
+    GolemMenuItem(
+      itemKey: const Key('menu-message-branch'),
+      label: 'Branch from here',
+      icon: CupertinoIcons.arrow_branch,
+      onPressed: () => _branch(context, ref),
+    ),
+    GolemMenuItem(
+      itemKey: const Key('menu-message-share'),
+      label: 'Share',
+      icon: CupertinoIcons.square_arrow_up,
+      onPressed: () => _share(context),
+    ),
+    GolemMenuItem(
+      itemKey: const Key('menu-message-delete'),
+      label: 'Delete message',
+      icon: CupertinoIcons.trash,
+      isDestructive: true,
+      onPressed: () =>
+          ref.read(chatControllerProvider.notifier).deleteMessage(message.id),
+    ),
+  ];
+
+  void _copy(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: message.text));
+    showGolemToast(context, 'Copied to clipboard');
+  }
+
+  Future<void> _branch(BuildContext context, WidgetRef ref) async {
+    await ref.read(chatControllerProvider.notifier).branchFrom(message.id);
+    if (context.mounted) showGolemToast(context, 'New branch started');
+  }
+
+  Future<void> _share(BuildContext context) async {
+    final box = context.findRenderObject() as RenderBox?;
+    await SharePlus.instance.share(
+      ShareParams(
+        text: message.text,
+        sharePositionOrigin: box == null
+            ? null
+            : box.localToGlobal(Offset.zero) & box.size,
+      ),
+    );
+  }
+
   Future<void> _showActions(BuildContext context, WidgetRef ref) async {
-    // Editing is silently rejected by the controller while a generation is
-    // in flight, so don't offer it — a Save that discards the user's edit is
-    // worse than a missing menu entry.
-    final idle =
-        ref.read(chatControllerProvider).requireValue.generation ==
-        GenerationPhase.idle;
+    // Mutating actions are silently rejected by the controller while a
+    // generation is in flight, so don't offer them — a Save that discards
+    // the user's edit is worse than a missing menu entry.
     // Action handlers pop their own sheet route and then open follow-up
     // dialogs on the bubble context, which survives the pop.
     await showGolemActions(
@@ -132,8 +275,8 @@ class MessageBubble extends ConsumerWidget {
         GolemSheetAction(
           label: 'Copy',
           onPressed: () {
-            Clipboard.setData(ClipboardData(text: message.text));
             Navigator.pop(context);
+            _copy(context);
           },
         ),
         if (message.role == MessageRole.user && idle)
@@ -150,6 +293,33 @@ class MessageBubble extends ConsumerWidget {
             onPressed: () {
               Navigator.pop(context);
               ref.read(chatControllerProvider.notifier).regenerate();
+            },
+          ),
+        if (idle)
+          GolemSheetAction(
+            label: 'Branch from here',
+            onPressed: () {
+              Navigator.pop(context);
+              _branch(context, ref);
+            },
+          ),
+        if (message.role == MessageRole.assistant)
+          GolemSheetAction(
+            label: 'Share',
+            onPressed: () {
+              Navigator.pop(context);
+              _share(context);
+            },
+          ),
+        if (idle)
+          GolemSheetAction(
+            label: 'Delete message',
+            isDestructive: true,
+            onPressed: () {
+              Navigator.pop(context);
+              ref
+                  .read(chatControllerProvider.notifier)
+                  .deleteMessage(message.id);
             },
           ),
       ],
@@ -191,10 +361,19 @@ class MessageBubble extends ConsumerWidget {
   }
 }
 
-class _ReasoningCard extends StatelessWidget {
+class _ReasoningCard extends StatefulWidget {
   const _ReasoningCard({required this.text, required this.streaming});
   final String text;
   final bool streaming;
+
+  @override
+  State<_ReasoningCard> createState() => _ReasoningCardState();
+}
+
+class _ReasoningCardState extends State<_ReasoningCard> {
+  // Widget-local disclosure: collapsing a reasoning card is ephemeral
+  // presentation state, never persisted.
+  bool _expanded = true;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -217,31 +396,121 @@ class _ReasoningCard extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Icon(
-              CupertinoIcons.lightbulb_fill,
-              color: GolemTheme.amber,
-              size: 16,
-            ),
-            const SizedBox(width: 7),
-            Text(
-              streaming ? 'Reasoning · LIVE' : 'Reasoning',
-              style: GolemText.footnoteStrong,
-            ),
-          ],
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Row(
+            children: [
+              const Icon(
+                CupertinoIcons.lightbulb_fill,
+                color: GolemTheme.amber,
+                size: 16,
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  widget.streaming ? 'Reasoning · LIVE' : 'Reasoning',
+                  style: GolemText.footnoteStrong,
+                ),
+              ),
+              Icon(
+                _expanded
+                    ? CupertinoIcons.chevron_up
+                    : CupertinoIcons.chevron_down,
+                size: 14,
+                semanticLabel: _expanded
+                    ? 'Collapse reasoning'
+                    : 'Expand reasoning',
+                color: CupertinoDynamicColor.resolve(
+                  GolemTheme.mutedInk,
+                  context,
+                ),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 8),
-        Text(text, style: GolemText.footnote),
+        if (_expanded) ...[
+          const SizedBox(height: 8),
+          Text(widget.text, style: GolemText.footnote),
+        ],
       ],
     ),
   );
 }
 
-class _MetricsPill extends StatelessWidget {
-  const _MetricsPill({required this.metrics, required this.live});
+/// The live "Generating · 26.8 tok/s" pill with its blinking dot.
+class _GeneratingPill extends StatelessWidget {
+  const _GeneratingPill({required this.metrics});
   final InferenceMetrics metrics;
-  final bool live;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = CupertinoDynamicColor.resolve(GolemTheme.accent, context);
+    return Container(
+      key: const Key('generating-pill'),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: CupertinoDynamicColor.resolve(GolemTheme.accentSoft, context),
+        borderRadius: BorderRadius.circular(GolemRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _BlinkDot(color: accent),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              'Generating · '
+              '${metrics.decodeTokensPerSecond.toStringAsFixed(1)} tok/s',
+              style: GolemText.metrics.copyWith(color: accent),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BlinkDot extends StatefulWidget {
+  const _BlinkDot({required this.color});
+  final Color color;
+
+  @override
+  State<_BlinkDot> createState() => _BlinkDotState();
+}
+
+class _BlinkDotState extends State<_BlinkDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+    opacity: _controller.drive(Tween(begin: 0.35, end: 1)),
+    child: Container(
+      width: 7,
+      height: 7,
+      decoration: BoxDecoration(
+        color: widget.color,
+        borderRadius: BorderRadius.circular(4),
+      ),
+    ),
+  );
+}
+
+class _MetricsPill extends StatelessWidget {
+  const _MetricsPill({required this.metrics});
+  final InferenceMetrics metrics;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -252,7 +521,7 @@ class _MetricsPill extends StatelessWidget {
       borderRadius: BorderRadius.circular(GolemRadius.pill),
     ),
     child: Text(
-      '${live ? 'LIVE · ' : ''}${metrics.decodeTokensPerSecond.toStringAsFixed(1)} tok/s  ·  ${metrics.tokenCount} tokens',
+      '${metrics.decodeTokensPerSecond.toStringAsFixed(1)} tok/s  ·  ${metrics.tokenCount} tokens',
       style: GolemText.metrics.copyWith(
         color: CupertinoDynamicColor.resolve(GolemTheme.accent, context),
       ),

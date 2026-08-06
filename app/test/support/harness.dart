@@ -123,6 +123,48 @@ Future<void> pumpWithRepositories(
   await tester.pumpAndSettle();
 }
 
+/// A markdown-rich transcript for renderer goldens: inline code, a
+/// fenced block, and a list, kept separate from [seedHistory] so drawer
+/// and rename goldens don't re-record when this seed evolves.
+ChatHistorySnapshot markdownHistory() {
+  final conversation = ChatConversation(
+    id: 'chat-md',
+    title: 'Read a CSV without pandas',
+    updatedAt: DateTime.utc(2026, 8, 5),
+    messages: [
+      ChatMessage(
+        id: 'user-md',
+        role: MessageRole.user,
+        text: 'Read a CSV in Python without pandas.',
+        createdAt: DateTime.utc(2026, 8, 5),
+      ),
+      ChatMessage(
+        id: 'assistant-md',
+        role: MessageRole.assistant,
+        text:
+            'Use the built-in `csv` module. It streams row by row.\n\n'
+            '```python\nimport csv\n\ndef rows(path):\n'
+            '    with open(path, newline="") as file:\n'
+            '        yield from csv.reader(file)\n```\n\n'
+            'Two things worth knowing:\n\n'
+            '- `newline=""` stops Python mangling quoted line breaks.\n'
+            '- Swap in **DictReader** if the file has a header row.',
+        metrics: const InferenceMetrics(
+          promptTokensPerSecond: 144,
+          decodeTokensPerSecond: 24.6,
+          tokenCount: 182,
+          elapsedSeconds: 7.4,
+        ),
+        createdAt: DateTime.utc(2026, 8, 5),
+      ),
+    ],
+  );
+  return ChatHistorySnapshot(
+    conversations: [conversation],
+    activeId: conversation.id,
+  );
+}
+
 ChatHistorySnapshot seedHistory() {
   final conversation = ChatConversation(
     id: 'chat-1',

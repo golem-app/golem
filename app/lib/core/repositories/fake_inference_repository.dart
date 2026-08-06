@@ -80,7 +80,17 @@ final class FakeInferenceRepository implements InferenceRepository {
       throw StateError('Injected simulated generation failure.');
     }
     if (prompt.contains('[oom]')) {
+      // Metrics land before the failure so the transcript can render the
+      // design's "Stopped after N tokens" caption under the partial.
       yield const AnswerDelta('A partial simulated response');
+      yield MetricsEvent(
+        InferenceMetrics(
+          promptTokensPerSecond: 144,
+          decodeTokensPerSecond: profile.decodeRate,
+          tokenCount: 41,
+          elapsedSeconds: 41 / profile.decodeRate,
+        ),
+      );
       throw StateError(
         'Ran out of memory at 4,096 tokens. Lower the context length or '
         'pick a smaller model.',

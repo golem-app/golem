@@ -84,6 +84,24 @@ void main() {
   }
 
   for (final brightness in Brightness.values) {
+    testWidgets('markdown transcript ${brightness.name} golden', (
+      tester,
+    ) async {
+      // The code card is deliberately identical in both chromes; iOS-only.
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        history: markdownHistory(),
+        child: const ChatScreen(),
+      );
+      await expectLater(
+        find.byType(ChatScreen),
+        matchesGoldenFile('goldens/markdown-transcript-${brightness.name}.png'),
+      );
+    }, variant: iosChrome);
+  }
+
+  for (final brightness in Brightness.values) {
     testWidgets('drawer and rename overlay ${brightness.name} goldens', (
       tester,
     ) async {
@@ -360,7 +378,11 @@ void main() {
     (tester) async {
       Widget wrap(ChatMessage message) => ProviderScope(
         child: wrapApp(
-          child: MessageBubble(message: message, canRegenerate: false),
+          child: MessageBubble(
+            message: message,
+            canRegenerate: false,
+            idle: false,
+          ),
         ),
       );
       final ghost = ChatMessage(
@@ -374,11 +396,10 @@ void main() {
       await tester.pumpWidget(wrap(ghost));
       expect(find.byKey(const Key('message-assistant-ghost')), findsNothing);
 
-      // While streaming, the same empty message is the typing indicator and
-      // must stay visible.
+      // While streaming, the same empty message is the typing indicator
+      // (the blinking caret) and must stay visible.
       await tester.pumpWidget(wrap(ghost.copyWith(isStreaming: true)));
       expect(find.byKey(const Key('message-assistant-ghost')), findsOneWidget);
-      expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
     },
     variant: iosChrome,
   );
