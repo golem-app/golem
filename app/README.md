@@ -27,9 +27,9 @@ only through direct `xcodebuild -scheme Runner` builds and is never used for
 QA or automation.
 
 > **Physical iPhone caution:** never install the `production`
-> (`app.golem`) or `dev` (`app.golem.dev`) flavor on the physical iPhone —
-> those identifiers belong to the native app there. Simulator use is
-> unrestricted.
+> (`app.golem`) flavor on the physical iPhone — that identifier belongs
+> to the native app there (and its imported model). The `qa` and `dev`
+> flavors are fine to deploy. Simulator use is unrestricted.
 
 ## Deterministic where it matters
 
