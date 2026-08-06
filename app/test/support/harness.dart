@@ -128,12 +128,14 @@ Future<void> pumpWithRepositories(
   ChatHistorySnapshot? history,
   ModelState model = const ModelState(),
   InferenceBackendConfig? backend,
+  PreferencesRepository? preferences,
 }) async {
   setViewport(tester);
   final container = buildContainer(
     history: history,
     model: model,
     backend: backend,
+    preferences: preferences,
   );
   addTearDown(container.dispose);
   await tester.pumpWidget(

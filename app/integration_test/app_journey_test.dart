@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
@@ -157,8 +158,12 @@ void main() {
     await tester.tap(find.byKey(const Key('open-settings')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('simulation-banner')), findsOneWidget);
-    final settingsScrollable = find.descendant(
-      of: find.byKey(const Key('settings-list')),
+
+    // Models & downloads live one screen deeper now.
+    await tester.tap(find.byKey(const Key('settings-model-row')));
+    await tester.pumpAndSettle();
+    final modelsScrollable = find.descendant(
+      of: find.byKey(const Key('models-list')),
       matching: find.byType(Scrollable),
     );
     final modelCommands = container.read(modelControllerProvider.notifier);
@@ -167,7 +172,7 @@ void main() {
       await tester.scrollUntilVisible(
         find.byKey(const Key('model-download-gemma4-mlx')),
         240,
-        scrollable: settingsScrollable,
+        scrollable: modelsScrollable,
       );
       await tester.tap(find.byKey(const Key('model-download-gemma4-mlx')));
       await _pumpUntilFound(
@@ -194,15 +199,91 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const Key('runtime-toggle-button')),
       260,
-      scrollable: settingsScrollable,
+      scrollable: modelsScrollable,
     );
+    // scrollUntilVisible can stop with the button only clipping into
+    // view; a tap there misses silently, so force it fully on-screen and
+    // assert the toggle actually flipped the phase (the persisted state
+    // survives reruns, so the direction depends on the last run).
+    await tester.ensureVisible(find.byKey(const Key('runtime-toggle-button')));
+    await tester.pumpAndSettle();
+    final runtimeBefore = container
+        .read(modelControllerProvider)
+        .requireValue
+        .runtime;
     await tester.tap(find.byKey(const Key('runtime-toggle-button')));
+    await tester.pumpAndSettle();
+    expect(
+      container.read(modelControllerProvider).requireValue.runtime,
+      runtimeBefore == RuntimePhase.loaded
+          ? RuntimePhase.unloaded
+          : RuntimePhase.loaded,
+    );
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    // Advanced mode reveals the system-prompt row; response style commits
+    // a per-profile preset the sampling layer picks up. The preference
+    // persists across reruns, so normalize to off before driving the
+    // switch through the UI.
+    await container
+        .read(preferencesControllerProvider.notifier)
+        .setAdvancedMode(false);
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('advanced-mode-switch')),
+      240,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('settings-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.ensureVisible(find.byKey(const Key('advanced-mode-switch')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('advanced-mode-switch')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('settings-system-prompt-row')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('settings-style-row')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('style-precise')));
+    await tester.pumpAndSettle();
+    expect(
+      container
+          .read(preferencesControllerProvider)
+          .requireValue
+          .styleFor('gemma4'),
+      ResponseStyle.precise,
+    );
+    expect(find.byKey(const Key('gen-temperature-gemma4')), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    // Storage: the breakdown renders and the cache clears with a toast.
+    await tester.tap(find.byKey(const Key('settings-storage-row')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('storage-bar')), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('clear-cache')),
+      240,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('storage-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('clear-cache')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('golem-toast')), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 1600));
+    await tester.pageBack();
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('open-benchmark')),
       260,
-      scrollable: settingsScrollable,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('settings-list')),
+        matching: find.byType(Scrollable),
+      ),
     );
     await tester.tap(find.byKey(const Key('open-benchmark')));
     await tester.pumpAndSettle();
