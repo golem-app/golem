@@ -5,6 +5,8 @@ import 'package:flutter/material.dart' show SelectableText;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/chrome/golem_alert.dart';
+import '../../../core/chrome/golem_sheet.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
@@ -122,80 +124,71 @@ class MessageBubble extends ConsumerWidget {
     final idle =
         ref.read(chatControllerProvider).requireValue.generation ==
         GenerationPhase.idle;
-    await showCupertinoModalPopup<void>(
+    // Action handlers pop their own sheet route and then open follow-up
+    // dialogs on the bubble context, which survives the pop.
+    await showGolemActions(
       context: context,
-      // The sheet context must stay distinct from the bubble context: actions
-      // pop the sheet and then open follow-up dialogs, which need a context
-      // that survives the pop.
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: Text(
-          message.role == MessageRole.user ? 'Your message' : 'Golem response',
+      title: message.role == MessageRole.user
+          ? 'Your message'
+          : 'Golem response',
+      actions: [
+        GolemSheetAction(
+          label: 'Copy',
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: message.text));
+            Navigator.pop(context);
+          },
         ),
-        actions: [
-          CupertinoActionSheetAction(
+        if (message.role == MessageRole.user && idle)
+          GolemSheetAction(
+            label: 'Edit and retry',
             onPressed: () {
-              Clipboard.setData(ClipboardData(text: message.text));
-              Navigator.pop(sheetContext);
+              Navigator.pop(context);
+              _showEdit(context, ref);
             },
-            child: const Text('Copy'),
           ),
-          if (message.role == MessageRole.user && idle)
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(sheetContext);
-                _showEdit(context, ref);
-              },
-              child: const Text('Edit and retry'),
-            ),
-          if (message.role == MessageRole.assistant && canRegenerate)
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(sheetContext);
-                ref.read(chatControllerProvider.notifier).regenerate();
-              },
-              child: const Text('Regenerate'),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('Cancel'),
-        ),
-      ),
+        if (message.role == MessageRole.assistant && canRegenerate)
+          GolemSheetAction(
+            label: 'Regenerate',
+            onPressed: () {
+              Navigator.pop(context);
+              ref.read(chatControllerProvider.notifier).regenerate();
+            },
+          ),
+      ],
     );
   }
 
   Future<void> _showEdit(BuildContext context, WidgetRef ref) async {
     final controller = TextEditingController(text: message.text);
-    await showCupertinoDialog<void>(
+    await showGolemAlert(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Edit message'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            key: const Key('edit-message-field'),
-            controller: controller,
-            minLines: 2,
-            maxLines: 5,
-          ),
+      title: 'Edit message',
+      content: Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: CupertinoTextField(
+          key: const Key('edit-message-field'),
+          controller: controller,
+          minLines: 2,
+          maxLines: 5,
         ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          CupertinoDialogAction(
-            key: const Key('edit-message-save'),
-            onPressed: () {
-              Navigator.pop(context);
-              ref
-                  .read(chatControllerProvider.notifier)
-                  .editAndTruncate(message.id, controller.text);
-            },
-            child: const Text('Save and regenerate'),
-          ),
-        ],
       ),
+      actions: [
+        GolemAlertAction(
+          label: 'Cancel',
+          onPressed: () => Navigator.pop(context),
+        ),
+        GolemAlertAction(
+          key: const Key('edit-message-save'),
+          label: 'Save and regenerate',
+          onPressed: () {
+            Navigator.pop(context);
+            ref
+                .read(chatControllerProvider.notifier)
+                .editAndTruncate(message.id, controller.text);
+          },
+        ),
+      ],
     );
     controller.dispose();
   }

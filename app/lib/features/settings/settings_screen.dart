@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../broker/model_profile.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/app_identity.dart';
+import '../../core/chrome/golem_alert.dart';
 import '../../core/domain/generation_settings.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/models.dart';
@@ -465,31 +466,25 @@ class _ModelCard extends ConsumerWidget {
   Future<void> _confirmDelete(
     BuildContext context,
     ModelController controller,
-  ) => showCupertinoDialog<void>(
+  ) => showGolemAlert(
     context: context,
-    builder: (dialogContext) => CupertinoAlertDialog(
-      key: const Key('model-delete-dialog'),
-      title: Text('Delete ${entry.displayName}?'),
-      content: Text(
+    dialogKey: const Key('model-delete-dialog'),
+    title: 'Delete ${entry.displayName}?',
+    message:
         'Removes ${_gigabytes(entry.totalBytes)} from this device. '
         'The model can be downloaded again later.',
+    actions: [
+      GolemAlertAction(label: 'Keep', onPressed: () => Navigator.pop(context)),
+      GolemAlertAction(
+        key: const Key('confirm-model-delete'),
+        label: 'Delete',
+        isDestructive: true,
+        onPressed: () {
+          Navigator.pop(context);
+          controller.delete(entry.key);
+        },
       ),
-      actions: [
-        CupertinoDialogAction(
-          onPressed: () => Navigator.of(dialogContext).pop(),
-          child: const Text('Keep'),
-        ),
-        CupertinoDialogAction(
-          key: const Key('confirm-model-delete'),
-          isDestructiveAction: true,
-          onPressed: () {
-            Navigator.of(dialogContext).pop();
-            controller.delete(entry.key);
-          },
-          child: const Text('Delete'),
-        ),
-      ],
-    ),
+    ],
   );
 
   String _statusLabel(String suffix) => switch (status.phase) {
