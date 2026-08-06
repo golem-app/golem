@@ -1,41 +1,29 @@
-import 'dart:io';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/models.dart';
-import 'package:golem_flutter/core/providers/app_providers.dart';
-import 'package:golem_flutter/core/repositories/contracts.dart';
-import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
-import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
-import 'support/in_memory_chat_history_repository.dart';
-import 'support/in_memory_settings_repository.dart';
-import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/benchmark/benchmark_screen.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/widgets/composer.dart';
 import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';
 import 'package:golem_flutter/features/splash/splash_screen.dart';
+import 'package:golem_flutter/core/providers/app_providers.dart';
 
-const viewport = Size(402, 874);
-
-Future<String> _fixtureAsset(String key) async =>
-    '[{"role": "user", "content": "${'x' * 400}"}]';
+import 'support/harness.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('splash golden', (tester) async {
-    _setViewport(tester);
+    setViewport(tester);
     await tester.pumpWidget(
       // The splash now reads the backend signal for honest copy; the
       // default scope resolves to the fake, matching the recorded golden.
       ProviderScope(
-        child: _app(
+        child: wrapApp(
           brightness: Brightness.light,
           child: SplashScreen(
             state: const StartupState(
@@ -61,7 +49,7 @@ void main() {
 
   for (final brightness in Brightness.values) {
     testWidgets('empty chat ${brightness.name} golden', (tester) async {
-      await _pumpWithRepositories(
+      await pumpWithRepositories(
         tester,
         brightness: brightness,
         child: const ChatScreen(),
@@ -75,10 +63,10 @@ void main() {
     testWidgets('populated reasoning ${brightness.name} golden', (
       tester,
     ) async {
-      await _pumpWithRepositories(
+      await pumpWithRepositories(
         tester,
         brightness: brightness,
-        history: _seedHistory(),
+        history: seedHistory(),
         child: const ChatScreen(),
       );
       await expectLater(
@@ -89,9 +77,9 @@ void main() {
   }
 
   testWidgets('drawer and rename overlay goldens', (tester) async {
-    await _pumpWithRepositories(
+    await pumpWithRepositories(
       tester,
-      history: _seedHistory(),
+      history: seedHistory(),
       child: const ChatScreen(),
     );
     await tester.tap(find.byKey(const Key('open-drawer')));
@@ -111,7 +99,7 @@ void main() {
   });
 
   testWidgets('settings states dark golden', (tester) async {
-    await _pumpWithRepositories(
+    await pumpWithRepositories(
       tester,
       brightness: Brightness.dark,
       // 42% of the pinned Gemma MLX artifact, mid-pause, with the Qwen GGUF
@@ -158,7 +146,7 @@ void main() {
   });
 
   testWidgets('benchmark result golden', (tester) async {
-    await _pumpWithRepositories(tester, child: const BenchmarkScreen());
+    await pumpWithRepositories(tester, child: const BenchmarkScreen());
     final container = ProviderScope.containerOf(
       tester.element(find.byType(BenchmarkScreen)),
     );
@@ -181,7 +169,7 @@ void main() {
   testWidgets('iOS targets, labels, contrast, and enlarged text', (
     tester,
   ) async {
-    await _pumpWithRepositories(tester, child: const ChatScreen());
+    await pumpWithRepositories(tester, child: const ChatScreen());
     await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
@@ -193,8 +181,8 @@ void main() {
           textScaler: TextScaler.linear(1.6),
         ),
         child: UncontrolledProviderScope(
-          container: _container(),
-          child: _app(child: const SettingsScreen()),
+          container: buildContainer(),
+          child: wrapApp(child: const SettingsScreen()),
         ),
       ),
     );
@@ -216,7 +204,7 @@ void main() {
       modelPathFromCatalog: true,
     );
 
-    await _pumpWithRepositories(
+    await pumpWithRepositories(
       tester,
       backend: backend,
       // Simulated downloads with real inference: the mixed state a dev
@@ -271,7 +259,7 @@ void main() {
     );
     expect(find.textContaining('UI evaluation build'), findsNothing);
 
-    await _pumpWithRepositories(
+    await pumpWithRepositories(
       tester,
       backend: backend,
       child: const ChatScreen(),
@@ -282,7 +270,7 @@ void main() {
     );
     expect(find.textContaining('simulated model'), findsNothing);
 
-    await _pumpWithRepositories(
+    await pumpWithRepositories(
       tester,
       backend: backend,
       child: SplashScreen(
@@ -312,7 +300,7 @@ void main() {
       if (phase == GenerationPhase.idle) continue;
       await tester.pumpWidget(
         ProviderScope(
-          child: _app(
+          child: wrapApp(
             brightness: Brightness.dark,
             child: Composer(
               controller: controller,
@@ -336,7 +324,9 @@ void main() {
     tester,
   ) async {
     Widget wrap(ChatMessage message) => ProviderScope(
-      child: _app(child: MessageBubble(message: message, canRegenerate: false)),
+      child: wrapApp(
+        child: MessageBubble(message: message, canRegenerate: false),
+      ),
     );
     final ghost = ChatMessage(
       id: 'assistant-ghost',
@@ -355,142 +345,4 @@ void main() {
     expect(find.byKey(const Key('message-assistant-ghost')), findsOneWidget);
     expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
   });
-}
-
-Widget _app({
-  required Widget child,
-  Brightness brightness = Brightness.light,
-}) => CupertinoApp(
-  debugShowCheckedModeBanner: false,
-  theme: GolemTheme.theme(brightness),
-  home: child,
-);
-
-ProviderContainer _container({
-  ChatHistorySnapshot? history,
-  ModelState model = const ModelState(),
-  InferenceBackendConfig? backend,
-}) {
-  final directory = Directory.systemTemp.createTempSync('golem-widget-test-');
-  return ProviderContainer(
-    overrides: [
-      if (backend != null) inferenceBackendProvider.overrideWithValue(backend),
-      chatHistoryRepositoryProvider.overrideWithValue(
-        InMemoryChatHistoryRepository(
-          history ?? const ChatHistorySnapshot(conversations: []),
-        ),
-      ),
-      inferenceRepositoryProvider.overrideWithValue(
-        FakeInferenceRepository(eventDelay: Duration.zero),
-      ),
-      settingsRepositoryProvider.overrideWithValue(
-        InMemorySettingsRepository(),
-      ),
-      modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
-      modelManagementRepositoryProvider.overrideWithValue(_ModelFake(model)),
-      benchmarkRepositoryProvider.overrideWithValue(
-        FakeBenchmarkRepository(
-          directory,
-          readAsset: _fixtureAsset,
-          delay: Duration.zero,
-        ),
-      ),
-    ],
-  );
-}
-
-Future<void> _pumpWithRepositories(
-  WidgetTester tester, {
-  required Widget child,
-  Brightness brightness = Brightness.light,
-  ChatHistorySnapshot? history,
-  ModelState model = const ModelState(),
-  InferenceBackendConfig? backend,
-}) async {
-  _setViewport(tester);
-  final container = _container(
-    history: history,
-    model: model,
-    backend: backend,
-  );
-  addTearDown(container.dispose);
-  await tester.pumpWidget(
-    UncontrolledProviderScope(
-      container: container,
-      child: _app(brightness: brightness, child: child),
-    ),
-  );
-  if (find.byType(ChatScreen).evaluate().isNotEmpty) {
-    final context = tester.element(find.byType(ChatScreen));
-    await tester.runAsync(
-      () => precacheImage(
-        const AssetImage('assets/images/golem_mascot.png'),
-        context,
-      ),
-    );
-    await tester.pump();
-  }
-  await tester.pumpAndSettle();
-}
-
-void _setViewport(WidgetTester tester) {
-  tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = viewport;
-  addTearDown(tester.view.resetDevicePixelRatio);
-  addTearDown(tester.view.resetPhysicalSize);
-}
-
-ChatHistorySnapshot _seedHistory() {
-  final conversation = ChatConversation(
-    id: 'chat-1',
-    title: 'Plan a quiet weekend',
-    updatedAt: DateTime.utc(2026, 8, 2),
-    reasoningEnabled: true,
-    messages: [
-      ChatMessage(
-        id: 'user-1',
-        role: MessageRole.user,
-        text: 'Suggest a calm weekend plan close to home.',
-        createdAt: DateTime.utc(2026, 8, 2),
-      ),
-      ChatMessage(
-        id: 'assistant-1',
-        role: MessageRole.assistant,
-        text:
-            'Start slowly: coffee, a long walk, and an afternoon with a good book.',
-        reasoning: 'I’ll balance rest, movement, and one small delight.',
-        metrics: const InferenceMetrics(
-          promptTokensPerSecond: 144,
-          decodeTokensPerSecond: 21.4,
-          tokenCount: 18,
-          elapsedSeconds: 0.84,
-        ),
-        createdAt: DateTime.utc(2026, 8, 2),
-      ),
-    ],
-  );
-  return ChatHistorySnapshot(
-    conversations: [conversation],
-    activeId: conversation.id,
-  );
-}
-
-final class _ModelFake implements ModelManagementRepository {
-  _ModelFake(this.state);
-  ModelState state;
-
-  @override
-  Future<ModelState> load() async => state;
-  @override
-  Future<ModelState> loadRuntime() async => state;
-  @override
-  Future<ModelState> unloadRuntime() async => state;
-  @override
-  Stream<ModelState> download(String artifactKey) => Stream.value(state);
-  @override
-  Future<ModelState> pause(String artifactKey) async => state;
-  @override
-  Future<ModelState> cancel(String artifactKey) async => state;
-  @override
-  Future<ModelState> delete(String artifactKey) async => state;
 }
