@@ -79,7 +79,7 @@ abstract final class GolemTheme {
   );
   static const userBubble = Color(0xFF152549);
   static const drawer = Color(0xFF152549);
-  static const splash = Color(0xFF0F1524);
+  static const splash = Color(0xFF060D1F);
   static const amber = Color(0xFFF6AA1B);
   static const destructive = Color(0xFFFF382C);
   // Fixed colors for the always-dark drawer and splash surfaces.
@@ -89,7 +89,7 @@ abstract final class GolemTheme {
   static const iconOnDark = Color(0xFFCDD0D5);
   static const scrim = Color(0x66000000);
   static const drawerShadow = Color(0x59000000);
-  static const splashGlow = Color(0x591D63ED);
+  static const splashGlow = Color(0x801763EE);
   static const errorSurface = CupertinoDynamicColor.withBrightness(
     color: Color(0xFFFFEDF0),
     darkColor: Color(0xFF33161C),

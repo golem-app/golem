@@ -62,9 +62,9 @@ void main() {
       final storyboard = await File(
         'ios/Runner/Base.lproj/GolemLaunchScreen.storyboard',
       ).readAsString();
-      expect(storyboard, contains('red="0.05882352941"'));
-      expect(storyboard, contains('green="0.08235294118"'));
-      expect(storyboard, contains('blue="0.1411764706"'));
+      expect(storyboard, contains('red="0.02352941176"'));
+      expect(storyboard, contains('green="0.05098039216"'));
+      expect(storyboard, contains('blue="0.1215686275"'));
       // The iOS 26 launch-snapshot renderer mishandles storyboard launch
       // images (wrong scale, alpha flattened to white), so the native launch
       // screen must stay image-free. The Flutter splash draws the artwork,
