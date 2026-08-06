@@ -82,150 +82,173 @@ class Composer extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _PowerButton(
-                    buttonKey: const Key('composer-attach'),
-                    semanticLabel: 'Add to this chat',
-                    onPressed: generating
-                        ? null
-                        : () =>
-                              showAttachSheet(context, modelLabel: modelLabel),
-                    child: _circle(
-                      context,
-                      child: Icon(
-                        CupertinoIcons.plus,
-                        size: 19,
-                        color: CupertinoDynamicColor.resolve(
-                          GolemTheme.mutedInk,
-                          context,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
+                  // The left cluster yields as one group so the send button
+                  // stays pinned right; inside it only the model chip
+                  // shrinks (ellipsised label), never the buttons.
                   Flexible(
-                    child: _PowerButton(
-                      buttonKey: const Key('composer-model-chip'),
-                      semanticLabel: 'Model for this chat',
-                      onPressed: generating
-                          ? null
-                          : () => _openModelPicker(context, ref),
-                      child: Container(
-                        height: 34,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: CupertinoDynamicColor.resolve(
-                            GolemTheme.field,
-                            context,
-                          ),
-                          borderRadius: BorderRadius.circular(GolemRadius.pill),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 7,
-                              height: 7,
-                              decoration: BoxDecoration(
-                                color: CupertinoDynamicColor.resolve(
-                                  GolemTheme.accent,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _PowerButton(
+                          buttonKey: const Key('composer-attach'),
+                          semanticLabel: 'Add to this chat',
+                          onPressed: generating
+                              ? null
+                              : () => showAttachSheet(
                                   context,
+                                  modelLabel: modelLabel,
                                 ),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                            const SizedBox(width: 7),
-                            Flexible(
-                              child: Text(
-                                modelLabel,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GolemText.captionStrong.copyWith(
-                                  color: CupertinoDynamicColor.resolve(
-                                    GolemTheme.mutedInk,
-                                    context,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(
-                              CupertinoIcons.chevron_down,
-                              size: 14,
-                              color: CupertinoDynamicColor.resolve(
-                                GolemTheme.tertiaryInk,
-                                context,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _PowerButton(
-                    buttonKey: const Key('reasoning-toggle'),
-                    semanticLabel: reasoningEnabled
-                        ? 'Reasoning on'
-                        : 'Reasoning off',
-                    onPressed: generating
-                        ? null
-                        : () => ref
-                              .read(chatControllerProvider.notifier)
-                              .toggleReasoning(),
-                    child: reasoningEnabled
-                        ? Container(
-                            height: 34,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: CupertinoDynamicColor.resolve(
-                                GolemTheme.reasoningSurface,
-                                context,
-                              ),
-                              borderRadius: BorderRadius.circular(
-                                GolemRadius.pill,
-                              ),
-                              border: Border.all(
-                                color: CupertinoDynamicColor.resolve(
-                                  GolemTheme.reasoningBorder,
-                                  context,
-                                ),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  CupertinoIcons.lightbulb_fill,
-                                  size: 15,
-                                  color: GolemTheme.amber,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Think',
-                                  style: GolemText.captionStrong.copyWith(
-                                    color: CupertinoDynamicColor.resolve(
-                                      GolemTheme.ink,
-                                      context,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        : _circle(
+                          child: _circle(
                             context,
                             child: Icon(
-                              CupertinoIcons.lightbulb,
-                              size: 18,
+                              CupertinoIcons.plus,
+                              size: 19,
                               color: CupertinoDynamicColor.resolve(
                                 GolemTheme.mutedInk,
                                 context,
                               ),
                             ),
                           ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Intrinsic width with a hard cap: sharing flex with a
+                        // trailing Spacer starved the label to nothing on device.
+                        Flexible(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 190),
+                            child: _PowerButton(
+                              buttonKey: const Key('composer-model-chip'),
+                              semanticLabel: 'Model for this chat',
+                              onPressed: generating
+                                  ? null
+                                  : () => _openModelPicker(context, ref),
+                              child: Container(
+                                height: 34,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: CupertinoDynamicColor.resolve(
+                                    GolemTheme.field,
+                                    context,
+                                  ),
+                                  borderRadius: BorderRadius.circular(
+                                    GolemRadius.pill,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 7,
+                                      height: 7,
+                                      decoration: BoxDecoration(
+                                        color: CupertinoDynamicColor.resolve(
+                                          GolemTheme.accent,
+                                          context,
+                                        ),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 7),
+                                    Flexible(
+                                      child: Text(
+                                        modelLabel,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GolemText.captionStrong.copyWith(
+                                          color: CupertinoDynamicColor.resolve(
+                                            GolemTheme.mutedInk,
+                                            context,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      CupertinoIcons.chevron_down,
+                                      size: 14,
+                                      color: CupertinoDynamicColor.resolve(
+                                        GolemTheme.tertiaryInk,
+                                        context,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _PowerButton(
+                          buttonKey: const Key('reasoning-toggle'),
+                          semanticLabel: reasoningEnabled
+                              ? 'Reasoning on'
+                              : 'Reasoning off',
+                          onPressed: generating
+                              ? null
+                              : () => ref
+                                    .read(chatControllerProvider.notifier)
+                                    .toggleReasoning(),
+                          child: reasoningEnabled
+                              ? Container(
+                                  height: 34,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: CupertinoDynamicColor.resolve(
+                                      GolemTheme.reasoningSurface,
+                                      context,
+                                    ),
+                                    borderRadius: BorderRadius.circular(
+                                      GolemRadius.pill,
+                                    ),
+                                    border: Border.all(
+                                      color: CupertinoDynamicColor.resolve(
+                                        GolemTheme.reasoningBorder,
+                                        context,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        CupertinoIcons.lightbulb_fill,
+                                        size: 15,
+                                        color: GolemTheme.amber,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Think',
+                                        style: GolemText.captionStrong.copyWith(
+                                          color: CupertinoDynamicColor.resolve(
+                                            GolemTheme.ink,
+                                            context,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : _circle(
+                                  context,
+                                  child: Icon(
+                                    CupertinoIcons.lightbulb,
+                                    size: 18,
+                                    color: CupertinoDynamicColor.resolve(
+                                      GolemTheme.mutedInk,
+                                      context,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const Spacer(),
                   // Only the send button depends on the live text, so it
                   // listens to the controller alone instead of rebuilding
                   // the whole composer on every keystroke.
