@@ -121,6 +121,8 @@ class ChatCanvas extends ConsumerWidget {
           focus: focus,
           reasoningEnabled: active?.reasoningEnabled ?? false,
           generation: chat.generation,
+          activeId: active?.id,
+          modelKey: active?.modelKey,
         ),
       ],
     );

@@ -7,6 +7,7 @@ import '../../core/domain/app_state.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
+import 'model_label.dart';
 import 'widgets/chat_canvas.dart';
 import 'widgets/conversation_drawer.dart';
 
@@ -166,6 +167,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         navigationBar: GolemNavBar(
                           backgroundColor: GolemTheme.canvas,
                           title: chat.active?.title ?? 'New chat',
+                          subtitle: chatModelSubtitle(
+                            backend: ref.watch(inferenceBackendProvider),
+                            catalog: ref.watch(modelCatalogEntriesProvider),
+                            modelKey: chat.active?.modelKey,
+                          ),
                           // Contained glass buttons follow the iOS 26
                           // toolbar style; bare nav-bar glyphs read too
                           // small next to it.

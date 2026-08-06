@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/models.dart';
@@ -99,6 +100,37 @@ void main() {
         matchesGoldenFile('goldens/markdown-transcript-${brightness.name}.png'),
       );
     }, variant: iosChrome);
+  }
+
+  for (final brightness in Brightness.values) {
+    testWidgets('composer sheet ${brightness.name} goldens', (tester) async {
+      // Like the rename sheet, these record android in BOTH appearances:
+      // the drag handle is the android-only element whose tint differs.
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        history: markdownHistory(),
+        child: const ChatScreen(),
+      );
+      await tester.tap(find.byKey(const Key('composer-model-chip')));
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byKey(const Key('model-picker-sheet')),
+        matchesGoldenFile(
+          'goldens/model-picker-sheet-${brightness.name}${chromeSuffix()}.png',
+        ),
+      );
+      await tester.tapAt(const Offset(200, 60));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('composer-attach')));
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byKey(const Key('attach-sheet')),
+        matchesGoldenFile(
+          'goldens/attach-sheet-${brightness.name}${chromeSuffix()}.png',
+        ),
+      );
+    }, variant: bothChromes);
   }
 
   for (final brightness in Brightness.values) {
@@ -353,6 +385,9 @@ void main() {
       if (phase == GenerationPhase.idle) continue;
       await tester.pumpWidget(
         ProviderScope(
+          overrides: [
+            modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
+          ],
           child: wrapApp(
             brightness: Brightness.dark,
             child: Composer(
@@ -360,6 +395,8 @@ void main() {
               focus: focus,
               reasoningEnabled: false,
               generation: phase,
+              activeId: null,
+              modelKey: null,
             ),
           ),
         ),
