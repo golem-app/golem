@@ -449,6 +449,14 @@ void main() {
     await container.read(storageBreakdownProvider.future);
     final afterSend = cache.calls;
     expect(afterSend, greaterThan(baseline), reason: 'new messages re-probe');
+    // The actual guard for the per-token regression: one send streams
+    // dozens of deltas, but only the message-count edges may re-probe.
+    // Reinstating a raw chat-state watch blows straight past this cap.
+    expect(
+      afterSend - baseline,
+      lessThanOrEqualTo(4),
+      reason: 'a send must re-probe per message added, not per token',
+    );
     final active = container
         .read(chatControllerProvider)
         .requireValue
