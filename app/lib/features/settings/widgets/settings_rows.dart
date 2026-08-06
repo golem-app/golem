@@ -54,17 +54,23 @@ class SettingsNavRow extends StatelessWidget {
   Widget build(BuildContext context) => CupertinoButton(
     padding: EdgeInsets.zero,
     onPressed: onTap,
-    child: SizedBox(
-      height: 50,
+    child: ConstrainedBox(
+      // A minimum, not a fixed height: device font scaling can wrap the
+      // label onto two lines, and a fixed 50pt row crams them against
+      // the centered value.
+      constraints: const BoxConstraints(minHeight: 50),
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              label,
-              style: GolemText.body.copyWith(
-                color: CupertinoDynamicColor.resolve(
-                  destructive ? GolemTheme.destructiveText : GolemTheme.ink,
-                  context,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              child: Text(
+                label,
+                style: GolemText.body.copyWith(
+                  color: CupertinoDynamicColor.resolve(
+                    destructive ? GolemTheme.destructiveText : GolemTheme.ink,
+                    context,
+                  ),
                 ),
               ),
             ),

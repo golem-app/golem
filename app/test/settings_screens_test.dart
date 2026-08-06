@@ -291,6 +291,18 @@ void main() {
     );
     expect(find.text('Precise'), findsOneWidget);
     expect(find.text('Custom'), findsOneWidget);
+    // The About row can sit below the fold once rows grow with the wide
+    // test font.
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('about-row')),
+      240,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('settings-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     expect(find.text(appVersion), findsOneWidget);
   }, variant: iosChrome);
 }
