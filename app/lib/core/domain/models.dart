@@ -93,6 +93,8 @@ final class ChatConversation {
     required this.messages,
     required this.updatedAt,
     this.reasoningEnabled = false,
+    this.pinned = false,
+    this.modelKey,
   });
 
   final String id;
@@ -100,19 +102,77 @@ final class ChatConversation {
   final List<ChatMessage> messages;
   final DateTime updatedAt;
   final bool reasoningEnabled;
+  final bool pinned;
+
+  /// Catalog key of the model chosen for this chat; null means the
+  /// build's default model. Engines act on it only where supported
+  /// (the fake today, real switching with #20).
+  final String? modelKey;
 
   ChatConversation copyWith({
     String? title,
     List<ChatMessage>? messages,
     DateTime? updatedAt,
     bool? reasoningEnabled,
+    bool? pinned,
   }) => ChatConversation(
     id: id,
     title: title ?? this.title,
     messages: messages ?? this.messages,
     updatedAt: updatedAt ?? this.updatedAt,
     reasoningEnabled: reasoningEnabled ?? this.reasoningEnabled,
+    pinned: pinned ?? this.pinned,
+    modelKey: modelKey,
   );
+
+  ChatConversation togglePinned() => copyWith(pinned: !pinned);
+
+  /// Explicit because [copyWith] cannot null a field: null selects the
+  /// build's default model again.
+  ChatConversation withModel(String? key) => ChatConversation(
+    id: id,
+    title: title,
+    messages: messages,
+    updatedAt: updatedAt,
+    reasoningEnabled: reasoningEnabled,
+    pinned: pinned,
+    modelKey: key,
+  );
+
+  /// A new conversation holding the prefix up to and including
+  /// [messageId], or null when the message is unknown.
+  ChatConversation? branchUpTo(
+    String messageId, {
+    required String id,
+    required DateTime now,
+  }) {
+    final index = messages.indexWhere((message) => message.id == messageId);
+    if (index < 0) return null;
+    return ChatConversation(
+      id: id,
+      title: title,
+      messages: messages.take(index + 1).toList(growable: false),
+      updatedAt: now,
+      reasoningEnabled: reasoningEnabled,
+      modelKey: modelKey,
+    );
+  }
+
+  ChatConversation withoutMessage(String messageId) => copyWith(
+    messages: messages
+        .where((message) => message.id != messageId)
+        .toList(growable: false),
+  );
+
+  /// Shareable transcript; reasoning stays private, like [promptContext].
+  String transcriptMarkdown() {
+    final buffer = StringBuffer('## $title\n');
+    for (final message in messages.where((message) => !message.isStreaming)) {
+      final speaker = message.role == MessageRole.user ? 'You' : 'Golem';
+      buffer.write('\n**$speaker:** ${message.text}\n');
+    }
+    return buffer.toString();
+  }
 
   /// Prompt context intentionally excludes private reasoning.
   List<Map<String, String>> get promptContext => messages
@@ -120,6 +180,8 @@ final class ChatConversation {
       .map((message) => {'role': message.role.name, 'content': message.text})
       .toList(growable: false);
 
+  // pinned/modelKey stay additive under schemaVersion 1: absent keys
+  // default below, so pre-#47 histories load unchanged.
   Map<String, Object?> toJson() => {
     'id': id,
     'title': title,
@@ -129,6 +191,8 @@ final class ChatConversation {
         .toList(),
     'updatedAt': updatedAt.toIso8601String(),
     'reasoningEnabled': reasoningEnabled,
+    'pinned': pinned,
+    'modelKey': modelKey,
   };
 
   factory ChatConversation.fromJson(Map<String, Object?> json) =>
@@ -143,6 +207,8 @@ final class ChatConversation {
             .toList(growable: false),
         updatedAt: DateTime.parse(json['updatedAt']! as String),
         reasoningEnabled: json['reasoningEnabled'] as bool? ?? false,
+        pinned: json['pinned'] as bool? ?? false,
+        modelKey: json['modelKey'] as String?,
       );
 }
 

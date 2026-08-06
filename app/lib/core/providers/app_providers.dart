@@ -163,6 +163,55 @@ class ChatController extends _$ChatController {
     await _persist(next);
   }
 
+  Future<void> togglePinned(String id) async {
+    // Metadata-only, like rename: safe while a generation streams.
+    final next = _value.copyWith(
+      conversations: [
+        for (final item in _value.conversations)
+          if (item.id == id) item.togglePinned() else item,
+      ],
+    );
+    state = AsyncData(next);
+    await _persist(next);
+  }
+
+  Future<void> setConversationModel(String id, String? modelKey) async {
+    if (_value.generation != GenerationPhase.idle) return;
+    final next = _value.copyWith(
+      conversations: [
+        for (final item in _value.conversations)
+          if (item.id == id) item.withModel(modelKey) else item,
+      ],
+    );
+    state = AsyncData(next);
+    await _persist(next);
+  }
+
+  Future<void> deleteMessage(String messageId) async {
+    final active = _value.active;
+    if (active == null || _value.generation != GenerationPhase.idle) return;
+    final next = _replaceActive(active.withoutMessage(messageId));
+    state = AsyncData(next);
+    await _persist(next);
+  }
+
+  Future<void> branchFrom(String messageId) async {
+    final active = _value.active;
+    if (active == null || _value.generation != GenerationPhase.idle) return;
+    final branched = active.branchUpTo(
+      messageId,
+      id: newId(),
+      now: DateTime.now(),
+    );
+    if (branched == null) return;
+    final next = ChatState(
+      conversations: [branched, ..._value.conversations],
+      activeId: branched.id,
+    );
+    state = AsyncData(next);
+    await _persist(next);
+  }
+
   Future<void> send(String rawText) async {
     final text = rawText.trim();
     if (text.isEmpty || _value.generation != GenerationPhase.idle) return;
@@ -303,6 +352,7 @@ class ChatController extends _$ChatController {
                 context: context,
                 reasoningEnabled: active.reasoningEnabled,
                 overrides: overrides,
+                modelKey: active.modelKey,
               )) {
         if (!ref.mounted || epoch != _generationEpoch) return;
         if (event is CompletedEvent) break;
