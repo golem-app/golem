@@ -32,21 +32,25 @@ List<ChatSearchResult> searchConversations(
   List<ChatConversation> conversations,
   String query,
 ) {
-  final needle = query.trim().toLowerCase();
+  // Counting, snippet, and highlight must all see the same text: one
+  // whitespace-flattened form on both sides, or a query spanning a
+  // newline drops a conversation whose card would show the match.
+  final needle = _flatten(query).toLowerCase();
   if (needle.isEmpty) return const [];
 
   final results = <ChatSearchResult>[];
   for (final conversation in conversations) {
     var matchCount = _countOccurrences(
-      conversation.title.toLowerCase(),
+      _flatten(conversation.title).toLowerCase(),
       needle,
     );
     String? snippetSource;
     for (final message in conversation.messages) {
       if (message.isStreaming) continue;
-      final occurrences = _countOccurrences(message.text.toLowerCase(), needle);
+      final flattened = _flatten(message.text);
+      final occurrences = _countOccurrences(flattened.toLowerCase(), needle);
       matchCount += occurrences;
-      if (occurrences > 0) snippetSource ??= message.text;
+      if (occurrences > 0) snippetSource ??= flattened;
     }
     if (matchCount == 0) continue;
 
@@ -54,7 +58,7 @@ List<ChatSearchResult> searchConversations(
     // message so the card never renders an empty snippet.
     snippetSource ??= conversation.messages
         .where((message) => !message.isStreaming)
-        .map((message) => message.text)
+        .map((message) => _flatten(message.text))
         .firstOrNull;
 
     final snippet = _buildSnippet(snippetSource ?? '', needle);
@@ -85,11 +89,14 @@ int _countOccurrences(String haystack, String needle) {
   return count;
 }
 
+String _flatten(String value) => value.replaceAll(RegExp(r'\s+'), ' ').trim();
+
 typedef _Snippet = ({String text, int start});
 
 /// Roughly ±40 characters around the first match, ellipsised on cut edges.
+/// [source] is already flattened; flattening again is a harmless no-op.
 _Snippet _buildSnippet(String source, String needle) {
-  final flattened = source.replaceAll(RegExp(r'\s+'), ' ').trim();
+  final flattened = _flatten(source);
   final matchIndex = flattened.toLowerCase().indexOf(needle);
   if (matchIndex < 0) {
     final text = flattened.length <= 90

@@ -111,6 +111,27 @@ void main() {
     expect(searchConversations(chats, 'waterproofs'), isEmpty);
   });
 
+  test('queries spanning newlines match the flattened text', () {
+    // Counting and snippet extraction must see the same flattened form:
+    // a raw-text count would drop this conversation even though its own
+    // card renders the match contiguously.
+    final chats = [
+      _chat(
+        'wrapped',
+        title: 'Notes',
+        messages: ['Read a CSV\nin Python without pandas.'],
+      ),
+    ];
+    final hit = searchConversations(chats, 'csv in python').single;
+    expect(hit.matchCount, 1);
+    expect(
+      hit.snippet.substring(hit.matchStart, hit.matchStart + hit.matchLength),
+      'CSV in Python',
+    );
+    // Repeated spaces in the query normalize the same way.
+    expect(searchConversations(chats, 'csv  in   python'), hasLength(1));
+  });
+
   test('long bodies clamp to a window around the first match', () {
     final filler = List.filled(60, 'word').join(' ');
     final results = searchConversations([

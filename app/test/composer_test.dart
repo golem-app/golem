@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 
@@ -55,6 +56,42 @@ void main() {
     final state = container.read(chatControllerProvider).requireValue;
     expect(state.conversations, hasLength(1));
     expect(state.active!.modelKey, 'gemma4-gguf');
+  });
+
+  testWidgets('a real backend keeps other model rows disabled', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      history: markdownHistory(),
+      backend: const InferenceBackendConfig(
+        kind: InferenceBackendKind.mlx,
+        profileKey: 'gemma4',
+        artifactKey: 'gemma4-mlx',
+        modelPath: '/models/gemma',
+        modelPathFromCatalog: true,
+      ),
+      child: const ChatScreen(),
+    );
+    await tester.tap(find.byKey(const Key('composer-model-chip')));
+    await tester.pumpAndSettle();
+    // Only the running artifact stays tappable until #20; the footnote
+    // explains the constraint honestly.
+    expect(
+      tester
+          .widget<CupertinoButton>(
+            find.byKey(const Key('model-picker-gemma4-mlx')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(
+      tester
+          .widget<CupertinoButton>(
+            find.byKey(const Key('model-picker-qwen35-gguf')),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(find.textContaining('Golem is running Gemma 4 E2B'), findsOneWidget);
   });
 
   testWidgets('starter chips prefill and focus the composer', (tester) async {

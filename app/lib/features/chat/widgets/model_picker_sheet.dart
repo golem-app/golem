@@ -68,14 +68,22 @@ final class _ModelPickerContent extends ConsumerWidget {
                 entry: entry,
                 selected: entry.key == selected,
                 status: _statusLine(entry, models),
-                onTap: () async {
-                  final controller = ref.read(chatControllerProvider.notifier);
-                  await controller.setConversationModel(
-                    conversationId,
-                    entry.key,
-                  );
-                  if (context.mounted) Navigator.pop(context);
-                },
+                // A real engine cannot switch models per chat until #20:
+                // only the running artifact's row stays tappable, and the
+                // footnote below explains why. The fake honors the choice
+                // in generation, so every row is live there.
+                onTap: backend.simulatedInference || entry.key == selected
+                    ? () async {
+                        final controller = ref.read(
+                          chatControllerProvider.notifier,
+                        );
+                        await controller.setConversationModel(
+                          conversationId,
+                          entry.key,
+                        );
+                        if (context.mounted) Navigator.pop(context);
+                      }
+                    : null,
               ),
               const SizedBox(height: GolemSpace.s2),
             ],
@@ -147,7 +155,7 @@ final class _ModelRow extends StatelessWidget {
   final ModelCatalogEntry entry;
   final bool selected;
   final String status;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -157,56 +165,59 @@ final class _ModelRow extends StatelessWidget {
       padding: EdgeInsets.zero,
       minimumSize: const Size.fromHeight(GolemSize.hitTarget),
       onPressed: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: GolemSpace.s3,
-        ),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(GolemRadius.field),
-          border: Border.all(
-            width: selected ? 1.5 : 1,
-            color: selected
-                ? accent
-                : CupertinoDynamicColor.resolve(GolemTheme.divider, context),
+      child: Opacity(
+        opacity: onTap == null ? 0.45 : 1,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: GolemSpace.s3,
           ),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    entry.displayName,
-                    style: GolemText.bodyStrong.copyWith(
-                      color: CupertinoDynamicColor.resolve(
-                        GolemTheme.ink,
-                        context,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    status,
-                    style: GolemText.caption.copyWith(
-                      color: CupertinoDynamicColor.resolve(
-                        GolemTheme.mutedInk,
-                        context,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(GolemRadius.field),
+            border: Border.all(
+              width: selected ? 1.5 : 1,
+              color: selected
+                  ? accent
+                  : CupertinoDynamicColor.resolve(GolemTheme.divider, context),
             ),
-            if (selected)
-              Icon(
-                CupertinoIcons.checkmark_circle_fill,
-                size: 22,
-                color: accent,
-                semanticLabel: 'Selected model',
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      entry.displayName,
+                      style: GolemText.bodyStrong.copyWith(
+                        color: CupertinoDynamicColor.resolve(
+                          GolemTheme.ink,
+                          context,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      status,
+                      style: GolemText.caption.copyWith(
+                        color: CupertinoDynamicColor.resolve(
+                          GolemTheme.mutedInk,
+                          context,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-          ],
+              if (selected)
+                Icon(
+                  CupertinoIcons.checkmark_circle_fill,
+                  size: 22,
+                  color: accent,
+                  semanticLabel: 'Selected model',
+                ),
+            ],
+          ),
         ),
       ),
     );

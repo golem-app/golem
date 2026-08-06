@@ -1,14 +1,20 @@
 import '../../core/domain/inference_backend.dart';
 import '../../core/domain/model_catalog.dart';
 
-/// The catalog key a conversation effectively runs: its own choice, else
-/// the build's active artifact, else the catalog's default-policy model.
+/// The catalog key a conversation effectively runs.
+///
+/// A real engine runs its configured artifact no matter what the
+/// conversation stored (per-chat switching arrives with #20), so on real
+/// backends the per-chat choice must never outrank [InferenceBackendConfig.artifactKey]
+/// — every label derived from this would otherwise name a model that is
+/// not running. Only the fake, which honors [modelKey] in generation,
+/// lets the stored choice win.
 String effectiveModelKey({
   required InferenceBackendConfig backend,
   required List<ModelCatalogEntry> catalog,
   String? modelKey,
 }) =>
-    modelKey ??
+    (backend.simulatedInference ? modelKey : null) ??
     backend.artifactKey ??
     (catalog.any((entry) => entry.key == 'gemma4-mlx')
         ? 'gemma4-mlx'

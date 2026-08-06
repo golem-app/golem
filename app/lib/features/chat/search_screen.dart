@@ -22,13 +22,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _controller = TextEditingController();
   Timer? _debounce;
 
+  // Captured at init because ref is unusable in dispose; the keepAlive
+  // notifier outlives this screen.
+  late final SearchQuery _query;
+
   @override
   void initState() {
     super.initState();
-    // A fresh search starts empty; stale queries from a previous visit
-    // must not flash old results.
+    _query = ref.read(searchQueryProvider.notifier);
+    // Both in-app exits clear the query before popping, so a fresh visit
+    // starts empty; this fallback covers exits that bypass them (the
+    // Android system back), accepting one transitional frame there.
     Future.microtask(() {
-      if (mounted) ref.read(searchQueryProvider.notifier).publish('');
+      if (mounted) _query.publish('');
     });
   }
 
@@ -42,15 +48,22 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void _onChanged(String text) {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 350), () {
-      if (mounted) ref.read(searchQueryProvider.notifier).publish(text);
+      if (mounted) _query.publish(text);
     });
+  }
+
+  void _cancel() {
+    _query.publish('');
+    context.pop();
   }
 
   void _open(String conversationId) async {
     await ref
         .read(chatControllerProvider.notifier)
         .selectConversation(conversationId);
-    if (mounted && context.mounted) context.pop();
+    if (!mounted || !context.mounted) return;
+    _query.publish('');
+    context.pop();
   }
 
   @override
@@ -79,8 +92,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       autofocus: true,
                       placeholder: 'Search chats',
                       onChanged: _onChanged,
-                      onSubmitted: (text) =>
-                          ref.read(searchQueryProvider.notifier).publish(text),
+                      onSubmitted: (text) => _query.publish(text),
                     ),
                   ),
                   CupertinoButton(
@@ -89,7 +101,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       horizontal: GolemSpace.s3,
                     ),
                     minimumSize: const Size(44, 44),
-                    onPressed: () => context.pop(),
+                    onPressed: _cancel,
                     child: Text(
                       'Cancel',
                       style: GolemText.body.copyWith(

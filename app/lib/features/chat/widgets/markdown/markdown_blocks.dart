@@ -46,15 +46,16 @@ final class InlineData {
   final bool link;
 }
 
-// The CommonMark default set covers the whole transcript subset
-// (paragraphs, emphasis, inline code, fenced code, lists, headings);
-// GFM extras like tables stay out on purpose.
-final _document = md.Document(encodeHtml: false);
-
 List<MarkdownBlockData> parseMarkdownBlocks(String text) {
   if (text.trim().isEmpty) return const [];
   final lines = text.replaceAll('\r\n', '\n').split('\n');
-  final nodes = _document.parseLines(lines);
+  // The CommonMark default set covers the whole transcript subset
+  // (paragraphs, emphasis, inline code, fenced code, lists, headings);
+  // GFM extras like tables stay out on purpose. One Document per parse:
+  // Document accumulates link references across parseLines calls, so a
+  // shared instance would leak `[label]: url` definitions between
+  // messages for the process lifetime.
+  final nodes = md.Document(encodeHtml: false).parseLines(lines);
   final blocks = <MarkdownBlockData>[];
   for (final node in nodes) {
     blocks.addAll(_blockFrom(node));

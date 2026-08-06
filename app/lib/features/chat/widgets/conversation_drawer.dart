@@ -131,10 +131,15 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
               key: const Key('drawer-search-button'),
               padding: EdgeInsets.zero,
               minimumSize: const Size.fromHeight(46),
-              onPressed: () {
-                widget.close();
-                context.push('/search');
-              },
+              // Gated like the conversation rows: opening a result calls
+              // selectConversation, which no-ops mid-generation — search
+              // must not offer taps that silently do nothing.
+              onPressed: widget.blocked
+                  ? null
+                  : () {
+                      widget.close();
+                      context.push('/search');
+                    },
               child: Container(
                 height: 46,
                 padding: const EdgeInsets.symmetric(horizontal: 14),

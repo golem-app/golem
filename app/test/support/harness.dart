@@ -175,17 +175,21 @@ Future<void> pumpSearchScreen(
 /// A markdown-rich transcript for renderer goldens: inline code, a
 /// fenced block, and a list, kept separate from [seedHistory] so drawer
 /// and rename goldens don't re-record when this seed evolves.
+///
+/// The date sits firmly in the past on purpose: search-result cards
+/// print it relative to the wall clock, and a seed near "now" would bake
+/// Today/Yesterday into goldens that break the next day.
 ChatHistorySnapshot markdownHistory() {
   final conversation = ChatConversation(
     id: 'chat-md',
     title: 'Read a CSV without pandas',
-    updatedAt: DateTime.utc(2026, 8, 5),
+    updatedAt: DateTime.utc(2026, 8, 2),
     messages: [
       ChatMessage(
         id: 'user-md',
         role: MessageRole.user,
         text: 'Read a CSV in Python without pandas.',
-        createdAt: DateTime.utc(2026, 8, 5),
+        createdAt: DateTime.utc(2026, 8, 2),
       ),
       ChatMessage(
         id: 'assistant-md',
@@ -204,7 +208,7 @@ ChatHistorySnapshot markdownHistory() {
           tokenCount: 182,
           elapsedSeconds: 7.4,
         ),
-        createdAt: DateTime.utc(2026, 8, 5),
+        createdAt: DateTime.utc(2026, 8, 2),
       ),
     ],
   );

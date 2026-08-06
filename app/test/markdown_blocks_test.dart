@@ -70,6 +70,23 @@ void main() {
     expect(parseMarkdownBlocks('   \n \n'), isEmpty);
   });
 
+  test('link references never leak between parses', () {
+    // One message defines a reference; a later, unrelated message using
+    // the same label must not resolve it (a shared Document accumulates
+    // linkReferences across parseLines calls).
+    final first = parseMarkdownBlocks(
+      'See [docs].\n\n[docs]: https://example.com',
+    );
+    expect(
+      (first.first as ParagraphData).spans.any((s) => s.link),
+      isTrue,
+      reason: 'the defining message itself links',
+    );
+    final second = parseMarkdownBlocks('Unrelated [docs] mention.');
+    final spans = (second.single as ParagraphData).spans;
+    expect(spans.any((s) => s.link), isFalse);
+  });
+
   test('blockquotes and rules flatten without artifacts', () {
     final blocks = parseMarkdownBlocks('> Quoted advice.\n\n---\n\nPlain.');
     expect(blocks, hasLength(2));
