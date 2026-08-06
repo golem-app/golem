@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/domain/app_state.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
@@ -162,13 +163,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       curve: Curves.easeOutCubic,
                       child: CupertinoPageScaffold(
                         backgroundColor: GolemTheme.canvas,
-                        navigationBar: CupertinoNavigationBar(
+                        navigationBar: GolemNavBar(
                           backgroundColor: GolemTheme.canvas,
-                          middle: Text(
-                            chat.active?.title ?? 'New chat',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          title: chat.active?.title ?? 'New chat',
                           // Contained glass buttons follow the iOS 26
                           // toolbar style; bare nav-bar glyphs read too
                           // small next to it.

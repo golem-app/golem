@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/domain/app_state.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
@@ -16,9 +17,9 @@ class BenchmarkScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final benchmark = ref.watch(benchmarkControllerProvider);
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
+      navigationBar: GolemNavBar(
+        title: 'Benchmark',
         previousPageTitle: 'Settings',
-        middle: Text('Benchmark'),
       ),
       child: SafeArea(
         bottom: false,

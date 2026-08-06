@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 // knowledge (profiles carry no Inferno import); the Inferno boundary is
 // unchanged — only lib/broker/ touches package:inferno.
 import '../../broker/model_profile.dart';
+import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/app_identity.dart';
 import '../../core/domain/generation_settings.dart';
 import '../../core/domain/model_catalog.dart';
@@ -26,10 +27,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final model = ref.watch(modelControllerProvider);
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        previousPageTitle: 'Chat',
-        middle: Text('Settings'),
-      ),
+      navigationBar: GolemNavBar(title: 'Settings', previousPageTitle: 'Chat'),
       child: SafeArea(
         bottom: false,
         child: model.when(

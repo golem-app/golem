@@ -1,0 +1,132 @@
+import 'package:flutter/cupertino.dart';
+
+import '../theme/golem_theme.dart';
+import 'golem_chrome.dart';
+
+class GolemAlertAction {
+  const GolemAlertAction({
+    required this.label,
+    required this.onPressed,
+    this.isDestructive = false,
+    this.isDefault = false,
+    this.key,
+  });
+
+  final String label;
+
+  /// The complete handler — it pops the dialog itself, matching the
+  /// existing Cupertino call sites.
+  final VoidCallback onPressed;
+  final bool isDestructive;
+  final bool isDefault;
+  final Key? key;
+}
+
+/// The adaptive alert. Cupertino shows the native [CupertinoAlertDialog];
+/// Android chrome renders a card with right-aligned text actions through
+/// the same dialog route, so callers and automation see one behavior.
+Future<void> showGolemAlert({
+  required BuildContext context,
+  required String title,
+  required List<GolemAlertAction> actions,
+  String? message,
+  Widget? content,
+  Key? dialogKey,
+}) {
+  assert(message == null || content == null, 'Pass message or content');
+  if (GolemChrome.current == GolemChrome.cupertino) {
+    return showCupertinoDialog<void>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        key: dialogKey,
+        title: Text(title),
+        content: content ?? (message == null ? null : Text(message)),
+        actions: [
+          for (final action in actions)
+            CupertinoDialogAction(
+              key: action.key,
+              isDestructiveAction: action.isDestructive,
+              isDefaultAction: action.isDefault,
+              onPressed: action.onPressed,
+              child: Text(action.label),
+            ),
+        ],
+      ),
+    );
+  }
+  return showCupertinoDialog<void>(
+    context: context,
+    builder: (context) => Center(
+      child: Container(
+        key: dialogKey,
+        margin: const EdgeInsets.symmetric(horizontal: GolemSpace.s10),
+        padding: const EdgeInsets.fromLTRB(
+          GolemSpace.s6,
+          GolemSpace.s5,
+          GolemSpace.s4,
+          GolemSpace.s3,
+        ),
+        constraints: const BoxConstraints(maxWidth: 320),
+        decoration: BoxDecoration(
+          color: CupertinoDynamicColor.resolve(
+            GolemTheme.surfaceRaised,
+            context,
+          ),
+          borderRadius: BorderRadius.circular(GolemRadius.card),
+          boxShadow: GolemShadow.menu,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DefaultTextStyle(
+              style: GolemText.bodyStrong.copyWith(
+                color: CupertinoDynamicColor.resolve(GolemTheme.ink, context),
+              ),
+              child: Text(title),
+            ),
+            if (content != null || message != null) ...[
+              const SizedBox(height: GolemSpace.s3),
+              DefaultTextStyle(
+                style: GolemText.footnote.copyWith(
+                  color: CupertinoDynamicColor.resolve(
+                    GolemTheme.mutedInk,
+                    context,
+                  ),
+                ),
+                child: content ?? Text(message!),
+              ),
+            ],
+            const SizedBox(height: GolemSpace.s4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                for (final action in actions)
+                  CupertinoButton(
+                    key: action.key,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: GolemSpace.s3,
+                      vertical: GolemSpace.s2,
+                    ),
+                    minimumSize: const Size(44, 44),
+                    onPressed: action.onPressed,
+                    child: Text(
+                      action.label,
+                      style: GolemText.bodyStrong.copyWith(
+                        color: action.isDestructive
+                            ? GolemTheme.destructive
+                            : CupertinoDynamicColor.resolve(
+                                GolemTheme.accent,
+                                context,
+                              ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}

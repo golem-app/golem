@@ -30,12 +30,21 @@ void setViewport(WidgetTester tester) {
   addTearDown(tester.view.resetPhysicalSize);
 }
 
-/// Renders the rest of this test under the given platform's chrome.
-/// Resets automatically; never leaks into later tests.
-void overridePlatform(TargetPlatform platform) {
-  debugDefaultTargetPlatformOverride = platform;
-  addTearDown(() => debugDefaultTargetPlatformOverride = null);
-}
+/// Widget tests report `TargetPlatform.android` unless overridden, and the
+/// chrome layer branches on the platform — golden tests pin the axis with
+/// these framework-managed variants (a bare override trips the foundation
+/// debug-variable invariant at test end).
+const iosChrome = TargetPlatformVariant(<TargetPlatform>{TargetPlatform.iOS});
+const bothChromes = TargetPlatformVariant(<TargetPlatform>{
+  TargetPlatform.iOS,
+  TargetPlatform.android,
+});
+
+/// Filename suffix for the current variant run of a golden matrix test.
+String chromeSuffix() =>
+    debugDefaultTargetPlatformOverride == TargetPlatform.android
+    ? '-android'
+    : '';
 
 Widget wrapApp({
   required Widget child,

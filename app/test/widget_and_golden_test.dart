@@ -45,7 +45,7 @@ void main() {
       find.byType(SplashScreen),
       matchesGoldenFile('goldens/splash.png'),
     );
-  });
+  }, variant: iosChrome);
 
   for (final brightness in Brightness.values) {
     testWidgets('empty chat ${brightness.name} golden', (tester) async {
@@ -58,7 +58,7 @@ void main() {
         find.byType(ChatScreen),
         matchesGoldenFile('goldens/empty-chat-${brightness.name}.png'),
       );
-    });
+    }, variant: iosChrome);
 
     testWidgets('populated reasoning ${brightness.name} golden', (
       tester,
@@ -73,7 +73,7 @@ void main() {
         find.byType(ChatScreen),
         matchesGoldenFile('goldens/populated-reasoning-${brightness.name}.png'),
       );
-    });
+    }, variant: iosChrome);
   }
 
   testWidgets('drawer and rename overlay goldens', (tester) async {
@@ -96,7 +96,7 @@ void main() {
       find.byKey(const Key('rename-sheet')),
       matchesGoldenFile('goldens/rename-sheet.png'),
     );
-  });
+  }, variant: iosChrome);
 
   testWidgets('settings states dark golden', (tester) async {
     await pumpWithRepositories(
@@ -143,7 +143,7 @@ void main() {
       find.byType(SettingsScreen),
       matchesGoldenFile('goldens/settings-generation-dark.png'),
     );
-  });
+  }, variant: iosChrome);
 
   testWidgets('benchmark result golden', (tester) async {
     await pumpWithRepositories(tester, child: const BenchmarkScreen());
@@ -164,7 +164,7 @@ void main() {
       find.byType(BenchmarkScreen),
       matchesGoldenFile('goldens/benchmark.png'),
     );
-  });
+  }, variant: iosChrome);
 
   testWidgets('iOS targets, labels, contrast, and enlarged text', (
     tester,
@@ -188,7 +188,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-  });
+  }, variant: iosChrome);
 
   testWidgets('a real backend renders honest copy on every surface', (
     tester,
@@ -284,7 +284,7 @@ void main() {
     );
     expect(find.text('Loading model on this device'), findsOneWidget);
     expect(find.textContaining('simulated'), findsNothing);
-  });
+  }, variant: iosChrome);
 
   testWidgets('the disabled composer keeps a transparent field', (
     tester,
@@ -318,31 +318,33 @@ void main() {
       expect(field.decoration, isNotNull, reason: phase.name);
       expect(field.decoration!.color, isNull, reason: phase.name);
     }
-  });
+  }, variant: iosChrome);
 
-  testWidgets('an empty failed assistant message renders no ghost bubble', (
-    tester,
-  ) async {
-    Widget wrap(ChatMessage message) => ProviderScope(
-      child: wrapApp(
-        child: MessageBubble(message: message, canRegenerate: false),
-      ),
-    );
-    final ghost = ChatMessage(
-      id: 'assistant-ghost',
-      role: MessageRole.assistant,
-      text: '',
-      createdAt: DateTime.utc(2026, 8, 5),
-    );
-    // A failure can strand an assistant message with no text, reasoning, or
-    // metrics; it must vanish instead of painting an empty bubble shell.
-    await tester.pumpWidget(wrap(ghost));
-    expect(find.byKey(const Key('message-assistant-ghost')), findsNothing);
+  testWidgets(
+    'an empty failed assistant message renders no ghost bubble',
+    (tester) async {
+      Widget wrap(ChatMessage message) => ProviderScope(
+        child: wrapApp(
+          child: MessageBubble(message: message, canRegenerate: false),
+        ),
+      );
+      final ghost = ChatMessage(
+        id: 'assistant-ghost',
+        role: MessageRole.assistant,
+        text: '',
+        createdAt: DateTime.utc(2026, 8, 5),
+      );
+      // A failure can strand an assistant message with no text, reasoning, or
+      // metrics; it must vanish instead of painting an empty bubble shell.
+      await tester.pumpWidget(wrap(ghost));
+      expect(find.byKey(const Key('message-assistant-ghost')), findsNothing);
 
-    // While streaming, the same empty message is the typing indicator and
-    // must stay visible.
-    await tester.pumpWidget(wrap(ghost.copyWith(isStreaming: true)));
-    expect(find.byKey(const Key('message-assistant-ghost')), findsOneWidget);
-    expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
-  });
+      // While streaming, the same empty message is the typing indicator and
+      // must stay visible.
+      await tester.pumpWidget(wrap(ghost.copyWith(isStreaming: true)));
+      expect(find.byKey(const Key('message-assistant-ghost')), findsOneWidget);
+      expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
+    },
+    variant: iosChrome,
+  );
 }
