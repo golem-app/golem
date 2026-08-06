@@ -79,15 +79,61 @@ void main() {
       isTrue,
     );
 
+    // Branch from the settled assistant tail: a new conversation holds
+    // the prefix, becomes active, and confirms with a toast. The edit ran
+    // through the controller, so settle the rebuilt transcript first.
+    await tester.pumpAndSettle();
+    final branchSource = active.messages.last;
+    expect(branchSource.role, MessageRole.assistant);
+    final sourceConversationId = active.id;
+    await tester.ensureVisible(
+      find.byKey(Key('message-menu-${branchSource.id}')),
+    );
+    await tester.tap(find.byKey(Key('message-menu-${branchSource.id}')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('menu-message-branch')));
+    await tester.pumpAndSettle();
+    active = container.read(chatControllerProvider).requireValue.active!;
+    expect(active.id, isNot(sourceConversationId));
+    expect(find.text('New branch started'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 1600));
+
+    // Cross-chat search is a full screen now: the drawer button opens
+    // it, the query debounces, and Cancel returns to the chat.
     await tester.tap(find.byKey(const Key('open-drawer')));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('drawer-search')), 'private');
-    expect(find.textContaining('private', findRichText: true), findsWidgets);
-    await tester.tap(
-      find.byKey(Key('conversation-menu-${_conversationId(tester)}')),
-    );
+    await tester.tap(find.byKey(const Key('drawer-search-button')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Rename'));
+    await tester.enterText(find.byKey(const Key('search-field')), 'private');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('search-results')), findsOneWidget);
+    expect(find.textContaining('private', findRichText: true), findsWidgets);
+    await tester.tap(find.byKey(const Key('search-cancel')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('open-drawer')));
+    await tester.pumpAndSettle();
+    final firstConversation = _conversationId(tester);
+    await tester.tap(find.byKey(Key('conversation-menu-$firstConversation')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('menu-pin-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('Pinned'), findsWidgets);
+    expect(
+      container
+          .read(chatControllerProvider)
+          .requireValue
+          .conversations
+          .singleWhere((item) => item.id == firstConversation)
+          .pinned,
+      isTrue,
+    );
+    await tester.pump(const Duration(milliseconds: 1600));
+
+    await tester.tap(find.byKey(Key('conversation-menu-$firstConversation')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('menu-rename')));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('rename-field')),
@@ -96,16 +142,13 @@ void main() {
     await tester.tap(find.byKey(const Key('rename-save')));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byKey(const Key('drawer-search')), '');
-    await tester.pump();
-    await tester.tap(
-      find.byKey(Key('conversation-menu-${_conversationId(tester)}')),
-    );
+    await tester.tap(find.byKey(Key('conversation-menu-$firstConversation')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Delete'));
+    await tester.tap(find.byKey(const Key('menu-delete')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('confirm-delete')));
     await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 1600));
     await tester.tap(find.byKey(const Key('new-chat-drawer')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('open-drawer')));

@@ -85,4 +85,32 @@ abstract final class GolemText {
     height: 1.3,
     letterSpacing: 0.96,
   );
+
+  static const _mono = 'Menlo';
+  static const _monoFallback = ['Courier', 'monospace'];
+
+  /// Inline code chips inside transcript markdown.
+  static const code = TextStyle(
+    fontFamily: _mono,
+    fontFamilyFallback: _monoFallback,
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    height: 1.3,
+  );
+
+  /// Fenced code block bodies on the dark code card.
+  static const codeBlock = TextStyle(
+    fontFamily: _mono,
+    fontFamilyFallback: _monoFallback,
+    fontSize: 12.5,
+    height: 1.65,
+  );
+
+  /// The code card's uppercase language label.
+  static const codeLanguage = TextStyle(
+    fontSize: 11,
+    fontWeight: FontWeight.w700,
+    height: 1,
+    letterSpacing: 0.99,
+  );
 }

@@ -41,7 +41,15 @@ class ChatCanvas extends ConsumerWidget {
           child: Stack(
             children: [
               if (!hasMessages)
-                const EmptyChat()
+                EmptyChat(
+                  onStarter: (prompt) {
+                    composer.text = prompt;
+                    composer.selection = TextSelection.collapsed(
+                      offset: prompt.length,
+                    );
+                    focus.requestFocus();
+                  },
+                )
               else
                 NotificationListener<UserScrollNotification>(
                   onNotification: (notification) {
@@ -63,12 +71,22 @@ class ChatCanvas extends ConsumerWidget {
                           ScrollViewKeyboardDismissBehavior.onDrag,
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                       itemCount: active.messages.length,
-                      itemBuilder: (context, index) => MessageBubble(
-                        message: active.messages[index],
-                        canRegenerate:
-                            index == active.messages.length - 1 &&
-                            chat.generation == GenerationPhase.idle,
-                      ),
+                      itemBuilder: (context, index) {
+                        final message = active.messages[index];
+                        final isLast = index == active.messages.length - 1;
+                        return MessageBubble(
+                          message: message,
+                          canRegenerate:
+                              isLast && chat.generation == GenerationPhase.idle,
+                          idle: chat.generation == GenerationPhase.idle,
+                          stoppedTokens:
+                              isLast &&
+                                  chat.generation == GenerationPhase.failed &&
+                                  message.role == MessageRole.assistant
+                              ? message.metrics?.tokenCount
+                              : null,
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -111,6 +129,8 @@ class ChatCanvas extends ConsumerWidget {
           focus: focus,
           reasoningEnabled: active?.reasoningEnabled ?? false,
           generation: chat.generation,
+          activeId: active?.id,
+          modelKey: active?.modelKey,
         ),
       ],
     );

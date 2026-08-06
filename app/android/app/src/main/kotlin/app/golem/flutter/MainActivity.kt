@@ -35,6 +35,11 @@ class MainActivity : FlutterActivity() {
                 } catch (error: Exception) {
                     result.error("free-bytes", error.message, null)
                 }
+                "totalBytes" -> try {
+                    result.success(StatFs(path).totalBytes)
+                } catch (error: Exception) {
+                    result.error("total-bytes", error.message, null)
+                }
                 // Backup exclusion is static on Android: dataExtractionRules
                 // already excludes the models directory.
                 "excludeFromBackup" -> result.success(null)

@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../domain/app_state.dart';
+import '../domain/chat_search.dart';
 import '../domain/generation_settings.dart';
 import '../domain/inference_backend.dart';
 import '../domain/model_catalog.dart';
 import '../domain/models.dart';
 import '../repositories/contracts.dart';
+import '../services/device_storage.dart';
 import '../startup/startup_sequence.dart';
 
 part 'app_providers.g.dart';
@@ -50,6 +52,59 @@ SettingsRepository settingsRepository(Ref ref) =>
 @Riverpod(keepAlive: true)
 InferenceBackendConfig inferenceBackend(Ref ref) =>
     const InferenceBackendConfig.fake();
+
+@Riverpod(keepAlive: true)
+DiskCapacityProbe deviceCapacityProbe(Ref ref) =>
+    throw UnimplementedError('Override deviceCapacityProbeProvider at startup');
+
+@Riverpod(keepAlive: true)
+String documentsPath(Ref ref) =>
+    throw UnimplementedError('Override documentsPathProvider at startup');
+
+typedef StorageOverview = ({int usedBytes, int? totalBytes});
+
+/// The drawer's storage meter: model bytes on disk over the volume's
+/// total capacity. [StorageOverview.totalBytes] is null whenever the
+/// platform cannot report it (or the seams are unwired, as in most
+/// tests) — the meter hides instead of inventing a denominator.
+@Riverpod(keepAlive: true)
+Future<StorageOverview> storageOverview(Ref ref) async {
+  final models = await ref.watch(modelControllerProvider.future);
+  final usedBytes = models.artifacts.values.fold(
+    0,
+    (sum, status) => sum + status.downloadedBytes,
+  );
+  int? totalBytes;
+  try {
+    totalBytes = await ref
+        .watch(deviceCapacityProbeProvider)
+        .totalBytes(ref.watch(documentsPathProvider));
+  } catch (_) {
+    totalBytes = null;
+  }
+  return (usedBytes: usedBytes, totalBytes: totalBytes);
+}
+
+/// The published cross-chat search query. The raw field text stays in
+/// the search screen (widget-local, debounced 350 ms); only the
+/// normalized query lands here, so results derive reactively without
+/// rebuilding on every keystroke.
+@Riverpod(keepAlive: true)
+class SearchQuery extends _$SearchQuery {
+  @override
+  String build() => '';
+
+  void publish(String raw) => state = raw.trim();
+}
+
+/// Search results over every conversation, derived from the published
+/// query and the chat state — one source of truth, no copies.
+@Riverpod(keepAlive: true)
+List<ChatSearchResult> chatSearchResults(Ref ref) {
+  final query = ref.watch(searchQueryProvider);
+  final conversations = ref.watch(chatControllerProvider).value?.conversations;
+  return searchConversations(conversations ?? const [], query);
+}
 
 /// Persisted per-model generation settings. Reads resolve against the
 /// broker profile's recommended defaults at the consumer, never here —
@@ -158,6 +213,55 @@ class ChatController extends _$ChatController {
     if (active == null || _value.generation != GenerationPhase.idle) return;
     final next = _replaceActive(
       active.copyWith(reasoningEnabled: !active.reasoningEnabled),
+    );
+    state = AsyncData(next);
+    await _persist(next);
+  }
+
+  Future<void> togglePinned(String id) async {
+    // Metadata-only, like rename: safe while a generation streams.
+    final next = _value.copyWith(
+      conversations: [
+        for (final item in _value.conversations)
+          if (item.id == id) item.togglePinned() else item,
+      ],
+    );
+    state = AsyncData(next);
+    await _persist(next);
+  }
+
+  Future<void> setConversationModel(String id, String? modelKey) async {
+    if (_value.generation != GenerationPhase.idle) return;
+    final next = _value.copyWith(
+      conversations: [
+        for (final item in _value.conversations)
+          if (item.id == id) item.withModel(modelKey) else item,
+      ],
+    );
+    state = AsyncData(next);
+    await _persist(next);
+  }
+
+  Future<void> deleteMessage(String messageId) async {
+    final active = _value.active;
+    if (active == null || _value.generation != GenerationPhase.idle) return;
+    final next = _replaceActive(active.withoutMessage(messageId));
+    state = AsyncData(next);
+    await _persist(next);
+  }
+
+  Future<void> branchFrom(String messageId) async {
+    final active = _value.active;
+    if (active == null || _value.generation != GenerationPhase.idle) return;
+    final branched = active.branchUpTo(
+      messageId,
+      id: newId(),
+      now: DateTime.now(),
+    );
+    if (branched == null) return;
+    final next = ChatState(
+      conversations: [branched, ..._value.conversations],
+      activeId: branched.id,
     );
     state = AsyncData(next);
     await _persist(next);
@@ -303,6 +407,7 @@ class ChatController extends _$ChatController {
                 context: context,
                 reasoningEnabled: active.reasoningEnabled,
                 overrides: overrides,
+                modelKey: active.modelKey,
               )) {
         if (!ref.mounted || epoch != _generationEpoch) return;
         if (event is CompletedEvent) break;

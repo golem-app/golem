@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/models.dart';
@@ -11,8 +12,10 @@ import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
+import 'package:golem_flutter/core/services/device_storage.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
+import 'package:golem_flutter/features/chat/search_screen.dart';
 
 import 'in_memory_chat_history_repository.dart';
 import 'in_memory_settings_repository.dart';
@@ -55,6 +58,15 @@ Widget wrapApp({
   home: child,
 );
 
+/// 64 decimal GB, matching the handoff's "… of 64 GB" storage meter.
+final class FakeDiskCapacity implements DiskCapacityProbe {
+  const FakeDiskCapacity([this.bytes = 64 * 1000 * 1000 * 1000]);
+  final int? bytes;
+
+  @override
+  Future<int?> totalBytes(String path) async => bytes;
+}
+
 ProviderContainer buildContainer({
   ChatHistorySnapshot? history,
   ModelState model = const ModelState(),
@@ -65,6 +77,8 @@ ProviderContainer buildContainer({
   return ProviderContainer(
     overrides: [
       if (backend != null) inferenceBackendProvider.overrideWithValue(backend),
+      deviceCapacityProbeProvider.overrideWithValue(const FakeDiskCapacity()),
+      documentsPathProvider.overrideWithValue(directory.path),
       chatHistoryRepositoryProvider.overrideWithValue(
         InMemoryChatHistoryRepository(
           history ?? const ChatHistorySnapshot(conversations: []),
@@ -121,6 +135,87 @@ Future<void> pumpWithRepositories(
     await tester.pump();
   }
   await tester.pumpAndSettle();
+}
+
+/// Pumps a routed app (chat at `/`, search at `/search`) already
+/// navigated to the search screen — it pops back to chat, so it needs a
+/// real router underneath.
+Future<void> pumpSearchScreen(
+  WidgetTester tester, {
+  Brightness brightness = Brightness.light,
+  ChatHistorySnapshot? history,
+}) async {
+  setViewport(tester);
+  final container = buildContainer(history: history);
+  addTearDown(container.dispose);
+  final router = GoRouter(
+    routes: [
+      GoRoute(path: '/', builder: (context, state) => const ChatScreen()),
+      GoRoute(
+        path: '/search',
+        builder: (context, state) => const SearchScreen(),
+      ),
+    ],
+  );
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: CupertinoApp.router(
+        debugShowCheckedModeBanner: false,
+        theme: GolemTheme.theme(brightness),
+        routerConfig: router,
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+  router.push('/search');
+  await tester.pumpAndSettle();
+}
+
+/// A markdown-rich transcript for renderer goldens: inline code, a
+/// fenced block, and a list, kept separate from [seedHistory] so drawer
+/// and rename goldens don't re-record when this seed evolves.
+///
+/// The date sits firmly in the past on purpose: search-result cards
+/// print it relative to the wall clock, and a seed near "now" would bake
+/// Today/Yesterday into goldens that break the next day.
+ChatHistorySnapshot markdownHistory() {
+  final conversation = ChatConversation(
+    id: 'chat-md',
+    title: 'Read a CSV without pandas',
+    updatedAt: DateTime.utc(2026, 8, 2),
+    messages: [
+      ChatMessage(
+        id: 'user-md',
+        role: MessageRole.user,
+        text: 'Read a CSV in Python without pandas.',
+        createdAt: DateTime.utc(2026, 8, 2),
+      ),
+      ChatMessage(
+        id: 'assistant-md',
+        role: MessageRole.assistant,
+        text:
+            'Use the built-in `csv` module. It streams row by row.\n\n'
+            '```python\nimport csv\n\ndef rows(path):\n'
+            '    with open(path, newline="") as file:\n'
+            '        yield from csv.reader(file)\n```\n\n'
+            'Two things worth knowing:\n\n'
+            '- `newline=""` stops Python mangling quoted line breaks.\n'
+            '- Swap in **DictReader** if the file has a header row.',
+        metrics: const InferenceMetrics(
+          promptTokensPerSecond: 144,
+          decodeTokensPerSecond: 24.6,
+          tokenCount: 182,
+          elapsedSeconds: 7.4,
+        ),
+        createdAt: DateTime.utc(2026, 8, 2),
+      ),
+    ],
+  );
+  return ChatHistorySnapshot(
+    conversations: [conversation],
+    activeId: conversation.id,
+  );
 }
 
 ChatHistorySnapshot seedHistory() {

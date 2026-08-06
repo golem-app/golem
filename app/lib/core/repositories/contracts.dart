@@ -14,10 +14,15 @@ abstract interface class InferenceRepository {
   /// [overrides] are the user's sparse per-model settings; a real backend
   /// merges them onto its profile's recommended defaults, the fake ignores
   /// them (simulated output has no sampling to steer).
+  ///
+  /// [modelKey] is the conversation's chosen catalog model. The fake
+  /// varies its simulated voice and metrics per key; real engines run
+  /// their configured model regardless until per-chat switching (#20).
   Stream<InferenceEvent> generate({
     required List<Map<String, String>> context,
     required bool reasoningEnabled,
     SamplingOverrides? overrides,
+    String? modelKey,
   });
 }
 

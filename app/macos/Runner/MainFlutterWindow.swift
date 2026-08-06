@@ -75,6 +75,19 @@ class MainFlutterWindow: NSWindow {
       } catch {
         result(FlutterError(code: "free-bytes", message: error.localizedDescription, details: nil))
       }
+    case "totalBytes":
+      do {
+        let values = try URL(fileURLWithPath: path).resourceValues(
+          forKeys: [.volumeTotalCapacityKey]
+        )
+        if let capacity = values.volumeTotalCapacity {
+          result(Int(capacity))
+        } else {
+          result(nil)
+        }
+      } catch {
+        result(FlutterError(code: "total-bytes", message: error.localizedDescription, details: nil))
+      }
     case "excludeFromBackup":
       do {
         var url = URL(fileURLWithPath: path)

@@ -1,11 +1,13 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/benchmark/benchmark_screen.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
+import 'package:golem_flutter/features/chat/search_screen.dart';
 import 'package:golem_flutter/features/chat/widgets/composer.dart';
 import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';
@@ -78,6 +80,73 @@ void main() {
         find.byType(ChatScreen),
         matchesGoldenFile(
           'goldens/populated-reasoning-${brightness.name}${chromeSuffix()}.png',
+        ),
+      );
+    }, variant: bothChromes);
+  }
+
+  for (final brightness in Brightness.values) {
+    testWidgets('markdown transcript ${brightness.name} golden', (
+      tester,
+    ) async {
+      // The code card is deliberately identical in both chromes; iOS-only.
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        history: markdownHistory(),
+        child: const ChatScreen(),
+      );
+      await expectLater(
+        find.byType(ChatScreen),
+        matchesGoldenFile('goldens/markdown-transcript-${brightness.name}.png'),
+      );
+    }, variant: iosChrome);
+  }
+
+  for (final brightness in Brightness.values) {
+    testWidgets('search ${brightness.name} golden', (tester) async {
+      // Search chrome is shared geometry; iOS records both appearances.
+      await pumpSearchScreen(
+        tester,
+        brightness: brightness,
+        history: markdownHistory(),
+      );
+      await tester.enterText(find.byKey(const Key('search-field')), 'csv');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byType(SearchScreen),
+        matchesGoldenFile('goldens/search-${brightness.name}.png'),
+      );
+    }, variant: iosChrome);
+  }
+
+  for (final brightness in Brightness.values) {
+    testWidgets('composer sheet ${brightness.name} goldens', (tester) async {
+      // Like the rename sheet, these record android in BOTH appearances:
+      // the drag handle is the android-only element whose tint differs.
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        history: markdownHistory(),
+        child: const ChatScreen(),
+      );
+      await tester.tap(find.byKey(const Key('composer-model-chip')));
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byKey(const Key('model-picker-sheet')),
+        matchesGoldenFile(
+          'goldens/model-picker-sheet-${brightness.name}${chromeSuffix()}.png',
+        ),
+      );
+      await tester.tapAt(const Offset(200, 60));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('composer-attach')));
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byKey(const Key('attach-sheet')),
+        matchesGoldenFile(
+          'goldens/attach-sheet-${brightness.name}${chromeSuffix()}.png',
         ),
       );
     }, variant: bothChromes);
@@ -300,10 +369,10 @@ void main() {
       child: const ChatScreen(),
     );
     expect(
-      find.textContaining('generates with a local on-device model'),
+      find.textContaining('is loaded and running on this phone'),
       findsOneWidget,
     );
-    expect(find.textContaining('simulated model'), findsNothing);
+    expect(find.textContaining('preview simulates'), findsNothing);
 
     await pumpWithRepositories(
       tester,
@@ -335,6 +404,9 @@ void main() {
       if (phase == GenerationPhase.idle) continue;
       await tester.pumpWidget(
         ProviderScope(
+          overrides: [
+            modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
+          ],
           child: wrapApp(
             brightness: Brightness.dark,
             child: Composer(
@@ -342,6 +414,8 @@ void main() {
               focus: focus,
               reasoningEnabled: false,
               generation: phase,
+              activeId: null,
+              modelKey: null,
             ),
           ),
         ),
@@ -360,7 +434,11 @@ void main() {
     (tester) async {
       Widget wrap(ChatMessage message) => ProviderScope(
         child: wrapApp(
-          child: MessageBubble(message: message, canRegenerate: false),
+          child: MessageBubble(
+            message: message,
+            canRegenerate: false,
+            idle: false,
+          ),
         ),
       );
       final ghost = ChatMessage(
@@ -374,11 +452,10 @@ void main() {
       await tester.pumpWidget(wrap(ghost));
       expect(find.byKey(const Key('message-assistant-ghost')), findsNothing);
 
-      // While streaming, the same empty message is the typing indicator and
-      // must stay visible.
+      // While streaming, the same empty message is the typing indicator
+      // (the blinking caret) and must stay visible.
       await tester.pumpWidget(wrap(ghost.copyWith(isStreaming: true)));
       expect(find.byKey(const Key('message-assistant-ghost')), findsOneWidget);
-      expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
     },
     variant: iosChrome,
   );

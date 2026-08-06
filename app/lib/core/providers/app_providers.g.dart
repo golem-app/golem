@@ -367,6 +367,273 @@ final class InferenceBackendProvider
 
 String _$inferenceBackendHash() => r'679d3dfd7f9bdcc675a964fdfe9368052cc0b632';
 
+@ProviderFor(deviceCapacityProbe)
+const deviceCapacityProbeProvider = DeviceCapacityProbeProvider._();
+
+final class DeviceCapacityProbeProvider
+    extends
+        $FunctionalProvider<
+          DiskCapacityProbe,
+          DiskCapacityProbe,
+          DiskCapacityProbe
+        >
+    with $Provider<DiskCapacityProbe> {
+  const DeviceCapacityProbeProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'deviceCapacityProbeProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$deviceCapacityProbeHash();
+
+  @$internal
+  @override
+  $ProviderElement<DiskCapacityProbe> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  DiskCapacityProbe create(Ref ref) {
+    return deviceCapacityProbe(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(DiskCapacityProbe value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<DiskCapacityProbe>(value),
+    );
+  }
+}
+
+String _$deviceCapacityProbeHash() =>
+    r'bffceb765c5bf126c7449e4761b2c951e7495b9c';
+
+@ProviderFor(documentsPath)
+const documentsPathProvider = DocumentsPathProvider._();
+
+final class DocumentsPathProvider
+    extends $FunctionalProvider<String, String, String>
+    with $Provider<String> {
+  const DocumentsPathProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'documentsPathProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$documentsPathHash();
+
+  @$internal
+  @override
+  $ProviderElement<String> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String create(Ref ref) {
+    return documentsPath(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$documentsPathHash() => r'22f7639f5b12516f043a3f4971f84d9142ebf642';
+
+/// The drawer's storage meter: model bytes on disk over the volume's
+/// total capacity. [StorageOverview.totalBytes] is null whenever the
+/// platform cannot report it (or the seams are unwired, as in most
+/// tests) — the meter hides instead of inventing a denominator.
+
+@ProviderFor(storageOverview)
+const storageOverviewProvider = StorageOverviewProvider._();
+
+/// The drawer's storage meter: model bytes on disk over the volume's
+/// total capacity. [StorageOverview.totalBytes] is null whenever the
+/// platform cannot report it (or the seams are unwired, as in most
+/// tests) — the meter hides instead of inventing a denominator.
+
+final class StorageOverviewProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<StorageOverview>,
+          StorageOverview,
+          FutureOr<StorageOverview>
+        >
+    with $FutureModifier<StorageOverview>, $FutureProvider<StorageOverview> {
+  /// The drawer's storage meter: model bytes on disk over the volume's
+  /// total capacity. [StorageOverview.totalBytes] is null whenever the
+  /// platform cannot report it (or the seams are unwired, as in most
+  /// tests) — the meter hides instead of inventing a denominator.
+  const StorageOverviewProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'storageOverviewProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$storageOverviewHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<StorageOverview> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<StorageOverview> create(Ref ref) {
+    return storageOverview(ref);
+  }
+}
+
+String _$storageOverviewHash() => r'26b51b21567e82a5138c1156566d21684dce03e9';
+
+/// The published cross-chat search query. The raw field text stays in
+/// the search screen (widget-local, debounced 350 ms); only the
+/// normalized query lands here, so results derive reactively without
+/// rebuilding on every keystroke.
+
+@ProviderFor(SearchQuery)
+const searchQueryProvider = SearchQueryProvider._();
+
+/// The published cross-chat search query. The raw field text stays in
+/// the search screen (widget-local, debounced 350 ms); only the
+/// normalized query lands here, so results derive reactively without
+/// rebuilding on every keystroke.
+final class SearchQueryProvider extends $NotifierProvider<SearchQuery, String> {
+  /// The published cross-chat search query. The raw field text stays in
+  /// the search screen (widget-local, debounced 350 ms); only the
+  /// normalized query lands here, so results derive reactively without
+  /// rebuilding on every keystroke.
+  const SearchQueryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'searchQueryProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$searchQueryHash();
+
+  @$internal
+  @override
+  SearchQuery create() => SearchQuery();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$searchQueryHash() => r'4dbfed33213193c0360e544ccb7b76d58c781f42';
+
+/// The published cross-chat search query. The raw field text stays in
+/// the search screen (widget-local, debounced 350 ms); only the
+/// normalized query lands here, so results derive reactively without
+/// rebuilding on every keystroke.
+
+abstract class _$SearchQuery extends $Notifier<String> {
+  String build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final created = build();
+    final ref = this.ref as $Ref<String, String>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<String, String>,
+              String,
+              Object?,
+              Object?
+            >;
+    element.handleValue(ref, created);
+  }
+}
+
+/// Search results over every conversation, derived from the published
+/// query and the chat state — one source of truth, no copies.
+
+@ProviderFor(chatSearchResults)
+const chatSearchResultsProvider = ChatSearchResultsProvider._();
+
+/// Search results over every conversation, derived from the published
+/// query and the chat state — one source of truth, no copies.
+
+final class ChatSearchResultsProvider
+    extends
+        $FunctionalProvider<
+          List<ChatSearchResult>,
+          List<ChatSearchResult>,
+          List<ChatSearchResult>
+        >
+    with $Provider<List<ChatSearchResult>> {
+  /// Search results over every conversation, derived from the published
+  /// query and the chat state — one source of truth, no copies.
+  const ChatSearchResultsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'chatSearchResultsProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatSearchResultsHash();
+
+  @$internal
+  @override
+  $ProviderElement<List<ChatSearchResult>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  List<ChatSearchResult> create(Ref ref) {
+    return chatSearchResults(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<ChatSearchResult> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<ChatSearchResult>>(value),
+    );
+  }
+}
+
+String _$chatSearchResultsHash() => r'4924c9bcb9501cbe48cf7c370df3e24254a943db';
+
 /// Persisted per-model generation settings. Reads resolve against the
 /// broker profile's recommended defaults at the consumer, never here —
 /// only user-set values are stored.
@@ -402,7 +669,7 @@ final class SettingsControllerProvider
 }
 
 String _$settingsControllerHash() =>
-    r'd88cf25eb3a423e29e409537a0882c7747400e70';
+    r'7040b13d308b8e347c0b0c2872bd4ada1c6a5d5d';
 
 /// Persisted per-model generation settings. Reads resolve against the
 /// broker profile's recommended defaults at the consumer, never here —
@@ -452,7 +719,7 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'293795790439a6637528c4ccf236ad068b6bd5ab';
+String _$chatControllerHash() => r'ef10a3182f25172b14500296ce7f73548d730e77';
 
 abstract class _$ChatController extends $AsyncNotifier<ChatState> {
   FutureOr<ChatState> build();
@@ -497,7 +764,7 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'2474110a35d5d5c861ba7f969216b444d54e1e7a';
+String _$modelControllerHash() => r'7a47bbcfd061e3946137acaef3bf8c24250d5a6c';
 
 abstract class _$ModelController extends $AsyncNotifier<ModelState> {
   FutureOr<ModelState> build();

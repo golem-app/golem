@@ -149,15 +149,40 @@ versions are committed in the workspace lockfile at `../pubspec.lock`.
 
 ## Screens and identifiers
 
-The app includes the model-aware launch splash, empty and populated chat, reasoning
-and answer streaming, live/final metrics, stop and failure recovery, copy,
-regenerate, edit-and-truncate, the edge-swipe conversation drawer, Settings model
-simulations, runtime controls, Benchmark, JSON export, and the native share sheet.
+The app includes the model-aware launch splash, empty chat with starter chips,
+markdown transcript with syntax-highlighted code cards, reasoning and answer
+streaming (blinking caret + live generating pill), stop and failure recovery
+with the ephemeral stopped-tokens caption, message actions (copy, regenerate,
+branch-from-here, share, delete), edit-and-truncate, the sectioned edge-swipe
+conversation drawer with pinning and a storage meter, full-screen cross-chat
+search, the per-chat model picker, the attach sheet (UI only until #18),
+confirmation toasts, Settings model simulations, runtime controls, Benchmark,
+JSON export, and the native share sheet.
+
+Assistant messages render a scoped markdown subset (paragraphs, emphasis,
+inline code, one-level lists, fenced code with a fixed dark card in both
+themes) through `features/chat/widgets/markdown/`; parsing is memoized per
+message so only the streaming bubble re-parses. Free text selection is
+deliberately absent — copy actions cover it on both chromes. Toasts are the
+chrome layer's `showGolemToast` (iOS pill / Android bar, no actions). The
+per-chat model selection persists on the conversation (`modelKey`); the fake
+simulates the switch fully, while real engines keep their configured model
+until #20 and the picker's footnote says so.
 
 Stable keys/semantics preserve the native automation vocabulary. The most useful
 identifiers are `launch-splash`, `chat-composer`, `send-button`, `stop-button`,
-`reasoning-toggle`, `open-drawer`, `drawer-search`, `new-chat-drawer`,
-`conversation-<id>`, `conversation-menu-<id>`, `rename-sheet`, `rename-field`,
+`reasoning-toggle`, `composer-attach`, `composer-model-chip`,
+`starter-chip-<name>`, `generating-pill`, `stopped-caption`,
+`message-copy-<id>`, `message-regenerate-<id>`, `message-share-<id>`,
+`message-menu-<id>` plus `menu-message-{copy,regenerate,branch,share,delete}`,
+`code-block`/`code-copy`, `attach-sheet` plus
+`attach-{photo-library,take-photo,files}`, `model-picker-sheet`,
+`model-picker-<catalogKey>`, `model-picker-manage`, `golem-toast`,
+`open-drawer`, `drawer-search-button`, `new-chat-drawer`,
+`conversation-<id>`, `conversation-menu-<id>` plus
+`menu-{pin-toggle,rename,share-transcript,delete}`, `storage-meter`,
+`search-field`, `search-cancel`, `search-results`, `search-result-<id>`,
+`search-empty`, `rename-sheet`, `rename-field`, `rename-counter`,
 `confirm-delete`, `open-settings`, `model-card-<key>`, `model-status-<key>`,
 `model-download-<key>`, `model-pause-<key>`, `model-cancel-<key>`,
 `model-delete-<key>`, `confirm-model-delete` (catalog keys: `gemma4-mlx`,
@@ -242,13 +267,16 @@ and migrate the presentation strings then.
 
 Golden tests use the iPhone 17 logical viewport (402 × 874). Every surface
 records light and dark under iOS chrome, and the chrome-visible surfaces
-(chat, rename sheet, Settings, Benchmark) add an `-android` light variant —
-the platform axis rides `TargetPlatformVariant` in `test/support/harness.dart`
-(widget tests report android by default, so goldens pin the platform
-explicitly). They cover splash, empty/populated chat, reasoning, the
-native-style conversation drawer, rename overlay, Settings states, and
-Benchmark. The widget suite also runs Flutter's iOS 44-point target,
-semantic-label, contrast, and enlarged-text checks.
+(chat, Settings, Benchmark) add an `-android` light variant — the platform
+axis rides `TargetPlatformVariant` in `test/support/harness.dart` (widget
+tests report android by default, so goldens pin the platform explicitly).
+Sheets (rename, model picker, attach) record android in both appearances:
+the drag handle is the android-only painted element whose tint differs.
+They cover splash, empty/populated chat, reasoning, the markdown
+transcript, search, the composer sheets, the sectioned conversation
+drawer, rename overlay, Settings states, and Benchmark. The widget suite
+also runs Flutter's iOS 44-point target, semantic-label, contrast, and
+enlarged-text checks.
 
 ## iPhone 17 simulator verification
 

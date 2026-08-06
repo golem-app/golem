@@ -75,6 +75,103 @@ void main() {
     expect(conversation.promptContext.toString(), isNot(contains('Private')));
   });
 
+  test('pinned and modelKey round-trip and default on legacy JSON', () async {
+    final conversation = ChatConversation(
+      id: 'chat-1',
+      title: 'Pinned chat',
+      messages: const [],
+      updatedAt: DateTime.utc(2026, 8, 1),
+      pinned: true,
+      modelKey: 'qwen35-gguf',
+    );
+    final decoded = ChatConversation.fromJson(
+      jsonDecode(jsonEncode(conversation.toJson())) as Map<String, Object?>,
+    );
+    expect(decoded.pinned, isTrue);
+    expect(decoded.modelKey, 'qwen35-gguf');
+
+    // A pre-#47 history has neither key: both must default, not throw —
+    // the loader renames unreadable files to `.corrupt` and silently
+    // empties history, so this default path is what protects users.
+    final legacy = ChatConversation.fromJson({
+      'id': 'old',
+      'title': 'Old chat',
+      'messages': const <Object?>[],
+      'updatedAt': DateTime.utc(2026, 1, 1).toIso8601String(),
+    });
+    expect(legacy.pinned, isFalse);
+    expect(legacy.modelKey, isNull);
+  });
+
+  test('branchUpTo copies the prefix and withoutMessage removes by id', () {
+    DateTime at(int day) => DateTime.utc(2026, 8, day);
+    ChatMessage message(String id, MessageRole role) =>
+        ChatMessage(id: id, role: role, text: 'text-$id', createdAt: at(1));
+    final conversation = ChatConversation(
+      id: 'chat',
+      title: 'Branch me',
+      updatedAt: at(1),
+      reasoningEnabled: true,
+      pinned: true,
+      modelKey: 'gemma4-mlx',
+      messages: [
+        message('u1', MessageRole.user),
+        message('a1', MessageRole.assistant),
+        message('u2', MessageRole.user),
+      ],
+    );
+
+    final branch = conversation.branchUpTo('a1', id: 'branch', now: at(2))!;
+    expect(branch.id, 'branch');
+    expect(branch.messages.map((m) => m.id), ['u1', 'a1']);
+    expect(branch.title, 'Branch me');
+    expect(branch.modelKey, 'gemma4-mlx');
+    expect(branch.reasoningEnabled, isTrue);
+    expect(branch.pinned, isFalse, reason: 'a branch starts unpinned');
+    expect(branch.updatedAt, at(2));
+    expect(conversation.branchUpTo('missing', id: 'x', now: at(2)), isNull);
+
+    final trimmed = conversation.withoutMessage('a1');
+    expect(trimmed.messages.map((m) => m.id), ['u1', 'u2']);
+    expect(conversation.withoutMessage('missing').messages.length, 3);
+  });
+
+  test('transcriptMarkdown names speakers and keeps reasoning private', () {
+    final conversation = ChatConversation(
+      id: 'chat',
+      title: 'Weekend plans',
+      updatedAt: DateTime.utc(2026, 8, 2),
+      messages: [
+        ChatMessage(
+          id: 'u1',
+          role: MessageRole.user,
+          text: 'Any ideas?',
+          createdAt: DateTime.utc(2026, 8, 2),
+        ),
+        ChatMessage(
+          id: 'a1',
+          role: MessageRole.assistant,
+          text: 'A slow morning walk.',
+          reasoning: 'Private chain of thought',
+          createdAt: DateTime.utc(2026, 8, 2),
+        ),
+        ChatMessage(
+          id: 'draft',
+          role: MessageRole.assistant,
+          text: 'Unfinished',
+          createdAt: DateTime.utc(2026, 8, 2),
+          isStreaming: true,
+        ),
+      ],
+    );
+    final transcript = conversation.transcriptMarkdown();
+    expect(transcript, contains('## Weekend plans'));
+    expect(transcript, contains('**You:** Any ideas?'));
+    expect(transcript, contains('**Golem:** A slow morning walk.'));
+    expect(transcript, isNot(contains('Private')));
+    expect(transcript, isNot(contains('Unfinished')));
+  });
+
   test('generation settings persist sparsely and round-trip', () async {
     final directory = await Directory.systemTemp.createTemp(
       'golem-settings-test-',

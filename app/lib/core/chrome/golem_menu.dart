@@ -8,12 +8,16 @@ class GolemMenuItem {
     required this.onPressed,
     this.icon,
     this.isDestructive = false,
+    this.itemKey,
   });
 
   final String label;
   final VoidCallback onPressed;
   final IconData? icon;
   final bool isDestructive;
+
+  /// Automation key for the rendered menu row.
+  final Key? itemKey;
 }
 
 /// The adaptive overflow menu. Both chromes anchor a [CupertinoMenuAnchor]
@@ -41,6 +45,7 @@ class GolemMenu extends StatelessWidget {
     menuChildren: [
       for (final item in items)
         CupertinoMenuItem(
+          key: item.itemKey,
           leading: item.icon == null ? null : Icon(item.icon),
           isDestructiveAction: item.isDestructive,
           onPressed: item.onPressed,

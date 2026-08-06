@@ -27,6 +27,7 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   final bool failPrepare;
   final bool failUnload;
   SamplingOverrides? lastOverrides;
+  String? lastModelKey;
   int prepares = 0;
   int unloads = 0;
 
@@ -50,8 +51,10 @@ final class _RecordingInferenceRepository implements InferenceRepository {
     required List<Map<String, String>> context,
     required bool reasoningEnabled,
     SamplingOverrides? overrides,
+    String? modelKey,
   }) async* {
     lastOverrides = overrides;
+    lastModelKey = modelKey;
     yield const AnswerDelta('ok');
     yield const CompletedEvent();
   }
@@ -188,6 +191,88 @@ void main() {
     await container.read(chatControllerProvider.notifier).send('Hello');
     expect(inference.lastOverrides?.maxTokens, 64);
     expect(inference.lastOverrides?.temperature, 1.4);
+  });
+
+  test('pin, message delete, and branch round-trip and persist', () async {
+    final container = containerWith();
+    addTearDown(container.dispose);
+    await container.read(chatControllerProvider.future);
+    final controller = container.read(chatControllerProvider.notifier);
+    await controller.send('First prompt');
+    var state = container.read(chatControllerProvider).requireValue;
+    final originalId = state.active!.id;
+    final userId = state.active!.messages.first.id;
+    final assistantId = state.active!.messages.last.id;
+
+    await controller.togglePinned(originalId);
+    state = container.read(chatControllerProvider).requireValue;
+    expect(state.active!.pinned, isTrue);
+
+    await controller.branchFrom(userId);
+    state = container.read(chatControllerProvider).requireValue;
+    expect(state.conversations, hasLength(2));
+    expect(state.active!.id, isNot(originalId));
+    expect(state.active!.messages.map((m) => m.id), [userId]);
+    expect(state.active!.pinned, isFalse);
+    final original = state.conversations.singleWhere((c) => c.id == originalId);
+    expect(original.messages, hasLength(2), reason: 'the source is intact');
+
+    // Unknown ids no-op instead of corrupting state.
+    await controller.branchFrom('missing');
+    expect(
+      container.read(chatControllerProvider).requireValue.conversations,
+      hasLength(2),
+    );
+
+    await controller.selectConversation(originalId);
+    await controller.deleteMessage(assistantId);
+    state = container.read(chatControllerProvider).requireValue;
+    expect(state.active!.messages.map((m) => m.id), [userId]);
+  });
+
+  test('the conversation model key reaches generation', () async {
+    final inference = _RecordingInferenceRepository();
+    final container = ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(inference),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(chatControllerProvider.future);
+    final controller = container.read(chatControllerProvider.notifier);
+    await controller.send('Hello');
+    expect(inference.lastModelKey, isNull);
+
+    final activeId = container
+        .read(chatControllerProvider)
+        .requireValue
+        .active!
+        .id;
+    await controller.setConversationModel(activeId, 'qwen35-gguf');
+    expect(
+      container.read(chatControllerProvider).requireValue.active!.modelKey,
+      'qwen35-gguf',
+    );
+    await controller.regenerate();
+    expect(inference.lastModelKey, 'qwen35-gguf');
+  });
+
+  test('the OOM injection surfaces the design failure copy', () async {
+    final container = containerWith();
+    addTearDown(container.dispose);
+    await container.read(chatControllerProvider.future);
+    final controller = container.read(chatControllerProvider.notifier);
+    await controller.send('please [oom] now');
+    final state = container.read(chatControllerProvider).requireValue;
+    expect(state.generation, GenerationPhase.failed);
+    expect(
+      state.failure,
+      'Ran out of memory at 4,096 tokens. Lower the context length or '
+      'pick a smaller model.',
+    );
   });
 
   FakeModelManagementRepository fakeModels(Directory directory) =>

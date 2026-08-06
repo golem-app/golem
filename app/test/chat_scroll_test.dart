@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
@@ -52,6 +53,9 @@ Future<ScrollPosition> _pumpChat(WidgetTester tester) async {
       inferenceRepositoryProvider.overrideWithValue(
         FakeInferenceRepository(eventDelay: _delay),
       ),
+      // The nav subtitle and composer chip resolve their model label
+      // through the catalog.
+      modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
     ],
   );
   addTearDown(container.dispose);

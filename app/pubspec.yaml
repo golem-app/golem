@@ -47,6 +47,8 @@ dependencies:
   background_downloader: ^9.5.7
   crypto: ^3.0.7
   url_launcher: ^6.3.2
+  markdown: ^7.3.1
+  highlight: ^0.7.0
 
 dev_dependencies:
   flutter_test:

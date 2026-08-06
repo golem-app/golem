@@ -54,6 +54,9 @@ final class InfernoInferenceRepository implements InferenceRepository {
     required List<Map<String, String>> context,
     required bool reasoningEnabled,
     SamplingOverrides? overrides,
+    // Ignored until per-chat model switching lands (#20): this repository
+    // is constructed around one engine, model path, and profile.
+    String? modelKey,
   }) async* {
     if (!_loaded) throw StateError('Inferno is not loaded.');
     final parser = profile.newParser(reasoningEnabled: reasoningEnabled);
