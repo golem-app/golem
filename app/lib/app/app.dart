@@ -6,12 +6,14 @@ import '../core/app_identity.dart';
 import '../core/theme/golem_theme.dart';
 import '../features/benchmark/benchmark_screen.dart';
 import '../features/chat/chat_screen.dart';
+import '../features/chat/search_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/splash/splash_screen.dart';
 
 final _router = GoRouter(
   routes: [
     GoRoute(path: '/', builder: (context, state) => const ChatScreen()),
+    GoRoute(path: '/search', builder: (context, state) => const SearchScreen()),
     GoRoute(
       path: '/settings',
       builder: (context, state) => const SettingsScreen(),
@@ -59,8 +61,8 @@ class _GolemAppState extends State<GolemApp> with WidgetsBindingObserver {
     ),
     // User-facing copy is intentionally hardcoded English. The global
     // delegates are still required by the framework widgets themselves —
-    // Material included: SelectableText's selection toolbar resolves to
-    // the Material implementation on Android chrome.
+    // Material included: text-field selection toolbars resolve to the
+    // Material implementation on Android chrome.
     localizationsDelegates: const [
       GlobalCupertinoLocalizations.delegate,
       GlobalMaterialLocalizations.delegate,

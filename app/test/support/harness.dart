@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/models.dart';
@@ -13,6 +14,7 @@ import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
+import 'package:golem_flutter/features/chat/search_screen.dart';
 
 import 'in_memory_chat_history_repository.dart';
 import 'in_memory_settings_repository.dart';
@@ -120,6 +122,41 @@ Future<void> pumpWithRepositories(
     );
     await tester.pump();
   }
+  await tester.pumpAndSettle();
+}
+
+/// Pumps a routed app (chat at `/`, search at `/search`) already
+/// navigated to the search screen — it pops back to chat, so it needs a
+/// real router underneath.
+Future<void> pumpSearchScreen(
+  WidgetTester tester, {
+  Brightness brightness = Brightness.light,
+  ChatHistorySnapshot? history,
+}) async {
+  setViewport(tester);
+  final container = buildContainer(history: history);
+  addTearDown(container.dispose);
+  final router = GoRouter(
+    routes: [
+      GoRoute(path: '/', builder: (context, state) => const ChatScreen()),
+      GoRoute(
+        path: '/search',
+        builder: (context, state) => const SearchScreen(),
+      ),
+    ],
+  );
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: CupertinoApp.router(
+        debugShowCheckedModeBanner: false,
+        theme: GolemTheme.theme(brightness),
+        routerConfig: router,
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+  router.push('/search');
   await tester.pumpAndSettle();
 }
 

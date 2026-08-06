@@ -7,6 +7,7 @@ import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/benchmark/benchmark_screen.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
+import 'package:golem_flutter/features/chat/search_screen.dart';
 import 'package:golem_flutter/features/chat/widgets/composer.dart';
 import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';
@@ -98,6 +99,24 @@ void main() {
       await expectLater(
         find.byType(ChatScreen),
         matchesGoldenFile('goldens/markdown-transcript-${brightness.name}.png'),
+      );
+    }, variant: iosChrome);
+  }
+
+  for (final brightness in Brightness.values) {
+    testWidgets('search ${brightness.name} golden', (tester) async {
+      // Search chrome is shared geometry; iOS records both appearances.
+      await pumpSearchScreen(
+        tester,
+        brightness: brightness,
+        history: markdownHistory(),
+      );
+      await tester.enterText(find.byKey(const Key('search-field')), 'csv');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byType(SearchScreen),
+        matchesGoldenFile('goldens/search-${brightness.name}.png'),
       );
     }, variant: iosChrome);
   }

@@ -367,6 +367,131 @@ final class InferenceBackendProvider
 
 String _$inferenceBackendHash() => r'679d3dfd7f9bdcc675a964fdfe9368052cc0b632';
 
+/// The published cross-chat search query. The raw field text stays in
+/// the search screen (widget-local, debounced 350 ms); only the
+/// normalized query lands here, so results derive reactively without
+/// rebuilding on every keystroke.
+
+@ProviderFor(SearchQuery)
+const searchQueryProvider = SearchQueryProvider._();
+
+/// The published cross-chat search query. The raw field text stays in
+/// the search screen (widget-local, debounced 350 ms); only the
+/// normalized query lands here, so results derive reactively without
+/// rebuilding on every keystroke.
+final class SearchQueryProvider extends $NotifierProvider<SearchQuery, String> {
+  /// The published cross-chat search query. The raw field text stays in
+  /// the search screen (widget-local, debounced 350 ms); only the
+  /// normalized query lands here, so results derive reactively without
+  /// rebuilding on every keystroke.
+  const SearchQueryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'searchQueryProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$searchQueryHash();
+
+  @$internal
+  @override
+  SearchQuery create() => SearchQuery();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$searchQueryHash() => r'4dbfed33213193c0360e544ccb7b76d58c781f42';
+
+/// The published cross-chat search query. The raw field text stays in
+/// the search screen (widget-local, debounced 350 ms); only the
+/// normalized query lands here, so results derive reactively without
+/// rebuilding on every keystroke.
+
+abstract class _$SearchQuery extends $Notifier<String> {
+  String build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final created = build();
+    final ref = this.ref as $Ref<String, String>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<String, String>,
+              String,
+              Object?,
+              Object?
+            >;
+    element.handleValue(ref, created);
+  }
+}
+
+/// Search results over every conversation, derived from the published
+/// query and the chat state — one source of truth, no copies.
+
+@ProviderFor(chatSearchResults)
+const chatSearchResultsProvider = ChatSearchResultsProvider._();
+
+/// Search results over every conversation, derived from the published
+/// query and the chat state — one source of truth, no copies.
+
+final class ChatSearchResultsProvider
+    extends
+        $FunctionalProvider<
+          List<ChatSearchResult>,
+          List<ChatSearchResult>,
+          List<ChatSearchResult>
+        >
+    with $Provider<List<ChatSearchResult>> {
+  /// Search results over every conversation, derived from the published
+  /// query and the chat state — one source of truth, no copies.
+  const ChatSearchResultsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'chatSearchResultsProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatSearchResultsHash();
+
+  @$internal
+  @override
+  $ProviderElement<List<ChatSearchResult>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  List<ChatSearchResult> create(Ref ref) {
+    return chatSearchResults(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<ChatSearchResult> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<ChatSearchResult>>(value),
+    );
+  }
+}
+
+String _$chatSearchResultsHash() => r'cbb4d67d9f5eaa014de30ad1ff5609dbbe81d49a';
+
 /// Persisted per-model generation settings. Reads resolve against the
 /// broker profile's recommended defaults at the consumer, never here —
 /// only user-set values are stored.
@@ -402,7 +527,7 @@ final class SettingsControllerProvider
 }
 
 String _$settingsControllerHash() =>
-    r'd88cf25eb3a423e29e409537a0882c7747400e70';
+    r'7040b13d308b8e347c0b0c2872bd4ada1c6a5d5d';
 
 /// Persisted per-model generation settings. Reads resolve against the
 /// broker profile's recommended defaults at the consumer, never here —
@@ -452,7 +577,7 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'293795790439a6637528c4ccf236ad068b6bd5ab';
+String _$chatControllerHash() => r'ef10a3182f25172b14500296ce7f73548d730e77';
 
 abstract class _$ChatController extends $AsyncNotifier<ChatState> {
   FutureOr<ChatState> build();
@@ -497,7 +622,7 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'2474110a35d5d5c861ba7f969216b444d54e1e7a';
+String _$modelControllerHash() => r'7a47bbcfd061e3946137acaef3bf8c24250d5a6c';
 
 abstract class _$ModelController extends $AsyncNotifier<ModelState> {
   FutureOr<ModelState> build();

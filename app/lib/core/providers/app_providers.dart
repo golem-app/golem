@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../domain/app_state.dart';
+import '../domain/chat_search.dart';
 import '../domain/generation_settings.dart';
 import '../domain/inference_backend.dart';
 import '../domain/model_catalog.dart';
@@ -50,6 +51,27 @@ SettingsRepository settingsRepository(Ref ref) =>
 @Riverpod(keepAlive: true)
 InferenceBackendConfig inferenceBackend(Ref ref) =>
     const InferenceBackendConfig.fake();
+
+/// The published cross-chat search query. The raw field text stays in
+/// the search screen (widget-local, debounced 350 ms); only the
+/// normalized query lands here, so results derive reactively without
+/// rebuilding on every keystroke.
+@Riverpod(keepAlive: true)
+class SearchQuery extends _$SearchQuery {
+  @override
+  String build() => '';
+
+  void publish(String raw) => state = raw.trim();
+}
+
+/// Search results over every conversation, derived from the published
+/// query and the chat state — one source of truth, no copies.
+@Riverpod(keepAlive: true)
+List<ChatSearchResult> chatSearchResults(Ref ref) {
+  final query = ref.watch(searchQueryProvider);
+  final conversations = ref.watch(chatControllerProvider).value?.conversations;
+  return searchConversations(conversations ?? const [], query);
+}
 
 /// Persisted per-model generation settings. Reads resolve against the
 /// broker profile's recommended defaults at the consumer, never here —
