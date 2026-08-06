@@ -10,15 +10,19 @@ import 'contracts.dart';
 final class FakeModelManagementRepository implements ModelManagementRepository {
   FakeModelManagementRepository(
     this.file, {
-    required this.catalog,
+    required List<ModelCatalogEntry> catalog,
     this.stepDelay = const Duration(milliseconds: 90),
     this.activeArtifactKey = 'gemma4-mlx',
     this.failKeys = const {},
-  }) {
+  }) : catalog = List.of(catalog) {
     _state = ModelState(activeArtifactKey: activeArtifactKey, simulated: true);
   }
 
   final File file;
+
+  /// Growable: [addModel] registers custom repositories at runtime; the
+  /// composition root re-merges persisted specs into the injected catalog
+  /// on the next launch.
   final List<ModelCatalogEntry> catalog;
   final Duration stepDelay;
   final String activeArtifactKey;
@@ -193,6 +197,18 @@ final class FakeModelManagementRepository implements ModelManagementRepository {
           _state.runtime != RuntimePhase.unloaded
       ? _state.copyWith(runtime: RuntimePhase.unloaded, clearFailure: true)
       : _state;
+
+  @override
+  Future<ModelState> addModel(ModelCatalogEntry entry) async {
+    // Re-adding an existing key refreshes the entry (a repaste with a new
+    // revision) without disturbing its download state.
+    catalog.removeWhere((item) => item.key == entry.key);
+    catalog.add(entry);
+    if (_state.statusOf(entry.key).phase == ArtifactPhase.notDownloaded) {
+      return _persist(_state.withArtifact(entry.key, const ArtifactStatus()));
+    }
+    return _state;
+  }
 
   @override
   Future<ModelState> loadRuntime() async {

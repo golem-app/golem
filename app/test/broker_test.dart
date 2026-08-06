@@ -179,6 +179,45 @@ void main() {
     expect(runtime.request!.sampling.stopSequences, ['<turn|>']);
   });
 
+  test('a custom system prompt becomes the leading system turn', () async {
+    final runtime = _RecordingRuntime();
+    final repository = InfernoInferenceRepository(
+      runtime,
+      engine: BrokerEngine.mlx,
+      profile: const Gemma4Profile(),
+      modelPath: '/local/model',
+    );
+    await repository.prepare();
+    await repository
+        .generate(
+          context: const [
+            {'role': 'user', 'content': 'Hello'},
+          ],
+          reasoningEnabled: false,
+          systemPrompt: 'Answer like a pirate.',
+        )
+        .toList();
+    final prompt = runtime.request!.prompt;
+    expect(prompt, contains('system\nAnswer like a pirate.'));
+    expect(
+      prompt.indexOf('Answer like a pirate.'),
+      lessThan(prompt.indexOf('Hello')),
+      reason: 'the system turn leads the conversation',
+    );
+
+    // Absent or blank prompts leave the rendered context untouched.
+    await repository
+        .generate(
+          context: const [
+            {'role': 'user', 'content': 'Hello'},
+          ],
+          reasoningEnabled: false,
+          systemPrompt: '',
+        )
+        .toList();
+    expect(runtime.request!.prompt, isNot(contains('pirate')));
+  });
+
   test('a configured seed emits one reproducible INFERNO_PROBE line', () async {
     final lines = <String>[];
     final original = debugPrint;

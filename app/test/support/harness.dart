@@ -7,17 +7,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
+import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
+import 'package:golem_flutter/core/services/cache_probe.dart';
 import 'package:golem_flutter/core/services/device_storage.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/search_screen.dart';
 
 import 'in_memory_chat_history_repository.dart';
+import 'in_memory_preferences_repository.dart';
 import 'in_memory_settings_repository.dart';
 
 /// The iPhone 17 logical viewport every widget/golden suite renders in.
@@ -67,18 +70,33 @@ final class FakeDiskCapacity implements DiskCapacityProbe {
   Future<int?> totalBytes(String path) async => bytes;
 }
 
+/// 61.2 decimal GB free, matching the handoff's Storage headline.
+final class FakeDiskSpace implements DiskSpaceProbe {
+  const FakeDiskSpace([this.bytes = 61200 * 1000 * 1000]);
+  final int? bytes;
+
+  @override
+  Future<int?> freeBytes(String path) async => bytes;
+}
+
 ProviderContainer buildContainer({
   ChatHistorySnapshot? history,
   ModelState model = const ModelState(),
   InferenceBackendConfig? backend,
   SettingsRepository? settings,
+  PreferencesRepository? preferences,
 }) {
   final directory = Directory.systemTemp.createTempSync('golem-widget-test-');
   return ProviderContainer(
     overrides: [
       if (backend != null) inferenceBackendProvider.overrideWithValue(backend),
       deviceCapacityProbeProvider.overrideWithValue(const FakeDiskCapacity()),
+      diskFreeSpaceProbeProvider.overrideWithValue(const FakeDiskSpace()),
+      cacheProbeProvider.overrideWithValue(FakeCacheProbe()),
       documentsPathProvider.overrideWithValue(directory.path),
+      preferencesRepositoryProvider.overrideWithValue(
+        preferences ?? InMemoryPreferencesRepository(),
+      ),
       chatHistoryRepositoryProvider.overrideWithValue(
         InMemoryChatHistoryRepository(
           history ?? const ChatHistorySnapshot(conversations: []),
@@ -272,4 +290,6 @@ final class StaticModels implements ModelManagementRepository {
   Future<ModelState> cancel(String artifactKey) async => state;
   @override
   Future<ModelState> delete(String artifactKey) async => state;
+  @override
+  Future<ModelState> addModel(ModelCatalogEntry entry) async => state;
 }

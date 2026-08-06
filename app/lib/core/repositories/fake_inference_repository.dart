@@ -69,10 +69,18 @@ final class FakeInferenceRepository implements InferenceRepository {
     // Deliberately unused: deterministic simulation has no sampling.
     SamplingOverrides? overrides,
     String? modelKey,
+    String? systemPrompt,
   }) async* {
     if (!_prepared) throw StateError('The simulated runtime is unloaded.');
     final epoch = ++_generationEpoch;
     final profile = _profileFor(modelKey);
+    // A custom system prompt is acknowledged up front so its round-trip is
+    // provable in QA without a real model; default builds stay unchanged.
+    if (systemPrompt != null && systemPrompt.isNotEmpty) {
+      yield const AnswerDelta(
+        'Simulated note: your custom system prompt is applied.\n\n',
+      );
+    }
     final prompt = context.lastOrNull?['content'] ?? '';
     if (prompt.contains('[fail]')) {
       if (reasoningEnabled) yield const ReasoningDelta('A partial thought…');

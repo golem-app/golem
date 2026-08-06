@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/broker/model_catalog.dart';
+import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
@@ -12,7 +14,9 @@ import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_model_management_repository.dart';
+import 'package:golem_flutter/core/services/cache_probe.dart';
 import 'support/in_memory_chat_history_repository.dart';
+import 'support/in_memory_preferences_repository.dart';
 import 'support/in_memory_settings_repository.dart';
 
 Future<String> _fixtureAsset(String key) async =>
@@ -28,6 +32,7 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   final bool failUnload;
   SamplingOverrides? lastOverrides;
   String? lastModelKey;
+  String? lastSystemPrompt;
   int prepares = 0;
   int unloads = 0;
 
@@ -52,12 +57,36 @@ final class _RecordingInferenceRepository implements InferenceRepository {
     required bool reasoningEnabled,
     SamplingOverrides? overrides,
     String? modelKey,
+    String? systemPrompt,
   }) async* {
     lastOverrides = overrides;
     lastModelKey = modelKey;
+    lastSystemPrompt = systemPrompt;
     yield const AnswerDelta('ok');
     yield const CompletedEvent();
   }
+}
+
+final class _StaticState implements ModelManagementRepository {
+  const _StaticState(this.state);
+  final ModelState state;
+
+  @override
+  Future<ModelState> load() async => state;
+  @override
+  Future<ModelState> loadRuntime() async => state;
+  @override
+  Future<ModelState> unloadRuntime() async => state;
+  @override
+  Stream<ModelState> download(String artifactKey) => Stream.value(state);
+  @override
+  Future<ModelState> pause(String artifactKey) async => state;
+  @override
+  Future<ModelState> cancel(String artifactKey) async => state;
+  @override
+  Future<ModelState> delete(String artifactKey) async => state;
+  @override
+  Future<ModelState> addModel(ModelCatalogEntry entry) async => state;
 }
 
 void main() {
@@ -191,6 +220,234 @@ void main() {
     await container.read(chatControllerProvider.notifier).send('Hello');
     expect(inference.lastOverrides?.maxTokens, 64);
     expect(inference.lastOverrides?.temperature, 1.4);
+  });
+
+  test(
+    'the response style layers under manual overrides at generate',
+    () async {
+      final inference = _RecordingInferenceRepository();
+      final container = ProviderContainer(
+        overrides: [
+          chatHistoryRepositoryProvider.overrideWithValue(
+            InMemoryChatHistoryRepository(),
+          ),
+          inferenceRepositoryProvider.overrideWithValue(inference),
+          inferenceBackendProvider.overrideWithValue(
+            const InferenceBackendConfig(
+              kind: InferenceBackendKind.fake,
+              profileKey: 'gemma4',
+            ),
+          ),
+          // Precise style (temp 0.3, topP 0.9) with a hand-set temperature:
+          // the manual knob must win, the untouched one must follow the
+          // style, and the system prompt must ride along.
+          preferencesRepositoryProvider.overrideWithValue(
+            InMemoryPreferencesRepository(
+              const AppPreferences(
+                systemPrompt: 'Answer briefly.',
+              ).withStyle('gemma4', ResponseStyle.precise),
+            ),
+          ),
+          settingsRepositoryProvider.overrideWithValue(
+            InMemorySettingsRepository(
+              const GenerationSettings().withModel(
+                'gemma4',
+                const SamplingOverrides(temperature: 0.55),
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(chatControllerProvider.future);
+      await container.read(chatControllerProvider.notifier).send('Hello');
+      expect(inference.lastOverrides?.temperature, 0.55);
+      expect(inference.lastOverrides?.topP, 0.9);
+      expect(inference.lastSystemPrompt, 'Answer briefly.');
+    },
+  );
+
+  test(
+    'history off stops persisting, wipes disk, and re-saves on enable',
+    () async {
+      final history = InMemoryChatHistoryRepository();
+      final container = ProviderContainer(
+        overrides: [
+          chatHistoryRepositoryProvider.overrideWithValue(history),
+          inferenceRepositoryProvider.overrideWithValue(
+            FakeInferenceRepository(eventDelay: Duration.zero),
+          ),
+          preferencesRepositoryProvider.overrideWithValue(
+            InMemoryPreferencesRepository(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(chatControllerProvider.future);
+      await container.read(preferencesControllerProvider.future);
+      final chat = container.read(chatControllerProvider.notifier);
+      final preferences = container.read(
+        preferencesControllerProvider.notifier,
+      );
+
+      await chat.send('Keep this one');
+      expect(history.snapshot.conversations, hasLength(1));
+
+      // Off: the disk copy empties immediately, and later sends stay
+      // memory-only.
+      await preferences.setSaveHistory(false);
+      expect(history.snapshot.conversations, isEmpty);
+      await chat.newChat();
+      await chat.send('Memory only');
+      expect(history.snapshot.conversations, isEmpty);
+      expect(
+        container.read(chatControllerProvider).requireValue.conversations,
+        hasLength(2),
+        reason: 'in-memory chats survive the session',
+      );
+
+      // Back on: whatever is in memory re-saves at once.
+      await preferences.setSaveHistory(true);
+      expect(history.snapshot.conversations, hasLength(2));
+    },
+  );
+
+  test('delete-all wipes memory and disk even with history off', () async {
+    final history = InMemoryChatHistoryRepository();
+    final container = ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(history),
+        inferenceRepositoryProvider.overrideWithValue(
+          FakeInferenceRepository(eventDelay: Duration.zero),
+        ),
+        preferencesRepositoryProvider.overrideWithValue(
+          InMemoryPreferencesRepository(
+            const AppPreferences(saveHistory: false),
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(chatControllerProvider.future);
+    final chat = container.read(chatControllerProvider.notifier);
+    await chat.send('Doomed');
+    final exported = chat.exportAllChats();
+    expect(exported, contains('Doomed'));
+    expect(exported, contains('"schemaVersion"'));
+
+    await chat.deleteAllChats();
+    expect(
+      container.read(chatControllerProvider).requireValue.conversations,
+      isEmpty,
+    );
+    expect(history.snapshot.conversations, isEmpty);
+  });
+
+  test(
+    'a custom repository registers, simulates, and survives relaunch',
+    () async {
+      final directory = Directory.systemTemp.createTempSync(
+        'golem-custom-model-test-',
+      );
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final stateFile = File('${directory.path}/model.json');
+      final preferencesRepository = InMemoryPreferencesRepository();
+      ProviderContainer build(List<ModelCatalogEntry> catalog) =>
+          ProviderContainer(
+            overrides: [
+              preferencesRepositoryProvider.overrideWithValue(
+                preferencesRepository,
+              ),
+              modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
+              modelManagementRepositoryProvider.overrideWithValue(
+                FakeModelManagementRepository(
+                  stateFile,
+                  catalog: catalog,
+                  stepDelay: Duration.zero,
+                ),
+              ),
+            ],
+          );
+
+      const spec = CustomModelSpec(
+        repository: 'mlx-community/tiny-test',
+        engine: ModelEngine.mlx,
+      );
+      final container = build(modelCatalog);
+      addTearDown(container.dispose);
+      await container.read(modelControllerProvider.future);
+      await container.read(preferencesControllerProvider.future);
+      await container
+          .read(preferencesControllerProvider.notifier)
+          .addCustomModel(spec);
+
+      // The derived entry joins the effective catalog and can download.
+      final effective = container.read(effectiveModelCatalogProvider);
+      expect(effective.map((e) => e.key), contains(spec.key));
+      await container.read(modelControllerProvider.notifier).download(spec.key);
+      final state = container.read(modelControllerProvider).requireValue;
+      expect(state.statusOf(spec.key).phase, ArtifactPhase.installed);
+      expect(
+        state.statusOf(spec.key).downloadedBytes,
+        spec.toCatalogEntry().totalBytes,
+      );
+
+      // Relaunch: the composition root merges persisted specs back into the
+      // repository catalog, so the installed state survives.
+      final merged = [...modelCatalog, spec.toCatalogEntry()];
+      final relaunched = build(merged);
+      addTearDown(relaunched.dispose);
+      final reloaded = await relaunched.read(modelControllerProvider.future);
+      expect(reloaded.statusOf(spec.key).phase, ArtifactPhase.installed);
+    },
+  );
+
+  test('storage breakdown sums buckets and tracks chat size', () async {
+    final container = ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(
+          FakeInferenceRepository(eventDelay: Duration.zero),
+        ),
+        preferencesRepositoryProvider.overrideWithValue(
+          InMemoryPreferencesRepository(),
+        ),
+        modelManagementRepositoryProvider.overrideWithValue(
+          _StaticState(
+            const ModelState(
+              artifacts: {
+                'gemma4-mlx': ArtifactStatus(
+                  phase: ArtifactPhase.installed,
+                  downloadedBytes: 1000,
+                ),
+              },
+            ),
+          ),
+        ),
+        cacheProbeProvider.overrideWithValue(FakeCacheProbe(sizeBytes: 500)),
+      ],
+    );
+    addTearDown(container.dispose);
+    // An active subscription, as the Storage screen would hold: the
+    // breakdown watches chat state, and an invalidation that lands
+    // mid-computation only recomputes for a live listener.
+    final subscription = container.listen(storageBreakdownProvider, (_, _) {});
+    addTearDown(subscription.close);
+    final before = await container.read(storageBreakdownProvider.future);
+    expect(before.modelsBytes, 1000);
+    expect(before.cacheBytes, 500);
+    expect(before.chatsBytes, greaterThan(0));
+    expect(before.usedBytes, before.modelsBytes + before.chatsBytes + 500);
+    // The free/total seams are unwired here — the figures must be null,
+    // never invented.
+    expect(before.freeBytes, isNull);
+    expect(before.totalBytes, isNull);
+
+    await container.read(chatControllerProvider.notifier).send('Grow the file');
+    final after = await container.read(storageBreakdownProvider.future);
+    expect(after.chatsBytes, greaterThan(before.chatsBytes));
   });
 
   test('pin, message delete, and branch round-trip and persist', () async {

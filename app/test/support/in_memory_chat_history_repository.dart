@@ -11,5 +11,8 @@ final class InMemoryChatHistoryRepository implements ChatHistoryRepository {
   Future<ChatHistorySnapshot> load() async => snapshot;
 
   @override
+  Future<int> storedBytes() async => snapshot.encode().length;
+
+  @override
   Future<void> save(ChatHistorySnapshot value) async => snapshot = value;
 }

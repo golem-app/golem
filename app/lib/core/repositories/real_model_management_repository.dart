@@ -500,6 +500,14 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   @override
   Future<ModelState> unloadRuntime() =>
       _persist(_state.copyWith(runtime: RuntimePhase.unloaded));
+
+  @override
+  Future<ModelState> addModel(ModelCatalogEntry entry) async {
+    // Arbitrary-repository downloads need real manifest/verification wiring
+    // (#20); until then the UI keeps Add disabled on this backend and this
+    // deliberately records nothing.
+    return _state;
+  }
 }
 
 String _gigabytes(int bytes) => '${(bytes / 1000000000).toStringAsFixed(2)} GB';

@@ -28,6 +28,9 @@ final class FileChatHistoryRepository implements ChatHistoryRepository {
   }
 
   @override
+  Future<int> storedBytes() async => await file.exists() ? file.length() : 0;
+
+  @override
   Future<void> save(ChatHistorySnapshot snapshot) {
     // Saves are fire-and-forget at call sites, so serialize them: concurrent
     // writes would otherwise race on the shared temporary file and could
