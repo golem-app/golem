@@ -395,9 +395,13 @@ class _ReasoningCard extends StatefulWidget {
 
 class _ReasoningCardState extends State<_ReasoningCard> {
   // Widget-local disclosure: collapsing a reasoning card is ephemeral
-  // presentation state, never persisted. Initial only — a card the
-  // stream opened stays open when the message settles.
-  late bool _expanded = widget.initiallyExpanded;
+  // presentation state, never persisted. Until the user touches the
+  // card it follows [_ReasoningCard.initiallyExpanded] reactively —
+  // preferences resolve a frame after cold start, and an initial-only
+  // read would freeze on that pre-resolution frame. Streaming cards
+  // therefore also settle back to the preference when the run ends.
+  bool? _userToggle;
+  bool get _expanded => _userToggle ?? widget.initiallyExpanded;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -422,7 +426,7 @@ class _ReasoningCardState extends State<_ReasoningCard> {
       children: [
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () => setState(() => _expanded = !_expanded),
+          onTap: () => setState(() => _userToggle = !_expanded),
           child: Row(
             children: [
               const Icon(

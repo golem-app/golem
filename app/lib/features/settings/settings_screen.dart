@@ -110,16 +110,30 @@ class SettingsScreen extends ConsumerWidget {
                           Expanded(
                             child: Text('Advanced mode', style: GolemText.body),
                           ),
-                          CupertinoSwitch(
-                            key: const Key('advanced-mode-switch'),
-                            value: preferences.advancedMode,
-                            activeTrackColor: CupertinoDynamicColor.resolve(
-                              GolemTheme.accent,
-                              context,
+                          MergeSemantics(
+                            child: Semantics(
+                              label: 'Advanced mode',
+                              child: SizedBox(
+                                height: GolemSize.hitTarget,
+                                child: Center(
+                                  child: CupertinoSwitch(
+                                    key: const Key('advanced-mode-switch'),
+                                    value: preferences.advancedMode,
+                                    activeTrackColor:
+                                        CupertinoDynamicColor.resolve(
+                                          GolemTheme.accent,
+                                          context,
+                                        ),
+                                    onChanged: (value) => ref
+                                        .read(
+                                          preferencesControllerProvider
+                                              .notifier,
+                                        )
+                                        .setAdvancedMode(value),
+                                  ),
+                                ),
+                              ),
                             ),
-                            onChanged: (value) => ref
-                                .read(preferencesControllerProvider.notifier)
-                                .setAdvancedMode(value),
                           ),
                         ],
                       ),

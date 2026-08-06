@@ -435,20 +435,39 @@ void main() {
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
 
-    await tester.pumpWidget(
-      MediaQuery(
-        data: const MediaQueryData(
-          size: viewport,
-          textScaler: TextScaler.linear(1.6),
+    // The redesigned settings surfaces enroll in the same guidelines.
+    for (final screen in const <Widget>[
+      SettingsScreen(),
+      AppearanceScreen(),
+      PrivacyScreen(),
+    ]) {
+      await pumpWithRepositories(tester, child: screen);
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(textContrastGuideline));
+    }
+
+    for (final screen in const <Widget>[
+      SettingsScreen(),
+      AppearanceScreen(),
+      PrivacyScreen(),
+      StorageScreen(),
+    ]) {
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(
+            size: viewport,
+            textScaler: TextScaler.linear(1.6),
+          ),
+          child: UncontrolledProviderScope(
+            container: buildContainer(),
+            child: wrapApp(child: screen),
+          ),
         ),
-        child: UncontrolledProviderScope(
-          container: buildContainer(),
-          child: wrapApp(child: const SettingsScreen()),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
   }, variant: iosChrome);
 
   testWidgets('a real backend renders honest copy on every surface', (

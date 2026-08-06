@@ -63,7 +63,7 @@ class SettingsNavRow extends StatelessWidget {
               label,
               style: GolemText.body.copyWith(
                 color: CupertinoDynamicColor.resolve(
-                  destructive ? GolemTheme.destructive : GolemTheme.ink,
+                  destructive ? GolemTheme.destructiveText : GolemTheme.ink,
                   context,
                 ),
               ),
@@ -129,13 +129,25 @@ class SettingsToggleRow extends StatelessWidget {
           children: [
             Expanded(child: Text(label, style: GolemText.body)),
             const SizedBox(width: 12),
-            CupertinoSwitch(
-              key: toggleKey,
-              value: value,
-              onChanged: onChanged,
-              activeTrackColor: CupertinoDynamicColor.resolve(
-                GolemTheme.accent,
-                context,
+            // Merged into a 44pt box so the switch clears the tap-target
+            // guideline (its own chrome is 39pt tall).
+            MergeSemantics(
+              child: Semantics(
+                label: label,
+                child: SizedBox(
+                  height: GolemSize.hitTarget,
+                  child: Center(
+                    child: CupertinoSwitch(
+                      key: toggleKey,
+                      value: value,
+                      onChanged: onChanged,
+                      activeTrackColor: CupertinoDynamicColor.resolve(
+                        GolemTheme.accent,
+                        context,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -179,7 +191,6 @@ class GolemSegmented<T extends Object> extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox(
     width: double.infinity,
-    height: GolemSize.segment,
     child: CupertinoSlidingSegmentedControl<T>(
       backgroundColor: CupertinoDynamicColor.resolve(
         GolemTheme.segmentTrack,
@@ -190,12 +201,23 @@ class GolemSegmented<T extends Object> extends StatelessWidget {
       onValueChanged: (value) {
         if (value != null) onChanged(value);
       },
-      children: segments,
+      children: {
+        for (final entry in segments.entries)
+          // Sized so each segment clears the 44pt tap-target guideline —
+          // the repo picks full hit areas over the handoff's 36pt visual
+          // (the #47 precedent).
+          entry.key: SizedBox(
+            height: GolemSize.hitTarget,
+            child: Center(child: entry.value),
+          ),
+      },
     ),
   );
 }
 
-/// A muted centered footnote under a section or screen.
+/// A muted centered footnote under a section or screen. Muted rather
+/// than tertiary ink: tertiary lands at ~3:1 on the canvas and fails
+/// the WCAG contrast gate the widget suite enforces.
 class SettingsFootnote extends StatelessWidget {
   const SettingsFootnote(this.text, {this.centered = true, super.key});
   final String text;
@@ -208,7 +230,7 @@ class SettingsFootnote extends StatelessWidget {
       text,
       textAlign: centered ? TextAlign.center : TextAlign.start,
       style: GolemText.footnote.copyWith(
-        color: CupertinoDynamicColor.resolve(GolemTheme.tertiaryInk, context),
+        color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
       ),
     ),
   );

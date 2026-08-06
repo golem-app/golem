@@ -179,10 +179,14 @@ class _Legend extends StatelessWidget {
         ),
       ),
       const SizedBox(width: 6),
-      Text(
-        label,
-        style: GolemText.footnote.copyWith(
-          color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
+      // Flexible so an enlarged-text chip wraps instead of overflowing
+      // its Wrap run.
+      Flexible(
+        child: Text(
+          label,
+          style: GolemText.footnote.copyWith(
+            color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
+          ),
         ),
       ),
     ],

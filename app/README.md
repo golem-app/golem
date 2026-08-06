@@ -69,11 +69,20 @@ backups (iOS/macOS `NSURLIsExcludedFromBackupKey`, Android
 `dataExtractionRules`).
 
 Per-model **generation settings** (temperature, top-p, top-k, max tokens,
-context length) live in Settings' Generation section, persist sparsely to
-`flutter-prefs-v1.json` (only user-set values; recommended defaults stay
-in the broker profiles), and merge onto the profile defaults at
-generation time — provable from the effective sampling fields on each
-`INFERNO_METRICS` line. Qwen's thinking-mode sampling is pinned against
+context length) live in Settings ▸ Response style's Advanced sampling
+section, persist sparsely to `flutter-prefs-v1.json` (only user-set
+values; recommended defaults stay in the broker profiles), and merge onto
+the profile defaults at generation time — provable from the effective
+sampling fields on each `INFERNO_METRICS` line. **Response styles**
+(Precise / Balanced / Creative, per profile) map onto explicit sampling
+values in `core/domain/response_style_mapping.dart` and layer *under*
+those hand-set overrides, knob by knob; Balanced means the profile
+defaults. The Advanced-mode **system prompt** renders as the leading
+system turn of the chat template on real engines and is acknowledged by
+the fake. App-wide preferences (theme, text size, transcript toggles,
+save-history, Advanced mode, response styles, custom repositories)
+persist separately to `flutter-ui-prefs-v1.json` with the same sparse
+schema-v1 atomic-write discipline. Qwen's thinking-mode sampling is pinned against
 overrides (off-spec thinking looped during the #33 bring-up); token
 budgets apply to both modes, and the UI keeps max tokens at least a
 512-token prompt reserve below the context length, clamped across both
@@ -131,6 +140,9 @@ repo root.
   policy above). Reasoning is never copied into later prompt context.
 - `SettingsRepository`: sparse per-model generation overrides, persisted
   as schema-v1 JSON with the same atomic-write discipline.
+- `PreferencesRepository`: app-wide preferences (appearance, transcript,
+  privacy, Advanced mode, response styles, custom repositories) in a
+  second schema-v1 store, so neither file's schema constrains the other.
 - `ModelManagementRepository`: per-artifact download/pause/cancel/delete over
   the injected catalog plus runtime state, persisted as schema-v2 JSON. The
   fake simulates the same catalog; `RealModelManagementRepository` downloads
@@ -156,8 +168,16 @@ with the ephemeral stopped-tokens caption, message actions (copy, regenerate,
 branch-from-here, share, delete), edit-and-truncate, the sectioned edge-swipe
 conversation drawer with pinning and a storage meter, full-screen cross-chat
 search, the per-chat model picker, the attach sheet (UI only until #18),
-confirmation toasts, Settings model simulations, runtime controls, Benchmark,
-JSON export, and the native share sheet.
+confirmation toasts, the redesigned minimal Settings (root rows plus Models,
+Response style, System prompt, Appearance, Privacy & data, and Storage
+sub-screens, with an Advanced mode switch gating the sampling controls, the
+system prompt, and the custom-repository loader), runtime controls, Benchmark,
+JSON export, and the native share sheet. Privacy & data can stop saving chat
+history (confirming, then emptying the on-disk store), export every chat as
+JSON, and delete all chats; Storage breaks usage into models, chats, and
+cache with per-model delete and a cache clear. Custom repositories download
+for real nowhere yet: the fake simulates them and the real backend keeps Add
+disabled until #20.
 
 Assistant messages render a scoped markdown subset (paragraphs, emphasis,
 inline code, one-level lists, fenced code with a fixed dark card in both
@@ -183,15 +203,27 @@ identifiers are `launch-splash`, `chat-composer`, `send-button`, `stop-button`,
 `menu-{pin-toggle,rename,share-transcript,delete}`, `storage-meter`,
 `search-field`, `search-cancel`, `search-results`, `search-result-<id>`,
 `search-empty`, `rename-sheet`, `rename-field`, `rename-counter`,
-`confirm-delete`, `open-settings`, `model-card-<key>`, `model-status-<key>`,
+`confirm-delete`, `open-settings`,
+`settings-{model,style,system-prompt,appearance,privacy,storage}-row`,
+`advanced-mode-switch`, `about-row`, `about-sheet`,
+`models-tab-{all,installed}`, `model-card-<key>`, `model-status-<key>`,
 `model-download-<key>`, `model-pause-<key>`, `model-cancel-<key>`,
 `model-delete-<key>`, `confirm-model-delete` (catalog keys: `gemma4-mlx`,
-`gemma4-gguf`, `qwen35-mlx`, `qwen35-gguf`), `download-active-model` (the
-chat failure banner's consent CTA when a real backend's model is not
-downloaded yet), `gen-temperature-<profile>`, `gen-top-p-<profile>`,
+`gemma4-gguf`, `qwen35-mlx`, `qwen35-gguf`, plus derived
+`custom-<repository-slug>` entries),
+`custom-repo-{engine-mlx,engine-gguf,field,add}`, `download-active-model`
+(the chat failure banner's consent CTA when a real backend's model is not
+downloaded yet), `style-{precise,balanced,creative}`,
+`gen-temperature-<profile>`, `gen-top-p-<profile>`,
 `gen-top-k-<profile>`, `gen-max-tokens-<profile>` and
 `gen-context-<profile>` (steppers expose `-minus`/`-plus` suffixed
-buttons), `gen-reset-<profile>` (profile keys: `gemma4`, `qwen35`),
+buttons; the sampling card edits the active profile),
+`gen-reset-<profile>` (profile keys: `gemma4`, `qwen35`),
+`system-prompt-field`, `system-prompt-reset`,
+`theme-{system,light,dark}`, `text-scale-slider`,
+`toggle-{metrics,reasoning,haptics,save-history}`, `confirm-history-off`,
+`export-chats`, `delete-all-chats`, `confirm-delete-all`, `storage-bar`,
+`storage-model-<key>`, `storage-delete-<key>`, `clear-cache`,
 `runtime-toggle-button`,
 `open-benchmark`, `benchmark-case-picker`, `benchmark-phase-picker`,
 `benchmark-run-button`, `benchmark-stop-button`, and `benchmark-export-button`.
@@ -274,9 +306,14 @@ Sheets (rename, model picker, attach) record android in both appearances:
 the drag handle is the android-only painted element whose tint differs.
 They cover splash, empty/populated chat, reasoning, the markdown
 transcript, search, the composer sheets, the sectioned conversation
-drawer, rename overlay, Settings states, and Benchmark. The widget suite
-also runs Flutter's iOS 44-point target, semantic-label, contrast, and
-enlarged-text checks.
+drawer, rename overlay, every settings surface (root, models, response
+style, appearance, privacy, storage, system prompt — with iOS-only
+Advanced variants for the root, custom repository, and sampling states),
+and Benchmark. The widget suite also runs Flutter's iOS 44-point target,
+semantic-label, contrast, and enlarged-text checks; the settings root,
+appearance, and privacy screens are enrolled alongside chat, which is
+why segments and switches carry full 44-point targets and footnotes use
+muted rather than tertiary ink.
 
 ## iPhone 17 simulator verification
 

@@ -82,6 +82,14 @@ abstract final class GolemTheme {
   static const splash = Color(0xFF060D1F);
   static const amber = Color(0xFFF6AA1B);
   static const destructive = Color(0xFFFF382C);
+
+  /// Destructive body text on light surfaces: the brand red reads at
+  /// ~3.6:1 on white, under the enforced WCAG 4.5:1, so standalone text
+  /// rows darken it in light mode; dark mode keeps the brand red.
+  static const destructiveText = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFFD70015),
+    darkColor: Color(0xFFFF6259),
+  );
   // Fixed colors for the always-dark drawer and splash surfaces.
   static const textOnDark = Color(0xFFF7F8FA);
   static const mutedOnDark = Color(0xFFAAB4C9);
