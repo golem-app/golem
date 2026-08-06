@@ -463,15 +463,16 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
   }
 }
 
-/// The storage footer: model bytes on this device over the volume's
-/// capacity. Hidden entirely when the capacity is unknown.
+/// The storage footer: Golem's bytes on this device (models, chats, and
+/// cache) over the volume's capacity. Hidden entirely when the capacity
+/// is unknown.
 final class _StorageMeter extends ConsumerWidget {
   const _StorageMeter({required this.gigabytes});
   final String Function(int) gigabytes;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final overview = ref.watch(storageOverviewProvider).value;
+    final overview = ref.watch(storageBreakdownProvider).value;
     final total = overview?.totalBytes;
     if (overview == null || total == null) return const SizedBox.shrink();
     return Padding(

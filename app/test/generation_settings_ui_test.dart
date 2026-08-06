@@ -2,22 +2,30 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
+import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
+import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
-import 'package:golem_flutter/features/settings/settings_screen.dart';
+import 'package:golem_flutter/features/settings/response_style_screen.dart';
 
 import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
+import 'support/in_memory_preferences_repository.dart';
 import 'support/in_memory_settings_repository.dart';
 
 void main() {
   late InMemorySettingsRepository settings;
 
+  // The sampling controls live on the Response style screen (Advanced
+  // mode) and always edit the active profile, so each pump names the
+  // profile under test through the backend signal.
   Future<void> pumpSettings(
     WidgetTester tester, {
     GenerationSettings seed = const GenerationSettings(),
+    String profileKey = 'gemma4',
+    ResponseStyle style = ResponseStyle.balanced,
   }) async {
     setViewport(tester);
     settings = InMemorySettingsRepository(seed);
@@ -29,7 +37,20 @@ void main() {
         inferenceRepositoryProvider.overrideWithValue(
           FakeInferenceRepository(eventDelay: Duration.zero),
         ),
+        inferenceBackendProvider.overrideWithValue(
+          InferenceBackendConfig(
+            kind: InferenceBackendKind.fake,
+            profileKey: profileKey,
+          ),
+        ),
         settingsRepositoryProvider.overrideWithValue(settings),
+        preferencesRepositoryProvider.overrideWithValue(
+          InMemoryPreferencesRepository(
+            const AppPreferences(
+              advancedMode: true,
+            ).withStyle(profileKey, style),
+          ),
+        ),
         modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
         modelManagementRepositoryProvider.overrideWithValue(
           const StaticModels(ModelState()),
@@ -40,7 +61,7 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: wrapApp(child: const SettingsScreen()),
+        child: wrapApp(child: const ResponseStyleScreen()),
       ),
     );
     await tester.pumpAndSettle();
@@ -52,7 +73,7 @@ void main() {
       200,
       scrollable: find
           .descendant(
-            of: find.byKey(const Key('settings-list')),
+            of: find.byKey(const Key('style-list')),
             matching: find.byType(Scrollable),
           )
           .first,
@@ -91,7 +112,7 @@ void main() {
     // reserve free — the engines reject prompt + budget over the context,
     // so budget == context would fail every send.
     final container = ProviderScope.containerOf(
-      tester.element(find.byType(SettingsScreen)),
+      tester.element(find.byType(ResponseStyleScreen)),
     );
     await container
         .read(settingsControllerProvider.notifier)
@@ -140,7 +161,7 @@ void main() {
   testWidgets('shrinking Qwen context clamps its thinking budget too', (
     tester,
   ) async {
-    await pumpSettings(tester);
+    await pumpSettings(tester, profileKey: 'qwen35');
     await reveal(tester, const Key('gen-context-qwen35'));
     // No maxTokens override: direct mode defaults to 2048 but thinking
     // mode to 4096, and the clamp must satisfy the larger of the two.
@@ -178,8 +199,31 @@ void main() {
     expect(find.byKey(const Key('gen-max-tokens-gemma4')), findsOneWidget);
   });
 
+  testWidgets('the sampling card states the effective style values', (
+    tester,
+  ) async {
+    // The card must show what generation will run — the style's values
+    // layered under manual overrides — never the profile defaults while
+    // a style silently steers them.
+    await pumpSettings(tester, style: ResponseStyle.precise);
+    await reveal(tester, const Key('gen-top-p-gemma4'));
+    expect(find.text('0.30'), findsOneWidget, reason: 'precise temperature');
+    expect(find.text('0.90'), findsOneWidget, reason: 'precise top-p');
+    expect(find.textContaining('· precise'), findsNWidgets(2));
+    // A hand-set knob wins and drops the style caption on that row only.
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ResponseStyleScreen)),
+    );
+    await container
+        .read(settingsControllerProvider.notifier)
+        .updateModel('gemma4', const SamplingOverrides(temperature: 0.55));
+    await tester.pumpAndSettle();
+    expect(find.text('0.55'), findsOneWidget);
+    expect(find.textContaining('· precise'), findsOneWidget);
+  });
+
   testWidgets('the temperature slider commits on drag end', (tester) async {
-    await pumpSettings(tester);
+    await pumpSettings(tester, profileKey: 'qwen35');
     await reveal(tester, const Key('gen-temperature-qwen35'));
 
     await tester.drag(

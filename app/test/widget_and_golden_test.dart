@@ -10,11 +10,19 @@ import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/search_screen.dart';
 import 'package:golem_flutter/features/chat/widgets/composer.dart';
 import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
+import 'package:golem_flutter/core/domain/app_preferences.dart';
+import 'package:golem_flutter/features/settings/appearance_screen.dart';
+import 'package:golem_flutter/features/settings/models_screen.dart';
+import 'package:golem_flutter/features/settings/privacy_screen.dart';
+import 'package:golem_flutter/features/settings/response_style_screen.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';
+import 'package:golem_flutter/features/settings/storage_screen.dart';
+import 'package:golem_flutter/features/settings/system_prompt_screen.dart';
 import 'package:golem_flutter/features/splash/splash_screen.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 
 import 'support/harness.dart';
+import 'support/in_memory_preferences_repository.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -188,29 +196,46 @@ void main() {
     }, variant: bothChromes);
   }
 
+  // 42% of the pinned Gemma MLX artifact, mid-pause, with the Qwen GGUF
+  // installed — exercises progress, resume, delete, and the storage
+  // breakdown from one seed.
+  const settingsModelSeed = ModelState(
+    artifacts: {
+      'gemma4-mlx': ArtifactStatus(
+        phase: ArtifactPhase.paused,
+        downloadedBytes: 1505735776,
+      ),
+      'qwen35-gguf': ArtifactStatus(
+        phase: ArtifactPhase.installed,
+        downloadedBytes: 2543899040,
+      ),
+    },
+    runtime: RuntimePhase.unloaded,
+    activeArtifactKey: 'gemma4-mlx',
+    simulated: true,
+  );
+
+  Future<void> revealIn(WidgetTester tester, Key listKey, Key target) async {
+    await tester.scrollUntilVisible(
+      find.byKey(target),
+      260,
+      scrollable: find
+          .descendant(
+            of: find.byKey(listKey),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+  }
+
   for (final brightness in Brightness.values) {
-    testWidgets('settings states ${brightness.name} golden', (tester) async {
+    testWidgets('settings root ${brightness.name} golden', (tester) async {
       if (chromeSuffix().isNotEmpty && brightness == Brightness.dark) return;
       await pumpWithRepositories(
         tester,
         brightness: brightness,
-        // 42% of the pinned Gemma MLX artifact, mid-pause, with the Qwen GGUF
-        // installed — exercises progress, resume, and delete affordances.
-        model: const ModelState(
-          artifacts: {
-            'gemma4-mlx': ArtifactStatus(
-              phase: ArtifactPhase.paused,
-              downloadedBytes: 1505735776,
-            ),
-            'qwen35-gguf': ArtifactStatus(
-              phase: ArtifactPhase.installed,
-              downloadedBytes: 2543899040,
-            ),
-          },
-          runtime: RuntimePhase.unloaded,
-          activeArtifactKey: 'gemma4-mlx',
-          simulated: true,
-        ),
+        model: settingsModelSeed,
         child: const SettingsScreen(),
       );
       await expectLater(
@@ -219,28 +244,160 @@ void main() {
           'goldens/settings-${brightness.name}${chromeSuffix()}.png',
         ),
       );
+    }, variant: bothChromes);
 
-      // The generation section lives below the fold; capture it scrolled
-      // into view so the per-model controls keep visual coverage. iOS
-      // variants only — the section is chrome-free.
-      if (chromeSuffix().isNotEmpty) return;
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('gen-context-gemma4')),
-        260,
-        scrollable: find
-            .descendant(
-              of: find.byKey(const Key('settings-list')),
-              matching: find.byType(Scrollable),
-            )
-            .first,
+    testWidgets('settings models ${brightness.name} golden', (tester) async {
+      if (chromeSuffix().isNotEmpty && brightness == Brightness.dark) return;
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        model: settingsModelSeed,
+        child: const ModelsScreen(),
       );
-      await tester.pumpAndSettle();
       await expectLater(
-        find.byType(SettingsScreen),
-        matchesGoldenFile('goldens/settings-generation-${brightness.name}.png'),
+        find.byType(ModelsScreen),
+        matchesGoldenFile(
+          'goldens/settings-models-${brightness.name}${chromeSuffix()}.png',
+        ),
       );
     }, variant: bothChromes);
 
+    testWidgets('settings style ${brightness.name} golden', (tester) async {
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        child: const ResponseStyleScreen(),
+      );
+      await expectLater(
+        find.byType(ResponseStyleScreen),
+        matchesGoldenFile('goldens/settings-style-${brightness.name}.png'),
+      );
+    }, variant: iosChrome);
+
+    testWidgets('settings style advanced ${brightness.name} golden', (
+      tester,
+    ) async {
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        preferences: InMemoryPreferencesRepository(
+          const AppPreferences(advancedMode: true),
+        ),
+        child: const ResponseStyleScreen(),
+      );
+      await revealIn(
+        tester,
+        const Key('style-list'),
+        const Key('gen-context-gemma4'),
+      );
+      await expectLater(
+        find.byType(ResponseStyleScreen),
+        matchesGoldenFile(
+          'goldens/settings-style-advanced-${brightness.name}.png',
+        ),
+      );
+    }, variant: iosChrome);
+
+    testWidgets('settings appearance ${brightness.name} golden', (
+      tester,
+    ) async {
+      if (chromeSuffix().isNotEmpty && brightness == Brightness.dark) return;
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        child: const AppearanceScreen(),
+      );
+      await expectLater(
+        find.byType(AppearanceScreen),
+        matchesGoldenFile(
+          'goldens/settings-appearance-${brightness.name}${chromeSuffix()}.png',
+        ),
+      );
+    }, variant: bothChromes);
+
+    testWidgets('settings privacy ${brightness.name} golden', (tester) async {
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        child: const PrivacyScreen(),
+      );
+      await expectLater(
+        find.byType(PrivacyScreen),
+        matchesGoldenFile('goldens/settings-privacy-${brightness.name}.png'),
+      );
+    }, variant: iosChrome);
+
+    testWidgets('settings storage ${brightness.name} golden', (tester) async {
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        model: settingsModelSeed,
+        child: const StorageScreen(),
+      );
+      await expectLater(
+        find.byType(StorageScreen),
+        matchesGoldenFile('goldens/settings-storage-${brightness.name}.png'),
+      );
+    }, variant: iosChrome);
+
+    testWidgets('settings system prompt ${brightness.name} golden', (
+      tester,
+    ) async {
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        preferences: InMemoryPreferencesRepository(
+          const AppPreferences(advancedMode: true),
+        ),
+        child: const SystemPromptScreen(),
+      );
+      await expectLater(
+        find.byType(SystemPromptScreen),
+        matchesGoldenFile(
+          'goldens/settings-system-prompt-${brightness.name}.png',
+        ),
+      );
+    }, variant: iosChrome);
+  }
+
+  testWidgets('settings advanced root and custom repository golden', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      model: settingsModelSeed,
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(advancedMode: true),
+      ),
+      child: const SettingsScreen(),
+    );
+    // Advanced on: the root grows the System prompt row.
+    expect(find.byKey(const Key('settings-system-prompt-row')), findsOneWidget);
+    await expectLater(
+      find.byType(SettingsScreen),
+      matchesGoldenFile('goldens/settings-advanced-light.png'),
+    );
+
+    await pumpWithRepositories(
+      tester,
+      model: settingsModelSeed,
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(advancedMode: true),
+      ),
+      child: const ModelsScreen(),
+    );
+    await revealIn(
+      tester,
+      const Key('models-list'),
+      const Key('custom-repo-add'),
+    );
+    await expectLater(
+      find.byType(ModelsScreen),
+      matchesGoldenFile('goldens/settings-models-advanced-light.png'),
+    );
+  }, variant: iosChrome);
+
+  for (final brightness in Brightness.values) {
     testWidgets('benchmark result ${brightness.name} golden', (tester) async {
       if (chromeSuffix().isNotEmpty && brightness == Brightness.dark) return;
       await pumpWithRepositories(
@@ -278,20 +435,39 @@ void main() {
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
 
-    await tester.pumpWidget(
-      MediaQuery(
-        data: const MediaQueryData(
-          size: viewport,
-          textScaler: TextScaler.linear(1.6),
+    // The redesigned settings surfaces enroll in the same guidelines.
+    for (final screen in const <Widget>[
+      SettingsScreen(),
+      AppearanceScreen(),
+      PrivacyScreen(),
+    ]) {
+      await pumpWithRepositories(tester, child: screen);
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(textContrastGuideline));
+    }
+
+    for (final screen in const <Widget>[
+      SettingsScreen(),
+      AppearanceScreen(),
+      PrivacyScreen(),
+      StorageScreen(),
+    ]) {
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(
+            size: viewport,
+            textScaler: TextScaler.linear(1.6),
+          ),
+          child: UncontrolledProviderScope(
+            container: buildContainer(),
+            child: wrapApp(child: screen),
+          ),
         ),
-        child: UncontrolledProviderScope(
-          container: buildContainer(),
-          child: wrapApp(child: const SettingsScreen()),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
   }, variant: iosChrome);
 
   testWidgets('a real backend renders honest copy on every surface', (
@@ -314,28 +490,22 @@ void main() {
       // Simulated downloads with real inference: the mixed state a dev
       // build can genuinely be in.
       model: const ModelState(simulated: true),
-      child: const SettingsScreen(),
-    );
-    expect(find.byKey(const Key('simulation-banner')), findsNothing);
-    expect(find.textContaining('SIMULATED'), findsNothing);
-    // The download axis stays honestly simulated under the fake
-    // repository; asserted before scrolling because the ListView
-    // virtualizes the header away.
-    expect(
-      find.textContaining('deterministic download simulation'),
-      findsOneWidget,
+      child: const ModelsScreen(),
     );
     await tester.scrollUntilVisible(
       find.byKey(const Key('runtime-toggle-button')),
       260,
       scrollable: find
           .descendant(
-            of: find.byKey(const Key('settings-list')),
+            of: find.byKey(const Key('models-list')),
             matching: find.byType(Scrollable),
           )
           .first,
     );
     await tester.pumpAndSettle();
+    // The download axis stays honestly simulated under the fake
+    // repository (the screen footer, virtualized until scrolled near).
+    expect(find.textContaining('deterministic simulation'), findsWidgets);
     expect(find.text('Load Runtime'), findsOneWidget);
     expect(find.textContaining('Simulated Runtime'), findsNothing);
     // The runtime rows: an honest bare state and no simulated qualifier
@@ -344,19 +514,24 @@ void main() {
     expect(find.text('None'), findsOneWidget);
     expect(find.textContaining('None · simulated'), findsNothing);
 
-    await tester.scrollUntilVisible(
-      find.textContaining('Inference runs the local engine'),
-      260,
-      scrollable: find
-          .descendant(
-            of: find.byKey(const Key('settings-list')),
-            matching: find.byType(Scrollable),
-          )
-          .first,
+    await pumpWithRepositories(
+      tester,
+      backend: backend,
+      model: const ModelState(simulated: true),
+      child: const SettingsScreen(),
     );
+    expect(find.byKey(const Key('simulation-banner')), findsNothing);
+    expect(find.textContaining('SIMULATED'), findsNothing);
+    // About composes per-axis honesty: the real inference sentence next
+    // to the simulated-downloads sentence. Ordered after the models
+    // scroll on purpose: an opened sheet leaves later re-pumped trees
+    // un-hit-testable, so no segment past this one taps or scrolls.
+    await tester.tap(find.byKey(const Key('about-row')));
     await tester.pumpAndSettle();
-    // About composes per-axis honesty: real inference sentence next to
-    // the simulated-downloads sentence.
+    expect(
+      find.textContaining('Inference runs the local engine'),
+      findsOneWidget,
+    );
     expect(
       find.textContaining('deterministic simulation of the pinned catalog'),
       findsOneWidget,

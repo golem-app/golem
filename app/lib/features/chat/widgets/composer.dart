@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/domain/models.dart';
@@ -269,6 +270,13 @@ class Composer extends ConsumerWidget {
                             : () {
                                 final text = controller.text;
                                 controller.clear();
+                                if (ref
+                                        .read(preferencesControllerProvider)
+                                        .value
+                                        ?.hapticsOnSend ??
+                                    true) {
+                                  HapticFeedback.lightImpact();
+                                }
                                 ref
                                     .read(chatControllerProvider.notifier)
                                     .send(text);

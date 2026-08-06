@@ -89,6 +89,18 @@ class MessageBubble extends ConsumerWidget {
               _ReasoningCard(
                 text: message.reasoning!,
                 streaming: message.isStreaming && message.text.isEmpty,
+                live: message.isStreaming,
+                // Streaming reasoning is always shown live; settled cards
+                // start collapsed unless the appearance preference says
+                // otherwise. A card opened by streaming latches open when
+                // the run settles (see _ReasoningCardState).
+                initiallyExpanded:
+                    message.isStreaming ||
+                    (ref
+                            .watch(preferencesControllerProvider)
+                            .value
+                            ?.expandReasoning ??
+                        false),
               ),
             if (isUser)
               Text(
@@ -119,11 +131,19 @@ class MessageBubble extends ConsumerWidget {
               ),
             ],
             if (!isUser && message.metrics != null) ...[
-              const SizedBox(height: 12),
-              if (message.isStreaming)
-                _GeneratingPill(metrics: message.metrics!)
-              else
+              // The generating pill is streaming status and always shows;
+              // the settled chip is what the appearance toggle hides.
+              if (message.isStreaming) ...[
+                const SizedBox(height: 12),
+                _GeneratingPill(metrics: message.metrics!),
+              ] else if (ref
+                      .watch(preferencesControllerProvider)
+                      .value
+                      ?.showMetrics ??
+                  true) ...[
+                const SizedBox(height: 12),
                 _MetricsPill(metrics: message.metrics!),
+              ],
             ],
           ],
         ),
@@ -362,9 +382,20 @@ class MessageBubble extends ConsumerWidget {
 }
 
 class _ReasoningCard extends StatefulWidget {
-  const _ReasoningCard({required this.text, required this.streaming});
+  const _ReasoningCard({
+    required this.text,
+    required this.streaming,
+    required this.live,
+    required this.initiallyExpanded,
+  });
   final String text;
   final bool streaming;
+
+  /// Whether the owning message is still streaming at all (the reasoning
+  /// header's LIVE state, [streaming], ends earlier — when answer text
+  /// starts).
+  final bool live;
+  final bool initiallyExpanded;
 
   @override
   State<_ReasoningCard> createState() => _ReasoningCardState();
@@ -372,8 +403,23 @@ class _ReasoningCard extends StatefulWidget {
 
 class _ReasoningCardState extends State<_ReasoningCard> {
   // Widget-local disclosure: collapsing a reasoning card is ephemeral
-  // presentation state, never persisted.
-  bool _expanded = true;
+  // presentation state, never persisted. Until the user touches the
+  // card it follows [_ReasoningCard.initiallyExpanded] reactively —
+  // preferences resolve a frame after cold start, and an initial-only
+  // read would freeze on that pre-resolution frame.
+  bool? _userToggle;
+  bool get _expanded => _userToggle ?? widget.initiallyExpanded;
+
+  @override
+  void didUpdateWidget(covariant _ReasoningCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A card the stream opened stays open when the run settles — the
+    // reader may be mid-thought. Latching only on the live→settled edge
+    // keeps preference toggles reactive for every other card.
+    if (oldWidget.live && !widget.live && _userToggle == null) {
+      _userToggle = true;
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Container(
@@ -398,7 +444,7 @@ class _ReasoningCardState extends State<_ReasoningCard> {
       children: [
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () => setState(() => _expanded = !_expanded),
+          onTap: () => setState(() => _userToggle = !_expanded),
           child: Row(
             children: [
               const Icon(

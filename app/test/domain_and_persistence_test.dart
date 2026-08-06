@@ -2,9 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
+import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/file_chat_history_repository.dart';
+import 'package:golem_flutter/core/repositories/file_preferences_repository.dart';
 import 'package:golem_flutter/core/repositories/file_settings_repository.dart';
 
 void main() {
@@ -222,5 +225,134 @@ void main() {
       expect(File('${file.path}.corrupt').existsSync(), isTrue);
       await File('${file.path}.corrupt').delete();
     }
+  });
+
+  test('app preferences persist sparsely and round-trip', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'golem-ui-prefs-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File('${directory.path}/ui-prefs.json');
+    final repository = FilePreferencesRepository(file);
+
+    // A missing file is all defaults, not an error.
+    final defaults = await repository.load();
+    expect(defaults.theme, ThemeSetting.system);
+    expect(defaults.saveHistory, isTrue);
+    expect(defaults.advancedMode, isFalse);
+
+    await repository.save(
+      const AppPreferences(
+        theme: ThemeSetting.dark,
+        textScale: 1.15,
+        showMetrics: false,
+        expandReasoning: true,
+        advancedMode: true,
+        systemPrompt: 'Answer like a pirate.',
+        customModels: [
+          CustomModelSpec(
+            repository: 'mlx-community/awesome-model',
+            engine: ModelEngine.mlx,
+          ),
+        ],
+      ).withStyle('gemma4', ResponseStyle.precise),
+    );
+    final loaded = await repository.load();
+    expect(loaded.theme, ThemeSetting.dark);
+    expect(loaded.textScale, 1.15);
+    expect(loaded.showMetrics, isFalse);
+    expect(loaded.expandReasoning, isTrue);
+    expect(loaded.hapticsOnSend, isTrue);
+    expect(loaded.advancedMode, isTrue);
+    expect(loaded.systemPrompt, 'Answer like a pirate.');
+    expect(loaded.styleFor('gemma4'), ResponseStyle.precise);
+    expect(loaded.styleFor('qwen35'), ResponseStyle.balanced);
+    expect(
+      loaded.customModels.single.key,
+      startsWith('custom-mlx-community-awesome-model-'),
+    );
+
+    // Only non-default values reach disk, so future default changes reach
+    // users who never touched a control.
+    final raw = jsonDecode(await file.readAsString()) as Map<String, Object?>;
+    expect(raw['schemaVersion'], 1);
+    expect(raw.containsKey('hapticsOnSend'), isFalse);
+    expect(raw.containsKey('saveHistory'), isFalse);
+    expect((raw['responseStyles'] as Map).keys, ['gemma4']);
+
+    // Reverting the style to balanced removes its entry entirely.
+    await repository.save(loaded.withStyle('gemma4', ResponseStyle.balanced));
+    expect((await repository.load()).responseStyles, isEmpty);
+  });
+
+  test('unreadable or unknown-schema app preferences recover', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'golem-ui-prefs-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    for (final content in ['not json at all', '{"schemaVersion": 2}']) {
+      final file = File('${directory.path}/ui-prefs.json');
+      await file.writeAsString(content);
+      final repository = FilePreferencesRepository(file);
+      expect((await repository.load()).saveHistory, isTrue);
+      expect(File('${file.path}.corrupt').existsSync(), isTrue);
+      await File('${file.path}.corrupt').delete();
+    }
+  });
+
+  test('a custom repository derives a stable catalog entry', () {
+    const spec = CustomModelSpec(
+      repository: 'TheBloke/Some_Model-GGUF',
+      engine: ModelEngine.gguf,
+      revision: 'abc123',
+    );
+    final entry = spec.toCatalogEntry();
+    expect(entry.key, startsWith('custom-thebloke-some-model-gguf-'));
+    expect(entry.displayName, 'Some_Model-GGUF');
+    expect(entry.engine, ModelEngine.gguf);
+    expect(entry.revision, 'abc123');
+    // The synthetic size is deterministic (goldens and journeys depend on
+    // it) and stays in a plausible on-device range.
+    expect(entry.totalBytes, spec.toCatalogEntry().totalBytes);
+    expect(entry.totalBytes, greaterThanOrEqualTo(1200 * 1000 * 1000));
+    expect(entry.totalBytes, lessThan(3200 * 1000 * 1000));
+    // Re-adding the same repository replaces rather than duplicates.
+    final prefs = const AppPreferences()
+        .withCustomModel(spec)
+        .withCustomModel(spec);
+    expect(prefs.customModels, hasLength(1));
+
+    // Repositories that differ only in punctuation collapse to the same
+    // slug; the hash suffix keeps them distinct instead of silently
+    // replacing each other's card and download state.
+    const underscore = CustomModelSpec(
+      repository: 'org/foo_bar',
+      engine: ModelEngine.mlx,
+    );
+    const dash = CustomModelSpec(
+      repository: 'org/foo-bar',
+      engine: ModelEngine.mlx,
+    );
+    expect(underscore.key, isNot(dash.key));
+    expect(
+      const AppPreferences()
+          .withCustomModel(underscore)
+          .withCustomModel(dash)
+          .customModels,
+      hasLength(2),
+    );
+  });
+
+  test('chat history reports its stored size', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'golem-history-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final repository = FileChatHistoryRepository(
+      File('${directory.path}/history.json'),
+    );
+    expect(await repository.storedBytes(), 0);
+    await repository.save(const ChatHistorySnapshot(conversations: []));
+    expect(await repository.storedBytes(), greaterThan(0));
   });
 }

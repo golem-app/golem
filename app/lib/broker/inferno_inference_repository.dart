@@ -57,8 +57,17 @@ final class InfernoInferenceRepository implements InferenceRepository {
     // Ignored until per-chat model switching lands (#20): this repository
     // is constructed around one engine, model path, and profile.
     String? modelKey,
+    String? systemPrompt,
   }) async* {
     if (!_loaded) throw StateError('Inferno is not loaded.');
+    // Both profile templates accept an optional leading system turn; the
+    // custom prompt becomes exactly that, ahead of the conversation.
+    final renderedContext = systemPrompt == null || systemPrompt.isEmpty
+        ? context
+        : [
+            {'role': 'system', 'content': systemPrompt},
+            ...context,
+          ];
     final parser = profile.newParser(reasoningEnabled: reasoningEnabled);
     final (sampling, overridesApplied) = _effectiveSampling(
       profile.sampling(reasoningEnabled: reasoningEnabled),
@@ -69,7 +78,10 @@ final class InfernoInferenceRepository implements InferenceRepository {
     final probe = seed == null ? null : StringBuffer();
     await for (final event in _runtime.generate(
       BrokerGenerationRequest(
-        prompt: profile.render(context, reasoningEnabled: reasoningEnabled),
+        prompt: profile.render(
+          renderedContext,
+          reasoningEnabled: reasoningEnabled,
+        ),
         sampling: sampling,
       ),
     )) {

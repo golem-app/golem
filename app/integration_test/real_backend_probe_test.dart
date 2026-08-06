@@ -71,10 +71,16 @@ void main() {
     'one seeded generation through the real backend',
     (tester) async {
       await app.main();
-      // Wait the splash out by polling for the composer — a persisted
-      // container restores the previous conversation, so the composer (not
-      // the empty-chat placeholder) is the reliable arrival signal.
+      // Wait the splash out. Polling for the composer is not enough:
+      // StartupGate keeps the whole chat tree mounted beneath the splash
+      // overlay, so the composer is findable while the launch splash still
+      // covers the screen — and a tap there lands on the splash.
       await _pumpUntilFound(tester, find.byKey(const Key('chat-composer')));
+      await _pumpUntil(
+        tester,
+        'the launch splash to dismiss',
+        () => find.byKey(const Key('launch-splash')).evaluate().isEmpty,
+      );
 
       // The probe must run in a fresh chat: every turn re-prefills the whole
       // conversation, so history would change the rendered prompt and the

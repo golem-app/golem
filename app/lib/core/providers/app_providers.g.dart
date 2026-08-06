@@ -297,6 +297,137 @@ final class SettingsRepositoryProvider
 String _$settingsRepositoryHash() =>
     r'7f08be7173b537a7eccd726a624b784cc87b3fa3';
 
+@ProviderFor(preferencesRepository)
+const preferencesRepositoryProvider = PreferencesRepositoryProvider._();
+
+final class PreferencesRepositoryProvider
+    extends
+        $FunctionalProvider<
+          PreferencesRepository,
+          PreferencesRepository,
+          PreferencesRepository
+        >
+    with $Provider<PreferencesRepository> {
+  const PreferencesRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'preferencesRepositoryProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$preferencesRepositoryHash();
+
+  @$internal
+  @override
+  $ProviderElement<PreferencesRepository> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  PreferencesRepository create(Ref ref) {
+    return preferencesRepository(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(PreferencesRepository value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<PreferencesRepository>(value),
+    );
+  }
+}
+
+String _$preferencesRepositoryHash() =>
+    r'84f12c67b0492c83d2e641eac794500552c759e5';
+
+@ProviderFor(cacheProbe)
+const cacheProbeProvider = CacheProbeProvider._();
+
+final class CacheProbeProvider
+    extends $FunctionalProvider<CacheProbe, CacheProbe, CacheProbe>
+    with $Provider<CacheProbe> {
+  const CacheProbeProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'cacheProbeProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$cacheProbeHash();
+
+  @$internal
+  @override
+  $ProviderElement<CacheProbe> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  CacheProbe create(Ref ref) {
+    return cacheProbe(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(CacheProbe value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<CacheProbe>(value),
+    );
+  }
+}
+
+String _$cacheProbeHash() => r'900fcb1840982afab2b91e05f9883543a2d767a4';
+
+@ProviderFor(diskFreeSpaceProbe)
+const diskFreeSpaceProbeProvider = DiskFreeSpaceProbeProvider._();
+
+final class DiskFreeSpaceProbeProvider
+    extends $FunctionalProvider<DiskSpaceProbe, DiskSpaceProbe, DiskSpaceProbe>
+    with $Provider<DiskSpaceProbe> {
+  const DiskFreeSpaceProbeProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'diskFreeSpaceProbeProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$diskFreeSpaceProbeHash();
+
+  @$internal
+  @override
+  $ProviderElement<DiskSpaceProbe> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  DiskSpaceProbe create(Ref ref) {
+    return diskFreeSpaceProbe(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(DiskSpaceProbe value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<DiskSpaceProbe>(value),
+    );
+  }
+}
+
+String _$diskFreeSpaceProbeHash() =>
+    r'95441f7541254e1512e632401b909a1180691934';
+
 /// The resolved inference backend for this process. Deliberately a fake
 /// default value rather than a throwing seam — a documented exception to
 /// the repository-provider discipline: this is a value signal that dozens
@@ -456,58 +587,183 @@ final class DocumentsPathProvider
 
 String _$documentsPathHash() => r'22f7639f5b12516f043a3f4971f84d9142ebf642';
 
-/// The drawer's storage meter: model bytes on disk over the volume's
-/// total capacity. [StorageOverview.totalBytes] is null whenever the
-/// platform cannot report it (or the seams are unwired, as in most
-/// tests) — the meter hides instead of inventing a denominator.
+/// Storage accounting for the drawer meter and the Storage screen: model
+/// bytes from artifact state, chat bytes from the history store, cache
+/// bytes from the cache probe. [StorageBreakdown.freeBytes] and
+/// [StorageBreakdown.totalBytes] are null whenever the platform cannot
+/// report them (or the seams are unwired) — surfaces hide those figures
+/// instead of inventing them. Watching the chat controller keeps the chat
+/// bucket honest after sends and deletes.
+/// A cheap signature of the chat store that changes only when
+/// conversations or messages are added or removed. ChatController
+/// reassigns state on every streaming delta; anything as heavy as disk
+/// probing must key on this instead of the raw chat state, or it re-runs
+/// per token for the always-mounted drawer meter.
 
-@ProviderFor(storageOverview)
-const storageOverviewProvider = StorageOverviewProvider._();
+@ProviderFor(chatStorageSignature)
+const chatStorageSignatureProvider = ChatStorageSignatureProvider._();
 
-/// The drawer's storage meter: model bytes on disk over the volume's
-/// total capacity. [StorageOverview.totalBytes] is null whenever the
-/// platform cannot report it (or the seams are unwired, as in most
-/// tests) — the meter hides instead of inventing a denominator.
+/// Storage accounting for the drawer meter and the Storage screen: model
+/// bytes from artifact state, chat bytes from the history store, cache
+/// bytes from the cache probe. [StorageBreakdown.freeBytes] and
+/// [StorageBreakdown.totalBytes] are null whenever the platform cannot
+/// report them (or the seams are unwired) — surfaces hide those figures
+/// instead of inventing them. Watching the chat controller keeps the chat
+/// bucket honest after sends and deletes.
+/// A cheap signature of the chat store that changes only when
+/// conversations or messages are added or removed. ChatController
+/// reassigns state on every streaming delta; anything as heavy as disk
+/// probing must key on this instead of the raw chat state, or it re-runs
+/// per token for the always-mounted drawer meter.
 
-final class StorageOverviewProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<StorageOverview>,
-          StorageOverview,
-          FutureOr<StorageOverview>
-        >
-    with $FutureModifier<StorageOverview>, $FutureProvider<StorageOverview> {
-  /// The drawer's storage meter: model bytes on disk over the volume's
-  /// total capacity. [StorageOverview.totalBytes] is null whenever the
-  /// platform cannot report it (or the seams are unwired, as in most
-  /// tests) — the meter hides instead of inventing a denominator.
-  const StorageOverviewProvider._()
+final class ChatStorageSignatureProvider
+    extends $FunctionalProvider<(int, int), (int, int), (int, int)>
+    with $Provider<(int, int)> {
+  /// Storage accounting for the drawer meter and the Storage screen: model
+  /// bytes from artifact state, chat bytes from the history store, cache
+  /// bytes from the cache probe. [StorageBreakdown.freeBytes] and
+  /// [StorageBreakdown.totalBytes] are null whenever the platform cannot
+  /// report them (or the seams are unwired) — surfaces hide those figures
+  /// instead of inventing them. Watching the chat controller keeps the chat
+  /// bucket honest after sends and deletes.
+  /// A cheap signature of the chat store that changes only when
+  /// conversations or messages are added or removed. ChatController
+  /// reassigns state on every streaming delta; anything as heavy as disk
+  /// probing must key on this instead of the raw chat state, or it re-runs
+  /// per token for the always-mounted drawer meter.
+  const ChatStorageSignatureProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'storageOverviewProvider',
+        name: r'chatStorageSignatureProvider',
         isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$storageOverviewHash();
+  String debugGetCreateSourceHash() => _$chatStorageSignatureHash();
 
   @$internal
   @override
-  $FutureProviderElement<StorageOverview> $createElement(
+  $ProviderElement<(int, int)> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  (int, int) create(Ref ref) {
+    return chatStorageSignature(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue((int, int) value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<(int, int)>(value),
+    );
+  }
+}
+
+String _$chatStorageSignatureHash() =>
+    r'df201c6875f3c90d6cd294e37597891dfd4b41a3';
+
+@ProviderFor(storageBreakdown)
+const storageBreakdownProvider = StorageBreakdownProvider._();
+
+final class StorageBreakdownProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<StorageBreakdown>,
+          StorageBreakdown,
+          FutureOr<StorageBreakdown>
+        >
+    with $FutureModifier<StorageBreakdown>, $FutureProvider<StorageBreakdown> {
+  const StorageBreakdownProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'storageBreakdownProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$storageBreakdownHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<StorageBreakdown> $createElement(
     $ProviderPointer pointer,
   ) => $FutureProviderElement(pointer);
 
   @override
-  FutureOr<StorageOverview> create(Ref ref) {
-    return storageOverview(ref);
+  FutureOr<StorageBreakdown> create(Ref ref) {
+    return storageBreakdown(ref);
   }
 }
 
-String _$storageOverviewHash() => r'26b51b21567e82a5138c1156566d21684dce03e9';
+String _$storageBreakdownHash() => r'4c77a7aac15e06c5068777b13f95507ee6db37f3';
+
+/// The catalog the UI renders: pinned entries plus the user's custom
+/// repositories (Advanced mode), derived — never stored — so the pinned
+/// manifest stays the single source of model knowledge.
+
+@ProviderFor(effectiveModelCatalog)
+const effectiveModelCatalogProvider = EffectiveModelCatalogProvider._();
+
+/// The catalog the UI renders: pinned entries plus the user's custom
+/// repositories (Advanced mode), derived — never stored — so the pinned
+/// manifest stays the single source of model knowledge.
+
+final class EffectiveModelCatalogProvider
+    extends
+        $FunctionalProvider<
+          List<ModelCatalogEntry>,
+          List<ModelCatalogEntry>,
+          List<ModelCatalogEntry>
+        >
+    with $Provider<List<ModelCatalogEntry>> {
+  /// The catalog the UI renders: pinned entries plus the user's custom
+  /// repositories (Advanced mode), derived — never stored — so the pinned
+  /// manifest stays the single source of model knowledge.
+  const EffectiveModelCatalogProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'effectiveModelCatalogProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$effectiveModelCatalogHash();
+
+  @$internal
+  @override
+  $ProviderElement<List<ModelCatalogEntry>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  List<ModelCatalogEntry> create(Ref ref) {
+    return effectiveModelCatalog(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<ModelCatalogEntry> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<ModelCatalogEntry>>(value),
+    );
+  }
+}
+
+String _$effectiveModelCatalogHash() =>
+    r'e5ef1df3119d320d101a756b92fbef2cf4d28857';
 
 /// The published cross-chat search query. The raw field text stays in
 /// the search screen (widget-local, debounced 350 ms); only the
@@ -695,6 +951,70 @@ abstract class _$SettingsController extends $AsyncNotifier<GenerationSettings> {
   }
 }
 
+/// Persisted app-wide preferences: appearance, transcript behavior,
+/// privacy, Advanced mode, response styles, custom repositories. Every
+/// command follows the settings idiom — drop taps that land in the
+/// cold-start load window, publish optimistically, then save.
+
+@ProviderFor(PreferencesController)
+const preferencesControllerProvider = PreferencesControllerProvider._();
+
+/// Persisted app-wide preferences: appearance, transcript behavior,
+/// privacy, Advanced mode, response styles, custom repositories. Every
+/// command follows the settings idiom — drop taps that land in the
+/// cold-start load window, publish optimistically, then save.
+final class PreferencesControllerProvider
+    extends $AsyncNotifierProvider<PreferencesController, AppPreferences> {
+  /// Persisted app-wide preferences: appearance, transcript behavior,
+  /// privacy, Advanced mode, response styles, custom repositories. Every
+  /// command follows the settings idiom — drop taps that land in the
+  /// cold-start load window, publish optimistically, then save.
+  const PreferencesControllerProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'preferencesControllerProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$preferencesControllerHash();
+
+  @$internal
+  @override
+  PreferencesController create() => PreferencesController();
+}
+
+String _$preferencesControllerHash() =>
+    r'3262f94c328a1845db90bcea44e3b348eb7363d7';
+
+/// Persisted app-wide preferences: appearance, transcript behavior,
+/// privacy, Advanced mode, response styles, custom repositories. Every
+/// command follows the settings idiom — drop taps that land in the
+/// cold-start load window, publish optimistically, then save.
+
+abstract class _$PreferencesController extends $AsyncNotifier<AppPreferences> {
+  FutureOr<AppPreferences> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final created = build();
+    final ref = this.ref as $Ref<AsyncValue<AppPreferences>, AppPreferences>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<AppPreferences>, AppPreferences>,
+              AsyncValue<AppPreferences>,
+              Object?,
+              Object?
+            >;
+    element.handleValue(ref, created);
+  }
+}
+
 @ProviderFor(ChatController)
 const chatControllerProvider = ChatControllerProvider._();
 
@@ -719,7 +1039,7 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'ef10a3182f25172b14500296ce7f73548d730e77';
+String _$chatControllerHash() => r'96e2f5a4c3ec8989251696607b8c8b54cb96c4df';
 
 abstract class _$ChatController extends $AsyncNotifier<ChatState> {
   FutureOr<ChatState> build();
@@ -764,7 +1084,7 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'7a47bbcfd061e3946137acaef3bf8c24250d5a6c';
+String _$modelControllerHash() => r'0fe753ec45bf7ac5918ad1712f13074e56567507';
 
 abstract class _$ModelController extends $AsyncNotifier<ModelState> {
   FutureOr<ModelState> build();

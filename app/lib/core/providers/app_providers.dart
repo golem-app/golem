@@ -2,13 +2,16 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../domain/app_preferences.dart';
 import '../domain/app_state.dart';
 import '../domain/chat_search.dart';
 import '../domain/generation_settings.dart';
 import '../domain/inference_backend.dart';
 import '../domain/model_catalog.dart';
 import '../domain/models.dart';
+import '../domain/response_style_mapping.dart';
 import '../repositories/contracts.dart';
+import '../services/cache_probe.dart';
 import '../services/device_storage.dart';
 import '../startup/startup_sequence.dart';
 
@@ -42,6 +45,20 @@ List<ModelCatalogEntry> modelCatalogEntries(Ref ref) =>
 SettingsRepository settingsRepository(Ref ref) =>
     throw UnimplementedError('Override settingsRepositoryProvider at startup');
 
+@Riverpod(keepAlive: true)
+PreferencesRepository preferencesRepository(Ref ref) =>
+    throw UnimplementedError(
+      'Override preferencesRepositoryProvider at startup',
+    );
+
+@Riverpod(keepAlive: true)
+CacheProbe cacheProbe(Ref ref) =>
+    throw UnimplementedError('Override cacheProbeProvider at startup');
+
+@Riverpod(keepAlive: true)
+DiskSpaceProbe diskFreeSpaceProbe(Ref ref) =>
+    throw UnimplementedError('Override diskFreeSpaceProbeProvider at startup');
+
 /// The resolved inference backend for this process. Deliberately a fake
 /// default value rather than a throwing seam — a documented exception to
 /// the repository-provider discipline: this is a value signal that dozens
@@ -61,28 +78,114 @@ DiskCapacityProbe deviceCapacityProbe(Ref ref) =>
 String documentsPath(Ref ref) =>
     throw UnimplementedError('Override documentsPathProvider at startup');
 
-typedef StorageOverview = ({int usedBytes, int? totalBytes});
+typedef StorageBreakdown = ({
+  int modelsBytes,
+  int chatsBytes,
+  int cacheBytes,
+  int? freeBytes,
+  int? totalBytes,
+});
 
-/// The drawer's storage meter: model bytes on disk over the volume's
-/// total capacity. [StorageOverview.totalBytes] is null whenever the
-/// platform cannot report it (or the seams are unwired, as in most
-/// tests) — the meter hides instead of inventing a denominator.
+extension StorageBreakdownTotals on StorageBreakdown {
+  int get usedBytes => modelsBytes + chatsBytes + cacheBytes;
+}
+
+/// Storage accounting for the drawer meter and the Storage screen: model
+/// bytes from artifact state, chat bytes from the history store, cache
+/// bytes from the cache probe. [StorageBreakdown.freeBytes] and
+/// [StorageBreakdown.totalBytes] are null whenever the platform cannot
+/// report them (or the seams are unwired) — surfaces hide those figures
+/// instead of inventing them. Watching the chat controller keeps the chat
+/// bucket honest after sends and deletes.
+/// A cheap signature of the chat store that changes only when
+/// conversations or messages are added or removed. ChatController
+/// reassigns state on every streaming delta; anything as heavy as disk
+/// probing must key on this instead of the raw chat state, or it re-runs
+/// per token for the always-mounted drawer meter.
 @Riverpod(keepAlive: true)
-Future<StorageOverview> storageOverview(Ref ref) async {
+(int, int) chatStorageSignature(Ref ref) {
+  final conversations =
+      ref.watch(chatControllerProvider).value?.conversations ??
+      const <ChatConversation>[];
+  var messages = 0;
+  for (final conversation in conversations) {
+    messages += conversation.messages.length;
+  }
+  return (conversations.length, messages);
+}
+
+@Riverpod(keepAlive: true)
+Future<StorageBreakdown> storageBreakdown(Ref ref) async {
+  // Every dependency registers before the first await: the signature is
+  // what re-runs this after sends and deletes, and a watch first taken
+  // mid-computation would race its own invalidation.
+  ref.watch(chatStorageSignatureProvider);
+  final history = ref.watch(chatHistoryRepositoryProvider);
+  CacheProbe? cache;
+  try {
+    cache = ref.watch(cacheProbeProvider);
+  } catch (_) {}
+  DiskSpaceProbe? free;
+  try {
+    free = ref.watch(diskFreeSpaceProbeProvider);
+  } catch (_) {}
+  DiskCapacityProbe? capacity;
+  try {
+    capacity = ref.watch(deviceCapacityProbeProvider);
+  } catch (_) {}
+  String? path;
+  try {
+    path = ref.watch(documentsPathProvider);
+  } catch (_) {}
   final models = await ref.watch(modelControllerProvider.future);
-  final usedBytes = models.artifacts.values.fold(
+  final modelsBytes = models.artifacts.values.fold(
     0,
     (sum, status) => sum + status.downloadedBytes,
   );
+  var chatsBytes = 0;
+  try {
+    chatsBytes = await history.storedBytes();
+  } catch (_) {}
+  var cacheBytes = 0;
+  try {
+    cacheBytes = await cache?.sizeBytes() ?? 0;
+  } catch (_) {}
+  int? freeBytes;
+  try {
+    freeBytes = path == null ? null : await free?.freeBytes(path);
+  } catch (_) {
+    freeBytes = null;
+  }
   int? totalBytes;
   try {
-    totalBytes = await ref
-        .watch(deviceCapacityProbeProvider)
-        .totalBytes(ref.watch(documentsPathProvider));
+    totalBytes = path == null ? null : await capacity?.totalBytes(path);
   } catch (_) {
     totalBytes = null;
   }
-  return (usedBytes: usedBytes, totalBytes: totalBytes);
+  return (
+    modelsBytes: modelsBytes,
+    chatsBytes: chatsBytes,
+    cacheBytes: cacheBytes,
+    freeBytes: freeBytes,
+    totalBytes: totalBytes,
+  );
+}
+
+/// The catalog the UI renders: pinned entries plus the user's custom
+/// repositories (Advanced mode), derived — never stored — so the pinned
+/// manifest stays the single source of model knowledge.
+@Riverpod(keepAlive: true)
+List<ModelCatalogEntry> effectiveModelCatalog(Ref ref) {
+  final pinned = ref.watch(modelCatalogEntriesProvider);
+  final custom =
+      ref.watch(preferencesControllerProvider).value?.customModels ??
+      const <CustomModelSpec>[];
+  final pinnedKeys = {for (final entry in pinned) entry.key};
+  return [
+    ...pinned,
+    for (final spec in custom)
+      if (!pinnedKeys.contains(spec.key)) spec.toCatalogEntry(),
+  ];
 }
 
 /// The published cross-chat search query. The raw field text stays in
@@ -133,6 +236,96 @@ class SettingsController extends _$SettingsController {
       updateModel(profileKey, const SamplingOverrides());
 }
 
+/// Persisted app-wide preferences: appearance, transcript behavior,
+/// privacy, Advanced mode, response styles, custom repositories. Every
+/// command follows the settings idiom — drop taps that land in the
+/// cold-start load window, publish optimistically, then save.
+@Riverpod(keepAlive: true)
+class PreferencesController extends _$PreferencesController {
+  @override
+  Future<AppPreferences> build() =>
+      ref.read(preferencesRepositoryProvider).load();
+
+  AppPreferences get _value => state.requireValue;
+
+  Future<void> _commit(AppPreferences next) async {
+    state = AsyncData(next);
+    await ref.read(preferencesRepositoryProvider).save(next);
+  }
+
+  Future<void> setTheme(ThemeSetting theme) async {
+    if (!state.hasValue) return;
+    await _commit(_value.copyWith(theme: theme));
+  }
+
+  Future<void> setTextScale(double scale) async {
+    if (!state.hasValue) return;
+    await _commit(_value.copyWith(textScale: scale));
+  }
+
+  Future<void> setShowMetrics(bool value) async {
+    if (!state.hasValue) return;
+    await _commit(_value.copyWith(showMetrics: value));
+  }
+
+  Future<void> setExpandReasoning(bool value) async {
+    if (!state.hasValue) return;
+    await _commit(_value.copyWith(expandReasoning: value));
+  }
+
+  Future<void> setHapticsOnSend(bool value) async {
+    if (!state.hasValue) return;
+    await _commit(_value.copyWith(hapticsOnSend: value));
+  }
+
+  Future<void> setAdvancedMode(bool value) async {
+    if (!state.hasValue) return;
+    await _commit(_value.copyWith(advancedMode: value));
+  }
+
+  /// Null or blank clears the custom prompt back to the model default.
+  Future<void> setSystemPrompt(String? prompt) async {
+    if (!state.hasValue) return;
+    final trimmed = prompt?.trim();
+    await _commit(
+      _value.copyWith(
+        systemPrompt: () => trimmed == null || trimmed.isEmpty ? null : trimmed,
+      ),
+    );
+  }
+
+  Future<void> setResponseStyle(String profileKey, ResponseStyle style) async {
+    if (!state.hasValue) return;
+    await _commit(_value.withStyle(profileKey, style));
+  }
+
+  /// Turning history off also empties the on-disk store immediately — the
+  /// design copy promises chats disappear, so nothing may linger on disk.
+  /// The confirmation alert lives at the widget layer; this is past the
+  /// point of consent. Turning it back on re-saves whatever is in memory.
+  Future<void> setSaveHistory(bool save) async {
+    if (!state.hasValue) return;
+    await _commit(_value.copyWith(saveHistory: save));
+    if (save) {
+      await ref.read(chatControllerProvider.notifier).persistCurrent();
+    } else {
+      await ref
+          .read(chatHistoryRepositoryProvider)
+          .save(const ChatHistorySnapshot(conversations: []));
+    }
+  }
+
+  /// Persists the spec and registers its derived entry with the model
+  /// repository, so the card appears and can simulate a download at once.
+  Future<void> addCustomModel(CustomModelSpec spec) async {
+    if (!state.hasValue) return;
+    await _commit(_value.withCustomModel(spec));
+    await ref
+        .read(modelControllerProvider.notifier)
+        .registerCustomModel(spec.toCatalogEntry());
+  }
+}
+
 @Riverpod(keepAlive: true)
 class ChatController extends _$ChatController {
   int _generationEpoch = 0;
@@ -147,14 +340,50 @@ class ChatController extends _$ChatController {
     );
   }
 
-  Future<void> _persist(ChatState value) => ref
-      .read(chatHistoryRepositoryProvider)
-      .save(
-        ChatHistorySnapshot(
-          conversations: value.conversations,
-          activeId: value.activeId,
-        ),
-      );
+  Future<void> _persist(ChatState value) async {
+    // Privacy gate: with history off, chats live in memory only. A cold
+    // start (preferences still loading) keeps the default and saves.
+    final preferences = ref.read(preferencesControllerProvider).value;
+    if (preferences != null && !preferences.saveHistory) return;
+    await ref
+        .read(chatHistoryRepositoryProvider)
+        .save(
+          ChatHistorySnapshot(
+            conversations: value.conversations,
+            activeId: value.activeId,
+          ),
+        );
+  }
+
+  /// Re-persists the in-memory state; the save-history re-enable path.
+  Future<void> persistCurrent() async {
+    if (!state.hasValue) return;
+    await _persist(_value);
+  }
+
+  /// Removes every conversation, in memory and on disk. The confirmation
+  /// alert lives at the widget layer; this is past the point of consent.
+  Future<void> deleteAllChats() async {
+    stop();
+    final next = ChatState(conversations: const []);
+    state = AsyncData(next);
+    // Directly, not via _persist: the wipe must reach disk even when the
+    // save-history gate is closed.
+    await ref
+        .read(chatHistoryRepositoryProvider)
+        .save(const ChatHistorySnapshot(conversations: []));
+  }
+
+  /// The full history snapshot as pretty JSON — the user's own data
+  /// export, so unlike shared transcripts it keeps everything, reasoning
+  /// included.
+  String? exportAllChats() {
+    if (!state.hasValue) return null;
+    return ChatHistorySnapshot(
+      conversations: _value.conversations,
+      activeId: _value.activeId,
+    ).encode();
+  }
 
   ChatState get _value => state.requireValue;
 
@@ -399,6 +628,7 @@ class ChatController extends _$ChatController {
       state = AsyncData(_value.copyWith(generation: GenerationPhase.streaming));
       final context = active.promptContext;
       final overrides = await _samplingOverrides();
+      final systemPrompt = await _systemPrompt();
       if (!ref.mounted || epoch != _generationEpoch) return;
       await for (final event
           in ref
@@ -408,6 +638,7 @@ class ChatController extends _$ChatController {
                 reasoningEnabled: active.reasoningEnabled,
                 overrides: overrides,
                 modelKey: active.modelKey,
+                systemPrompt: systemPrompt,
               )) {
         if (!ref.mounted || epoch != _generationEpoch) return;
         if (event is CompletedEvent) break;
@@ -465,16 +696,34 @@ class ChatController extends _$ChatController {
     }
   }
 
-  /// The persisted overrides for the active model profile. Settings that
-  /// fail to surface must never block chat — the fake ignores overrides
-  /// anyway, and the repository already folds corrupt files into defaults —
-  /// so an unavailable settings store degrades to profile defaults.
+  /// The effective sparse overrides for the active model profile: the
+  /// response style's values with the user's hand-set Advanced overrides
+  /// layered on top, knob by knob. Settings that fail to surface must
+  /// never block chat — each layer degrades independently to nothing,
+  /// leaving the profile defaults.
   Future<SamplingOverrides?> _samplingOverrides() async {
+    final profileKey = ref.read(inferenceBackendProvider).profileKey;
+    var manual = const SamplingOverrides();
     try {
       final settings = await ref.read(settingsControllerProvider.future);
-      return settings.overridesFor(
-        ref.read(inferenceBackendProvider).profileKey,
-      );
+      manual = settings.overridesFor(profileKey);
+    } catch (_) {}
+    var style = const SamplingOverrides();
+    try {
+      final preferences = await ref.read(preferencesControllerProvider.future);
+      style = styleOverridesFor(profileKey, preferences.styleFor(profileKey));
+    } catch (_) {}
+    final merged = layerOverrides(manual: manual, style: style);
+    return merged.isEmpty ? null : merged;
+  }
+
+  /// The custom system prompt (Advanced mode), or null for the model's
+  /// default behavior. Unavailable preferences degrade to no prompt.
+  Future<String?> _systemPrompt() async {
+    try {
+      final preferences = await ref.read(preferencesControllerProvider.future);
+      final prompt = preferences.systemPrompt?.trim();
+      return prompt == null || prompt.isEmpty ? null : prompt;
     } catch (_) {
       return null;
     }
@@ -671,6 +920,21 @@ class ModelController extends _$ModelController {
       // Phase bookkeeping must never disturb an in-flight generation.
     } finally {
       _busy = false;
+    }
+  }
+
+  /// Registers a custom repository's derived entry (Advanced mode). Fast
+  /// and non-streaming, so it skips the busy gate; a failure lands on the
+  /// new card like any other artifact failure.
+  Future<void> registerCustomModel(ModelCatalogEntry entry) async {
+    try {
+      final value = await ref
+          .read(modelManagementRepositoryProvider)
+          .addModel(entry);
+      if (!ref.mounted) return;
+      state = AsyncData(value);
+    } catch (error) {
+      _publishFailure(entry.key, error);
     }
   }
 

@@ -55,6 +55,53 @@ void main() {
     },
   );
 
+  test(
+    'the system-prompt note never precedes reasoning or a failure',
+    () async {
+      final repository = FakeInferenceRepository(eventDelay: Duration.zero);
+      // With reasoning on, answer text arriving early would end the
+      // reasoning card's live state — the note must follow the whole
+      // reasoning stream.
+      final events = await repository
+          .generate(
+            context: const [
+              {'role': 'user', 'content': 'Hello'},
+            ],
+            reasoningEnabled: true,
+            systemPrompt: 'Answer briefly.',
+          )
+          .toList();
+      final firstAnswer = events.indexWhere((event) => event is AnswerDelta);
+      final lastReasoning = events.lastIndexWhere(
+        (event) => event is ReasoningDelta,
+      );
+      expect(firstAnswer, greaterThan(lastReasoning));
+      expect(
+        (events[firstAnswer] as AnswerDelta).text,
+        contains('system prompt is applied'),
+      );
+
+      // The failure injections stay pristine: no note ahead of the throw.
+      final failed = <InferenceEvent>[];
+      await expectLater(
+        repository
+            .generate(
+              context: const [
+                {'role': 'user', 'content': '[fail]'},
+              ],
+              reasoningEnabled: false,
+              systemPrompt: 'Answer briefly.',
+            )
+            .forEach(failed.add),
+        throwsA(isA<StateError>()),
+      );
+      expect(
+        failed.whereType<AnswerDelta>().map((event) => event.text).join(),
+        isNot(contains('system prompt')),
+      );
+    },
+  );
+
   test('fake inference supports cancellation and injected failure', () async {
     final repository = FakeInferenceRepository(
       eventDelay: const Duration(milliseconds: 20),

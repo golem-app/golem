@@ -14,9 +14,11 @@ import 'core/repositories/contracts.dart';
 import 'core/repositories/fake_benchmark_repository.dart';
 import 'core/repositories/fake_model_management_repository.dart';
 import 'core/repositories/file_chat_history_repository.dart';
+import 'core/repositories/file_preferences_repository.dart';
 import 'core/repositories/file_settings_repository.dart';
 import 'core/repositories/real_model_management_repository.dart';
 import 'core/services/artifact_downloader.dart';
+import 'core/services/cache_probe.dart';
 import 'core/services/device_storage.dart';
 
 Future<void> main() async {
@@ -38,13 +40,28 @@ Future<void> main() async {
   final backendConfig = await resolveConfiguredBackend();
   final support = await getApplicationSupportDirectory();
   final documents = await getApplicationDocumentsDirectory();
+  final temporary = await getTemporaryDirectory();
   final stateFile = File('${support.path}/flutter-model-v2.json');
   final identity = AppIdentity.current;
   final useFakeModels =
       (identity == AppIdentity.qa || identity == AppIdentity.flutter) &&
       backendConfig.simulatedInference;
+  // Preferences load before the repositories so persisted custom
+  // repositories (Advanced mode) are part of the fake downloader's catalog
+  // from the first frame. The provider catalog stays the pinned list; the
+  // UI derives pinned + custom reactively.
+  final preferencesRepository = FilePreferencesRepository(
+    File('${support.path}/flutter-ui-prefs-v1.json'),
+  );
+  final preferences = await preferencesRepository.load();
+  final pinnedKeys = {for (final entry in modelCatalog) entry.key};
+  final mergedCatalog = [
+    ...modelCatalog,
+    for (final spec in preferences.customModels)
+      if (!pinnedKeys.contains(spec.key)) spec.toCatalogEntry(),
+  ];
   final ModelManagementRepository modelManagement = useFakeModels
-      ? FakeModelManagementRepository(stateFile, catalog: modelCatalog)
+      ? FakeModelManagementRepository(stateFile, catalog: mergedCatalog)
       : RealModelManagementRepository(
           stateFile: stateFile,
           documentsDirectory: documents.path,
@@ -64,6 +81,15 @@ Future<void> main() async {
         ),
         settingsRepositoryProvider.overrideWithValue(
           FileSettingsRepository(File('${support.path}/flutter-prefs-v1.json')),
+        ),
+        preferencesRepositoryProvider.overrideWithValue(preferencesRepository),
+        cacheProbeProvider.overrideWithValue(
+          useFakeModels
+              ? FakeCacheProbe()
+              : DirectoryCacheProbe(temporary.path),
+        ),
+        diskFreeSpaceProbeProvider.overrideWithValue(
+          const DeviceStorageChannel(),
         ),
         inferenceBackendProvider.overrideWithValue(backendConfig),
         inferenceRepositoryProvider.overrideWithValue(
