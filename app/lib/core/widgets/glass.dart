@@ -5,12 +5,33 @@ import 'package:flutter/cupertino.dart';
 import '../theme/golem_theme.dart';
 
 class Glass extends StatelessWidget {
-  const Glass({required this.child, this.radius = 22, super.key});
+  const Glass({
+    required this.child,
+    this.radius = 22,
+    this.floating = false,
+    super.key,
+  });
   final Widget child;
   final double radius;
 
+  /// Floating surfaces (nav buttons, the composer, jump-to-latest) carry
+  /// the float shadow outside the blur clip.
+  final bool floating;
+
   @override
-  Widget build(BuildContext context) => ClipRRect(
+  Widget build(BuildContext context) {
+    final core = _clipped(context);
+    if (!floating) return core;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: GolemShadow.float(context),
+      ),
+      child: core,
+    );
+  }
+
+  Widget _clipped(BuildContext context) => ClipRRect(
     borderRadius: BorderRadius.circular(radius),
     child: BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),

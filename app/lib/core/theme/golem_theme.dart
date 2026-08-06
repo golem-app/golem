@@ -118,11 +118,13 @@ abstract final class GolemTheme {
         fontSize: 17,
         color: ink,
       ),
+      // The ramp's 19pt title (GolemText.title) with the display face.
       navTitleTextStyle: TextStyle(
         inherit: false,
         fontFamily: '.SF Pro Display',
-        fontSize: 17,
+        fontSize: 19,
         fontWeight: FontWeight.w600,
+        height: 1.3,
         color: ink,
       ),
     ),

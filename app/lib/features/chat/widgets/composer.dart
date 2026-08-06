@@ -30,6 +30,7 @@ class Composer extends ConsumerWidget {
       ),
       child: Glass(
         radius: 30,
+        floating: true,
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: GolemSize.composer),
           child: Row(

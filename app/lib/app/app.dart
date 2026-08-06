@@ -57,11 +57,13 @@ class _GolemAppState extends State<GolemApp> with WidgetsBindingObserver {
     theme: GolemTheme.theme(
       WidgetsBinding.instance.platformDispatcher.platformBrightness,
     ),
-    // User-facing copy is intentionally hardcoded English. The Cupertino
-    // global delegates are still required by the framework widgets
-    // themselves.
+    // User-facing copy is intentionally hardcoded English. The global
+    // delegates are still required by the framework widgets themselves —
+    // Material included: SelectableText's selection toolbar resolves to
+    // the Material implementation on Android chrome.
     localizationsDelegates: const [
       GlobalCupertinoLocalizations.delegate,
+      GlobalMaterialLocalizations.delegate,
       GlobalWidgetsLocalizations.delegate,
     ],
     supportedLocales: const [Locale('en')],

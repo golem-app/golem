@@ -87,7 +87,9 @@ void main() {
     testWidgets('drawer and rename overlay ${brightness.name} goldens', (
       tester,
     ) async {
-      if (chromeSuffix().isNotEmpty && brightness == Brightness.dark) return;
+      // Unlike the other surfaces, the rename sheet records android in BOTH
+      // appearances: the drag handle is the one android-only painted element
+      // whose tint (tertiaryInk) differs between light and dark.
       await pumpWithRepositories(
         tester,
         brightness: brightness,

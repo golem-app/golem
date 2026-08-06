@@ -54,79 +54,109 @@ Future<void> showGolemAlert({
       ),
     );
   }
+  // Mirrors what CupertinoAlertDialog provides for free: keyboard-inset
+  // lifting, a scrollable content section, and actions that never clip at
+  // large text scales (they wrap instead of overflowing a fixed row).
   return showCupertinoDialog<void>(
     context: context,
-    builder: (context) => Center(
-      child: Container(
-        key: dialogKey,
-        margin: const EdgeInsets.symmetric(horizontal: GolemSpace.s10),
-        padding: const EdgeInsets.fromLTRB(
-          GolemSpace.s6,
-          GolemSpace.s5,
-          GolemSpace.s4,
-          GolemSpace.s3,
-        ),
-        constraints: const BoxConstraints(maxWidth: 320),
-        decoration: BoxDecoration(
-          color: CupertinoDynamicColor.resolve(
-            GolemTheme.surfaceRaised,
-            context,
-          ),
-          borderRadius: BorderRadius.circular(GolemRadius.card),
-          boxShadow: GolemShadow.menu,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            DefaultTextStyle(
-              style: GolemText.bodyStrong.copyWith(
-                color: CupertinoDynamicColor.resolve(GolemTheme.ink, context),
-              ),
-              child: Text(title),
+    builder: (context) {
+      final insets = MediaQuery.viewInsetsOf(context);
+      final maxHeight =
+          (MediaQuery.sizeOf(context).height - insets.bottom) * 0.8;
+      return AnimatedPadding(
+        padding: insets,
+        duration: GolemMotion.fast,
+        curve: GolemMotion.standard,
+        child: Center(
+          child: Container(
+            key: dialogKey,
+            margin: const EdgeInsets.symmetric(horizontal: GolemSpace.s10),
+            padding: const EdgeInsets.fromLTRB(
+              GolemSpace.s6,
+              GolemSpace.s5,
+              GolemSpace.s4,
+              GolemSpace.s3,
             ),
-            if (content != null || message != null) ...[
-              const SizedBox(height: GolemSpace.s3),
-              DefaultTextStyle(
-                style: GolemText.footnote.copyWith(
-                  color: CupertinoDynamicColor.resolve(
-                    GolemTheme.mutedInk,
-                    context,
-                  ),
-                ),
-                child: content ?? Text(message!),
+            constraints: BoxConstraints(maxWidth: 320, maxHeight: maxHeight),
+            decoration: BoxDecoration(
+              color: CupertinoDynamicColor.resolve(
+                GolemTheme.surfaceRaised,
+                context,
               ),
-            ],
-            const SizedBox(height: GolemSpace.s4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+              borderRadius: BorderRadius.circular(GolemRadius.card),
+              boxShadow: GolemShadow.menu,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final action in actions)
-                  CupertinoButton(
-                    key: action.key,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: GolemSpace.s3,
-                      vertical: GolemSpace.s2,
-                    ),
-                    minimumSize: const Size(44, 44),
-                    onPressed: action.onPressed,
-                    child: Text(
-                      action.label,
-                      style: GolemText.bodyStrong.copyWith(
-                        color: action.isDestructive
-                            ? GolemTheme.destructive
-                            : CupertinoDynamicColor.resolve(
-                                GolemTheme.accent,
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        DefaultTextStyle(
+                          style: GolemText.bodyStrong.copyWith(
+                            color: CupertinoDynamicColor.resolve(
+                              GolemTheme.ink,
+                              context,
+                            ),
+                          ),
+                          child: Text(title),
+                        ),
+                        if (content != null || message != null) ...[
+                          const SizedBox(height: GolemSpace.s3),
+                          DefaultTextStyle(
+                            style: GolemText.footnote.copyWith(
+                              color: CupertinoDynamicColor.resolve(
+                                GolemTheme.mutedInk,
                                 context,
                               ),
-                      ),
+                            ),
+                            child: content ?? Text(message!),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
+                ),
+                const SizedBox(height: GolemSpace.s4),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      for (final action in actions)
+                        CupertinoButton(
+                          key: action.key,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: GolemSpace.s3,
+                            vertical: GolemSpace.s2,
+                          ),
+                          minimumSize: const Size(44, 44),
+                          onPressed: action.onPressed,
+                          child: Text(
+                            action.label,
+                            style: GolemText.bodyStrong.copyWith(
+                              color: action.isDestructive
+                                  ? GolemTheme.destructive
+                                  : CupertinoDynamicColor.resolve(
+                                      GolemTheme.accent,
+                                      context,
+                                    ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ],
             ),
-          ],
+          ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }

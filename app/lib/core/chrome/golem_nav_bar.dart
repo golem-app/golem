@@ -41,11 +41,20 @@ class GolemNavBar extends CupertinoNavigationBar {
                 : CrossAxisAlignment.center,
             children: [
               Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GolemText.caption.copyWith(color: GolemTheme.mutedInk),
+              Builder(
+                // Resolved against the bar's context: the raw dynamic color
+                // would collapse to its light variant on the dark bar.
+                builder: (context) => Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GolemText.caption.copyWith(
+                    color: CupertinoDynamicColor.resolve(
+                      GolemTheme.mutedInk,
+                      context,
+                    ),
+                  ),
+                ),
               ),
             ],
           );

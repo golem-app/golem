@@ -12,33 +12,45 @@ Future<T?> showGolemSheet<T>({
   Key? sheetKey,
 }) => showCupertinoModalPopup<T>(
   context: context,
-  builder: (context) => Container(
-    key: sheetKey,
-    decoration: BoxDecoration(
-      color: CupertinoDynamicColor.resolve(GolemTheme.surface, context),
-      borderRadius: const BorderRadius.vertical(
-        top: Radius.circular(GolemRadius.card),
+  builder: (context) => GestureDetector(
+    // The Android drag handle must deliver what it advertises: a firm
+    // downward fling dismisses the sheet (barrier tap and system back
+    // still work on both chromes).
+    onVerticalDragEnd: GolemChrome.current == GolemChrome.android
+        ? (details) {
+            if ((details.primaryVelocity ?? 0) > 300) {
+              Navigator.of(context).maybePop();
+            }
+          }
+        : null,
+    child: Container(
+      key: sheetKey,
+      decoration: BoxDecoration(
+        color: CupertinoDynamicColor.resolve(GolemTheme.surface, context),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(GolemRadius.card),
+        ),
+        boxShadow: GolemShadow.sheet,
       ),
-      boxShadow: GolemShadow.sheet,
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (GolemChrome.current == GolemChrome.android)
-          Container(
-            width: 32,
-            height: 4,
-            margin: const EdgeInsets.only(top: GolemSpace.s3),
-            decoration: BoxDecoration(
-              color: CupertinoDynamicColor.resolve(
-                GolemTheme.tertiaryInk,
-                context,
-              ).withValues(alpha: 0.45),
-              borderRadius: BorderRadius.circular(2),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (GolemChrome.current == GolemChrome.android)
+            Container(
+              width: 32,
+              height: 4,
+              margin: const EdgeInsets.only(top: GolemSpace.s3),
+              decoration: BoxDecoration(
+                color: CupertinoDynamicColor.resolve(
+                  GolemTheme.tertiaryInk,
+                  context,
+                ).withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-        builder(context),
-      ],
+          builder(context),
+        ],
+      ),
     ),
   ),
 );

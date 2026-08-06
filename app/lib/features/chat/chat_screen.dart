@@ -181,6 +181,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                   },
                             child: const Glass(
                               radius: 20,
+                              floating: true,
                               child: SizedBox(
                                 width: 40,
                                 height: 40,
@@ -203,6 +204,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                       .newChat(),
                             child: const Glass(
                               radius: 20,
+                              floating: true,
                               child: SizedBox(
                                 width: 40,
                                 height: 40,
