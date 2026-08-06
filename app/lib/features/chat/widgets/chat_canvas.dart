@@ -88,6 +88,7 @@ class ChatCanvas extends ConsumerWidget {
                       onPressed: scrollToLatest,
                       child: const Glass(
                         radius: 22,
+                        floating: true,
                         child: SizedBox(
                           width: 44,
                           height: 44,

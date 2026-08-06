@@ -4,9 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
-import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 
+import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
 
 const _delay = Duration(milliseconds: 40);
@@ -43,9 +43,7 @@ ChatHistorySnapshot _longHistory() => ChatHistorySnapshot(
 );
 
 Future<ScrollPosition> _pumpChat(WidgetTester tester) async {
-  tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = const Size(402, 874);
-  addTearDown(tester.view.reset);
+  setViewport(tester);
   final container = ProviderContainer(
     overrides: [
       chatHistoryRepositoryProvider.overrideWithValue(
@@ -60,11 +58,7 @@ Future<ScrollPosition> _pumpChat(WidgetTester tester) async {
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: CupertinoApp(
-        debugShowCheckedModeBanner: false,
-        theme: GolemTheme.theme(Brightness.light),
-        home: const ChatScreen(),
-      ),
+      child: wrapApp(child: const ChatScreen()),
     ),
   );
   await tester.pumpAndSettle();

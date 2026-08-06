@@ -16,24 +16,20 @@ class SectionHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          title,
-          style: const TextStyle(
-            fontSize: 23,
-            fontWeight: FontWeight.bold,
-            letterSpacing: -0.3,
+          title.toUpperCase(),
+          style: GolemText.overline.copyWith(
+            color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
           ),
         ),
         if (subtitle != null) ...[
           const SizedBox(height: 4),
           Text(
             subtitle!,
-            style: TextStyle(
+            style: GolemText.footnote.copyWith(
               color: CupertinoDynamicColor.resolve(
                 GolemTheme.mutedInk,
                 context,
               ),
-              fontSize: 14,
-              height: 1.35,
             ),
           ),
         ],

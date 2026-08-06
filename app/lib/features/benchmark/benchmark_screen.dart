@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/chrome/golem_nav_bar.dart';
+import '../../core/chrome/golem_sheet.dart';
 import '../../core/domain/app_state.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
@@ -16,9 +18,9 @@ class BenchmarkScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final benchmark = ref.watch(benchmarkControllerProvider);
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
+      navigationBar: GolemNavBar(
+        title: 'Benchmark',
         previousPageTitle: 'Settings',
-        middle: Text('Benchmark'),
       ),
       child: SafeArea(
         bottom: false,
@@ -189,29 +191,23 @@ class BenchmarkScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     String selected,
-  ) => showCupertinoModalPopup<void>(
+  ) => showGolemActions(
     context: context,
-    builder: (context) => CupertinoActionSheet(
-      title: const Text('Benchmark prompt'),
-      actions: [
-        for (final id in const [
-          'short-explanation',
-          'medium-review',
-          'long-synthesis',
-        ])
-          CupertinoActionSheetAction(
-            onPressed: () {
-              ref.read(benchmarkControllerProvider.notifier).selectCase(id);
-              Navigator.pop(context);
-            },
-            child: Text('${id == selected ? '✓  ' : ''}${_caseTitle(id)}'),
-          ),
-      ],
-      cancelButton: CupertinoActionSheetAction(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
-      ),
-    ),
+    title: 'Benchmark prompt',
+    actions: [
+      for (final id in const [
+        'short-explanation',
+        'medium-review',
+        'long-synthesis',
+      ])
+        GolemSheetAction(
+          label: '${id == selected ? '✓  ' : ''}${_caseTitle(id)}',
+          onPressed: () {
+            ref.read(benchmarkControllerProvider.notifier).selectCase(id);
+            Navigator.pop(context);
+          },
+        ),
+    ],
   );
 }
 

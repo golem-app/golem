@@ -112,8 +112,15 @@ The Flutter app never migrates, opens, or otherwise reads another app's data.
 ## Architecture
 
 `CupertinoApp.router` and GoRouter own navigation. Features live under
-`lib/features/`; shared immutable models, Glacier tokens, repository contracts,
-and generated Riverpod providers live under `lib/core/`.
+`lib/features/`; shared immutable models, the Golem Navy design tokens
+(`lib/core/theme/` — colors, type ramp, radii/spacing/sizes, elevation and
+motion, light + dark), the platform-chrome layer (`lib/core/chrome/` —
+`GolemChrome` resolves cupertino or android chrome from the target platform
+and drives the nav bar, menu, alert, sheet, action list, and primary button;
+layout, color, and type stay identical across platforms), repository
+contracts, and generated Riverpod providers live under `lib/core/`. The
+design source of truth is the handoff under `references/ui_redesign/` at the
+repo root.
 
 - `ChatHistoryRepository`: versioned, atomic JSON persistence plus an in-memory
   test implementation. It is the source of truth for chats and active selection.
@@ -213,8 +220,10 @@ presence makes the tool ignore any pubspec block): the
 `android/app/src/<flavor>/res` source sets on Android. The launch splash is
 deliberately identical for every flavor.
 
-The in-app splash uses mascot-only transparent artwork over a Glacier navy
-(`#0F1524`) surface, without an app-icon tile, frame, or backing panel. The
+The in-app splash uses mascot-only transparent artwork over a Golem navy
+(`#060D1F`) surface, without an app-icon tile, frame, or backing panel. The
+launcher-icon matte deliberately stays on the older `#0F1524` navy — icon
+artwork is regenerated only by an artwork change. The
 native iOS launch screen is the hand-owned, solid-navy
 `GolemLaunchScreen.storyboard` with no image: the iOS 26 launch-snapshot
 renderer draws storyboard launch images at the wrong scale and flattens their
@@ -231,11 +240,15 @@ ARB/gen-l10n layer to keep half-wired. If a
 second locale ever materializes, reintroduce `l10n.yaml` + `generate: true`
 and migrate the presentation strings then.
 
-Golden tests use the iPhone 17 logical viewport (402 × 874) in light and dark
-appearances. They cover splash, empty/populated chat, reasoning, the native-style
-conversation drawer, rename overlay, Settings states, and Benchmark. The widget
-suite also runs Flutter's iOS
-44-point target, semantic-label, contrast, and enlarged-text checks.
+Golden tests use the iPhone 17 logical viewport (402 × 874). Every surface
+records light and dark under iOS chrome, and the chrome-visible surfaces
+(chat, rename sheet, Settings, Benchmark) add an `-android` light variant —
+the platform axis rides `TargetPlatformVariant` in `test/support/harness.dart`
+(widget tests report android by default, so goldens pin the platform
+explicitly). They cover splash, empty/populated chat, reasoning, the
+native-style conversation drawer, rename overlay, Settings states, and
+Benchmark. The widget suite also runs Flutter's iOS 44-point target,
+semantic-label, contrast, and enlarged-text checks.
 
 ## iPhone 17 simulator verification
 

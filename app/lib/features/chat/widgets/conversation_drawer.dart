@@ -2,6 +2,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/chrome/golem_alert.dart';
+import '../../../core/chrome/golem_button.dart';
+import '../../../core/chrome/golem_menu.dart';
+import '../../../core/chrome/golem_sheet.dart';
 import '../../../core/domain/app_state.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
@@ -231,39 +235,26 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                                     ),
                                   ),
                                 ),
-                                CupertinoMenuAnchor(
-                                  key: Key('conversation-menu-${item.id}'),
-                                  menuChildren: [
-                                    CupertinoMenuItem(
-                                      leading: const Icon(
-                                        CupertinoIcons.pencil,
-                                      ),
+                                GolemMenu(
+                                  anchorKey: Key(
+                                    'conversation-menu-${item.id}',
+                                  ),
+                                  enabled: !widget.blocked,
+                                  triggerColor: GolemTheme.mutedOnDark,
+                                  triggerSemanticLabel: 'Conversation actions',
+                                  items: [
+                                    GolemMenuItem(
+                                      label: 'Rename',
+                                      icon: CupertinoIcons.pencil,
                                       onPressed: () => _rename(context, item),
-                                      child: const Text('Rename'),
                                     ),
-                                    CupertinoMenuItem(
-                                      leading: const Icon(CupertinoIcons.trash),
-                                      isDestructiveAction: true,
+                                    GolemMenuItem(
+                                      label: 'Delete',
+                                      icon: CupertinoIcons.trash,
+                                      isDestructive: true,
                                       onPressed: () => _delete(context, item),
-                                      child: const Text('Delete'),
                                     ),
                                   ],
-                                  builder: (context, controller, child) =>
-                                      CupertinoButton(
-                                        padding: EdgeInsets.zero,
-                                        minimumSize: const Size(44, 44),
-                                        onPressed: widget.blocked
-                                            ? null
-                                            : () => controller.isOpen
-                                                  ? controller.close()
-                                                  : controller.open(),
-                                        child: const Icon(
-                                          CupertinoIcons.ellipsis,
-                                          semanticLabel: 'Conversation actions',
-                                          color: GolemTheme.mutedOnDark,
-                                          size: 20,
-                                        ),
-                                      ),
                                 ),
                               ],
                             ),
@@ -310,29 +301,22 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
     ChatConversation conversation,
   ) async {
     final controller = TextEditingController(text: conversation.title);
-    await showCupertinoModalPopup<void>(
+    await showGolemSheet<void>(
       context: context,
-      builder: (context) => Container(
-        key: const Key('rename-sheet'),
+      sheetKey: const Key('rename-sheet'),
+      builder: (context) => Padding(
         padding: EdgeInsets.fromLTRB(
           20,
           18,
           20,
           20 + MediaQuery.viewInsetsOf(context).bottom,
         ),
-        decoration: BoxDecoration(
-          color: CupertinoDynamicColor.resolve(GolemTheme.surface, context),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
         child: SafeArea(
           top: false,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Rename chat',
-                style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
-              ),
+              const Text('Rename chat', style: GolemText.cardTitle),
               const SizedBox(height: 16),
               CupertinoTextField(
                 key: const Key('rename-field'),
@@ -342,16 +326,15 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                 padding: const EdgeInsets.all(14),
               ),
               const SizedBox(height: 16),
-              CupertinoButton.filled(
+              GolemButton.filled(
                 key: const Key('rename-save'),
-                minimumSize: const Size.fromHeight(50),
+                label: 'Save',
                 onPressed: () {
                   ref
                       .read(chatControllerProvider.notifier)
                       .renameConversation(conversation.id, controller.text);
                   Navigator.pop(context);
                 },
-                child: const Text('Save'),
               ),
             ],
           ),
@@ -365,31 +348,28 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
     BuildContext context,
     ChatConversation conversation,
   ) async {
-    await showCupertinoDialog<void>(
+    await showGolemAlert(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Delete chat?'),
-        content: Text(
+      title: 'Delete chat?',
+      message:
           '“${conversation.title}” and all of its messages will be removed from this device.',
+      actions: [
+        GolemAlertAction(
+          label: 'Cancel',
+          onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          CupertinoDialogAction(
-            key: const Key('confirm-delete'),
-            isDestructiveAction: true,
-            onPressed: () {
-              ref
-                  .read(chatControllerProvider.notifier)
-                  .deleteConversation(conversation.id);
-              Navigator.pop(context);
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+        GolemAlertAction(
+          key: const Key('confirm-delete'),
+          label: 'Delete',
+          isDestructive: true,
+          onPressed: () {
+            ref
+                .read(chatControllerProvider.notifier)
+                .deleteConversation(conversation.id);
+            Navigator.pop(context);
+          },
+        ),
+      ],
     );
   }
 }

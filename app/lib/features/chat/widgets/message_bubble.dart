@@ -5,6 +5,8 @@ import 'package:flutter/material.dart' show SelectableText;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/chrome/golem_alert.dart';
+import '../../../core/chrome/golem_sheet.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
@@ -19,8 +21,8 @@ class MessageBubble extends ConsumerWidget {
   final bool canRegenerate;
 
   /// Readable measure for a bubble on wide desktop windows; phone layouts
-  /// never reach it (82% of a phone viewport stays below the cap).
-  static const _maxBubbleWidth = 640.0;
+  /// never reach it (88% of a phone viewport stays below the cap).
+  static const _maxBubbleWidth = GolemSize.bubbleMaxWidth;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -46,12 +48,13 @@ class MessageBubble extends ConsumerWidget {
           child: Container(
             constraints: BoxConstraints(
               maxWidth: math.min(
-                MediaQuery.sizeOf(context).width * 0.82,
+                MediaQuery.sizeOf(context).width * GolemSize.bubbleMaxFraction,
                 _maxBubbleWidth,
               ),
             ),
             margin: const EdgeInsets.only(bottom: 14),
             padding: const EdgeInsets.all(18),
+            // Every corner equally round — no tails, per the handoff.
             decoration: BoxDecoration(
               color: isUser
                   ? GolemTheme.userBubble
@@ -59,11 +62,8 @@ class MessageBubble extends ConsumerWidget {
                       GolemTheme.assistantBubble,
                       context,
                     ),
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(24),
-                topRight: const Radius.circular(24),
-                bottomLeft: Radius.circular(isUser ? 24 : 6),
-                bottomRight: Radius.circular(isUser ? 6 : 24),
+              borderRadius: BorderRadius.circular(
+                isUser ? GolemRadius.bubble : GolemRadius.bubbleAssistant,
               ),
               border: isUser
                   ? null
@@ -73,6 +73,7 @@ class MessageBubble extends ConsumerWidget {
                         context,
                       ),
                     ),
+              boxShadow: isUser ? null : GolemShadow.card(context),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,15 +86,13 @@ class MessageBubble extends ConsumerWidget {
                 if (message.text.isNotEmpty)
                   SelectableText(
                     message.text,
-                    style: TextStyle(
+                    style: GolemText.body.copyWith(
                       color: isUser
-                          ? CupertinoColors.white
+                          ? GolemTheme.textOnDark
                           : CupertinoDynamicColor.resolve(
                               GolemTheme.ink,
                               context,
                             ),
-                      height: 1.42,
-                      fontSize: 16,
                     ),
                   ),
                 if (message.isStreaming) ...[
@@ -122,80 +121,71 @@ class MessageBubble extends ConsumerWidget {
     final idle =
         ref.read(chatControllerProvider).requireValue.generation ==
         GenerationPhase.idle;
-    await showCupertinoModalPopup<void>(
+    // Action handlers pop their own sheet route and then open follow-up
+    // dialogs on the bubble context, which survives the pop.
+    await showGolemActions(
       context: context,
-      // The sheet context must stay distinct from the bubble context: actions
-      // pop the sheet and then open follow-up dialogs, which need a context
-      // that survives the pop.
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: Text(
-          message.role == MessageRole.user ? 'Your message' : 'Golem response',
+      title: message.role == MessageRole.user
+          ? 'Your message'
+          : 'Golem response',
+      actions: [
+        GolemSheetAction(
+          label: 'Copy',
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: message.text));
+            Navigator.pop(context);
+          },
         ),
-        actions: [
-          CupertinoActionSheetAction(
+        if (message.role == MessageRole.user && idle)
+          GolemSheetAction(
+            label: 'Edit and retry',
             onPressed: () {
-              Clipboard.setData(ClipboardData(text: message.text));
-              Navigator.pop(sheetContext);
+              Navigator.pop(context);
+              _showEdit(context, ref);
             },
-            child: const Text('Copy'),
           ),
-          if (message.role == MessageRole.user && idle)
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(sheetContext);
-                _showEdit(context, ref);
-              },
-              child: const Text('Edit and retry'),
-            ),
-          if (message.role == MessageRole.assistant && canRegenerate)
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(sheetContext);
-                ref.read(chatControllerProvider.notifier).regenerate();
-              },
-              child: const Text('Regenerate'),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('Cancel'),
-        ),
-      ),
+        if (message.role == MessageRole.assistant && canRegenerate)
+          GolemSheetAction(
+            label: 'Regenerate',
+            onPressed: () {
+              Navigator.pop(context);
+              ref.read(chatControllerProvider.notifier).regenerate();
+            },
+          ),
+      ],
     );
   }
 
   Future<void> _showEdit(BuildContext context, WidgetRef ref) async {
     final controller = TextEditingController(text: message.text);
-    await showCupertinoDialog<void>(
+    await showGolemAlert(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Edit message'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            key: const Key('edit-message-field'),
-            controller: controller,
-            minLines: 2,
-            maxLines: 5,
-          ),
+      title: 'Edit message',
+      content: Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: CupertinoTextField(
+          key: const Key('edit-message-field'),
+          controller: controller,
+          minLines: 2,
+          maxLines: 5,
         ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          CupertinoDialogAction(
-            key: const Key('edit-message-save'),
-            onPressed: () {
-              Navigator.pop(context);
-              ref
-                  .read(chatControllerProvider.notifier)
-                  .editAndTruncate(message.id, controller.text);
-            },
-            child: const Text('Save and regenerate'),
-          ),
-        ],
       ),
+      actions: [
+        GolemAlertAction(
+          label: 'Cancel',
+          onPressed: () => Navigator.pop(context),
+        ),
+        GolemAlertAction(
+          key: const Key('edit-message-save'),
+          label: 'Save and regenerate',
+          onPressed: () {
+            Navigator.pop(context);
+            ref
+                .read(chatControllerProvider.notifier)
+                .editAndTruncate(message.id, controller.text);
+          },
+        ),
+      ],
     );
     controller.dispose();
   }
@@ -216,7 +206,7 @@ class _ReasoningCard extends StatelessWidget {
         GolemTheme.reasoningSurface,
         context,
       ),
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(GolemRadius.notice),
       border: Border.all(
         color: CupertinoDynamicColor.resolve(
           GolemTheme.reasoningBorder,
@@ -237,12 +227,12 @@ class _ReasoningCard extends StatelessWidget {
             const SizedBox(width: 7),
             Text(
               streaming ? 'Reasoning · LIVE' : 'Reasoning',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              style: GolemText.footnoteStrong,
             ),
           ],
         ),
         const SizedBox(height: 8),
-        Text(text, style: const TextStyle(fontSize: 14, height: 1.38)),
+        Text(text, style: GolemText.footnote),
       ],
     ),
   );
@@ -259,14 +249,12 @@ class _MetricsPill extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
     decoration: BoxDecoration(
       color: CupertinoDynamicColor.resolve(GolemTheme.accentSoft, context),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(GolemRadius.pill),
     ),
     child: Text(
       '${live ? 'LIVE · ' : ''}${metrics.decodeTokensPerSecond.toStringAsFixed(1)} tok/s  ·  ${metrics.tokenCount} tokens',
-      style: TextStyle(
+      style: GolemText.metrics.copyWith(
         color: CupertinoDynamicColor.resolve(GolemTheme.accent, context),
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
       ),
     ),
   );

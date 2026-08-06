@@ -9,7 +9,9 @@ import 'package:url_launcher/url_launcher.dart';
 // knowledge (profiles carry no Inferno import); the Inferno boundary is
 // unchanged — only lib/broker/ touches package:inferno.
 import '../../broker/model_profile.dart';
+import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/app_identity.dart';
+import '../../core/chrome/golem_alert.dart';
 import '../../core/domain/generation_settings.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/models.dart';
@@ -26,10 +28,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final model = ref.watch(modelControllerProvider);
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        previousPageTitle: 'Chat',
-        middle: Text('Settings'),
-      ),
+      navigationBar: GolemNavBar(title: 'Settings', previousPageTitle: 'Chat'),
       child: SafeArea(
         bottom: false,
         child: model.when(
@@ -283,13 +282,7 @@ class _ModelCard extends ConsumerWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  entry.displayName,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                child: Text(entry.displayName, style: GolemText.cardTitle),
               ),
               if (active) ...[
                 const SizedBox(width: 8),
@@ -303,17 +296,15 @@ class _ModelCard extends ConsumerWidget {
                       GolemTheme.accentSoft,
                       context,
                     ),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(GolemRadius.badge),
                   ),
                   child: Text(
                     'ACTIVE',
-                    style: TextStyle(
+                    style: GolemText.badge.copyWith(
                       color: CupertinoDynamicColor.resolve(
                         GolemTheme.accent,
                         context,
                       ),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -467,31 +458,25 @@ class _ModelCard extends ConsumerWidget {
   Future<void> _confirmDelete(
     BuildContext context,
     ModelController controller,
-  ) => showCupertinoDialog<void>(
+  ) => showGolemAlert(
     context: context,
-    builder: (dialogContext) => CupertinoAlertDialog(
-      key: const Key('model-delete-dialog'),
-      title: Text('Delete ${entry.displayName}?'),
-      content: Text(
+    dialogKey: const Key('model-delete-dialog'),
+    title: 'Delete ${entry.displayName}?',
+    message:
         'Removes ${_gigabytes(entry.totalBytes)} from this device. '
         'The model can be downloaded again later.',
+    actions: [
+      GolemAlertAction(label: 'Keep', onPressed: () => Navigator.pop(context)),
+      GolemAlertAction(
+        key: const Key('confirm-model-delete'),
+        label: 'Delete',
+        isDestructive: true,
+        onPressed: () {
+          Navigator.pop(context);
+          controller.delete(entry.key);
+        },
       ),
-      actions: [
-        CupertinoDialogAction(
-          onPressed: () => Navigator.of(dialogContext).pop(),
-          child: const Text('Keep'),
-        ),
-        CupertinoDialogAction(
-          key: const Key('confirm-model-delete'),
-          isDestructiveAction: true,
-          onPressed: () {
-            Navigator.of(dialogContext).pop();
-            controller.delete(entry.key);
-          },
-          child: const Text('Delete'),
-        ),
-      ],
-    ),
+    ],
   );
 
   String _statusLabel(String suffix) => switch (status.phase) {

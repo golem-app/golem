@@ -27,7 +27,7 @@ class RecoveryBanner extends ConsumerWidget {
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
       color: CupertinoDynamicColor.resolve(GolemTheme.errorSurface, context),
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(GolemRadius.notice),
     ),
     child: Column(
       mainAxisSize: MainAxisSize.min,
@@ -40,9 +40,7 @@ class RecoveryBanner extends ConsumerWidget {
               color: GolemTheme.destructive,
             ),
             const SizedBox(width: 10),
-            Expanded(
-              child: Text(message, style: const TextStyle(fontSize: 13)),
-            ),
+            Expanded(child: Text(message, style: GolemText.footnote)),
             CupertinoButton(
               key: const Key('retry-generation'),
               padding: const EdgeInsets.symmetric(horizontal: 8),

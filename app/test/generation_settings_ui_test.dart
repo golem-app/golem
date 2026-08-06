@@ -5,40 +5,12 @@ import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
-import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
-import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';
 
+import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_settings_repository.dart';
-
-/// A frozen model state: this suite exercises the generation section only.
-final class _StaticModels implements ModelManagementRepository {
-  const _StaticModels(this.state);
-  final ModelState state;
-
-  @override
-  Future<ModelState> load() async => state;
-
-  @override
-  Stream<ModelState> download(String artifactKey) => Stream.value(state);
-
-  @override
-  Future<ModelState> pause(String artifactKey) async => state;
-
-  @override
-  Future<ModelState> cancel(String artifactKey) async => state;
-
-  @override
-  Future<ModelState> delete(String artifactKey) async => state;
-
-  @override
-  Future<ModelState> loadRuntime() async => state;
-
-  @override
-  Future<ModelState> unloadRuntime() async => state;
-}
 
 void main() {
   late InMemorySettingsRepository settings;
@@ -47,10 +19,7 @@ void main() {
     WidgetTester tester, {
     GenerationSettings seed = const GenerationSettings(),
   }) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(402, 874);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    addTearDown(tester.view.resetPhysicalSize);
+    setViewport(tester);
     settings = InMemorySettingsRepository(seed);
     final container = ProviderContainer(
       overrides: [
@@ -63,7 +32,7 @@ void main() {
         settingsRepositoryProvider.overrideWithValue(settings),
         modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
         modelManagementRepositoryProvider.overrideWithValue(
-          _StaticModels(const ModelState()),
+          const StaticModels(ModelState()),
         ),
       ],
     );
@@ -71,10 +40,7 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: CupertinoApp(
-          theme: GolemTheme.theme(Brightness.light),
-          home: const SettingsScreen(),
-        ),
+        child: wrapApp(child: const SettingsScreen()),
       ),
     );
     await tester.pumpAndSettle();
