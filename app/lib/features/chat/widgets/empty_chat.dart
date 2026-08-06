@@ -26,14 +26,7 @@ class EmptyChat extends ConsumerWidget {
                 height: 112,
               ),
               const SizedBox(height: 22),
-              const Text(
-                'How can I help?',
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.5,
-                ),
-              ),
+              const Text('How can I help?', style: GolemText.display),
               const SizedBox(height: 10),
               Text(
                 simulated

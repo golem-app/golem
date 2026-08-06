@@ -21,8 +21,8 @@ class MessageBubble extends ConsumerWidget {
   final bool canRegenerate;
 
   /// Readable measure for a bubble on wide desktop windows; phone layouts
-  /// never reach it (82% of a phone viewport stays below the cap).
-  static const _maxBubbleWidth = 640.0;
+  /// never reach it (88% of a phone viewport stays below the cap).
+  static const _maxBubbleWidth = GolemSize.bubbleMaxWidth;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -48,12 +48,13 @@ class MessageBubble extends ConsumerWidget {
           child: Container(
             constraints: BoxConstraints(
               maxWidth: math.min(
-                MediaQuery.sizeOf(context).width * 0.82,
+                MediaQuery.sizeOf(context).width * GolemSize.bubbleMaxFraction,
                 _maxBubbleWidth,
               ),
             ),
             margin: const EdgeInsets.only(bottom: 14),
             padding: const EdgeInsets.all(18),
+            // Every corner equally round — no tails, per the handoff.
             decoration: BoxDecoration(
               color: isUser
                   ? GolemTheme.userBubble
@@ -61,11 +62,8 @@ class MessageBubble extends ConsumerWidget {
                       GolemTheme.assistantBubble,
                       context,
                     ),
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(24),
-                topRight: const Radius.circular(24),
-                bottomLeft: Radius.circular(isUser ? 24 : 6),
-                bottomRight: Radius.circular(isUser ? 6 : 24),
+              borderRadius: BorderRadius.circular(
+                isUser ? GolemRadius.bubble : GolemRadius.bubbleAssistant,
               ),
               border: isUser
                   ? null
@@ -75,6 +73,7 @@ class MessageBubble extends ConsumerWidget {
                         context,
                       ),
                     ),
+              boxShadow: isUser ? null : GolemShadow.card(context),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,15 +86,13 @@ class MessageBubble extends ConsumerWidget {
                 if (message.text.isNotEmpty)
                   SelectableText(
                     message.text,
-                    style: TextStyle(
+                    style: GolemText.body.copyWith(
                       color: isUser
-                          ? CupertinoColors.white
+                          ? GolemTheme.textOnDark
                           : CupertinoDynamicColor.resolve(
                               GolemTheme.ink,
                               context,
                             ),
-                      height: 1.42,
-                      fontSize: 16,
                     ),
                   ),
                 if (message.isStreaming) ...[
@@ -209,7 +206,7 @@ class _ReasoningCard extends StatelessWidget {
         GolemTheme.reasoningSurface,
         context,
       ),
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(GolemRadius.notice),
       border: Border.all(
         color: CupertinoDynamicColor.resolve(
           GolemTheme.reasoningBorder,
@@ -230,12 +227,12 @@ class _ReasoningCard extends StatelessWidget {
             const SizedBox(width: 7),
             Text(
               streaming ? 'Reasoning · LIVE' : 'Reasoning',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              style: GolemText.footnoteStrong,
             ),
           ],
         ),
         const SizedBox(height: 8),
-        Text(text, style: const TextStyle(fontSize: 14, height: 1.38)),
+        Text(text, style: GolemText.footnote),
       ],
     ),
   );
@@ -252,14 +249,12 @@ class _MetricsPill extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
     decoration: BoxDecoration(
       color: CupertinoDynamicColor.resolve(GolemTheme.accentSoft, context),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(GolemRadius.pill),
     ),
     child: Text(
       '${live ? 'LIVE · ' : ''}${metrics.decodeTokensPerSecond.toStringAsFixed(1)} tok/s  ·  ${metrics.tokenCount} tokens',
-      style: TextStyle(
+      style: GolemText.metrics.copyWith(
         color: CupertinoDynamicColor.resolve(GolemTheme.accent, context),
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
       ),
     ),
   );

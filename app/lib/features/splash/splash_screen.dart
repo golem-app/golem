@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/domain/app_state.dart';
+import '../../core/chrome/golem_button.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/progress_track.dart';
@@ -86,21 +87,17 @@ class SplashScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 28),
-                  const Text(
+                  Text(
                     'Golem',
-                    style: TextStyle(
+                    style: GolemText.hero.copyWith(
                       color: CupertinoColors.white,
-                      fontSize: 34,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.6,
                     ),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
+                  Text(
                     'Private, local, and ready when you are.',
-                    style: TextStyle(
+                    style: GolemText.body.copyWith(
                       color: GolemTheme.mutedOnDark,
-                      fontSize: 17,
                     ),
                   ),
                 ],
@@ -125,17 +122,17 @@ class SplashScreen extends ConsumerWidget {
                           ? 'Preparing $model setup'
                           : 'Loading $model on this device',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: GolemText.caption.copyWith(
                         color: GolemTheme.mutedOnDark,
-                        fontSize: 13,
                       ),
                     ),
                     if (failed) ...[
                       const SizedBox(height: 14),
-                      CupertinoButton.filled(
+                      GolemButton.filled(
                         key: const Key('splash-retry'),
+                        label: 'Try again',
                         onPressed: retry,
-                        child: const Text('Try again'),
+                        expand: false,
                       ),
                     ],
                   ],

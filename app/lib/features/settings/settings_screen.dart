@@ -282,13 +282,7 @@ class _ModelCard extends ConsumerWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  entry.displayName,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                child: Text(entry.displayName, style: GolemText.cardTitle),
               ),
               if (active) ...[
                 const SizedBox(width: 8),
@@ -302,17 +296,15 @@ class _ModelCard extends ConsumerWidget {
                       GolemTheme.accentSoft,
                       context,
                     ),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(GolemRadius.badge),
                   ),
                   child: Text(
                     'ACTIVE',
-                    style: TextStyle(
+                    style: GolemText.badge.copyWith(
                       color: CupertinoDynamicColor.resolve(
                         GolemTheme.accent,
                         context,
                       ),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),

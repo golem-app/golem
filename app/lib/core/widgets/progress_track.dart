@@ -17,7 +17,7 @@ class ProgressTrack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(4),
+    borderRadius: BorderRadius.circular(height / 2),
     child: SizedBox(
       height: height,
       child: Stack(
