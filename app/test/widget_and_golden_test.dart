@@ -49,6 +49,8 @@ void main() {
 
   for (final brightness in Brightness.values) {
     testWidgets('empty chat ${brightness.name} golden', (tester) async {
+      // Chrome deltas are geometry, not color: android renders light only.
+      if (chromeSuffix().isNotEmpty && brightness == Brightness.dark) return;
       await pumpWithRepositories(
         tester,
         brightness: brightness,
@@ -56,13 +58,16 @@ void main() {
       );
       await expectLater(
         find.byType(ChatScreen),
-        matchesGoldenFile('goldens/empty-chat-${brightness.name}.png'),
+        matchesGoldenFile(
+          'goldens/empty-chat-${brightness.name}${chromeSuffix()}.png',
+        ),
       );
-    }, variant: iosChrome);
+    }, variant: bothChromes);
 
     testWidgets('populated reasoning ${brightness.name} golden', (
       tester,
     ) async {
+      if (chromeSuffix().isNotEmpty && brightness == Brightness.dark) return;
       await pumpWithRepositories(
         tester,
         brightness: brightness,
@@ -71,100 +76,128 @@ void main() {
       );
       await expectLater(
         find.byType(ChatScreen),
-        matchesGoldenFile('goldens/populated-reasoning-${brightness.name}.png'),
+        matchesGoldenFile(
+          'goldens/populated-reasoning-${brightness.name}${chromeSuffix()}.png',
+        ),
       );
-    }, variant: iosChrome);
+    }, variant: bothChromes);
   }
 
-  testWidgets('drawer and rename overlay goldens', (tester) async {
-    await pumpWithRepositories(
+  for (final brightness in Brightness.values) {
+    testWidgets('drawer and rename overlay ${brightness.name} goldens', (
       tester,
-      history: seedHistory(),
-      child: const ChatScreen(),
-    );
-    await tester.tap(find.byKey(const Key('open-drawer')));
-    await tester.pumpAndSettle();
-    await expectLater(
-      find.byType(ChatScreen),
-      matchesGoldenFile('goldens/drawer.png'),
-    );
-    await tester.tap(find.byKey(const Key('conversation-menu-chat-1')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Rename'));
-    await tester.pumpAndSettle();
-    await expectLater(
-      find.byKey(const Key('rename-sheet')),
-      matchesGoldenFile('goldens/rename-sheet.png'),
-    );
-  }, variant: iosChrome);
+    ) async {
+      if (chromeSuffix().isNotEmpty && brightness == Brightness.dark) return;
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        history: seedHistory(),
+        child: const ChatScreen(),
+      );
+      await tester.tap(find.byKey(const Key('open-drawer')));
+      await tester.pumpAndSettle();
+      // The drawer is deliberately identical on both chromes; only the
+      // iOS variant records it. The rename sheet differs (drag handle).
+      if (chromeSuffix().isEmpty) {
+        await expectLater(
+          find.byType(ChatScreen),
+          matchesGoldenFile('goldens/drawer-${brightness.name}.png'),
+        );
+      }
+      await tester.tap(find.byKey(const Key('conversation-menu-chat-1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Rename'));
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byKey(const Key('rename-sheet')),
+        matchesGoldenFile(
+          'goldens/rename-sheet-${brightness.name}${chromeSuffix()}.png',
+        ),
+      );
+    }, variant: bothChromes);
+  }
 
-  testWidgets('settings states dark golden', (tester) async {
-    await pumpWithRepositories(
-      tester,
-      brightness: Brightness.dark,
-      // 42% of the pinned Gemma MLX artifact, mid-pause, with the Qwen GGUF
-      // installed — exercises progress, resume, and delete affordances.
-      model: const ModelState(
-        artifacts: {
-          'gemma4-mlx': ArtifactStatus(
-            phase: ArtifactPhase.paused,
-            downloadedBytes: 1505735776,
-          ),
-          'qwen35-gguf': ArtifactStatus(
-            phase: ArtifactPhase.installed,
-            downloadedBytes: 2543899040,
-          ),
-        },
-        runtime: RuntimePhase.unloaded,
-        activeArtifactKey: 'gemma4-mlx',
-        simulated: true,
-      ),
-      child: const SettingsScreen(),
-    );
-    await expectLater(
-      find.byType(SettingsScreen),
-      matchesGoldenFile('goldens/settings-dark.png'),
-    );
+  for (final brightness in Brightness.values) {
+    testWidgets('settings states ${brightness.name} golden', (tester) async {
+      if (chromeSuffix().isNotEmpty && brightness == Brightness.dark) return;
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        // 42% of the pinned Gemma MLX artifact, mid-pause, with the Qwen GGUF
+        // installed — exercises progress, resume, and delete affordances.
+        model: const ModelState(
+          artifacts: {
+            'gemma4-mlx': ArtifactStatus(
+              phase: ArtifactPhase.paused,
+              downloadedBytes: 1505735776,
+            ),
+            'qwen35-gguf': ArtifactStatus(
+              phase: ArtifactPhase.installed,
+              downloadedBytes: 2543899040,
+            ),
+          },
+          runtime: RuntimePhase.unloaded,
+          activeArtifactKey: 'gemma4-mlx',
+          simulated: true,
+        ),
+        child: const SettingsScreen(),
+      );
+      await expectLater(
+        find.byType(SettingsScreen),
+        matchesGoldenFile(
+          'goldens/settings-${brightness.name}${chromeSuffix()}.png',
+        ),
+      );
 
-    // The generation section lives below the fold; capture it scrolled
-    // into view so the per-model controls keep visual coverage.
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('gen-context-gemma4')),
-      260,
-      scrollable: find
-          .descendant(
-            of: find.byKey(const Key('settings-list')),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
-    await tester.pumpAndSettle();
-    await expectLater(
-      find.byType(SettingsScreen),
-      matchesGoldenFile('goldens/settings-generation-dark.png'),
-    );
-  }, variant: iosChrome);
+      // The generation section lives below the fold; capture it scrolled
+      // into view so the per-model controls keep visual coverage. iOS
+      // variants only — the section is chrome-free.
+      if (chromeSuffix().isNotEmpty) return;
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('gen-context-gemma4')),
+        260,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const Key('settings-list')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byType(SettingsScreen),
+        matchesGoldenFile('goldens/settings-generation-${brightness.name}.png'),
+      );
+    }, variant: bothChromes);
 
-  testWidgets('benchmark result golden', (tester) async {
-    await pumpWithRepositories(tester, child: const BenchmarkScreen());
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(BenchmarkScreen)),
-    );
-    await tester.runAsync(
-      () => container.read(benchmarkControllerProvider.notifier).run(),
-    );
-    await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('benchmark-result-card')),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-    await expectLater(
-      find.byType(BenchmarkScreen),
-      matchesGoldenFile('goldens/benchmark.png'),
-    );
-  }, variant: iosChrome);
+    testWidgets('benchmark result ${brightness.name} golden', (tester) async {
+      if (chromeSuffix().isNotEmpty && brightness == Brightness.dark) return;
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        child: const BenchmarkScreen(),
+      );
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(BenchmarkScreen)),
+      );
+      await tester.runAsync(
+        () => container.read(benchmarkControllerProvider.notifier).run(),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('benchmark-result-card')),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byType(BenchmarkScreen),
+        matchesGoldenFile(
+          'goldens/benchmark-${brightness.name}${chromeSuffix()}.png',
+        ),
+      );
+    }, variant: bothChromes);
+  }
 
   testWidgets('iOS targets, labels, contrast, and enlarged text', (
     tester,
