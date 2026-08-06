@@ -20,7 +20,6 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _composer = TextEditingController();
-  final _search = TextEditingController();
   final _scroll = ScrollController();
   final _focus = FocusNode();
   bool _drawerOpen = false;
@@ -50,7 +49,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void dispose() {
     _composer.dispose();
-    _search.dispose();
     _scroll.dispose();
     _focus.dispose();
     super.dispose();
@@ -295,7 +293,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       excluding: !_drawerOpen,
                       child: ConversationDrawer(
                         chat: chat,
-                        search: _search,
                         blocked: blocked,
                         close: () => setState(() => _drawerOpen = false),
                       ),

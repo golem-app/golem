@@ -3,15 +3,53 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
+import '../model_label.dart';
 
 class EmptyChat extends ConsumerWidget {
-  const EmptyChat({super.key});
+  const EmptyChat({required this.onStarter, super.key});
+
+  /// Receives a starter prompt to prefill the composer with.
+  final ValueChanged<String> onStarter;
+
+  static const _starters = [
+    (
+      key: Key('starter-chip-draft-reply'),
+      icon: CupertinoIcons.pencil,
+      label: 'Draft a reply',
+      prompt: 'Draft a reply to this message: ',
+    ),
+    (
+      key: Key('starter-chip-explain'),
+      icon: CupertinoIcons.lightbulb,
+      label: 'Explain something',
+      prompt: 'Explain, simply: ',
+    ),
+    (
+      key: Key('starter-chip-rewrite'),
+      icon: CupertinoIcons.doc_on_doc,
+      label: 'Rewrite my text',
+      prompt: 'Rewrite this so it reads clearly: ',
+    ),
+    (
+      key: Key('starter-chip-summarise'),
+      icon: CupertinoIcons.search,
+      label: 'Summarise a note',
+      prompt: 'Summarise this note: ',
+    ),
+  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Copy stays honest in both directions: only the fake backend may call
     // itself simulated.
-    final simulated = ref.watch(inferenceBackendProvider).simulatedInference;
+    final backend = ref.watch(inferenceBackendProvider);
+    final label = chatModelLabel(
+      backend: backend,
+      catalog: ref.watch(modelCatalogEntriesProvider),
+      modelKey: ref.watch(
+        chatControllerProvider.select((state) => state.value?.active?.modelKey),
+      ),
+    );
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(32),
@@ -20,18 +58,25 @@ class EmptyChat extends ConsumerWidget {
           label: 'Start a private conversation',
           child: Column(
             children: [
-              Image.asset(
-                'assets/images/golem_mascot.png',
-                width: 112,
-                height: 112,
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: GolemTheme.accent,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                padding: const EdgeInsets.all(7),
+                child: Image.asset('assets/images/golem_mascot.png'),
               ),
               const SizedBox(height: 22),
-              const Text('How can I help?', style: GolemText.display),
+              const Text('What are we building?', style: GolemText.display),
               const SizedBox(height: 10),
               Text(
-                simulated
-                    ? 'Your conversations stay on this device.\nThis Flutter preview uses a simulated model.'
-                    : 'Your conversations stay on this device.\nGolem generates with a local on-device model.',
+                backend.simulatedInference
+                    ? 'This preview simulates $label on this phone. '
+                          'Nothing you type here goes anywhere.'
+                    : '$label is loaded and running on this phone. '
+                          'Nothing you type here goes anywhere.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   height: 1.4,
@@ -40,6 +85,65 @@ class EmptyChat extends ConsumerWidget {
                     context,
                   ),
                 ),
+              ),
+              const SizedBox(height: 24),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 10,
+                children: [
+                  for (final starter in _starters)
+                    CupertinoButton(
+                      key: starter.key,
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(44, 44),
+                      onPressed: () => onStarter(starter.prompt),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 13,
+                          vertical: 9,
+                        ),
+                        decoration: BoxDecoration(
+                          color: CupertinoDynamicColor.resolve(
+                            GolemTheme.surface,
+                            context,
+                          ),
+                          borderRadius: BorderRadius.circular(GolemRadius.pill),
+                          border: Border.all(
+                            color: CupertinoDynamicColor.resolve(
+                              GolemTheme.divider,
+                              context,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              starter.icon,
+                              size: 15,
+                              color: CupertinoDynamicColor.resolve(
+                                GolemTheme.accentIcon,
+                                context,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              starter.label,
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.3,
+                                color: CupertinoDynamicColor.resolve(
+                                  GolemTheme.ink,
+                                  context,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
           ),

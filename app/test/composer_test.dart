@@ -18,9 +18,10 @@ void main() {
     final container = ProviderScope.containerOf(
       tester.element(find.byType(ChatScreen)),
     );
-    // The default effective model labels the chip and the honest subtitle.
+    // The default effective model labels the chip and the honest
+    // subtitle (nav bar and drawer header both carry the subtitle).
     expect(find.text('Gemma 4 E2B'), findsOneWidget);
-    expect(find.text('Gemma 4 E2B · simulated'), findsOneWidget);
+    expect(find.text('Gemma 4 E2B · simulated'), findsAtLeastNWidgets(1));
 
     await tester.tap(find.byKey(const Key('composer-model-chip')));
     await tester.pumpAndSettle();
@@ -33,7 +34,7 @@ void main() {
     final active = container.read(chatControllerProvider).requireValue.active!;
     expect(active.modelKey, 'qwen35-gguf');
     expect(find.text('Qwen 3.5 4B QAT'), findsOneWidget);
-    expect(find.text('Qwen 3.5 4B QAT · simulated'), findsOneWidget);
+    expect(find.text('Qwen 3.5 4B QAT · simulated'), findsAtLeastNWidgets(1));
   });
 
   testWidgets('picking a model on a fresh session materializes the chat', (
@@ -54,6 +55,17 @@ void main() {
     final state = container.read(chatControllerProvider).requireValue;
     expect(state.conversations, hasLength(1));
     expect(state.active!.modelKey, 'gemma4-gguf');
+  });
+
+  testWidgets('starter chips prefill and focus the composer', (tester) async {
+    await pumpWithRepositories(tester, child: const ChatScreen());
+    await tester.tap(find.byKey(const Key('starter-chip-rewrite')));
+    await tester.pump();
+    final field = tester.widget<CupertinoTextField>(
+      find.byKey(const Key('chat-composer')),
+    );
+    expect(field.controller!.text, 'Rewrite this so it reads clearly: ');
+    expect(field.focusNode!.hasFocus, isTrue);
   });
 
   testWidgets('the attach sheet is inert and its rows dismiss', (tester) async {

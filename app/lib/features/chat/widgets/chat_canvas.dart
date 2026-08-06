@@ -41,7 +41,15 @@ class ChatCanvas extends ConsumerWidget {
           child: Stack(
             children: [
               if (!hasMessages)
-                const EmptyChat()
+                EmptyChat(
+                  onStarter: (prompt) {
+                    composer.text = prompt;
+                    composer.selection = TextSelection.collapsed(
+                      offset: prompt.length,
+                    );
+                    focus.requestFocus();
+                  },
+                )
               else
                 NotificationListener<UserScrollNotification>(
                   onNotification: (notification) {

@@ -367,6 +367,148 @@ final class InferenceBackendProvider
 
 String _$inferenceBackendHash() => r'679d3dfd7f9bdcc675a964fdfe9368052cc0b632';
 
+@ProviderFor(deviceCapacityProbe)
+const deviceCapacityProbeProvider = DeviceCapacityProbeProvider._();
+
+final class DeviceCapacityProbeProvider
+    extends
+        $FunctionalProvider<
+          DiskCapacityProbe,
+          DiskCapacityProbe,
+          DiskCapacityProbe
+        >
+    with $Provider<DiskCapacityProbe> {
+  const DeviceCapacityProbeProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'deviceCapacityProbeProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$deviceCapacityProbeHash();
+
+  @$internal
+  @override
+  $ProviderElement<DiskCapacityProbe> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  DiskCapacityProbe create(Ref ref) {
+    return deviceCapacityProbe(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(DiskCapacityProbe value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<DiskCapacityProbe>(value),
+    );
+  }
+}
+
+String _$deviceCapacityProbeHash() =>
+    r'bffceb765c5bf126c7449e4761b2c951e7495b9c';
+
+@ProviderFor(documentsPath)
+const documentsPathProvider = DocumentsPathProvider._();
+
+final class DocumentsPathProvider
+    extends $FunctionalProvider<String, String, String>
+    with $Provider<String> {
+  const DocumentsPathProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'documentsPathProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$documentsPathHash();
+
+  @$internal
+  @override
+  $ProviderElement<String> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String create(Ref ref) {
+    return documentsPath(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$documentsPathHash() => r'22f7639f5b12516f043a3f4971f84d9142ebf642';
+
+/// The drawer's storage meter: model bytes on disk over the volume's
+/// total capacity. [StorageOverview.totalBytes] is null whenever the
+/// platform cannot report it (or the seams are unwired, as in most
+/// tests) — the meter hides instead of inventing a denominator.
+
+@ProviderFor(storageOverview)
+const storageOverviewProvider = StorageOverviewProvider._();
+
+/// The drawer's storage meter: model bytes on disk over the volume's
+/// total capacity. [StorageOverview.totalBytes] is null whenever the
+/// platform cannot report it (or the seams are unwired, as in most
+/// tests) — the meter hides instead of inventing a denominator.
+
+final class StorageOverviewProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<StorageOverview>,
+          StorageOverview,
+          FutureOr<StorageOverview>
+        >
+    with $FutureModifier<StorageOverview>, $FutureProvider<StorageOverview> {
+  /// The drawer's storage meter: model bytes on disk over the volume's
+  /// total capacity. [StorageOverview.totalBytes] is null whenever the
+  /// platform cannot report it (or the seams are unwired, as in most
+  /// tests) — the meter hides instead of inventing a denominator.
+  const StorageOverviewProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'storageOverviewProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$storageOverviewHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<StorageOverview> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<StorageOverview> create(Ref ref) {
+    return storageOverview(ref);
+  }
+}
+
+String _$storageOverviewHash() => r'26b51b21567e82a5138c1156566d21684dce03e9';
+
 /// The published cross-chat search query. The raw field text stays in
 /// the search screen (widget-local, debounced 350 ms); only the
 /// normalized query lands here, so results derive reactively without
@@ -490,7 +632,7 @@ final class ChatSearchResultsProvider
   }
 }
 
-String _$chatSearchResultsHash() => r'cbb4d67d9f5eaa014de30ad1ff5609dbbe81d49a';
+String _$chatSearchResultsHash() => r'4924c9bcb9501cbe48cf7c370df3e24254a943db';
 
 /// Persisted per-model generation settings. Reads resolve against the
 /// broker profile's recommended defaults at the consumer, never here —

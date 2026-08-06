@@ -22,8 +22,19 @@ abstract interface class DeviceMemoryProbe {
   Future<int?> physicalMemoryBytes();
 }
 
+/// Total capacity of the volume containing a path, for the drawer's
+/// storage meter. Returns null when the platform cannot report it — the
+/// meter hides rather than invent a denominator.
+abstract interface class DiskCapacityProbe {
+  Future<int?> totalBytes(String path);
+}
+
 final class DeviceStorageChannel
-    implements DiskSpaceProbe, BackupExclusion, DeviceMemoryProbe {
+    implements
+        DiskSpaceProbe,
+        BackupExclusion,
+        DeviceMemoryProbe,
+        DiskCapacityProbe {
   const DeviceStorageChannel();
 
   static const _channel = MethodChannel('app.golem.flutter/storage');
@@ -39,4 +50,8 @@ final class DeviceStorageChannel
   @override
   Future<int?> physicalMemoryBytes() =>
       _channel.invokeMethod<int>('physicalMemoryBytes');
+
+  @override
+  Future<int?> totalBytes(String path) =>
+      _channel.invokeMethod<int>('totalBytes', {'path': path});
 }

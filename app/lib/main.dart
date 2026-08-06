@@ -75,6 +75,10 @@ Future<void> main() async {
         ),
         modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
         modelManagementRepositoryProvider.overrideWithValue(modelManagement),
+        deviceCapacityProbeProvider.overrideWithValue(
+          const DeviceStorageChannel(),
+        ),
+        documentsPathProvider.overrideWithValue(documents.path),
         benchmarkRepositoryProvider.overrideWithValue(
           FakeBenchmarkRepository(
             Directory('${documents.path}/SimulatedBenchmarks'),

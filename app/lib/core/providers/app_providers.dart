@@ -9,6 +9,7 @@ import '../domain/inference_backend.dart';
 import '../domain/model_catalog.dart';
 import '../domain/models.dart';
 import '../repositories/contracts.dart';
+import '../services/device_storage.dart';
 import '../startup/startup_sequence.dart';
 
 part 'app_providers.g.dart';
@@ -51,6 +52,38 @@ SettingsRepository settingsRepository(Ref ref) =>
 @Riverpod(keepAlive: true)
 InferenceBackendConfig inferenceBackend(Ref ref) =>
     const InferenceBackendConfig.fake();
+
+@Riverpod(keepAlive: true)
+DiskCapacityProbe deviceCapacityProbe(Ref ref) =>
+    throw UnimplementedError('Override deviceCapacityProbeProvider at startup');
+
+@Riverpod(keepAlive: true)
+String documentsPath(Ref ref) =>
+    throw UnimplementedError('Override documentsPathProvider at startup');
+
+typedef StorageOverview = ({int usedBytes, int? totalBytes});
+
+/// The drawer's storage meter: model bytes on disk over the volume's
+/// total capacity. [StorageOverview.totalBytes] is null whenever the
+/// platform cannot report it (or the seams are unwired, as in most
+/// tests) — the meter hides instead of inventing a denominator.
+@Riverpod(keepAlive: true)
+Future<StorageOverview> storageOverview(Ref ref) async {
+  final models = await ref.watch(modelControllerProvider.future);
+  final usedBytes = models.artifacts.values.fold(
+    0,
+    (sum, status) => sum + status.downloadedBytes,
+  );
+  int? totalBytes;
+  try {
+    totalBytes = await ref
+        .watch(deviceCapacityProbeProvider)
+        .totalBytes(ref.watch(documentsPathProvider));
+  } catch (_) {
+    totalBytes = null;
+  }
+  return (usedBytes: usedBytes, totalBytes: totalBytes);
+}
 
 /// The published cross-chat search query. The raw field text stays in
 /// the search screen (widget-local, debounced 350 ms); only the

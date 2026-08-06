@@ -369,10 +369,10 @@ void main() {
       child: const ChatScreen(),
     );
     expect(
-      find.textContaining('generates with a local on-device model'),
+      find.textContaining('is loaded and running on this phone'),
       findsOneWidget,
     );
-    expect(find.textContaining('simulated model'), findsNothing);
+    expect(find.textContaining('preview simulates'), findsNothing);
 
     await pumpWithRepositories(
       tester,

@@ -12,6 +12,7 @@ import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
+import 'package:golem_flutter/core/services/device_storage.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/search_screen.dart';
@@ -57,6 +58,15 @@ Widget wrapApp({
   home: child,
 );
 
+/// 64 decimal GB, matching the handoff's "… of 64 GB" storage meter.
+final class FakeDiskCapacity implements DiskCapacityProbe {
+  const FakeDiskCapacity([this.bytes = 64 * 1000 * 1000 * 1000]);
+  final int? bytes;
+
+  @override
+  Future<int?> totalBytes(String path) async => bytes;
+}
+
 ProviderContainer buildContainer({
   ChatHistorySnapshot? history,
   ModelState model = const ModelState(),
@@ -67,6 +77,8 @@ ProviderContainer buildContainer({
   return ProviderContainer(
     overrides: [
       if (backend != null) inferenceBackendProvider.overrideWithValue(backend),
+      deviceCapacityProbeProvider.overrideWithValue(const FakeDiskCapacity()),
+      documentsPathProvider.overrideWithValue(directory.path),
       chatHistoryRepositoryProvider.overrideWithValue(
         InMemoryChatHistoryRepository(
           history ?? const ChatHistorySnapshot(conversations: []),
