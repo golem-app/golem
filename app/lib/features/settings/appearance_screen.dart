@@ -102,14 +102,21 @@ class _TextSizeCard extends StatefulWidget {
 }
 
 class _TextSizeCardState extends State<_TextSizeCard> {
-  static const _min = 0.85;
-  static const _max = 1.3;
+  static const _min = minTextScale;
+  static const _max = maxTextScale;
   double? _drag;
 
   @override
   Widget build(BuildContext context) {
     final scale = (_drag ?? widget.scale).clamp(_min, _max);
     final ink = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
+    // The ambient scaler already bakes in the committed preference
+    // (widget.scale); divide it back out to recover the platform factor,
+    // then render the preview under no-text-scaling so the sample shows
+    // systemFactor × dragged-scale exactly — never the square of the
+    // committed setting.
+    final ambient = MediaQuery.of(context).textScaler.scale(100) / 100;
+    final systemFactor = widget.scale == 0 ? 1.0 : ambient / widget.scale;
     return SettingsCard(
       children: [
         Padding(
@@ -121,11 +128,7 @@ class _TextSizeCardState extends State<_TextSizeCard> {
               // real chat copy at the dragged size.
               Align(
                 alignment: Alignment.centerLeft,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 11,
-                  ),
+                child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: CupertinoDynamicColor.resolve(
                       GolemTheme.userBubble,
@@ -133,11 +136,22 @@ class _TextSizeCardState extends State<_TextSizeCard> {
                     ),
                     borderRadius: BorderRadius.circular(GolemRadius.bubble),
                   ),
-                  child: Text(
-                    'Looks about right.',
-                    style: GolemText.body.copyWith(
-                      color: GolemTheme.textOnDark,
-                      fontSize: (GolemText.body.fontSize ?? 17) * scale,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 11,
+                    ),
+                    child: MediaQuery.withNoTextScaling(
+                      child: Text(
+                        'Looks about right.',
+                        style: GolemText.body.copyWith(
+                          color: GolemTheme.textOnDark,
+                          fontSize:
+                              (GolemText.body.fontSize ?? 17) *
+                              systemFactor *
+                              scale,
+                        ),
+                      ),
                     ),
                   ),
                 ),

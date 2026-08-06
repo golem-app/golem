@@ -97,7 +97,12 @@ class _GolemAppState extends ConsumerState<GolemApp>
       ThemeSetting.light => Brightness.light,
       ThemeSetting.dark => Brightness.dark,
     };
-    final textScale = preferences?.textScale ?? 1.0;
+    // Clamped on read: the store's leaves are deliberately tolerant, and
+    // TextScaler.linear asserts on negative factors.
+    final textScale = (preferences?.textScale ?? 1.0).clamp(
+      minTextScale,
+      maxTextScale,
+    );
     return CupertinoApp.router(
       title: AppIdentity.current.displayName,
       debugShowCheckedModeBanner: false,

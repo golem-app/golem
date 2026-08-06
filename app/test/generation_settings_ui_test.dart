@@ -25,6 +25,7 @@ void main() {
     WidgetTester tester, {
     GenerationSettings seed = const GenerationSettings(),
     String profileKey = 'gemma4',
+    ResponseStyle style = ResponseStyle.balanced,
   }) async {
     setViewport(tester);
     settings = InMemorySettingsRepository(seed);
@@ -45,7 +46,9 @@ void main() {
         settingsRepositoryProvider.overrideWithValue(settings),
         preferencesRepositoryProvider.overrideWithValue(
           InMemoryPreferencesRepository(
-            const AppPreferences(advancedMode: true),
+            const AppPreferences(
+              advancedMode: true,
+            ).withStyle(profileKey, style),
           ),
         ),
         modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
@@ -194,6 +197,29 @@ void main() {
     await reveal(tester, const Key('gen-context-gemma4'));
     expect(tester.takeException(), isNull);
     expect(find.byKey(const Key('gen-max-tokens-gemma4')), findsOneWidget);
+  });
+
+  testWidgets('the sampling card states the effective style values', (
+    tester,
+  ) async {
+    // The card must show what generation will run — the style's values
+    // layered under manual overrides — never the profile defaults while
+    // a style silently steers them.
+    await pumpSettings(tester, style: ResponseStyle.precise);
+    await reveal(tester, const Key('gen-top-p-gemma4'));
+    expect(find.text('0.30'), findsOneWidget, reason: 'precise temperature');
+    expect(find.text('0.90'), findsOneWidget, reason: 'precise top-p');
+    expect(find.textContaining('· precise'), findsNWidgets(2));
+    // A hand-set knob wins and drops the style caption on that row only.
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ResponseStyleScreen)),
+    );
+    await container
+        .read(settingsControllerProvider.notifier)
+        .updateModel('gemma4', const SamplingOverrides(temperature: 0.55));
+    await tester.pumpAndSettle();
+    expect(find.text('0.55'), findsOneWidget);
+    expect(find.textContaining('· precise'), findsOneWidget);
   });
 
   testWidgets('the temperature slider commits on drag end', (tester) async {

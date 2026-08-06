@@ -67,6 +67,19 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   }
 }
 
+final class _CountingCacheProbe implements CacheProbe {
+  int calls = 0;
+
+  @override
+  Future<int> sizeBytes() async {
+    calls++;
+    return 500;
+  }
+
+  @override
+  Future<void> clear() async {}
+}
+
 final class _StaticState implements ModelManagementRepository {
   const _StaticState(this.state);
   final ModelState state;
@@ -401,6 +414,55 @@ void main() {
       expect(reloaded.statusOf(spec.key).phase, ArtifactPhase.installed);
     },
   );
+
+  test('storage probing keys on message counts, not chat identity', () async {
+    final cache = _CountingCacheProbe();
+    final container = ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(
+          FakeInferenceRepository(eventDelay: Duration.zero),
+        ),
+        preferencesRepositoryProvider.overrideWithValue(
+          InMemoryPreferencesRepository(),
+        ),
+        modelManagementRepositoryProvider.overrideWithValue(
+          const _StaticState(ModelState()),
+        ),
+        cacheProbeProvider.overrideWithValue(cache),
+      ],
+    );
+    addTearDown(container.dispose);
+    final subscription = container.listen(storageBreakdownProvider, (_, _) {});
+    addTearDown(subscription.close);
+    await container.read(chatControllerProvider.future);
+    await container.read(storageBreakdownProvider.future);
+    final baseline = cache.calls;
+
+    // Metadata-only state reassignments (what every streaming delta also
+    // is, shape-wise) must not re-run the disk probes: the drawer meter
+    // keeps this provider listened at all times.
+    final chat = container.read(chatControllerProvider.notifier);
+    await chat.send('Count me');
+    await container.read(storageBreakdownProvider.future);
+    final afterSend = cache.calls;
+    expect(afterSend, greaterThan(baseline), reason: 'new messages re-probe');
+    final active = container
+        .read(chatControllerProvider)
+        .requireValue
+        .active!
+        .id;
+    await chat.togglePinned(active);
+    await chat.renameConversation(active, 'Same counts');
+    await container.read(storageBreakdownProvider.future);
+    expect(
+      cache.calls,
+      afterSend,
+      reason: 'identity-only chat changes must not re-run disk probes',
+    );
+  });
 
   test('storage breakdown sums buckets and tracks chat size', () async {
     final container = ProviderContainer(

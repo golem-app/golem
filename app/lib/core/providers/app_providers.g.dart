@@ -594,9 +594,14 @@ String _$documentsPathHash() => r'22f7639f5b12516f043a3f4971f84d9142ebf642';
 /// report them (or the seams are unwired) — surfaces hide those figures
 /// instead of inventing them. Watching the chat controller keeps the chat
 /// bucket honest after sends and deletes.
+/// A cheap signature of the chat store that changes only when
+/// conversations or messages are added or removed. ChatController
+/// reassigns state on every streaming delta; anything as heavy as disk
+/// probing must key on this instead of the raw chat state, or it re-runs
+/// per token for the always-mounted drawer meter.
 
-@ProviderFor(storageBreakdown)
-const storageBreakdownProvider = StorageBreakdownProvider._();
+@ProviderFor(chatStorageSignature)
+const chatStorageSignatureProvider = ChatStorageSignatureProvider._();
 
 /// Storage accounting for the drawer meter and the Storage screen: model
 /// bytes from artifact state, chat bytes from the history store, cache
@@ -605,6 +610,65 @@ const storageBreakdownProvider = StorageBreakdownProvider._();
 /// report them (or the seams are unwired) — surfaces hide those figures
 /// instead of inventing them. Watching the chat controller keeps the chat
 /// bucket honest after sends and deletes.
+/// A cheap signature of the chat store that changes only when
+/// conversations or messages are added or removed. ChatController
+/// reassigns state on every streaming delta; anything as heavy as disk
+/// probing must key on this instead of the raw chat state, or it re-runs
+/// per token for the always-mounted drawer meter.
+
+final class ChatStorageSignatureProvider
+    extends $FunctionalProvider<(int, int), (int, int), (int, int)>
+    with $Provider<(int, int)> {
+  /// Storage accounting for the drawer meter and the Storage screen: model
+  /// bytes from artifact state, chat bytes from the history store, cache
+  /// bytes from the cache probe. [StorageBreakdown.freeBytes] and
+  /// [StorageBreakdown.totalBytes] are null whenever the platform cannot
+  /// report them (or the seams are unwired) — surfaces hide those figures
+  /// instead of inventing them. Watching the chat controller keeps the chat
+  /// bucket honest after sends and deletes.
+  /// A cheap signature of the chat store that changes only when
+  /// conversations or messages are added or removed. ChatController
+  /// reassigns state on every streaming delta; anything as heavy as disk
+  /// probing must key on this instead of the raw chat state, or it re-runs
+  /// per token for the always-mounted drawer meter.
+  const ChatStorageSignatureProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'chatStorageSignatureProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatStorageSignatureHash();
+
+  @$internal
+  @override
+  $ProviderElement<(int, int)> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  (int, int) create(Ref ref) {
+    return chatStorageSignature(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue((int, int) value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<(int, int)>(value),
+    );
+  }
+}
+
+String _$chatStorageSignatureHash() =>
+    r'df201c6875f3c90d6cd294e37597891dfd4b41a3';
+
+@ProviderFor(storageBreakdown)
+const storageBreakdownProvider = StorageBreakdownProvider._();
 
 final class StorageBreakdownProvider
     extends
@@ -614,13 +678,6 @@ final class StorageBreakdownProvider
           FutureOr<StorageBreakdown>
         >
     with $FutureModifier<StorageBreakdown>, $FutureProvider<StorageBreakdown> {
-  /// Storage accounting for the drawer meter and the Storage screen: model
-  /// bytes from artifact state, chat bytes from the history store, cache
-  /// bytes from the cache probe. [StorageBreakdown.freeBytes] and
-  /// [StorageBreakdown.totalBytes] are null whenever the platform cannot
-  /// report them (or the seams are unwired) — surfaces hide those figures
-  /// instead of inventing them. Watching the chat controller keeps the chat
-  /// bucket honest after sends and deletes.
   const StorageBreakdownProvider._()
     : super(
         from: null,
@@ -647,7 +704,7 @@ final class StorageBreakdownProvider
   }
 }
 
-String _$storageBreakdownHash() => r'4afd816d798d6c15e2ed415194ca3cb619be5b59';
+String _$storageBreakdownHash() => r'4c77a7aac15e06c5068777b13f95507ee6db37f3';
 
 /// The catalog the UI renders: pinned entries plus the user's custom
 /// repositories (Advanced mode), derived — never stored — so the pinned

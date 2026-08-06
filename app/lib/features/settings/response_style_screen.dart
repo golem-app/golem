@@ -10,6 +10,7 @@ import '../../broker/model_profile.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/domain/app_preferences.dart';
 import '../../core/domain/generation_settings.dart';
+import '../../core/domain/response_style_mapping.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
@@ -229,6 +230,18 @@ class GenerationCard extends ConsumerWidget {
     final overrides =
         ref.watch(settingsControllerProvider).value?.overridesFor(profileKey) ??
         const SamplingOverrides();
+    // The card must state what generation will actually run: the response
+    // style's values layered under the hand-set overrides, exactly as
+    // ChatController computes them. Captions name each value's source.
+    final style =
+        ref.watch(preferencesControllerProvider).value?.styleFor(profileKey) ??
+        ResponseStyle.balanced;
+    final styleOverrides = styleOverridesFor(profileKey, style);
+    String? caption(Object? manual, Object? styled) => manual != null
+        ? null
+        : styled != null
+        ? '· ${style.name}'
+        : '· default';
     // Persisted values are sanitized into the controls' ranges before
     // rendering: the store's leaves are deliberately tolerant, and a
     // hand-edited file must not be able to make the steppers throw.
@@ -269,8 +282,11 @@ class GenerationCard extends ConsumerWidget {
           _SliderRow(
             sliderKey: Key('gen-temperature-$profileKey'),
             label: 'Temperature',
-            value: overrides.temperature ?? defaults.temperature,
-            isDefault: overrides.temperature == null,
+            value:
+                overrides.temperature ??
+                styleOverrides.temperature ??
+                defaults.temperature,
+            caption: caption(overrides.temperature, styleOverrides.temperature),
             min: 0,
             max: 2,
             display: (value) => value.toStringAsFixed(2),
@@ -280,8 +296,8 @@ class GenerationCard extends ConsumerWidget {
           _SliderRow(
             sliderKey: Key('gen-top-p-$profileKey'),
             label: 'Top-p',
-            value: overrides.topP ?? defaults.topP,
-            isDefault: overrides.topP == null,
+            value: overrides.topP ?? styleOverrides.topP ?? defaults.topP,
+            caption: caption(overrides.topP, styleOverrides.topP),
             min: 0.05,
             max: 1,
             display: (value) => value.toStringAsFixed(2),
@@ -290,8 +306,9 @@ class GenerationCard extends ConsumerWidget {
           _SliderRow(
             sliderKey: Key('gen-top-k-$profileKey'),
             label: 'Top-k',
-            value: (overrides.topK ?? defaults.topK ?? 0).toDouble(),
-            isDefault: overrides.topK == null,
+            value: (overrides.topK ?? styleOverrides.topK ?? defaults.topK ?? 0)
+                .toDouble(),
+            caption: caption(overrides.topK, styleOverrides.topK),
             min: 0,
             max: 100,
             display: (value) => value.round() == 0 ? 'Off' : '${value.round()}',
@@ -371,7 +388,7 @@ class _SliderRow extends StatefulWidget {
     required this.sliderKey,
     required this.label,
     required this.value,
-    required this.isDefault,
+    required this.caption,
     required this.min,
     required this.max,
     required this.display,
@@ -381,7 +398,10 @@ class _SliderRow extends StatefulWidget {
   final Key sliderKey;
   final String label;
   final double value;
-  final bool isDefault;
+
+  /// Source caption ('· default', '· precise', …); null when the value is
+  /// a hand-set override.
+  final String? caption;
   final double min;
   final double max;
   final String Function(double value) display;
@@ -407,8 +427,11 @@ class _SliderRowState extends State<_SliderRow> {
               child: Text(widget.label, style: const TextStyle(fontSize: 14)),
             ),
             Text(widget.display(value), style: const TextStyle(fontSize: 14)),
-            if (widget.isDefault && _drag == null)
-              Text(' · default', style: TextStyle(fontSize: 14, color: muted)),
+            if (widget.caption != null && _drag == null)
+              Text(
+                ' ${widget.caption}',
+                style: TextStyle(fontSize: 14, color: muted),
+              ),
           ],
         ),
         SizedBox(

@@ -63,6 +63,12 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
 
   Widget _body(BuildContext context, ModelState model) {
     final catalog = ref.watch(effectiveModelCatalogProvider);
+    // Only the fake backend can download hand-added repositories; the
+    // real downloader knows the pinned catalog alone until #20, and an
+    // enabled button there would fail on every tap.
+    final pinnedKeys = {
+      for (final entry in ref.watch(modelCatalogEntriesProvider)) entry.key,
+    };
     final advanced =
         ref.watch(preferencesControllerProvider).value?.advancedMode ?? false;
     final simulatedInference = ref
@@ -120,6 +126,7 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
             active: entry.key == model.activeArtifactKey,
             otherDownloadActive:
                 downloadingKey != null && downloadingKey != entry.key,
+            downloadable: model.simulated || pinnedKeys.contains(entry.key),
           ),
           const SizedBox(height: 12),
         ],
@@ -389,6 +396,7 @@ class _ModelCard extends ConsumerWidget {
     required this.simulated,
     required this.active,
     required this.otherDownloadActive,
+    required this.downloadable,
   });
 
   final ModelCatalogEntry entry;
@@ -396,6 +404,10 @@ class _ModelCard extends ConsumerWidget {
   final bool simulated;
   final bool active;
   final bool otherDownloadActive;
+
+  /// False for hand-added entries on a real download backend, whose
+  /// repository would reject the unknown key.
+  final bool downloadable;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -556,16 +568,35 @@ class _ModelCard extends ConsumerWidget {
   }
 
   List<Widget> _buttons(BuildContext context, ModelController controller) {
-    final download = GolemButton.filled(
-      key: Key('model-download-${entry.key}'),
-      label: switch (status.phase) {
-        ArtifactPhase.paused => 'Resume Download',
-        ArtifactPhase.failed => 'Retry Download',
-        _ => 'Download · ${_gigabytes(entry.totalBytes)}',
-      },
-      onPressed: otherDownloadActive
-          ? null
-          : () => controller.download(entry.key),
+    final download = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        GolemButton.filled(
+          key: Key('model-download-${entry.key}'),
+          label: switch (status.phase) {
+            ArtifactPhase.paused => 'Resume Download',
+            ArtifactPhase.failed => 'Retry Download',
+            _ => 'Download · ${_gigabytes(entry.totalBytes)}',
+          },
+          onPressed: otherDownloadActive || !downloadable
+              ? null
+              : () => controller.download(entry.key),
+        ),
+        if (!downloadable)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(
+              'Hand-added repositories can\'t download on this engine yet — '
+              'that arrives in a future update.',
+              style: GolemText.footnote.copyWith(
+                color: CupertinoDynamicColor.resolve(
+                  GolemTheme.mutedInk,
+                  context,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
     final cancel = CupertinoButton(
       key: Key('model-cancel-${entry.key}'),

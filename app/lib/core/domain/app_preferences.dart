@@ -5,6 +5,13 @@ import 'model_catalog.dart';
 /// The user's theme choice; [system] follows the platform brightness.
 enum ThemeSetting { system, light, dark }
 
+/// Bounds the appearance slider enforces. The store's leaves stay
+/// deliberately tolerant, so every consumer of [AppPreferences.textScale]
+/// clamps into this range — a hand-edited file must never reach
+/// TextScaler.linear with a negative or absurd factor.
+const minTextScale = 0.85;
+const maxTextScale = 1.3;
+
 /// How much room the model gets to improvise. [balanced] means the model
 /// profile's own defaults; the other two map onto explicit sampling values
 /// per profile (see `response_style_mapping.dart`).
@@ -24,9 +31,22 @@ final class CustomModelSpec {
   final ModelEngine engine;
   final String revision;
 
-  /// Stable catalog key derived from the repository name.
-  String get key =>
-      'custom-${repository.toLowerCase().replaceAll(RegExp('[^a-z0-9]+'), '-')}';
+  /// Stable catalog key derived from the repository name. The hash
+  /// suffix keeps repositories whose names differ only in punctuation
+  /// (org/foo_bar vs org/foo-bar) from colliding on one slug and
+  /// silently replacing each other's card and download state.
+  String get key {
+    final slug = repository.toLowerCase().replaceAll(RegExp('[^a-z0-9]+'), '-');
+    return 'custom-$slug-${_fnv32(repository).toRadixString(16).padLeft(8, '0')}';
+  }
+
+  static int _fnv32(String value) {
+    var hash = 0x811c9dc5;
+    for (final unit in value.codeUnits) {
+      hash = ((hash ^ unit) * 0x01000193) & 0xFFFFFFFF;
+    }
+    return hash;
+  }
 
   /// The repository tail, as the display name ("mlx-community/foo" → "foo").
   String get displayName =>

@@ -89,9 +89,11 @@ class MessageBubble extends ConsumerWidget {
               _ReasoningCard(
                 text: message.reasoning!,
                 streaming: message.isStreaming && message.text.isEmpty,
+                live: message.isStreaming,
                 // Streaming reasoning is always shown live; settled cards
                 // start collapsed unless the appearance preference says
-                // otherwise. A card opened by streaming keeps its state.
+                // otherwise. A card opened by streaming latches open when
+                // the run settles (see _ReasoningCardState).
                 initiallyExpanded:
                     message.isStreaming ||
                     (ref
@@ -383,10 +385,16 @@ class _ReasoningCard extends StatefulWidget {
   const _ReasoningCard({
     required this.text,
     required this.streaming,
+    required this.live,
     required this.initiallyExpanded,
   });
   final String text;
   final bool streaming;
+
+  /// Whether the owning message is still streaming at all (the reasoning
+  /// header's LIVE state, [streaming], ends earlier — when answer text
+  /// starts).
+  final bool live;
   final bool initiallyExpanded;
 
   @override
@@ -398,10 +406,20 @@ class _ReasoningCardState extends State<_ReasoningCard> {
   // presentation state, never persisted. Until the user touches the
   // card it follows [_ReasoningCard.initiallyExpanded] reactively —
   // preferences resolve a frame after cold start, and an initial-only
-  // read would freeze on that pre-resolution frame. Streaming cards
-  // therefore also settle back to the preference when the run ends.
+  // read would freeze on that pre-resolution frame.
   bool? _userToggle;
   bool get _expanded => _userToggle ?? widget.initiallyExpanded;
+
+  @override
+  void didUpdateWidget(covariant _ReasoningCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A card the stream opened stays open when the run settles — the
+    // reader may be mid-thought. Latching only on the live→settled edge
+    // keeps preference toggles reactive for every other card.
+    if (oldWidget.live && !widget.live && _userToggle == null) {
+      _userToggle = true;
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Container(

@@ -74,13 +74,6 @@ final class FakeInferenceRepository implements InferenceRepository {
     if (!_prepared) throw StateError('The simulated runtime is unloaded.');
     final epoch = ++_generationEpoch;
     final profile = _profileFor(modelKey);
-    // A custom system prompt is acknowledged up front so its round-trip is
-    // provable in QA without a real model; default builds stay unchanged.
-    if (systemPrompt != null && systemPrompt.isNotEmpty) {
-      yield const AnswerDelta(
-        'Simulated note: your custom system prompt is applied.\n\n',
-      );
-    }
     final prompt = context.lastOrNull?['content'] ?? '';
     if (prompt.contains('[fail]')) {
       if (reasoningEnabled) yield const ReasoningDelta('A partial thought…');
@@ -113,6 +106,16 @@ final class FakeInferenceRepository implements InferenceRepository {
         }
         yield ReasoningDelta(part);
       }
+    }
+    // A custom system prompt is acknowledged so its round-trip is provable
+    // in QA without a real model — but only here, after the failure
+    // branches and the reasoning loop: answer text arriving while
+    // reasoning still streams would end the reasoning card's live state,
+    // and the failure injections must stay pristine.
+    if (systemPrompt != null && systemPrompt.isNotEmpty) {
+      yield const AnswerDelta(
+        'Simulated note: your custom system prompt is applied.\n\n',
+      );
     }
     var tokens = 0;
     for (final (index, part) in _answer.indexed) {

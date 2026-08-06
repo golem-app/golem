@@ -269,7 +269,7 @@ void main() {
     expect(loaded.styleFor('qwen35'), ResponseStyle.balanced);
     expect(
       loaded.customModels.single.key,
-      'custom-mlx-community-awesome-model',
+      startsWith('custom-mlx-community-awesome-model-'),
     );
 
     // Only non-default values reach disk, so future default changes reach
@@ -307,7 +307,7 @@ void main() {
       revision: 'abc123',
     );
     final entry = spec.toCatalogEntry();
-    expect(entry.key, 'custom-thebloke-some-model-gguf');
+    expect(entry.key, startsWith('custom-thebloke-some-model-gguf-'));
     expect(entry.displayName, 'Some_Model-GGUF');
     expect(entry.engine, ModelEngine.gguf);
     expect(entry.revision, 'abc123');
@@ -321,6 +321,26 @@ void main() {
         .withCustomModel(spec)
         .withCustomModel(spec);
     expect(prefs.customModels, hasLength(1));
+
+    // Repositories that differ only in punctuation collapse to the same
+    // slug; the hash suffix keeps them distinct instead of silently
+    // replacing each other's card and download state.
+    const underscore = CustomModelSpec(
+      repository: 'org/foo_bar',
+      engine: ModelEngine.mlx,
+    );
+    const dash = CustomModelSpec(
+      repository: 'org/foo-bar',
+      engine: ModelEngine.mlx,
+    );
+    expect(underscore.key, isNot(dash.key));
+    expect(
+      const AppPreferences()
+          .withCustomModel(underscore)
+          .withCustomModel(dash)
+          .customModels,
+      hasLength(2),
+    );
   });
 
   test('chat history reports its stored size', () async {

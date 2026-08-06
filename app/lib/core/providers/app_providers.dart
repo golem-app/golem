@@ -97,12 +97,29 @@ extension StorageBreakdownTotals on StorageBreakdown {
 /// report them (or the seams are unwired) — surfaces hide those figures
 /// instead of inventing them. Watching the chat controller keeps the chat
 /// bucket honest after sends and deletes.
+/// A cheap signature of the chat store that changes only when
+/// conversations or messages are added or removed. ChatController
+/// reassigns state on every streaming delta; anything as heavy as disk
+/// probing must key on this instead of the raw chat state, or it re-runs
+/// per token for the always-mounted drawer meter.
+@Riverpod(keepAlive: true)
+(int, int) chatStorageSignature(Ref ref) {
+  final conversations =
+      ref.watch(chatControllerProvider).value?.conversations ??
+      const <ChatConversation>[];
+  var messages = 0;
+  for (final conversation in conversations) {
+    messages += conversation.messages.length;
+  }
+  return (conversations.length, messages);
+}
+
 @Riverpod(keepAlive: true)
 Future<StorageBreakdown> storageBreakdown(Ref ref) async {
-  // Every dependency registers before the first await: the chat watch is
+  // Every dependency registers before the first await: the signature is
   // what re-runs this after sends and deletes, and a watch first taken
   // mid-computation would race its own invalidation.
-  ref.watch(chatControllerProvider);
+  ref.watch(chatStorageSignatureProvider);
   final history = ref.watch(chatHistoryRepositoryProvider);
   CacheProbe? cache;
   try {
