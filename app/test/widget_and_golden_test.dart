@@ -549,7 +549,10 @@ void main() {
       expect(size.height, 4);
       expect(size.width, greaterThan(0));
     }
-    // The fill is the used fraction of the track — 2.8 of the fake 64 GB.
+    // The fill is Golem's own share of the volume, not the disk's used
+    // space: 0.10 of the fake 64 GB, so it is a sliver of the 290pt track
+    // and too narrow to show in a golden. Its width regressing to zero is
+    // exactly the failure this guards.
     expect(sizes.last.width, lessThan(sizes.first.width));
   }, variant: iosChrome);
 
