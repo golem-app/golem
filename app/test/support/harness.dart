@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
+import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
@@ -146,12 +147,17 @@ Future<void> pumpWithRepositories(
   );
   if (find.byType(ChatScreen).evaluate().isNotEmpty) {
     final context = tester.element(find.byType(ChatScreen));
-    await tester.runAsync(
-      () => precacheImage(
+    // The drawer header's tile as well as the empty-state mascot: asset
+    // decoding is real async work that pump cannot drain, so a golden that
+    // draws either one has to precache it rather than rely on the other's
+    // runAsync window happening to cover it.
+    await tester.runAsync(() async {
+      await precacheImage(
         const AssetImage('assets/images/golem_mascot.png'),
         context,
-      ),
-    );
+      );
+      await precacheImage(AssetImage(AppIdentity.current.iconAsset), context);
+    });
     await tester.pump();
   }
   await tester.pumpAndSettle();

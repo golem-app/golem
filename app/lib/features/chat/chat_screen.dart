@@ -24,6 +24,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     right: Radius.circular(GolemRadius.drawer),
   );
 
+  /// How far past its own width the closed drawer parks, so that
+  /// [GolemShadow.drawer] does not bleed back over the canvas.
+  static const _drawerHideMargin = 52.0;
+
   final _composer = TextEditingController();
   final _scroll = ScrollController();
   final _focus = FocusNode();
@@ -257,14 +261,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     curve: GolemMotion.standard,
                     // Labelled like the modal barrier it is, so the one
                     // screen-sized tap target the open drawer adds still
-                    // announces itself.
+                    // announces itself, and carrying the dismiss action so
+                    // the screen-reader escape gesture closes the drawer
+                    // without hunting for the barrier.
                     child: Semantics(
                       button: true,
                       label: 'Close conversations',
+                      onDismiss: () => setState(() => _drawerOpen = false),
                       child: GestureDetector(
                         key: const Key('drawer-dismiss'),
                         onTap: () => setState(() => _drawerOpen = false),
-                        child: const ColoredBox(color: GolemTheme.scrim),
+                        child: const ColoredBox(color: GolemTheme.drawerScrim),
                       ),
                     ),
                   ),
@@ -272,7 +279,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
               AnimatedPositioned(
                 key: const Key('conversation-drawer'),
-                left: _drawerOpen ? 0 : -drawerWidth - GolemRadius.drawer,
+                left: _drawerOpen ? 0 : -drawerWidth - _drawerHideMargin,
                 top: 0,
                 bottom: 0,
                 width: drawerWidth,

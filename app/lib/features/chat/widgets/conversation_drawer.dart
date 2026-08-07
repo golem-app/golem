@@ -522,20 +522,31 @@ final class _StorageMeter extends ConsumerWidget {
             borderRadius: BorderRadius.circular(2),
             child: SizedBox(
               height: 4,
+              // Both bars need Positioned.fill. A Stack hands its
+              // non-positioned children loose constraints, and a childless
+              // ColoredBox takes the smallest size it is offered — so either
+              // one laid out 4pt tall by 0pt wide and painted nothing.
               child: Stack(
                 children: [
-                  ColoredBox(
-                    color: CupertinoDynamicColor.resolve(
-                      GolemTheme.drawerLine,
-                      context,
-                    ),
-                  ),
-                  FractionallySizedBox(
-                    widthFactor: (overview.usedBytes / total).clamp(0.0, 1.0),
+                  Positioned.fill(
                     child: ColoredBox(
                       color: CupertinoDynamicColor.resolve(
-                        GolemTheme.accent,
+                        GolemTheme.drawerLine,
                         context,
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: FractionallySizedBox(
+                      // Left-anchored: the default centers the fill, which
+                      // would float it in the middle of the track.
+                      alignment: Alignment.centerLeft,
+                      widthFactor: (overview.usedBytes / total).clamp(0.0, 1.0),
+                      child: ColoredBox(
+                        color: CupertinoDynamicColor.resolve(
+                          GolemTheme.accent,
+                          context,
+                        ),
                       ),
                     ),
                   ),

@@ -144,8 +144,9 @@ abstract final class GolemTheme {
   );
 
   /// Splash navy at 44% over the chat behind the open drawer. Fixed in both
-  /// appearances: it darkens the canvas rather than tinting it.
-  static const scrim = Color(0x70060D1F);
+  /// appearances: it darkens the canvas rather than tinting it. Named for
+  /// the drawer because the value is tuned to that one composite.
+  static const drawerScrim = Color(0x70060D1F);
   // The code card tracks the appearance: a navy card with white-alpha
   // chrome in dark, a cool-grey card with black-alpha chrome in light.
   // Every ink below clears 4.5:1 on its own surface — the light syntax

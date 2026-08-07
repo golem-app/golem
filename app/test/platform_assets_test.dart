@@ -459,10 +459,8 @@ void main() {
       // artwork sample point, scaled from 1024 to 168.
       _expectDominantChannel(tile.getPixel(84, 148), flavor.dominant);
     }
-
-    // The flavorless legacy identity owns no artwork and falls back to the
-    // production tile.
-    expect(AppIdentity.flutter.iconAsset, AppIdentity.production.iconAsset);
+    // The flavorless identity's fallback to the production tile is an enum
+    // mapping, asserted in app_identity_test.dart.
   });
 
   test('platform launchers use their configured native artwork', () async {

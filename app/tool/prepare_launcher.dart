@@ -41,9 +41,16 @@ void main() {
   _writeAdaptiveForeground();
 }
 
+/// The squircle both maskers cut to, as a superellipse exponent and an inset
+/// (in source pixels, at the tracked 1024×1024 scale). They are shared so
+/// that retuning the Android matte cannot silently desync the in-app tile.
+const _squircleExponent = 4.5;
+const _squircleInset = 12.0;
+const _sourceSize = 1024;
+
 void _writeMattedLauncher(String flavor, image.Image icon) {
-  const exponent = 4.5;
-  const matteInset = 12.0;
+  const exponent = _squircleExponent;
+  const matteInset = _squircleInset;
   const navy = (r: 15, g: 21, b: 36);
   final halfWidth = icon.width / 2;
   final halfHeight = icon.height / 2;
@@ -73,15 +80,19 @@ void _writeMattedLauncher(String flavor, image.Image icon) {
 /// applies its own icon mask at display time, so the corners never reach the
 /// Home Screen. Nothing masks a Flutter surface, so a widget that draws the
 /// source directly (the drawer header) would show those white corners around
-/// the framed artwork. This derivative bakes the mask into the alpha channel
+/// the framed artwork. This derivative bakes a mask into the alpha channel
 /// instead, leaving the artwork itself untouched. 168×168 is the 42pt header
 /// tile at 4x, the densest scale any shipped device asks for.
+///
+/// The curve is this project's squircle, not a reproduction of Apple's mask:
+/// as the file header notes, this inset runs slightly wider than the real one,
+/// which is why iOS ships the unmodified artwork. At a 42pt tile the
+/// difference is a fraction of a point, and using one curve for both maskers
+/// is worth more than matching the Home Screen to the pixel.
 void _writeAppIconTile(String flavor, image.Image icon) {
   const size = 168;
-  const exponent = 4.5;
-  // The launcher's 12px inset at 1024, kept proportional so both writers
-  // describe the same curve.
-  const matteInset = 12.0 * size / 1024;
+  const exponent = _squircleExponent;
+  const matteInset = _squircleInset * size / _sourceSize;
   // A single center sample per pixel leaves a visibly stepped rim at this
   // size; coverage from a 4×4 sub-sample grid anti-aliases it.
   const samples = 4;

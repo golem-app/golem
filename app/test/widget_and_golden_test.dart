@@ -522,28 +522,48 @@ void main() {
     }
   }, variant: iosChrome);
 
+  testWidgets('the storage meter paints a track and a used fill', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      history: seedHistory(),
+      child: const ChatScreen(),
+    );
+    await tester.tap(find.byKey(const Key('open-drawer')));
+    await tester.pumpAndSettle();
+    // Both bars are childless ColoredBoxes inside a 4pt Stack. Without a
+    // tight constraint each takes constraints.smallest and lays out 0×0,
+    // painting nothing — and a re-blessed golden records the absence as if
+    // it were intended, which is exactly how this shipped unnoticed.
+    final bars = find.descendant(
+      of: find.byKey(const Key('storage-meter')),
+      matching: find.byType(ColoredBox),
+    );
+    expect(bars, findsNWidgets(2));
+    final sizes = bars
+        .evaluate()
+        .map((element) => (element.renderObject! as RenderBox).size)
+        .toList();
+    for (final size in sizes) {
+      expect(size.height, 4);
+      expect(size.width, greaterThan(0));
+    }
+    // The fill is the used fraction of the track — 2.8 of the fake 64 GB.
+    expect(sizes.last.width, lessThan(sizes.first.width));
+  }, variant: iosChrome);
+
   // The drawer's own inks, asserted against the tokens the way
   // code_block_test.dart asserts the syntax palette. This is what keeps the
   // dark column honest while `textContrastGuideline` runs light-only above,
   // and it is the guard on the handoff's alpha values, which read 4.07 and
   // 2.92 in light and 4.83 and 4.18 in dark — four of five under the bar.
   group('drawer palette contrast', () {
-    double luminance(Color c) {
-      double channel(double v) {
-        final s = v / 255;
-        return s <= 0.03928
-            ? s / 12.92
-            : pow((s + 0.055) / 1.055, 2.4).toDouble();
-      }
-
-      return 0.2126 * channel(c.r * 255) +
-          0.7152 * channel(c.g * 255) +
-          0.0722 * channel(c.b * 255);
-    }
-
+    // Color.computeLuminance is already the WCAG relative-luminance
+    // formula, so the ratio is all that is left to spell out.
     double ratio(Color fg, Color bg) {
-      final a = luminance(fg);
-      final b = luminance(bg);
+      final a = fg.computeLuminance();
+      final b = bg.computeLuminance();
       return (max(a, b) + 0.05) / (min(a, b) + 0.05);
     }
 
