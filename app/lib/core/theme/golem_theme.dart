@@ -78,7 +78,6 @@ abstract final class GolemTheme {
     darkColor: Color(0xFF4A3B18),
   );
   static const userBubble = Color(0xFF152549);
-  static const drawer = Color(0xFF152549);
   static const splash = Color(0xFF060D1F);
   static const amber = Color(0xFFF6AA1B);
   static const destructive = Color(0xFFFF382C);
@@ -90,14 +89,63 @@ abstract final class GolemTheme {
     color: Color(0xFFD70015),
     darkColor: Color(0xFFFF6259),
   );
-  // Fixed colors for the always-dark drawer and splash surfaces.
+  // Fixed colors for the surfaces that stay dark in both appearances: the
+  // splash, the toast, and the user bubble. The drawer used to belong here
+  // and no longer does — it tracks the appearance through the tokens below.
   static const textOnDark = Color(0xFFF7F8FA);
   static const mutedOnDark = Color(0xFFAAB4C9);
-  static const faintOnDark = Color(0xFF8FA0C0);
-  static const iconOnDark = Color(0xFFCDD0D5);
-  static const scrim = Color(0x66000000);
-  static const drawerShadow = Color(0x59000000);
+  static const toastSurface = Color(0xFF152549);
   static const splashGlow = Color(0x801763EE);
+
+  // The conversation drawer, from the `.gmdw` scope of the Drawer Redesign
+  // handoff. Its structural colors are the export's exactly; the two ink
+  // ramps are not. Measured on the export's own grounds its secondary and
+  // faint inks read 4.07 and 2.92 in light and 4.83 and 4.18 in dark —
+  // four of five below the 4.5:1 this project enforces, and the dark pair
+  // would have regressed the drawer that already ships at 7.24 and 5.71.
+  // So the dark ramp is kept as-is and light mirrors its ratios (12.0 /
+  // 7.2 / 5.7 against 14.2 / 7.2 / 5.7), which reads the same in both
+  // appearances and clears AA. Same trade as [destructiveText] above.
+  static const drawer = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFFDBE6FB),
+    darkColor: Color(0xFF152549),
+  );
+  static const drawerInk = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFF152549),
+    darkColor: Color(0xFFFFFFFF),
+  );
+  static const drawerMutedInk = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFF39496A),
+    darkColor: Color(0xFFAAB4C9),
+  );
+  static const drawerFaintInk = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFF495878),
+    darkColor: Color(0xFF8FA0C0),
+  );
+
+  /// The search field. Light lifts a near-white fill off the pale blue
+  /// ground; dark keeps the barely-there white wash.
+  static const drawerFill = CupertinoDynamicColor.withBrightness(
+    color: Color(0xA8FFFFFF),
+    darkColor: Color(0x12FFFFFF),
+  );
+
+  /// The active conversation row: a tint of the accent in light, where a
+  /// white wash would be invisible against the fill.
+  static const drawerSelected = CupertinoDynamicColor.withBrightness(
+    color: Color(0x1F1763EE),
+    darkColor: Color(0x17FFFFFF),
+  );
+
+  /// Shared by the footer divider and the storage meter's track.
+  static const drawerLine = CupertinoDynamicColor.withBrightness(
+    color: Color(0x21152549),
+    darkColor: Color(0x1CFFFFFF),
+  );
+
+  /// Splash navy at 44% over the chat behind the open drawer. Fixed in both
+  /// appearances: it darkens the canvas rather than tinting it.
+  static const scrim = Color(0x70060D1F);
   // The code card tracks the appearance: a navy card with white-alpha
   // chrome in dark, a cool-grey card with black-alpha chrome in light.
   // Every ink below clears 4.5:1 on its own surface — the light syntax

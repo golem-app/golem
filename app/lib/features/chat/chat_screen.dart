@@ -19,6 +19,11 @@ class ChatScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
+  /// Only the free edge is rounded; the hinged edge meets the screen.
+  static const _drawerRadius = BorderRadius.horizontal(
+    right: Radius.circular(GolemRadius.drawer),
+  );
+
   final _composer = TextEditingController();
   final _scroll = ScrollController();
   final _focus = FocusNode();
@@ -125,114 +130,99 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget _buildShell(BuildContext context, ChatState chat) {
     final blocked =
         chat.generation != GenerationPhase.idle || chat.hasUnsavedAssistant;
-    // Canvas, not drawer navy: this is what shows behind the translucent
-    // keyboard in both appearances. The navy drawer backdrop is a fading
-    // layer inside the stack instead, present only while the drawer shows.
+    // Canvas, not drawer: this is what shows behind the translucent
+    // keyboard in both appearances.
     return CupertinoPageScaffold(
       backgroundColor: GolemTheme.canvas,
       child: LayoutBuilder(
         builder: (context, constraints) {
           // Capped at 330pt so a consistent tap-to-dismiss strip of chat
-          // stays visible on phone widths.
+          // stays visible on phone widths. Deliberately wider than the
+          // handoff's 318-of-417 (~307pt here), which read cramped on
+          // device against the conversation titles it has to hold.
           final drawerWidth = (constraints.maxWidth * 0.9)
               .clamp(0, 330.0)
               .toDouble();
           return Stack(
             children: [
               Positioned.fill(
-                child: IgnorePointer(
-                  child: AnimatedOpacity(
-                    opacity: _drawerOpen ? 1 : 0,
-                    duration: const Duration(milliseconds: 360),
-                    curve: Curves.easeOutCubic,
-                    child: const ColoredBox(color: GolemTheme.drawer),
-                  ),
-                ),
-              ),
-              Positioned.fill(
                 child: ExcludeSemantics(
                   excluding: _drawerOpen,
                   child: IgnorePointer(
+                    key: const Key('chat-canvas'),
                     ignoring: _drawerOpen,
-                    child: AnimatedScale(
-                      key: const Key('chat-canvas'),
-                      scale: _drawerOpen ? 0.94 : 1,
-                      alignment: const Alignment(0.7, 0),
-                      duration: const Duration(milliseconds: 360),
-                      curve: Curves.easeOutCubic,
-                      child: CupertinoPageScaffold(
+                    child: CupertinoPageScaffold(
+                      backgroundColor: GolemTheme.canvas,
+                      navigationBar: GolemNavBar(
                         backgroundColor: GolemTheme.canvas,
-                        navigationBar: GolemNavBar(
-                          backgroundColor: GolemTheme.canvas,
-                          title: chat.active?.title ?? 'New chat',
-                          subtitle: chatModelSubtitle(
-                            backend: ref.watch(inferenceBackendProvider),
-                            catalog: ref.watch(modelCatalogEntriesProvider),
-                            modelKey: chat.active?.modelKey,
-                          ),
-                          // Contained glass buttons follow the iOS 26
-                          // toolbar style; bare nav-bar glyphs read too
-                          // small next to it.
-                          leading: CupertinoButton(
-                            key: const Key('open-drawer'),
-                            padding: EdgeInsets.zero,
-                            minimumSize: const Size(44, 44),
-                            onPressed: blocked
-                                ? null
-                                : () {
-                                    _focus.unfocus();
-                                    setState(() => _drawerOpen = true);
-                                  },
-                            child: const Glass(
-                              radius: 20,
-                              floating: true,
-                              child: SizedBox(
-                                width: 40,
-                                height: 40,
-                                child: Icon(
-                                  CupertinoIcons.bars,
-                                  semanticLabel: 'Open conversations',
-                                  size: 24,
-                                ),
-                              ),
-                            ),
-                          ),
-                          trailing: CupertinoButton(
-                            key: const Key('new-chat-header'),
-                            padding: EdgeInsets.zero,
-                            minimumSize: const Size(44, 44),
-                            onPressed: blocked
-                                ? null
-                                : () => ref
-                                      .read(chatControllerProvider.notifier)
-                                      .newChat(),
-                            child: const Glass(
-                              radius: 20,
-                              floating: true,
-                              child: SizedBox(
-                                width: 40,
-                                height: 40,
-                                child: Icon(
-                                  CupertinoIcons.square_pencil,
-                                  semanticLabel: 'New chat',
-                                  size: 24,
-                                ),
+                        title: chat.active?.title ?? 'New chat',
+                        subtitle: chatModelSubtitle(
+                          backend: ref.watch(inferenceBackendProvider),
+                          catalog: ref.watch(modelCatalogEntriesProvider),
+                          modelKey: chat.active?.modelKey,
+                        ),
+                        // Contained glass buttons follow the iOS 26
+                        // toolbar style; bare nav-bar glyphs read too
+                        // small next to it.
+                        leading: CupertinoButton(
+                          key: const Key('open-drawer'),
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(44, 44),
+                          onPressed: blocked
+                              ? null
+                              : () {
+                                  _focus.unfocus();
+                                  setState(() => _drawerOpen = true);
+                                },
+                          child: const Glass(
+                            radius: 20,
+                            floating: true,
+                            child: SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: Icon(
+                                CupertinoIcons.bars,
+                                semanticLabel: 'Open conversations',
+                                size: 24,
                               ),
                             ),
                           ),
                         ),
-                        child: SafeArea(
-                          top: false,
-                          child: ChatCanvas(
-                            chat: chat,
-                            composer: _composer,
-                            focus: _focus,
-                            scroll: _scroll,
-                            scrollToLatest: _scrollToLatest,
-                            onUserScroll: _onUserScroll,
-                            onScrollMetrics: _updateScrollState,
-                            showJump: _showJump,
+                        trailing: CupertinoButton(
+                          key: const Key('new-chat-header'),
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(44, 44),
+                          onPressed: blocked
+                              ? null
+                              : () => ref
+                                    .read(chatControllerProvider.notifier)
+                                    .newChat(),
+                          child: const Glass(
+                            radius: 20,
+                            floating: true,
+                            child: SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: Icon(
+                                CupertinoIcons.square_pencil,
+                                semanticLabel: 'New chat',
+                                size: 24,
+                              ),
+                            ),
                           ),
+                        ),
+                      ),
+                      child: SafeArea(
+                        top: false,
+                        child: ChatCanvas(
+                          chat: chat,
+                          composer: _composer,
+                          focus: _focus,
+                          scroll: _scroll,
+                          scrollToLatest: _scrollToLatest,
+                          onUserScroll: _onUserScroll,
+                          onScrollMetrics: _updateScrollState,
+                          showJump: _showJump,
                         ),
                       ),
                     ),
@@ -256,22 +246,38 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     },
                   ),
                 ),
-              if (_drawerOpen)
-                Positioned.fill(
-                  child: GestureDetector(
-                    key: const Key('drawer-dismiss'),
-                    onTap: () => setState(() => _drawerOpen = false),
-                    child: const ColoredBox(color: GolemTheme.scrim),
+              // Always mounted so it can fade with the panel. Mounting it on
+              // _drawerOpen made it pop in and out against a 250ms slide.
+              Positioned.fill(
+                child: IgnorePointer(
+                  ignoring: !_drawerOpen,
+                  child: AnimatedOpacity(
+                    opacity: _drawerOpen ? 1 : 0,
+                    duration: GolemMotion.medium,
+                    curve: GolemMotion.standard,
+                    // Labelled like the modal barrier it is, so the one
+                    // screen-sized tap target the open drawer adds still
+                    // announces itself.
+                    child: Semantics(
+                      button: true,
+                      label: 'Close conversations',
+                      child: GestureDetector(
+                        key: const Key('drawer-dismiss'),
+                        onTap: () => setState(() => _drawerOpen = false),
+                        child: const ColoredBox(color: GolemTheme.scrim),
+                      ),
+                    ),
                   ),
                 ),
+              ),
               AnimatedPositioned(
                 key: const Key('conversation-drawer'),
-                left: _drawerOpen ? 0 : -drawerWidth - 28,
+                left: _drawerOpen ? 0 : -drawerWidth - GolemRadius.drawer,
                 top: 0,
                 bottom: 0,
                 width: drawerWidth,
-                duration: const Duration(milliseconds: 400),
-                curve: Curves.easeOutCubic,
+                duration: GolemMotion.medium,
+                curve: GolemMotion.standard,
                 child: GestureDetector(
                   onHorizontalDragEnd: (details) {
                     if ((details.primaryVelocity ?? 0) < -280) {
@@ -279,22 +285,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     }
                   },
                   child: DecoratedBox(
-                    decoration: const BoxDecoration(
-                      color: GolemTheme.drawer,
-                      boxShadow: [
-                        BoxShadow(
-                          color: GolemTheme.drawerShadow,
-                          blurRadius: 30,
-                          offset: Offset(12, 0),
-                        ),
-                      ],
+                    decoration: BoxDecoration(
+                      color: CupertinoDynamicColor.resolve(
+                        GolemTheme.drawer,
+                        context,
+                      ),
+                      borderRadius: _drawerRadius,
+                      boxShadow: GolemShadow.drawer,
                     ),
-                    child: ExcludeSemantics(
-                      excluding: !_drawerOpen,
-                      child: ConversationDrawer(
-                        chat: chat,
-                        blocked: blocked,
-                        close: () => setState(() => _drawerOpen = false),
+                    // The panel's own rows round to 12pt, so without this
+                    // the topmost and bottommost of them cut the corner.
+                    child: ClipRRect(
+                      borderRadius: _drawerRadius,
+                      child: ExcludeSemantics(
+                        excluding: !_drawerOpen,
+                        child: ConversationDrawer(
+                          chat: chat,
+                          blocked: blocked,
+                          close: () => setState(() => _drawerOpen = false),
+                        ),
                       ),
                     ),
                   ),

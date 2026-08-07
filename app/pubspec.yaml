@@ -80,6 +80,12 @@ flutter:
   assets:
     - assets/images/golem_mascot.png
     - assets/images/golem_splash_icon.png
+    # Masked derivatives of the native icons, drawn by in-app surfaces that
+    # get no iOS icon mask. All three ship because the asset list is shared
+    # by every flavor build; AppIdentity.iconAsset picks the running one.
+    - assets/images/golem_app_icon_production.png
+    - assets/images/golem_app_icon_qa.png
+    - assets/images/golem_app_icon_dev.png
     - assets/benchmark_prompts/
 
 # iOS generation is disabled on purpose: the iOS 26 simulator's launch-snapshot

@@ -24,9 +24,10 @@ void main() {
     if (icon == null || icon.width != 1024 || icon.height != 1024) {
       throw StateError('Expected the tracked 1024×1024 $flavor Golem icon.');
     }
-    // Order matters: the background and macOS writers sample the artwork
-    // before the matte mutates the decoded icon in place.
+    // Order matters: the background, tile, and macOS writers sample the
+    // artwork before the matte mutates the decoded icon in place.
     _writeAdaptiveBackground(flavor, icon);
+    _writeAppIconTile(flavor, icon);
     _writeMacIconset('AppIcon-$flavor', icon);
     if (flavor == 'production') {
       // The flavorless legacy identity (xcodebuild -scheme Runner) keeps a
@@ -63,6 +64,67 @@ void _writeMattedLauncher(String flavor, image.Image icon) {
   File(
     'assets/images/golem_launcher_$flavor.png',
   ).writeAsBytesSync(image.encodePng(icon, level: 9));
+}
+
+/// The shipped app icon as an in-app tile, cut to the same superellipse the
+/// Android matte uses — but expressed as alpha instead of a navy fill.
+///
+/// The tracked sources are opaque RGB with white corners on purpose: iOS
+/// applies its own icon mask at display time, so the corners never reach the
+/// Home Screen. Nothing masks a Flutter surface, so a widget that draws the
+/// source directly (the drawer header) would show those white corners around
+/// the framed artwork. This derivative bakes the mask into the alpha channel
+/// instead, leaving the artwork itself untouched. 168×168 is the 42pt header
+/// tile at 4x, the densest scale any shipped device asks for.
+void _writeAppIconTile(String flavor, image.Image icon) {
+  const size = 168;
+  const exponent = 4.5;
+  // The launcher's 12px inset at 1024, kept proportional so both writers
+  // describe the same curve.
+  const matteInset = 12.0 * size / 1024;
+  // A single center sample per pixel leaves a visibly stepped rim at this
+  // size; coverage from a 4×4 sub-sample grid anti-aliases it.
+  const samples = 4;
+  // Resize first, while the artwork is still opaque: a cubic filter run over
+  // pre-masked pixels would drag the transparent corners into the frame.
+  final resized = image.copyResize(
+    icon,
+    width: size,
+    height: size,
+    interpolation: image.Interpolation.cubic,
+  );
+  final canvas = image.Image(width: size, height: size, numChannels: 4);
+  const half = size / 2;
+  const visibleRadius = half - matteInset;
+  for (var y = 0; y < size; y++) {
+    for (var x = 0; x < size; x++) {
+      var covered = 0;
+      for (var sy = 0; sy < samples; sy++) {
+        final normalizedY =
+            ((y + (sy + 0.5) / samples) - half).abs() / visibleRadius;
+        final poweredY = math.pow(normalizedY, exponent);
+        for (var sx = 0; sx < samples; sx++) {
+          final normalizedX =
+              ((x + (sx + 0.5) / samples) - half).abs() / visibleRadius;
+          if (poweredY + math.pow(normalizedX, exponent) <= 1) covered++;
+        }
+      }
+      if (covered == 0) continue;
+      final pixel = resized.getPixel(x, y);
+      canvas.setPixelRgba(
+        x,
+        y,
+        pixel.r,
+        pixel.g,
+        pixel.b,
+        (255 * covered / (samples * samples)).round(),
+      );
+    }
+  }
+
+  File(
+    'assets/images/golem_app_icon_$flavor.png',
+  ).writeAsBytesSync(image.encodePng(canvas, level: 9));
 }
 
 /// Android 12+ always reserves a centered icon slot on its system splash and

@@ -430,6 +430,41 @@ void main() {
     );
   });
 
+  test('app-icon tiles have transparent corners and opaque artwork', () async {
+    for (final flavor in _flavors) {
+      final identity = flavor.identity;
+      final tile = image.decodePng(
+        await File(identity.iconAsset).readAsBytes(),
+      );
+      expect(tile, isNotNull, reason: identity.iconAsset);
+      // 42pt at 4x: the drawer header's tile at the densest shipped scale.
+      expect(tile!.width, 168);
+      expect(tile.height, 168);
+
+      // The source's opaque white corners are cut away by the same
+      // superellipse the Android matte fills with navy, so an in-app surface
+      // gets the masked shape iOS draws on the Home Screen.
+      final corners = <image.Pixel>[
+        tile.getPixel(0, 0),
+        tile.getPixel(tile.width - 1, 0),
+        tile.getPixel(0, tile.height - 1),
+        tile.getPixel(tile.width - 1, tile.height - 1),
+      ];
+      for (final corner in corners) {
+        expect(corner.a, 0);
+      }
+      expect(tile.getPixel(tile.width ~/ 2, tile.height ~/ 2).a, 255);
+
+      // The flavor hue survives the downscale at the launcher assertions'
+      // artwork sample point, scaled from 1024 to 168.
+      _expectDominantChannel(tile.getPixel(84, 148), flavor.dominant);
+    }
+
+    // The flavorless legacy identity owns no artwork and falls back to the
+    // production tile.
+    expect(AppIdentity.flutter.iconAsset, AppIdentity.production.iconAsset);
+  });
+
   test('platform launchers use their configured native artwork', () async {
     for (final flavor in _flavors) {
       final sourceBytes = await File(

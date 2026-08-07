@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/app_identity.dart';
 import '../../../core/chrome/golem_alert.dart';
 import '../../../core/chrome/golem_button.dart';
 import '../../../core/chrome/golem_menu.dart';
@@ -46,6 +47,11 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
       modelKey: widget.chat.active?.modelKey,
     );
     final backend = ref.watch(inferenceBackendProvider);
+    final ink = CupertinoDynamicColor.resolve(GolemTheme.drawerInk, context);
+    final faint = CupertinoDynamicColor.resolve(
+      GolemTheme.drawerFaintInk,
+      context,
+    );
     return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -54,25 +60,23 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
             child: Row(
               children: [
-                Container(
+                // The shipped app icon, not the bare mascot: this is the
+                // tile carrying the frame, and it already masks its own
+                // corners (tool/prepare_launcher.dart).
+                Image.asset(
+                  AppIdentity.current.iconAsset,
                   width: 42,
                   height: 42,
-                  decoration: BoxDecoration(
-                    color: GolemTheme.accent,
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  padding: const EdgeInsets.all(5),
-                  child: Image.asset('assets/images/golem_mascot.png'),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Golem',
                         style: TextStyle(
-                          color: GolemTheme.textOnDark,
+                          color: ink,
                           fontSize: 23,
                           fontWeight: FontWeight.w700,
                           letterSpacing: -0.23,
@@ -86,9 +90,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                             : '$modelLabel · on device',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: GolemText.caption.copyWith(
-                          color: GolemTheme.mutedOnDark,
-                        ),
+                        style: GolemText.caption.copyWith(color: faint),
                       ),
                     ],
                   ),
@@ -144,23 +146,19 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                 height: 46,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
-                  color: CupertinoColors.white.withValues(alpha: 0.07),
+                  color: CupertinoDynamicColor.resolve(
+                    GolemTheme.drawerFill,
+                    context,
+                  ),
                   borderRadius: BorderRadius.circular(GolemRadius.field),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(
-                      CupertinoIcons.search,
-                      size: 19,
-                      color: GolemTheme.faintOnDark,
-                    ),
-                    SizedBox(width: 10),
+                    Icon(CupertinoIcons.search, size: 19, color: faint),
+                    const SizedBox(width: 10),
                     Text(
                       'Search chats',
-                      style: TextStyle(
-                        color: GolemTheme.faintOnDark,
-                        fontSize: 17,
-                      ),
+                      style: TextStyle(color: faint, fontSize: 17),
                     ),
                   ],
                 ),
@@ -169,12 +167,15 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
           ),
           Expanded(
             child: widget.chat.conversations.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20),
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
                       'Your conversations will appear here.',
                       style: TextStyle(
-                        color: GolemTheme.mutedOnDark,
+                        color: CupertinoDynamicColor.resolve(
+                          GolemTheme.drawerMutedInk,
+                          context,
+                        ),
                         fontSize: 15,
                       ),
                     ),
@@ -189,9 +190,18 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                     ],
                   ),
           ),
-          Container(
-            height: 1,
-            color: CupertinoColors.white.withValues(alpha: 0.1),
+          // Inset, not full-bleed: the handoff rules this line to the
+          // footer block, which sits 6pt outside the storage row's own
+          // gutter rather than running edge to edge across the panel.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Container(
+              height: 1,
+              color: CupertinoDynamicColor.resolve(
+                GolemTheme.drawerLine,
+                context,
+              ),
+            ),
           ),
           _StorageMeter(gigabytes: _gigabytes),
           CupertinoButton(
@@ -202,18 +212,11 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
               widget.close();
               context.push('/settings');
             },
-            child: const Row(
+            child: Row(
               children: [
-                Icon(
-                  CupertinoIcons.slider_horizontal_3,
-                  color: GolemTheme.iconOnDark,
-                  size: 20,
-                ),
-                SizedBox(width: 14),
-                Text(
-                  'Settings',
-                  style: TextStyle(color: CupertinoColors.white, fontSize: 17),
-                ),
+                Icon(CupertinoIcons.slider_horizontal_3, color: ink, size: 21),
+                const SizedBox(width: 14),
+                Text('Settings', style: TextStyle(color: ink, fontSize: 17)),
               ],
             ),
           ),
@@ -235,7 +238,12 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
           padding: const EdgeInsets.fromLTRB(12, 14, 12, 8),
           child: Text(
             title.toUpperCase(),
-            style: GolemText.overline.copyWith(color: GolemTheme.faintOnDark),
+            style: GolemText.overline.copyWith(
+              color: CupertinoDynamicColor.resolve(
+                GolemTheme.drawerFaintInk,
+                context,
+              ),
+            ),
           ),
         ),
         for (final item in items) _row(context, item),
@@ -245,10 +253,13 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
 
   Widget _row(BuildContext context, ChatConversation item) {
     final selected = item.id == widget.chat.activeId;
+    final accent = CupertinoDynamicColor.resolve(GolemTheme.accent, context);
     return Container(
       margin: const EdgeInsets.only(bottom: 3),
       decoration: BoxDecoration(
-        color: selected ? CupertinoColors.white.withValues(alpha: 0.09) : null,
+        color: selected
+            ? CupertinoDynamicColor.resolve(GolemTheme.drawerSelected, context)
+            : null,
         borderRadius: BorderRadius.circular(GolemRadius.field),
       ),
       child: Stack(
@@ -261,7 +272,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
               child: Container(
                 width: 4,
                 decoration: BoxDecoration(
-                  color: GolemTheme.accent,
+                  color: accent,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -286,8 +297,11 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                     item.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: CupertinoColors.white,
+                    style: TextStyle(
+                      color: CupertinoDynamicColor.resolve(
+                        GolemTheme.drawerInk,
+                        context,
+                      ),
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
@@ -297,7 +311,10 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
               GolemMenu(
                 anchorKey: Key('conversation-menu-${item.id}'),
                 enabled: !widget.blocked,
-                triggerColor: GolemTheme.mutedOnDark,
+                triggerColor: CupertinoDynamicColor.resolve(
+                  GolemTheme.drawerMutedInk,
+                  context,
+                ),
                 triggerSemanticLabel: 'Conversation actions',
                 items: [
                   GolemMenuItem(
@@ -475,6 +492,10 @@ final class _StorageMeter extends ConsumerWidget {
     final overview = ref.watch(storageBreakdownProvider).value;
     final total = overview?.totalBytes;
     if (overview == null || total == null) return const SizedBox.shrink();
+    final muted = CupertinoDynamicColor.resolve(
+      GolemTheme.drawerMutedInk,
+      context,
+    );
     return Padding(
       key: const Key('storage-meter'),
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
@@ -483,12 +504,7 @@ final class _StorageMeter extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Text(
-                'Storage',
-                style: GolemText.caption.copyWith(
-                  color: GolemTheme.mutedOnDark,
-                ),
-              ),
+              Text('Storage', style: GolemText.caption.copyWith(color: muted)),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -496,9 +512,7 @@ final class _StorageMeter extends ConsumerWidget {
                   textAlign: TextAlign.right,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GolemText.caption.copyWith(
-                    color: GolemTheme.mutedOnDark,
-                  ),
+                  style: GolemText.caption.copyWith(color: muted),
                 ),
               ),
             ],
@@ -510,12 +524,20 @@ final class _StorageMeter extends ConsumerWidget {
               height: 4,
               child: Stack(
                 children: [
-                  Container(
-                    color: CupertinoColors.white.withValues(alpha: 0.12),
+                  ColoredBox(
+                    color: CupertinoDynamicColor.resolve(
+                      GolemTheme.drawerLine,
+                      context,
+                    ),
                   ),
                   FractionallySizedBox(
                     widthFactor: (overview.usedBytes / total).clamp(0.0, 1.0),
-                    child: const ColoredBox(color: Color(0xFF5B94FF)),
+                    child: ColoredBox(
+                      color: CupertinoDynamicColor.resolve(
+                        GolemTheme.accent,
+                        context,
+                      ),
+                    ),
                   ),
                 ],
               ),
