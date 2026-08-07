@@ -98,7 +98,8 @@ abstract final class GolemText {
     height: 1.3,
   );
 
-  /// Fenced code block bodies on the dark code card.
+  /// Fenced code block bodies. The card tracks the appearance, so any
+  /// color paired with this style needs a light and a dark value.
   static const codeBlock = TextStyle(
     fontFamily: _mono,
     fontFamilyFallback: _monoFallback,

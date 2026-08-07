@@ -435,6 +435,23 @@ void main() {
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
 
+    // An empty chat has no code card, so the transcript enrolls again with
+    // one on screen, in both appearances. Note this covers the card's
+    // chrome only: `textContrastGuideline` measures a text node's two
+    // modal colors, so the minority syntax hues never reach it —
+    // `code_block_test.dart` asserts those ratios against the tokens.
+    for (final brightness in Brightness.values) {
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        history: markdownHistory(),
+        child: const ChatScreen(),
+      );
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(textContrastGuideline));
+    }
+
     // The redesigned settings surfaces enroll in the same guidelines.
     for (final screen in const <Widget>[
       SettingsScreen(),
