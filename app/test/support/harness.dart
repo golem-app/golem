@@ -238,6 +238,31 @@ ChatHistorySnapshot markdownHistory() {
   );
 }
 
+/// A transcript whose fenced block carries **no** language on the fence —
+/// the path a real model takes when it omits the info string. The fake
+/// always tags its Python sample, so this is the only way the untagged
+/// branch gets exercised.
+ChatHistorySnapshot bareFenceHistory() {
+  const code = 'SELECT id, name FROM users WHERE active = true ORDER BY id;';
+  final conversation = ChatConversation(
+    id: 'chat-bare',
+    title: 'Untagged fence',
+    updatedAt: DateTime.utc(2026, 8, 2),
+    messages: [
+      ChatMessage(
+        id: 'assistant-bare',
+        role: MessageRole.assistant,
+        text: 'Here you go:\n\n```\n$code\n```\n',
+        createdAt: DateTime.utc(2026, 8, 2),
+      ),
+    ],
+  );
+  return ChatHistorySnapshot(
+    conversations: [conversation],
+    activeId: conversation.id,
+  );
+}
+
 ChatHistorySnapshot seedHistory() {
   final conversation = ChatConversation(
     id: 'chat-1',

@@ -98,18 +98,61 @@ abstract final class GolemTheme {
   static const scrim = Color(0x66000000);
   static const drawerShadow = Color(0x59000000);
   static const splashGlow = Color(0x801763EE);
-  // The code card is deliberately dark in both themes (handoff: fixed
-  // #0B1220 card with white-alpha header chrome and a fixed syntax
-  // palette), so none of these are dynamic.
-  static const codeSurface = Color(0xFF0B1220);
-  static const codeHeader = Color(0x0DFFFFFF);
-  static const codeHeaderInk = Color(0x6BFFFFFF);
-  static const codeChip = Color(0x12FFFFFF);
-  static const codeChipInk = Color(0xB8FFFFFF);
-  static const codeInk = Color(0xFFDCE6F7);
-  static const codeKeyword = Color(0xFF6F86AD);
-  static const codeCallable = Color(0xFF7FB3FF);
-  static const codeString = Color(0xFF8FD3A8);
+  // The code card tracks the appearance: a navy card with white-alpha
+  // chrome in dark, a cool-grey card with black-alpha chrome in light.
+  // Every ink below clears 4.5:1 on its own surface — the light syntax
+  // palette is a fresh set, not the dark one reused, because those hues
+  // are picked against #0B1220 and wash out on a light ground.
+  static const codeSurface = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFFEDF0F6),
+    darkColor: Color(0xFF0B1220),
+  );
+  // A real hairline in both appearances. A transparent dark variant still
+  // reserves its 1px inset, which left a ring of undarkened card surface
+  // around the header band; the navy value is the same border the rest of
+  // the dark surfaces use.
+  static const codeBorder = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFFDCE0E9),
+    darkColor: Color(0xFF1B2744),
+  );
+  static const codeHeader = CupertinoDynamicColor.withBrightness(
+    color: Color(0x0D000000),
+    darkColor: Color(0x0DFFFFFF),
+  );
+  static const codeHeaderInk = CupertinoDynamicColor.withBrightness(
+    color: Color(0x99000000),
+    darkColor: Color(0x80FFFFFF),
+  );
+  static const codeChip = CupertinoDynamicColor.withBrightness(
+    color: Color(0x12000000),
+    darkColor: Color(0x12FFFFFF),
+  );
+  static const codeChipInk = CupertinoDynamicColor.withBrightness(
+    color: Color(0xB8000000),
+    darkColor: Color(0xB8FFFFFF),
+  );
+  static const codeInk = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFF1F2637),
+    darkColor: Color(0xFFDCE6F7),
+  );
+  // Comments are body content, not chrome: they keep their own token so
+  // that tuning the header band's legibility never restyles the code.
+  static const codeComment = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFF636C7B),
+    darkColor: Color(0xFF78849A),
+  );
+  static const codeKeyword = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFF4C5B7A),
+    darkColor: Color(0xFF6F86AD),
+  );
+  static const codeCallable = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFF0A5BED),
+    darkColor: Color(0xFF7FB3FF),
+  );
+  static const codeString = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFF12693C),
+    darkColor: Color(0xFF8FD3A8),
+  );
   static const errorSurface = CupertinoDynamicColor.withBrightness(
     color: Color(0xFFFFEDF0),
     darkColor: Color(0xFF33161C),
