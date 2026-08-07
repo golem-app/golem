@@ -20,6 +20,14 @@ enum AppIdentity {
   /// The Android application ID / iOS bundle identifier for this flavor.
   final String applicationId;
 
+  /// The bundled app-icon tile for in-app surfaces (the drawer header).
+  /// The flavorless legacy identity shows the production artwork, matching
+  /// the flavorless macOS catalog written by tool/prepare_launcher.dart.
+  String get iconAsset => switch (this) {
+    flutter => 'assets/images/golem_app_icon_${production.name}.png',
+    _ => 'assets/images/golem_app_icon_$name.png',
+  };
+
   /// The identity of the running build.
   static AppIdentity get current => forFlavor(appFlavor);
 

@@ -1,7 +1,10 @@
+import 'dart:math';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
+import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/models.dart';
@@ -452,6 +455,38 @@ void main() {
       await expectLater(tester, meetsGuideline(textContrastGuideline));
     }
 
+    // The open drawer enrolls too — it stopped being a fixed-navy surface,
+    // so its light column is new and unproven. The chat behind it never
+    // reaches the contrast check even though the scrim dims it: the canvas
+    // is ExcludeSemantics while the drawer is open, and the guideline walks
+    // the semantics tree.
+    //
+    // Contrast is asserted in light only. Dark trips on the filled "New
+    // chat" button — white on the dark accent is 2.95:1 — which is neither
+    // new nor local: every GolemButton.filled in the app has it, because
+    // the accent lightens to #5B94FF in dark while its label stays white.
+    // Restyling filled buttons app-wide is its own change; the drawer's own
+    // dark inks are covered by the palette group below instead.
+    for (final brightness in Brightness.values) {
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        history: seedHistory(),
+        // Keyed per appearance so the second pass gets a fresh state:
+        // _drawerOpen lives in the element, which pumpWidget reuses when
+        // the widget type matches, and the tap would land on the drawer
+        // this loop already opened.
+        child: ChatScreen(key: ValueKey(brightness)),
+      );
+      await tester.tap(find.byKey(const Key('open-drawer')));
+      await tester.pumpAndSettle();
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      if (brightness == Brightness.light) {
+        await expectLater(tester, meetsGuideline(textContrastGuideline));
+      }
+    }
+
     // The redesigned settings surfaces enroll in the same guidelines.
     for (final screen in const <Widget>[
       SettingsScreen(),
@@ -486,6 +521,92 @@ void main() {
       expect(tester.takeException(), isNull);
     }
   }, variant: iosChrome);
+
+  testWidgets('the storage meter paints a track and a used fill', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      history: seedHistory(),
+      child: const ChatScreen(),
+    );
+    await tester.tap(find.byKey(const Key('open-drawer')));
+    await tester.pumpAndSettle();
+    // Both bars are childless ColoredBoxes inside a 4pt Stack. Without a
+    // tight constraint each takes constraints.smallest and lays out 0×0,
+    // painting nothing — and a re-blessed golden records the absence as if
+    // it were intended, which is exactly how this shipped unnoticed.
+    final bars = find.descendant(
+      of: find.byKey(const Key('storage-meter')),
+      matching: find.byType(ColoredBox),
+    );
+    expect(bars, findsNWidgets(2));
+    final sizes = bars
+        .evaluate()
+        .map((element) => (element.renderObject! as RenderBox).size)
+        .toList();
+    for (final size in sizes) {
+      expect(size.height, 4);
+      expect(size.width, greaterThan(0));
+    }
+    // The fill is Golem's own share of the volume, not the disk's used
+    // space: 0.10 of the fake 64 GB, so it is a sliver of the 290pt track
+    // and too narrow to show in a golden. Its width regressing to zero is
+    // exactly the failure this guards.
+    expect(sizes.last.width, lessThan(sizes.first.width));
+  }, variant: iosChrome);
+
+  // The drawer's own inks, asserted against the tokens the way
+  // code_block_test.dart asserts the syntax palette. This is what keeps the
+  // dark column honest while `textContrastGuideline` runs light-only above,
+  // and it is the guard on the handoff's alpha values, which read 4.07 and
+  // 2.92 in light and 4.83 and 4.18 in dark — four of five under the bar.
+  group('drawer palette contrast', () {
+    // Color.computeLuminance is already the WCAG relative-luminance
+    // formula, so the ratio is all that is left to spell out.
+    double ratio(Color fg, Color bg) {
+      final a = fg.computeLuminance();
+      final b = bg.computeLuminance();
+      return (max(a, b) + 0.05) / (min(a, b) + 0.05);
+    }
+
+    for (final brightness in Brightness.values) {
+      test('every ink clears 4.5:1 in ${brightness.name}', () {
+        Color pick(CupertinoDynamicColor c) =>
+            brightness == Brightness.dark ? c.darkColor : c.color;
+        final surface = pick(GolemTheme.drawer);
+        for (final entry in <String, CupertinoDynamicColor>{
+          'drawerInk': GolemTheme.drawerInk,
+          'drawerMutedInk': GolemTheme.drawerMutedInk,
+          'drawerFaintInk': GolemTheme.drawerFaintInk,
+        }.entries) {
+          expect(
+            ratio(pick(entry.value), surface),
+            greaterThanOrEqualTo(4.5),
+            reason: '${entry.key} on the drawer surface',
+          );
+        }
+        // The search placeholder sits on the field fill, and the active
+        // conversation's title on the selected row — both washes over the
+        // same surface, so neither is covered by the loop above.
+        final fill = Color.alphaBlend(pick(GolemTheme.drawerFill), surface);
+        expect(
+          ratio(pick(GolemTheme.drawerFaintInk), fill),
+          greaterThanOrEqualTo(4.5),
+          reason: 'drawerFaintInk on the search field',
+        );
+        final selected = Color.alphaBlend(
+          pick(GolemTheme.drawerSelected),
+          surface,
+        );
+        expect(
+          ratio(pick(GolemTheme.drawerInk), selected),
+          greaterThanOrEqualTo(4.5),
+          reason: 'drawerInk on the selected conversation row',
+        );
+      });
+    }
+  });
 
   testWidgets('a real backend renders honest copy on every surface', (
     tester,

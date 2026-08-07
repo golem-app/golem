@@ -61,7 +61,7 @@ final class _GolemToastState extends State<_GolemToast>
     final bottom = MediaQuery.paddingOf(context).bottom;
     final toast = DecoratedBox(
       decoration: BoxDecoration(
-        color: GolemTheme.drawer,
+        color: GolemTheme.toastSurface,
         borderRadius: BorderRadius.circular(android ? 6 : GolemRadius.pill),
         boxShadow: GolemShadow.menu,
       ),

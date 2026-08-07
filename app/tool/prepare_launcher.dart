@@ -24,9 +24,10 @@ void main() {
     if (icon == null || icon.width != 1024 || icon.height != 1024) {
       throw StateError('Expected the tracked 1024×1024 $flavor Golem icon.');
     }
-    // Order matters: the background and macOS writers sample the artwork
-    // before the matte mutates the decoded icon in place.
+    // Order matters: the background, tile, and macOS writers sample the
+    // artwork before the matte mutates the decoded icon in place.
     _writeAdaptiveBackground(flavor, icon);
+    _writeAppIconTile(flavor, icon);
     _writeMacIconset('AppIcon-$flavor', icon);
     if (flavor == 'production') {
       // The flavorless legacy identity (xcodebuild -scheme Runner) keeps a
@@ -40,9 +41,16 @@ void main() {
   _writeAdaptiveForeground();
 }
 
+/// The squircle both maskers cut to, as a superellipse exponent and an inset
+/// (in source pixels, at the tracked 1024×1024 scale). They are shared so
+/// that retuning the Android matte cannot silently desync the in-app tile.
+const _squircleExponent = 4.5;
+const _squircleInset = 12.0;
+const _sourceSize = 1024;
+
 void _writeMattedLauncher(String flavor, image.Image icon) {
-  const exponent = 4.5;
-  const matteInset = 12.0;
+  const exponent = _squircleExponent;
+  const matteInset = _squircleInset;
   const navy = (r: 15, g: 21, b: 36);
   final halfWidth = icon.width / 2;
   final halfHeight = icon.height / 2;
@@ -63,6 +71,71 @@ void _writeMattedLauncher(String flavor, image.Image icon) {
   File(
     'assets/images/golem_launcher_$flavor.png',
   ).writeAsBytesSync(image.encodePng(icon, level: 9));
+}
+
+/// The shipped app icon as an in-app tile, cut to the same superellipse the
+/// Android matte uses — but expressed as alpha instead of a navy fill.
+///
+/// The tracked sources are opaque RGB with white corners on purpose: iOS
+/// applies its own icon mask at display time, so the corners never reach the
+/// Home Screen. Nothing masks a Flutter surface, so a widget that draws the
+/// source directly (the drawer header) would show those white corners around
+/// the framed artwork. This derivative bakes a mask into the alpha channel
+/// instead, leaving the artwork itself untouched. 168×168 is the 42pt header
+/// tile at 4x, the densest scale any shipped device asks for.
+///
+/// The curve is this project's squircle, not a reproduction of Apple's mask:
+/// as the file header notes, this inset runs slightly wider than the real one,
+/// which is why iOS ships the unmodified artwork. At a 42pt tile the
+/// difference is a fraction of a point, and using one curve for both maskers
+/// is worth more than matching the Home Screen to the pixel.
+void _writeAppIconTile(String flavor, image.Image icon) {
+  const size = 168;
+  const exponent = _squircleExponent;
+  const matteInset = _squircleInset * size / _sourceSize;
+  // A single center sample per pixel leaves a visibly stepped rim at this
+  // size; coverage from a 4×4 sub-sample grid anti-aliases it.
+  const samples = 4;
+  // Resize first, while the artwork is still opaque: a cubic filter run over
+  // pre-masked pixels would drag the transparent corners into the frame.
+  final resized = image.copyResize(
+    icon,
+    width: size,
+    height: size,
+    interpolation: image.Interpolation.cubic,
+  );
+  final canvas = image.Image(width: size, height: size, numChannels: 4);
+  const half = size / 2;
+  const visibleRadius = half - matteInset;
+  for (var y = 0; y < size; y++) {
+    for (var x = 0; x < size; x++) {
+      var covered = 0;
+      for (var sy = 0; sy < samples; sy++) {
+        final normalizedY =
+            ((y + (sy + 0.5) / samples) - half).abs() / visibleRadius;
+        final poweredY = math.pow(normalizedY, exponent);
+        for (var sx = 0; sx < samples; sx++) {
+          final normalizedX =
+              ((x + (sx + 0.5) / samples) - half).abs() / visibleRadius;
+          if (poweredY + math.pow(normalizedX, exponent) <= 1) covered++;
+        }
+      }
+      if (covered == 0) continue;
+      final pixel = resized.getPixel(x, y);
+      canvas.setPixelRgba(
+        x,
+        y,
+        pixel.r,
+        pixel.g,
+        pixel.b,
+        (255 * covered / (samples * samples)).round(),
+      );
+    }
+  }
+
+  File(
+    'assets/images/golem_app_icon_$flavor.png',
+  ).writeAsBytesSync(image.encodePng(canvas, level: 9));
 }
 
 /// Android 12+ always reserves a centered icon slot on its system splash and

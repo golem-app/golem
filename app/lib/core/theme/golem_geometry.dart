@@ -10,6 +10,9 @@ abstract final class GolemRadius {
   static const double segment = 10;
   static const double badge = 8;
   static const double pill = 999;
+
+  /// The conversation drawer's free edge; its hinged edge stays square.
+  static const double drawer = 28;
 }
 
 /// The 4pt spacing scale plus the shared screen gutter.
