@@ -7,10 +7,9 @@ Map<String, String> _turn(String role, int chars) => {
   'content': 'x' * chars,
 };
 
-// One message of 1000 chars estimates to 250 tokens, costs
-// ceil(250 * 5 / 4) + 8 = 321 within the budget math below.
+// One message of 1000 chars estimates to 250 tokens and costs
+// ceil(250 * 5 / 4) + 8 = 321 in the budget math below.
 const _chars = 1000;
-const _cost = 321;
 
 void main() {
   test('a conversation inside the budget passes through untouched', () {

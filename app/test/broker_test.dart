@@ -18,7 +18,7 @@ import 'package:golem_flutter/broker/runtime.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart'
-    show InferenceFailureKind;
+    show InferenceException, InferenceFailureKind;
 
 final class _RecordingRuntime implements BrokerRuntime {
   BrokerGenerationRequest? request;
@@ -900,6 +900,86 @@ void main() {
       expect(repository.residentModelKey.value, isNull);
       await repository.prepare();
       expect(repository.residentModelKey.value, 'gemma4-gguf');
+    });
+  });
+
+  group('memory preflight (#62)', () {
+    InfernoInferenceRepository buildRepository(
+      _ResidencyRuntime runtime, {
+      required int? available,
+      int? modelSize = 2 << 30,
+    }) => InfernoInferenceRepository(
+      runtime,
+      engine: BrokerEngine.llamaCpp,
+      profile: const Gemma4Profile(),
+      modelPath: '/local/gemma.gguf',
+      initialCatalogKey: 'gemma4-gguf',
+      availableMemoryBytes: () async => available,
+      modelSizeBytes: (_) async => modelSize,
+    );
+
+    test(
+      'an insufficient reading refuses before touching the engine',
+      () async {
+        final runtime = _ResidencyRuntime();
+        final repository = buildRepository(runtime, available: 1 << 30);
+        await expectLater(
+          repository.prepare(),
+          throwsA(
+            isA<InferenceException>()
+                .having(
+                  (error) => error.kind,
+                  'kind',
+                  InferenceFailureKind.insufficientMemory,
+                )
+                .having(
+                  (error) => error.message,
+                  'message',
+                  contains('Not enough free memory'),
+                ),
+          ),
+        );
+        expect(runtime.loadedPaths, isEmpty);
+        expect(repository.residentModelKey.value, isNull);
+      },
+    );
+
+    test('a refused load can retry once memory frees up', () async {
+      final runtime = _ResidencyRuntime();
+      var available = 1 << 30;
+      final repository = InfernoInferenceRepository(
+        runtime,
+        engine: BrokerEngine.llamaCpp,
+        profile: const Gemma4Profile(),
+        modelPath: '/local/gemma.gguf',
+        initialCatalogKey: 'gemma4-gguf',
+        availableMemoryBytes: () async => available,
+        modelSizeBytes: (_) async => 2 << 30,
+      );
+      await expectLater(repository.prepare(), throwsA(anything));
+      available = 4 << 30;
+      await repository.prepare();
+      expect(repository.residentModelKey.value, 'gemma4-gguf');
+    });
+
+    test('unknown readings let the load proceed', () async {
+      final runtime = _ResidencyRuntime();
+      await buildRepository(runtime, available: null).prepare();
+      expect(runtime.loadedPaths, hasLength(1));
+
+      final second = _ResidencyRuntime();
+      await buildRepository(
+        second,
+        available: 1 << 30,
+        modelSize: null,
+      ).prepare();
+      expect(second.loadedPaths, hasLength(1));
+    });
+
+    test('a sufficient reading loads normally', () async {
+      final runtime = _ResidencyRuntime();
+      await buildRepository(runtime, available: 4 << 30).prepare();
+      expect(runtime.loadedPaths, ['/local/gemma.gguf']);
     });
   });
 }

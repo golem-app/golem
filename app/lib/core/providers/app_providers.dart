@@ -1076,6 +1076,35 @@ class ModelController extends _$ModelController {
     }
   }
 
+  /// Frees the engine on an OS memory-pressure signal or backgrounding —
+  /// the app must never hold multi-gigabyte weights it is not actively
+  /// using while the platform is reclaiming memory. Only when idle: an
+  /// advisory signal never cancels a visible stream (the typed OOM path
+  /// reports honestly if generation truly cannot continue), and the busy
+  /// guard keeps this off an in-flight model operation. Failures stay
+  /// silent — the next explicit operation reports normally.
+  Future<void> releaseEngineWhileInactive() async {
+    if (_busy) return;
+    final current = state.value;
+    if (current == null || current.runtime != RuntimePhase.loaded) return;
+    final chat = ref.read(chatControllerProvider).value;
+    if (chat != null && chat.generation != GenerationPhase.idle) return;
+    _busy = true;
+    try {
+      await ref.read(inferenceRepositoryProvider).unload();
+      if (!ref.mounted) return;
+      final value = await ref
+          .read(modelManagementRepositoryProvider)
+          .recordRuntime(RuntimePhase.unloaded);
+      if (!ref.mounted) return;
+      state = AsyncData(value);
+    } catch (_) {
+      // Advisory signal: no user-visible failure state.
+    } finally {
+      _busy = false;
+    }
+  }
+
   /// The load-refusal copy for a not-installed active model. Owned here
   /// since #42: the management repository records phases and no longer
   /// knows why a load was refused.

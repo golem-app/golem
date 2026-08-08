@@ -95,6 +95,7 @@ InferenceRepository selectInferenceRepository({
       modelProfile: modelProfile,
     ),
     documentsDirectory: documentsDirectory,
+    availableMemoryBytes: const DeviceStorageChannel().availableMemoryBytes,
     seed: samplingSeed == 0 ? null : samplingSeed,
   );
 }

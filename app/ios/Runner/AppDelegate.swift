@@ -1,3 +1,4 @@
+import Darwin
 import Flutter
 import UIKit
 
@@ -27,6 +28,13 @@ import UIKit
   ) {
     if call.method == "physicalMemoryBytes" {
       result(Int(ProcessInfo.processInfo.physicalMemory))
+      return
+    }
+    if call.method == "availableMemoryBytes" {
+      // The jetsam headroom: what this process can still allocate before
+      // iOS terminates it. The increased-memory-limit entitlement raises
+      // it on supported devices.
+      result(Int(os_proc_available_memory()))
       return
     }
     guard

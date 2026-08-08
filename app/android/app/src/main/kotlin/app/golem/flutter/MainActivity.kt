@@ -24,6 +24,13 @@ class MainActivity : FlutterActivity() {
                 result.success(info.totalMem)
                 return@setMethodCallHandler
             }
+            if (call.method == "availableMemoryBytes") {
+                val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                val info = ActivityManager.MemoryInfo()
+                manager.getMemoryInfo(info)
+                result.success(info.availMem)
+                return@setMethodCallHandler
+            }
             val path = call.argument<String>("path")
             if (path == null) {
                 result.error("bad-args", "Expected a path argument", null)

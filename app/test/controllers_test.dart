@@ -60,6 +60,10 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   @override
   Future<void> cancel() async {}
 
+  /// When set, generate parks mid-stream until completed — for tests that
+  /// need a deterministically in-flight generation.
+  Completer<void>? generateGate;
+
   @override
   Stream<InferenceEvent> generate({
     required List<Map<String, String>> context,
@@ -72,6 +76,8 @@ final class _RecordingInferenceRepository implements InferenceRepository {
     lastModelKey = modelKey;
     lastSystemPrompt = systemPrompt;
     yield const AnswerDelta('ok');
+    final gate = generateGate;
+    if (gate != null) await gate.future;
     yield const CompletedEvent();
   }
 }
@@ -723,6 +729,90 @@ void main() {
       container.read(modelControllerProvider).requireValue.runtime,
       RuntimePhase.unloaded,
     );
+  });
+
+  test(
+    'memory pressure unloads an idle engine and records the phase',
+    () async {
+      final directory = Directory.systemTemp.createTempSync('golem-pressure-');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final inference = _RecordingInferenceRepository();
+      final container = ProviderContainer(
+        overrides: [
+          chatHistoryRepositoryProvider.overrideWithValue(
+            InMemoryChatHistoryRepository(),
+          ),
+          inferenceRepositoryProvider.overrideWithValue(inference),
+          modelManagementRepositoryProvider.overrideWithValue(
+            fakeModels(directory),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await installActiveModel(container);
+      await container.read(chatControllerProvider.future);
+      final controller = container.read(modelControllerProvider.notifier);
+      await controller.toggleRuntime();
+      expect(
+        container.read(modelControllerProvider).requireValue.runtime,
+        RuntimePhase.loaded,
+      );
+
+      await controller.releaseEngineWhileInactive();
+      expect(inference.unloads, 1);
+      expect(
+        container.read(modelControllerProvider).requireValue.runtime,
+        RuntimePhase.unloaded,
+      );
+      // Persisted too, so Settings stays honest after a relaunch.
+      expect(
+        (await fakeModels(directory).load()).runtime,
+        RuntimePhase.unloaded,
+      );
+
+      // A second signal on an already-empty engine is a no-op.
+      await controller.releaseEngineWhileInactive();
+      expect(inference.unloads, 1);
+    },
+  );
+
+  test('memory pressure never interrupts an active generation', () async {
+    final directory = Directory.systemTemp.createTempSync('golem-pressure2-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final inference = _RecordingInferenceRepository();
+    final container = ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await installActiveModel(container);
+    await container.read(chatControllerProvider.future);
+    final models = container.read(modelControllerProvider.notifier);
+    await models.toggleRuntime();
+
+    // Park the generation mid-stream so the chat is deterministically
+    // non-idle when the signal arrives.
+    inference.generateGate = Completer<void>();
+    final chat = container.read(chatControllerProvider.notifier);
+    final send = chat.send('slow question');
+    while (container.read(chatControllerProvider).requireValue.generation ==
+        GenerationPhase.idle) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    await models.releaseEngineWhileInactive();
+    expect(inference.unloads, 0, reason: 'a visible stream must survive');
+    inference.generateGate!.complete();
+    await send;
+
+    await models.releaseEngineWhileInactive();
+    expect(inference.unloads, 1, reason: 'idle again: the signal applies');
   });
 
   test('toggling without an installed model refuses per backend', () async {
