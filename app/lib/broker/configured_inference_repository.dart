@@ -7,6 +7,7 @@ import '../core/repositories/fake_inference_repository.dart';
 import '../core/services/device_storage.dart';
 import 'backend_policy.dart';
 import 'inferno_inference_repository.dart';
+import 'model_catalog.dart';
 import 'model_profile.dart';
 import 'runtime.dart';
 
@@ -90,6 +91,11 @@ InferenceRepository selectInferenceRepository({
     engine: engine,
     modelPath: resolvedModelPath,
     profile: profile,
+    initialCatalogKey: activeArtifactKeyFor(
+      backend: backend,
+      modelProfile: modelProfile,
+    ),
+    documentsDirectory: documentsDirectory,
     seed: samplingSeed == 0 ? null : samplingSeed,
   );
 }

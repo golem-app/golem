@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart'
+    show ValueListenable, ValueNotifier;
+
 import '../domain/generation_settings.dart';
 import '../domain/models.dart';
 import 'contracts.dart';
@@ -10,6 +13,10 @@ final class FakeInferenceRepository implements InferenceRepository {
   final Duration eventDelay;
   bool _prepared = true;
   int _generationEpoch = 0;
+  final ValueNotifier<String?> _residentKey = ValueNotifier<String?>(null);
+
+  @override
+  ValueListenable<String?> get residentModelKey => _residentKey;
 
   static const _reasoning = <String>[
     'I’ll identify the main idea. ',
@@ -48,15 +55,17 @@ final class FakeInferenceRepository implements InferenceRepository {
       };
 
   @override
-  Future<void> prepare() async {
+  Future<void> prepare({String? modelKey}) async {
     await Future<void>.delayed(eventDelay);
     _prepared = true;
+    if (modelKey != null) _residentKey.value = modelKey;
   }
 
   @override
   Future<void> unload() async {
     _generationEpoch++;
     _prepared = false;
+    _residentKey.value = null;
   }
 
   @override
@@ -73,6 +82,7 @@ final class FakeInferenceRepository implements InferenceRepository {
   }) async* {
     if (!_prepared) throw StateError('The simulated runtime is unloaded.');
     final epoch = ++_generationEpoch;
+    if (modelKey != null) _residentKey.value = modelKey;
     final profile = _profileFor(modelKey);
     final prompt = context.lastOrNull?['content'] ?? '';
     if (prompt.contains('[fail]')) {

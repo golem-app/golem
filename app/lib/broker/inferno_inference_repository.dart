@@ -5,61 +5,153 @@ import '../core/domain/models.dart';
 import '../core/repositories/contracts.dart';
 import 'hash.dart';
 import 'model_profile.dart';
+import 'model_runtime_config.dart';
 import 'runtime.dart';
 
+/// The single owner of engine residency (#42): exactly one model is loaded
+/// at a time, activation is keyed by catalog entry, and every load or
+/// unload of weights goes through this repository.
 final class InfernoInferenceRepository implements InferenceRepository {
   InfernoInferenceRepository(
     this._runtime, {
-    required this.engine,
-    required this.modelPath,
-    required this.profile,
+    required BrokerEngine engine,
+    required String modelPath,
+    required ModelProfile profile,
+    String? initialCatalogKey,
+    this.documentsDirectory = '',
+    this.resolveConfig = resolveModelRuntimeConfig,
     this.seed,
-  });
+  }) : _initial = _Target(
+         catalogKey: initialCatalogKey,
+         engine: engine,
+         modelPath: modelPath,
+         profile: profile,
+       );
 
   final BrokerRuntime _runtime;
-  final BrokerEngine engine;
-  final String modelPath;
-  final ModelProfile profile;
   final int? seed;
-  bool _loaded = false;
-  Future<void>? _preparing;
+  final String documentsDirectory;
+  final ModelRuntimeConfig Function(String catalogKey) resolveConfig;
+
+  /// The boot-resolved configuration. Its model path may be an operator
+  /// sideload, so activation by its own key must reuse this path rather
+  /// than re-derive it from the catalog.
+  final _Target _initial;
+
+  /// The initial configuration's surface, kept public for construction
+  /// tests and diagnostics; the resident target may differ at runtime.
+  BrokerEngine get engine => _initial.engine;
+  String get modelPath => _initial.modelPath;
+  ModelProfile get profile => _initial.profile;
+
+  _Target? _resident;
+  Future<void>? _activating;
+  String? _activatingKey;
+  final ValueNotifier<String?> _residentKey = ValueNotifier<String?>(null);
 
   @override
-  Future<void> prepare() {
-    if (_loaded) return Future.value();
-    // Loading takes seconds; a second caller must join the load in flight
-    // rather than trip the runtime's single-operation lifecycle.
-    return _preparing ??= () async {
-      try {
-        await _runtime.load(engine: engine, modelPath: modelPath);
-        _loaded = true;
-      } finally {
-        _preparing = null;
-      }
-    }();
-  }
+  ValueListenable<String?> get residentModelKey => _residentKey;
+
+  @override
+  Future<void> prepare({String? modelKey}) =>
+      _ensureResident(_targetFor(modelKey));
 
   @override
   Future<void> unload() async {
-    if (!_loaded) return;
+    // Let an in-flight activation settle first; its caller owns the error.
+    final pending = _activating;
+    if (pending != null) {
+      try {
+        await pending;
+      } catch (_) {}
+    }
+    if (_resident == null) return;
     await _runtime.unload();
-    _loaded = false;
+    _resident = null;
+    _residentKey.value = null;
   }
 
   @override
   Future<void> cancel() => _runtime.cancel();
+
+  /// The configuration a request addresses: the initial one for null or
+  /// its own key, otherwise the catalog resolution for [modelKey].
+  _Target _targetFor(String? modelKey) {
+    if (modelKey == null || modelKey == _initial.catalogKey) return _initial;
+    final config = resolveConfig(modelKey);
+    return _Target(
+      catalogKey: config.catalogKey,
+      engine: config.engine,
+      modelPath: config.modelPath,
+      profile: config.profile,
+    );
+  }
+
+  /// Activates [target] unless it is already resident. Single-flight per
+  /// key: concurrent callers for the same key join the load in flight; a
+  /// different key queues behind it rather than tripping the runtime's
+  /// single-operation lifecycle.
+  Future<void> _ensureResident(_Target target) {
+    if (_resident != null && _resident!.catalogKey == target.catalogKey) {
+      return Future.value();
+    }
+    if (_activating != null && _activatingKey == target.catalogKey) {
+      return _activating!;
+    }
+    final previous = _activating;
+    _activatingKey = target.catalogKey;
+    final activation = () async {
+      if (previous != null) {
+        // A failed predecessor reports to its own caller; this activation
+        // still gets its attempt.
+        try {
+          await previous;
+        } catch (_) {}
+      }
+      // Note `_resident == null` and a null-keyed target must not compare
+      // equal: a sideloaded initial configuration has no catalog key.
+      if (_resident != null && _resident!.catalogKey == target.catalogKey) {
+        return;
+      }
+      if (_resident != null) {
+        await _runtime.unload();
+        _resident = null;
+        _residentKey.value = null;
+      }
+      await _runtime.load(
+        engine: target.engine,
+        modelPath: _resolvePath(target.modelPath),
+      );
+      _resident = target;
+      _residentKey.value = target.catalogKey;
+    }();
+    _activating = activation;
+    activation.whenComplete(() {
+      if (identical(_activating, activation)) {
+        _activating = null;
+        _activatingKey = null;
+      }
+    }).ignore();
+    return activation;
+  }
+
+  String _resolvePath(String path) => path.startsWith('documents:')
+      ? '$documentsDirectory/${path.substring('documents:'.length)}'
+      : path;
 
   @override
   Stream<InferenceEvent> generate({
     required List<Map<String, String>> context,
     required bool reasoningEnabled,
     SamplingOverrides? overrides,
-    // Ignored until per-chat model switching lands (#20): this repository
-    // is constructed around one engine, model path, and profile.
     String? modelKey,
     String? systemPrompt,
   }) async* {
-    if (!_loaded) throw StateError('Inferno is not loaded.');
+    // Activate the addressed configuration when it is not already
+    // resident (#42); the load joins any activation in flight.
+    final target = _targetFor(modelKey);
+    await _ensureResident(target);
+    final profile = target.profile;
     // Both profile templates accept an optional leading system turn; the
     // custom prompt becomes exactly that, ahead of the conversation.
     final renderedContext = systemPrompt == null || systemPrompt.isEmpty
@@ -70,6 +162,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
           ];
     final parser = profile.newParser(reasoningEnabled: reasoningEnabled);
     final (sampling, overridesApplied) = _effectiveSampling(
+      profile,
       profile.sampling(reasoningEnabled: reasoningEnabled),
       overrides,
     );
@@ -105,8 +198,14 @@ final class InfernoInferenceRepository implements InferenceRepository {
             ),
           );
         case BrokerGenerationCompleted():
-          _logMetrics(finalMetrics, event.reason, sampling, overridesApplied);
-          if (probe != null) _logProbe(probe.toString());
+          _logMetrics(
+            target.engine,
+            finalMetrics,
+            event.reason,
+            sampling,
+            overridesApplied,
+          );
+          if (probe != null) _logProbe(target.engine, probe.toString());
           for (final domainEvent in _domainEvents(parser.finish())) {
             if (domainEvent is AnswerDelta) sawAnswer = true;
             yield domainEvent;
@@ -127,6 +226,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
   /// see the profile); token budgets stay the user's to size. Returns the
   /// effective parameters and whether any override was actually consumed.
   (BrokerSamplingParameters, bool) _effectiveSampling(
+    ModelProfile profile,
     ProfileSampling defaults,
     SamplingOverrides? overrides,
   ) {
@@ -165,6 +265,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
   /// The effective sampling fields are the evidence that a settings change
   /// actually reached the engine.
   void _logMetrics(
+    BrokerEngine engine,
     BrokerRuntimeMetrics? metrics,
     BrokerStopReason reason,
     BrokerSamplingParameters sampling,
@@ -195,7 +296,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
   /// text so two devices can be compared for token-identical output without
   /// shipping the transcript through logs. Only emitted when a fixed seed is
   /// configured (`GOLEM_SAMPLING_SEED`), i.e. during determinism probes.
-  void _logProbe(String rawText) {
+  void _logProbe(BrokerEngine engine, String rawText) {
     debugPrint(
       'INFERNO_PROBE engine=${engine.name}'
       ' seed=$seed'
@@ -211,4 +312,20 @@ final class InfernoInferenceRepository implements InferenceRepository {
     if (delta.reasoning.isNotEmpty) yield ReasoningDelta(delta.reasoning);
     if (delta.answer.isNotEmpty) yield AnswerDelta(delta.answer);
   }
+}
+
+/// One activatable configuration. [catalogKey] is null only for a
+/// sideloaded initial configuration whose backend derives no artifact key.
+final class _Target {
+  const _Target({
+    required this.catalogKey,
+    required this.engine,
+    required this.modelPath,
+    required this.profile,
+  });
+
+  final String? catalogKey;
+  final BrokerEngine engine;
+  final String modelPath;
+  final ModelProfile profile;
 }

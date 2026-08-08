@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
@@ -35,11 +36,16 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   String? lastSystemPrompt;
   int prepares = 0;
   int unloads = 0;
+  final ValueNotifier<String?> _residentKey = ValueNotifier<String?>(null);
 
   @override
-  Future<void> prepare() async {
+  ValueListenable<String?> get residentModelKey => _residentKey;
+
+  @override
+  Future<void> prepare({String? modelKey}) async {
     prepares++;
     if (failPrepare) throw StateError('injected prepare failure');
+    if (modelKey != null) _residentKey.value = modelKey;
   }
 
   @override
