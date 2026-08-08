@@ -631,7 +631,14 @@ class ChatController extends _$ChatController {
       ),
     );
     try {
-      await ref.read(inferenceRepositoryProvider).prepare();
+      // Address the conversation's own model, not the boot configuration:
+      // generate() below activates `active.modelKey`, so a keyless prepare
+      // would load the initial model only for the stream to unload it and
+      // load another — two multi-gigabyte loads per send, with the second
+      // preflight failing after preparation already reported success.
+      await ref
+          .read(inferenceRepositoryProvider)
+          .prepare(modelKey: active.modelKey);
       if (!ref.mounted || epoch != _generationEpoch) return;
       // The lazy load must keep the persisted RuntimePhase honest in both
       // directions: after this prepare() the engine holds weights, so

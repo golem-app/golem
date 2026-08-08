@@ -33,6 +33,7 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   final bool failUnload;
   SamplingOverrides? lastOverrides;
   String? lastModelKey;
+  String? lastPrepareModelKey;
   String? lastSystemPrompt;
   int prepares = 0;
   int unloads = 0;
@@ -44,6 +45,7 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   @override
   Future<void> prepare({String? modelKey}) async {
     prepares++;
+    lastPrepareModelKey = modelKey;
     if (failPrepare) throw StateError('injected prepare failure');
     if (modelKey != null) _residentKey.value = modelKey;
   }
@@ -562,7 +564,7 @@ void main() {
     expect(state.active!.messages.map((m) => m.id), [userId]);
   });
 
-  test('the conversation model key reaches generation', () async {
+  test('preparation and generation address the same model', () async {
     final inference = _RecordingInferenceRepository();
     final container = ProviderContainer(
       overrides: [
@@ -577,6 +579,7 @@ void main() {
     final controller = container.read(chatControllerProvider.notifier);
     await controller.send('Hello');
     expect(inference.lastModelKey, isNull);
+    expect(inference.lastPrepareModelKey, isNull);
 
     final activeId = container
         .read(chatControllerProvider)
@@ -590,6 +593,10 @@ void main() {
     );
     await controller.regenerate();
     expect(inference.lastModelKey, 'qwen35-gguf');
+    // Preparation must address the same model the stream will: a keyless
+    // prepare here would load the boot artifact and generate() would then
+    // swap it out, loading twice for one answer.
+    expect(inference.lastPrepareModelKey, 'qwen35-gguf');
   });
 
   test('the OOM injection surfaces the design failure copy', () async {
