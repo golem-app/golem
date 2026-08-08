@@ -36,7 +36,14 @@ private struct EventSink: @unchecked Sendable {
             callback(operationID, kind, nil, 0, userData)
             return
         }
-        guard let storage = malloc(bytes.count) else { return }
+        guard let storage = malloc(bytes.count) else {
+            // Allocation failed under memory exhaustion — a dropped
+            // terminal event would hang the Dart completer forever, so
+            // deliver the event with an empty payload; the Dart side maps
+            // a payloadless error to its out-of-memory code.
+            callback(operationID, kind, nil, 0, userData)
+            return
+        }
         _ = bytes.withUnsafeBytes { source in
             memcpy(storage, source.baseAddress, bytes.count)
         }
@@ -62,6 +69,25 @@ private struct EventSink: @unchecked Sendable {
 
     func fail(code: String, message: String) {
         emitJSON(EventKind.error, ["code": code, "message": message])
+    }
+
+    /// Types a thrown error: the shim's own context-budget error keeps its
+    /// dedicated code, and allocation-flavored failures are memory
+    /// exhaustion rather than the [fallback] (an OOM reported as "damaged
+    /// model" sends users deleting healthy downloads).
+    func fail(error: Error, fallback: String) {
+        let nsError = error as NSError
+        if nsError.domain == "InfernoMLX", nsError.code == 3 {
+            fail(code: "context_exhausted", message: nsError.localizedDescription)
+            return
+        }
+        let text = error.localizedDescription.lowercased()
+        if text.contains("memory") || text.contains("alloc")
+            || text.contains("metal buffer") {
+            fail(code: "out_of_memory", message: error.localizedDescription)
+            return
+        }
+        fail(code: fallback, message: error.localizedDescription)
     }
 }
 
@@ -327,7 +353,7 @@ public func infernoMlxEngineLoad(
             engine.setContainer(container)
             sink.emit(EventKind.operationCompleted)
         } catch {
-            sink.fail(code: "incompatible_model", message: error.localizedDescription)
+            sink.fail(error: error, fallback: "incompatible_model")
         }
     }
 }
@@ -561,7 +587,7 @@ public func infernoMlxEngineGenerate(
                 sink.emit(EventKind.operationCompleted)
             }
         } catch {
-            sink.fail(code: "generation_failed", message: error.localizedDescription)
+            sink.fail(error: error, fallback: "generation_failed")
         }
     }
 }

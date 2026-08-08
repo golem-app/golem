@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 
 import '../core/domain/generation_settings.dart';
 import '../core/domain/models.dart';
 import '../core/repositories/contracts.dart';
+import 'context_window.dart';
 import 'hash.dart';
 import 'model_profile.dart';
 import 'model_runtime_config.dart';
@@ -20,6 +23,8 @@ final class InfernoInferenceRepository implements InferenceRepository {
     String? initialCatalogKey,
     this.documentsDirectory = '',
     this.resolveConfig = resolveModelRuntimeConfig,
+    this.availableMemoryBytes,
+    this.modelSizeBytes = _modelSizeOnDisk,
     this.seed,
   }) : _initial = _Target(
          catalogKey: initialCatalogKey,
@@ -32,6 +37,20 @@ final class InfernoInferenceRepository implements InferenceRepository {
   final int? seed;
   final String documentsDirectory;
   final ModelRuntimeConfig Function(String catalogKey) resolveConfig;
+
+  /// Free-memory probe for the load preflight; null (no probe) or a null
+  /// reading skips the preflight — the engine's own failure stays the
+  /// loud path when the platform cannot report headroom.
+  final Future<int?> Function()? availableMemoryBytes;
+
+  /// Size of the artifact at a resolved path; null skips the preflight.
+  final Future<int?> Function(String path) modelSizeBytes;
+
+  /// Headroom the preflight demands beyond the weights themselves: KV
+  /// cache (low hundreds of MB at the 8192 budget per ADR 0003) plus
+  /// runtime overhead. Deliberately conservative-but-modest; the typed
+  /// failure is retryable, so a borderline refusal costs one tap.
+  static const int loadHeadroomBytes = 512 << 20;
 
   /// The boot-resolved configuration. Its model path may be an operator
   /// sideload, so activation by its own key must reuse this path rather
@@ -118,10 +137,9 @@ final class InfernoInferenceRepository implements InferenceRepository {
         _resident = null;
         _residentKey.value = null;
       }
-      await _runtime.load(
-        engine: target.engine,
-        modelPath: _resolvePath(target.modelPath),
-      );
+      final path = _resolvePath(target.modelPath);
+      await _preflightMemory(path);
+      await _runtime.load(engine: target.engine, modelPath: path);
       _resident = target;
       _residentKey.value = target.catalogKey;
     }();
@@ -139,6 +157,53 @@ final class InfernoInferenceRepository implements InferenceRepository {
       ? '$documentsDirectory/${path.substring('documents:'.length)}'
       : path;
 
+  /// Refuses a load that cannot fit — typed and retryable — instead of
+  /// letting the engine OOM into a crash or a misleading "damaged model"
+  /// verdict. Skipped whenever either reading is unknown (§8: the
+  /// repository hides the probe mechanism; the controller owns the copy's
+  /// consequences).
+  Future<void> _preflightMemory(String path) async {
+    final probe = availableMemoryBytes;
+    if (probe == null) return;
+    final int? available;
+    final int? required;
+    try {
+      available = await probe();
+      required = await modelSizeBytes(path);
+    } catch (_) {
+      return;
+    }
+    if (available == null || required == null) return;
+    if (available < required + loadHeadroomBytes) {
+      throw const InferenceException(
+        InferenceFailureKind.insufficientMemory,
+        'Not enough free memory to load the model. Close other apps and '
+        'try again.',
+      );
+    }
+  }
+
+  /// Weights on disk: the file's own size, or a directory's file sum for
+  /// MLX artifacts. Null (skip) when the path does not resolve — the load
+  /// itself reports missing files with better copy.
+  static Future<int?> _modelSizeOnDisk(String path) async {
+    try {
+      if (await File(path).exists()) return File(path).length();
+      final directory = Directory(path);
+      if (!await directory.exists()) return null;
+      var total = 0;
+      await for (final entry in directory.list(
+        recursive: true,
+        followLinks: false,
+      )) {
+        if (entry is File) total += await entry.length();
+      }
+      return total;
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Stream<InferenceEvent> generate({
     required List<Map<String, String>> context,
@@ -152,20 +217,31 @@ final class InfernoInferenceRepository implements InferenceRepository {
     final target = _targetFor(modelKey);
     await _ensureResident(target);
     final profile = target.profile;
-    // Both profile templates accept an optional leading system turn; the
-    // custom prompt becomes exactly that, ahead of the conversation.
-    final renderedContext = systemPrompt == null || systemPrompt.isEmpty
-        ? context
-        : [
-            {'role': 'system', 'content': systemPrompt},
-            ...context,
-          ];
     final parser = profile.newParser(reasoningEnabled: reasoningEnabled);
     final (sampling, overridesApplied) = _effectiveSampling(
       profile,
       profile.sampling(reasoningEnabled: reasoningEnabled),
       overrides,
     );
+    // Window the conversation before rendering: newest turns that fit the
+    // budget, typed contextExhausted when even the final turn cannot. The
+    // engines' own budget check stays the backstop for estimation drift.
+    final windowed = windowedContext(
+      context: context,
+      contextLength:
+          sampling.contextLength ??
+          profile.sampling(reasoningEnabled: reasoningEnabled).contextLength,
+      maxTokens: sampling.maxTokens,
+      systemPrompt: systemPrompt,
+    );
+    // Both profile templates accept an optional leading system turn; the
+    // custom prompt becomes exactly that, ahead of the conversation.
+    final renderedContext = systemPrompt == null || systemPrompt.isEmpty
+        ? windowed
+        : [
+            {'role': 'system', 'content': systemPrompt},
+            ...windowed,
+          ];
     BrokerRuntimeMetrics? finalMetrics;
     var sawAnswer = false;
     final probe = seed == null ? null : StringBuffer();
@@ -217,6 +293,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
             throw const BrokerRuntimeException(
               'The response used its whole token budget before reaching an '
               'answer. Try again, or turn reasoning off.',
+              kind: InferenceFailureKind.budgetExhaustedBeforeAnswer,
             );
           }
           yield CompletedEvent(

@@ -39,11 +39,41 @@ namespace {
 
 std::once_flag backend_once;
 
+// The last ERROR line llama.cpp logged, kept so a failure event can carry
+// the native diagnostic instead of losing it to stderr. Guarded because
+// log callbacks and workers run on arbitrary threads.
+std::mutex log_error_mutex;
+std::string last_log_error;
+
+std::string consume_log_error() {
+  std::lock_guard<std::mutex> lock(log_error_mutex);
+  std::string taken = last_log_error;
+  last_log_error.clear();
+  return taken;
+}
+
+// Appends the buffered native diagnostic to a failure message; the result
+// is diagnostic evidence for logs, never user-facing copy.
+std::string with_log_detail(const std::string &message) {
+  const std::string detail = consume_log_error();
+  if (detail.empty()) return message;
+  return message + " [" + detail + "]";
+}
+
 void initialize_backend() {
   std::call_once(backend_once, [] {
     llama_log_set(
         [](enum ggml_log_level level, const char *text, void *) {
           if (level == GGML_LOG_LEVEL_ERROR && text != nullptr) {
+            {
+              std::lock_guard<std::mutex> lock(log_error_mutex);
+              std::string line(text);
+              while (!line.empty() &&
+                     (line.back() == '\n' || line.back() == '\r')) {
+                line.pop_back();
+              }
+              if (!line.empty()) last_log_error = line;
+            }
             std::fputs(text, stderr);
           }
         },
@@ -62,7 +92,15 @@ void emit(inferno_event_callback callback,
   uint8_t *copy = nullptr;
   if (!payload.empty()) {
     copy = static_cast<uint8_t *>(std::malloc(payload.size()));
-    if (copy == nullptr) return;
+    if (copy == nullptr) {
+      // Allocation failed at the worst moment — memory exhaustion. A
+      // dropped terminal event would hang the Dart completer forever, so
+      // deliver the event with an empty payload instead; the Dart side
+      // maps a payloadless error to its out-of-memory code.
+      callback(operation_id, static_cast<int32_t>(kind), nullptr, 0,
+               user_data);
+      return;
+    }
     std::memcpy(copy, payload.data(), payload.size());
   }
   callback(operation_id,
@@ -326,17 +364,22 @@ int32_t inferno_engine_load(inferno_engine *engine,
       return !static_cast<inferno_engine *>(context)->cancel_requested.load();
     };
     params.progress_callback_user_data = engine;
+    consume_log_error();
     llama_model *loaded = nullptr;
     try {
       loaded = llama_model_load_from_file(path.c_str(), params);
     } catch (const std::exception &error) {
-      emit_error(callback, operation_id, "load_failed", error.what(), user_data);
+      emit_error(callback,
+                 operation_id,
+                 "load_failed",
+                 with_log_detail(error.what()),
+                 user_data);
       return;
     } catch (...) {
       emit_error(callback,
                  operation_id,
                  "load_failed",
-                 "llama.cpp rejected the model.",
+                 with_log_detail("llama.cpp rejected the model."),
                  user_data);
       return;
     }
@@ -346,10 +389,13 @@ int32_t inferno_engine_load(inferno_engine *engine,
       return;
     }
     if (loaded == nullptr) {
+      // llama.cpp's own log line distinguishes an allocation failure from
+      // a genuinely broken file; carry it so "damaged" is never claimed
+      // blind.
       emit_error(callback,
                  operation_id,
                  "incompatible_model",
-                 "llama.cpp could not load this GGUF model.",
+                 with_log_detail("llama.cpp could not load this GGUF model."),
                  user_data);
       return;
     }
@@ -435,7 +481,7 @@ int32_t inferno_engine_generate(inferno_engine *engine,
     if (requested_context > context_budget) {
       emit_error(callback,
                  operation_id,
-                 "generation_failed",
+                 "context_exhausted",
                  "The rendered prompt and max tokens exceed the context budget.",
                  user_data);
       return;
@@ -453,10 +499,13 @@ int32_t inferno_engine_generate(inferno_engine *engine,
     context_params.abort_callback_data = engine;
     llama_context *context = llama_init_from_model(engine->model, context_params);
     if (context == nullptr) {
+      // The KV cache and compute buffers are the allocation here; a null
+      // return on a valid model is memory exhaustion, not a model defect.
       emit_error(callback,
                  operation_id,
-                 "generation_failed",
-                 "llama.cpp could not allocate a generation context.",
+                 "out_of_memory",
+                 with_log_detail(
+                     "llama.cpp could not allocate a generation context."),
                  user_data);
       return;
     }

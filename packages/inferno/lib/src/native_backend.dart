@@ -778,6 +778,16 @@ final class NativeInfernoBackend implements InfernoBackend {
   }
 
   static InfernoException _decodeError(String payload) {
+    // A payloadless error event is the shims' emergency path: the event
+    // payload itself could not be allocated, which only happens under
+    // memory exhaustion (the shims deliver the event rather than hang the
+    // completer).
+    if (payload.isEmpty) {
+      return const InfernoException(
+        InfernoErrorCode.outOfMemory,
+        'The engine ran out of memory while reporting a failure.',
+      );
+    }
     try {
       final json = jsonDecode(payload) as Map<String, Object?>;
       final nativeCode = json['code']! as String;
@@ -787,6 +797,8 @@ final class NativeInfernoBackend implements InfernoBackend {
         'corrupt_model' => InfernoErrorCode.corruptModel,
         'load_failed' => InfernoErrorCode.loadFailed,
         'generation_failed' => InfernoErrorCode.generationFailed,
+        'context_exhausted' => InfernoErrorCode.contextExhausted,
+        'out_of_memory' => InfernoErrorCode.outOfMemory,
         'cancelled' => InfernoErrorCode.cancelled,
         _ => InfernoErrorCode.internal,
       }, json['message']! as String);

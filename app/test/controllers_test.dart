@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
+import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
@@ -37,6 +38,7 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   String? lastSystemPrompt;
   int prepares = 0;
   int unloads = 0;
+  String initialResidentKey = 'test-mlx';
   final ValueNotifier<String?> _residentKey = ValueNotifier<String?>(null);
 
   @override
@@ -47,17 +49,24 @@ final class _RecordingInferenceRepository implements InferenceRepository {
     prepares++;
     lastPrepareModelKey = modelKey;
     if (failPrepare) throw StateError('injected prepare failure');
-    if (modelKey != null) _residentKey.value = modelKey;
+    // Mirrors the real repository: a keyless prepare makes the initial
+    // configuration resident, sideloaded path or not.
+    _residentKey.value = modelKey ?? initialResidentKey;
   }
 
   @override
   Future<void> unload() async {
     unloads++;
     if (failUnload) throw StateError('injected unload failure');
+    _residentKey.value = null;
   }
 
   @override
   Future<void> cancel() async {}
+
+  /// When set, generate parks mid-stream until completed — for tests that
+  /// need a deterministically in-flight generation.
+  Completer<void>? generateGate;
 
   @override
   Stream<InferenceEvent> generate({
@@ -71,6 +80,8 @@ final class _RecordingInferenceRepository implements InferenceRepository {
     lastModelKey = modelKey;
     lastSystemPrompt = systemPrompt;
     yield const AnswerDelta('ok');
+    final gate = generateGate;
+    if (gate != null) await gate.future;
     yield const CompletedEvent();
   }
 }
@@ -608,10 +619,11 @@ void main() {
     final state = container.read(chatControllerProvider).requireValue;
     expect(state.generation, GenerationPhase.failed);
     expect(
-      state.failure,
+      state.failure?.message,
       'Ran out of memory at 4,096 tokens. Lower the context length or '
       'pick a smaller model.',
     );
+    expect(state.failure?.kind, ChatFailureKind.outOfMemory);
   });
 
   FakeModelManagementRepository fakeModels(Directory directory) =>
@@ -682,19 +694,14 @@ void main() {
 
     final state = container.read(chatControllerProvider).requireValue;
     expect(state.generation, GenerationPhase.failed);
-    expect(state.missingModelArtifactKey, 'test-mlx');
-    expect(state.failure, contains('not downloaded'));
+    expect(state.failure?.kind, ChatFailureKind.missingModel);
+    expect(state.failure?.artifactKey, 'test-mlx');
+    expect(state.failure?.message, contains('not downloaded'));
     // The engine was never touched: no hang-like prepare, no cryptic error.
     expect(inference.prepares, 0);
-    // Discard clears the typed marker with the failure.
+    // Discard clears the typed failure whole.
     await container.read(chatControllerProvider.notifier).discardFailure();
-    expect(
-      container
-          .read(chatControllerProvider)
-          .requireValue
-          .missingModelArtifactKey,
-      isNull,
-    );
+    expect(container.read(chatControllerProvider).requireValue.failure, isNull);
   });
 
   test('runtime toggle drives real engine load and unload', () async {
@@ -726,6 +733,90 @@ void main() {
       container.read(modelControllerProvider).requireValue.runtime,
       RuntimePhase.unloaded,
     );
+  });
+
+  test(
+    'memory pressure unloads an idle engine and records the phase',
+    () async {
+      final directory = Directory.systemTemp.createTempSync('golem-pressure-');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final inference = _RecordingInferenceRepository();
+      final container = ProviderContainer(
+        overrides: [
+          chatHistoryRepositoryProvider.overrideWithValue(
+            InMemoryChatHistoryRepository(),
+          ),
+          inferenceRepositoryProvider.overrideWithValue(inference),
+          modelManagementRepositoryProvider.overrideWithValue(
+            fakeModels(directory),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await installActiveModel(container);
+      await container.read(chatControllerProvider.future);
+      final controller = container.read(modelControllerProvider.notifier);
+      await controller.toggleRuntime();
+      expect(
+        container.read(modelControllerProvider).requireValue.runtime,
+        RuntimePhase.loaded,
+      );
+
+      await controller.releaseEngineWhileInactive();
+      expect(inference.unloads, 1);
+      expect(
+        container.read(modelControllerProvider).requireValue.runtime,
+        RuntimePhase.unloaded,
+      );
+      // Persisted too, so Settings stays honest after a relaunch.
+      expect(
+        (await fakeModels(directory).load()).runtime,
+        RuntimePhase.unloaded,
+      );
+
+      // A second signal on an already-empty engine is a no-op.
+      await controller.releaseEngineWhileInactive();
+      expect(inference.unloads, 1);
+    },
+  );
+
+  test('memory pressure never interrupts an active generation', () async {
+    final directory = Directory.systemTemp.createTempSync('golem-pressure2-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final inference = _RecordingInferenceRepository();
+    final container = ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await installActiveModel(container);
+    await container.read(chatControllerProvider.future);
+    final models = container.read(modelControllerProvider.notifier);
+    await models.toggleRuntime();
+
+    // Park the generation mid-stream so the chat is deterministically
+    // non-idle when the signal arrives.
+    inference.generateGate = Completer<void>();
+    final chat = container.read(chatControllerProvider.notifier);
+    final send = chat.send('slow question');
+    while (container.read(chatControllerProvider).requireValue.generation ==
+        GenerationPhase.idle) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    await models.releaseEngineWhileInactive();
+    expect(inference.unloads, 0, reason: 'a visible stream must survive');
+    inference.generateGate!.complete();
+    await send;
+
+    await models.releaseEngineWhileInactive();
+    expect(inference.unloads, 1, reason: 'idle again: the signal applies');
   });
 
   test('toggling without an installed model refuses per backend', () async {
@@ -864,8 +955,52 @@ void main() {
     // The send reached the engine (the probe/sideload contract) instead of
     // dead-ending on a download it never asked for.
     expect(inference.prepares, 1);
-    expect(state.missingModelArtifactKey, isNull);
+    expect(state.failure, isNull);
     expect(state.generation, GenerationPhase.idle);
+  });
+
+  test('memory pressure releases a sideloaded model too', () async {
+    final directory = Directory.systemTemp.createTempSync('golem-side2-test-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final inference = _RecordingInferenceRepository();
+    final container = ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        inferenceBackendProvider.overrideWithValue(
+          const InferenceBackendConfig(
+            kind: InferenceBackendKind.llama,
+            profileKey: 'gemma4',
+            artifactKey: 'test-mlx',
+            modelPath: '/sideloaded/model.gguf',
+          ),
+        ),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(chatControllerProvider.future);
+    // A sideload is outside the catalog, so the lazy load leaves the
+    // persisted phase at unloaded — while the engine holds the weights.
+    await container.read(chatControllerProvider.notifier).send('Hello');
+    await container.read(modelControllerProvider.future);
+    final models = container.read(modelControllerProvider.notifier);
+    expect(
+      container.read(modelControllerProvider).requireValue.runtime,
+      RuntimePhase.unloaded,
+    );
+
+    await models.releaseEngineWhileInactive();
+    expect(inference.unloads, 1, reason: 'resident weights must be released');
+
+    // And the phase it never claimed is not rewritten on the way out.
+    expect((await fakeModels(directory).load()).runtime, RuntimePhase.unloaded);
+    await models.releaseEngineWhileInactive();
+    expect(inference.unloads, 1, reason: 'nothing resident: a no-op');
   });
 
   test('lazy engine load reflects into the persisted runtime phase', () async {

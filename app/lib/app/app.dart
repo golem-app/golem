@@ -85,6 +85,22 @@ class _GolemAppState extends ConsumerState<GolemApp>
   @override
   void didChangePlatformBrightness() => setState(() {});
 
+  // The widget layer only reports OS signals; the controller decides
+  // whether freeing the engine is safe (never mid-stream, never mid-op).
+  @override
+  void didHaveMemoryPressure() {
+    ref.read(modelControllerProvider.notifier).releaseEngineWhileInactive();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Multi-gigabyte weights must not sit resident under the platform's
+    // background memory ceiling; prepare() reloads lazily on return.
+    if (state == AppLifecycleState.paused) {
+      ref.read(modelControllerProvider.notifier).releaseEngineWhileInactive();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Appearance preferences resolve here so a change re-themes the live

@@ -17,6 +17,8 @@ import 'package:golem_flutter/broker/model_runtime_config.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/models.dart';
+import 'package:golem_flutter/core/repositories/contracts.dart'
+    show InferenceException, InferenceFailureKind;
 
 final class _RecordingRuntime implements BrokerRuntime {
   BrokerGenerationRequest? request;
@@ -636,6 +638,143 @@ void main() {
     );
   });
 
+  test('the rendered prompt excludes evicted turns', () async {
+    final runtime = _RecordingRuntime();
+    final repository = InfernoInferenceRepository(
+      runtime,
+      engine: BrokerEngine.llamaCpp,
+      profile: const Gemma4Profile(),
+      modelPath: '/local/model.gguf',
+    );
+    await repository.prepare();
+    // ~30k chars estimate past the 5632-token budget
+    // (8192 − 2048 maxTokens − 512 reserve); the newest turn fits alone.
+    await repository
+        .generate(
+          context: [
+            {'role': 'user', 'content': 'EVICTED-OLDEST ${'x' * 30000}'},
+            {'role': 'assistant', 'content': 'EVICTED-REPLY'},
+            {'role': 'user', 'content': 'KEPT-LATEST question'},
+          ],
+          reasoningEnabled: false,
+        )
+        .drain<void>();
+    expect(runtime.request?.prompt, contains('KEPT-LATEST'));
+    expect(runtime.request?.prompt, isNot(contains('EVICTED-OLDEST')));
+    expect(runtime.request?.prompt, isNot(contains('EVICTED-REPLY')));
+  });
+
+  group('error translation (#62)', () {
+    // The complete code → (copy, kind) contract of the adapter's
+    // translation switch. Exhaustive on purpose: a new InfernoErrorCode
+    // fails this test until its user-facing mapping is decided here.
+    const expectedCopy = <InfernoErrorCode, String>{
+      InfernoErrorCode.invalidModelPath:
+          'The model file could not be found on this device.',
+      InfernoErrorCode.corruptModel:
+          'The model on this device is damaged or not compatible '
+          'with this build.',
+      InfernoErrorCode.incompatibleModel:
+          'The model on this device is damaged or not compatible '
+          'with this build.',
+      InfernoErrorCode.loadFailed: 'The model could not be loaded.',
+      InfernoErrorCode.generationFailed:
+          'The local engine failed while generating a response.',
+      InfernoErrorCode.contextExhausted:
+          'This conversation no longer fits the model’s context '
+          'window. Start a new chat to continue.',
+      InfernoErrorCode.outOfMemory:
+          'The model ran out of memory while responding. Close other '
+          'apps and try again, or lower the context length in Settings.',
+      InfernoErrorCode.cancelled: 'Generation was cancelled.',
+      InfernoErrorCode.nativeUnavailable:
+          'The local inference runtime hit an internal error.',
+      InfernoErrorCode.invalidState:
+          'The local inference runtime hit an internal error.',
+      InfernoErrorCode.internal:
+          'The local inference runtime hit an internal error.',
+    };
+    const expectedKind = <InfernoErrorCode, InferenceFailureKind>{
+      InfernoErrorCode.contextExhausted: InferenceFailureKind.contextExhausted,
+      InfernoErrorCode.outOfMemory: InferenceFailureKind.outOfMemory,
+    };
+
+    // A real file path: Inferno's own load pre-flight must pass so the
+    // injected backend failure is what the adapter translates.
+    late String modelPath;
+    setUpAll(() {
+      final directory = Directory.systemTemp.createTempSync('golem-broker-');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final file = File('${directory.path}/model.gguf')
+        ..writeAsStringSync('stub');
+      modelPath = file.path;
+    });
+
+    test('covers every InfernoErrorCode', () {
+      expect(expectedCopy.keys.toSet(), InfernoErrorCode.values.toSet());
+    });
+
+    for (final code in InfernoErrorCode.values) {
+      test('maps ${code.name} on the load path', () async {
+        final native = InfernoException(code, 'native detail');
+        final adapter = InfernoRuntimeAdapter(
+          Inferno.withBackend(MockInfernoBackend(failLoad: native)),
+        );
+        try {
+          await adapter.load(
+            engine: BrokerEngine.llamaCpp,
+            modelPath: modelPath,
+          );
+          fail('expected a BrokerRuntimeException');
+        } on BrokerRuntimeException catch (error) {
+          expect(error.message, expectedCopy[code]);
+          expect(error.kind, expectedKind[code] ?? InferenceFailureKind.engine);
+          // The vendor error stays attached for logs and failure metrics.
+          expect(error.cause, same(native));
+          // toString is the copy: no package exception ever renders raw.
+          expect('$error', expectedCopy[code]);
+        }
+      });
+    }
+
+    test('maps generation-path errors identically', () async {
+      const native = InfernoException(
+        InfernoErrorCode.contextExhausted,
+        'The rendered prompt and max tokens exceed the context budget.',
+      );
+      final adapter = InfernoRuntimeAdapter(
+        Inferno.withBackend(MockInfernoBackend(failGeneration: native)),
+      );
+      await adapter.load(engine: BrokerEngine.llamaCpp, modelPath: modelPath);
+      await expectLater(
+        adapter
+            .generate(
+              const BrokerGenerationRequest(
+                prompt: 'p',
+                sampling: BrokerSamplingParameters(
+                  maxTokens: 8,
+                  temperature: 1,
+                  topP: 1,
+                  seed: null,
+                  stopSequences: [],
+                  stopTokenIds: [],
+                ),
+              ),
+            )
+            .drain<void>(),
+        throwsA(
+          isA<BrokerRuntimeException>()
+              .having(
+                (error) => error.kind,
+                'kind',
+                InferenceFailureKind.contextExhausted,
+              )
+              .having((error) => error.cause, 'cause', same(native)),
+        ),
+      );
+    });
+  });
+
   group('residency (#42)', () {
     InfernoInferenceRepository buildRepository(_ResidencyRuntime runtime) =>
         InfernoInferenceRepository(
@@ -761,6 +900,86 @@ void main() {
       expect(repository.residentModelKey.value, isNull);
       await repository.prepare();
       expect(repository.residentModelKey.value, 'gemma4-gguf');
+    });
+  });
+
+  group('memory preflight (#62)', () {
+    InfernoInferenceRepository buildRepository(
+      _ResidencyRuntime runtime, {
+      required int? available,
+      int? modelSize = 2 << 30,
+    }) => InfernoInferenceRepository(
+      runtime,
+      engine: BrokerEngine.llamaCpp,
+      profile: const Gemma4Profile(),
+      modelPath: '/local/gemma.gguf',
+      initialCatalogKey: 'gemma4-gguf',
+      availableMemoryBytes: () async => available,
+      modelSizeBytes: (_) async => modelSize,
+    );
+
+    test(
+      'an insufficient reading refuses before touching the engine',
+      () async {
+        final runtime = _ResidencyRuntime();
+        final repository = buildRepository(runtime, available: 1 << 30);
+        await expectLater(
+          repository.prepare(),
+          throwsA(
+            isA<InferenceException>()
+                .having(
+                  (error) => error.kind,
+                  'kind',
+                  InferenceFailureKind.insufficientMemory,
+                )
+                .having(
+                  (error) => error.message,
+                  'message',
+                  contains('Not enough free memory'),
+                ),
+          ),
+        );
+        expect(runtime.loadedPaths, isEmpty);
+        expect(repository.residentModelKey.value, isNull);
+      },
+    );
+
+    test('a refused load can retry once memory frees up', () async {
+      final runtime = _ResidencyRuntime();
+      var available = 1 << 30;
+      final repository = InfernoInferenceRepository(
+        runtime,
+        engine: BrokerEngine.llamaCpp,
+        profile: const Gemma4Profile(),
+        modelPath: '/local/gemma.gguf',
+        initialCatalogKey: 'gemma4-gguf',
+        availableMemoryBytes: () async => available,
+        modelSizeBytes: (_) async => 2 << 30,
+      );
+      await expectLater(repository.prepare(), throwsA(anything));
+      available = 4 << 30;
+      await repository.prepare();
+      expect(repository.residentModelKey.value, 'gemma4-gguf');
+    });
+
+    test('unknown readings let the load proceed', () async {
+      final runtime = _ResidencyRuntime();
+      await buildRepository(runtime, available: null).prepare();
+      expect(runtime.loadedPaths, hasLength(1));
+
+      final second = _ResidencyRuntime();
+      await buildRepository(
+        second,
+        available: 1 << 30,
+        modelSize: null,
+      ).prepare();
+      expect(second.loadedPaths, hasLength(1));
+    });
+
+    test('a sufficient reading loads normally', () async {
+      final runtime = _ResidencyRuntime();
+      await buildRepository(runtime, available: 4 << 30).prepare();
+      expect(runtime.loadedPaths, ['/local/gemma.gguf']);
     });
   });
 }

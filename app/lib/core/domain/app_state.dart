@@ -1,26 +1,45 @@
 import 'models.dart';
 
+/// What kind of failure the chat banner is showing, deciding its actions:
+/// Retry is offered only where retrying can succeed, and the one failure
+/// it can never fix ([contextExhausted]) offers a new chat instead.
+enum ChatFailureKind {
+  generic,
+  missingModel,
+  contextExhausted,
+  outOfMemory,
+  insufficientMemory,
+}
+
+/// A typed chat failure: the classification that picks banner actions,
+/// the user-presentable message, and — for [ChatFailureKind.missingModel]
+/// — the catalog key whose download the banner can offer. Raw exception
+/// text never lands here; controllers map everything to copy first.
+final class ChatFailure {
+  const ChatFailure({
+    required this.kind,
+    required this.message,
+    this.artifactKey,
+  });
+
+  final ChatFailureKind kind;
+  final String message;
+  final String? artifactKey;
+}
+
 final class ChatState {
   const ChatState({
     this.conversations = const [],
     this.activeId,
     this.generation = GenerationPhase.idle,
     this.failure,
-    this.missingModelArtifactKey,
     this.hasUnsavedAssistant = false,
   });
 
   final List<ChatConversation> conversations;
   final String? activeId;
   final GenerationPhase generation;
-  final String? failure;
-
-  /// Typed marker for the one recoverable failure the banner can fix
-  /// itself: generation was attempted on a real backend whose active
-  /// artifact is not installed. Carries the catalog key so the banner can
-  /// offer the download without string-matching the failure text. Cleared
-  /// together with [failure].
-  final String? missingModelArtifactKey;
+  final ChatFailure? failure;
 
   final bool hasUnsavedAssistant;
 
@@ -32,8 +51,7 @@ final class ChatState {
     List<ChatConversation>? conversations,
     String? activeId,
     GenerationPhase? generation,
-    String? failure,
-    String? missingModelArtifactKey,
+    ChatFailure? failure,
     bool clearFailure = false,
     bool? hasUnsavedAssistant,
   }) => ChatState(
@@ -41,9 +59,6 @@ final class ChatState {
     activeId: activeId ?? this.activeId,
     generation: generation ?? this.generation,
     failure: clearFailure ? null : failure ?? this.failure,
-    missingModelArtifactKey: clearFailure
-        ? null
-        : missingModelArtifactKey ?? this.missingModelArtifactKey,
     hasUnsavedAssistant: hasUnsavedAssistant ?? this.hasUnsavedAssistant,
   );
 }

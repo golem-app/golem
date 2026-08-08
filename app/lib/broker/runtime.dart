@@ -1,5 +1,8 @@
 import 'package:inferno/inferno.dart';
 
+import '../core/repositories/contracts.dart'
+    show InferenceException, InferenceFailureKind;
+
 /// Pinned-artifact and engine-pin metadata, re-exported so evaluation and
 /// measurement code outside the broker can cite pins in evidence reports
 /// without importing package:inferno across the boundary.
@@ -107,15 +110,15 @@ final class BrokerGenerationCompleted extends BrokerRuntimeEvent {
 }
 
 /// A runtime failure with user-presentable text; `toString` is the message
-/// so the recovery banner never shows a package exception verbatim.
-final class BrokerRuntimeException implements Exception {
-  const BrokerRuntimeException(this.message, {this.cause});
-
-  final String message;
-  final Object? cause;
-
-  @override
-  String toString() => message;
+/// so the recovery banner never shows a package exception verbatim. The
+/// broker's subtype of the app-level [InferenceException] so controllers
+/// catch one type across fake and real backends (§19.2).
+final class BrokerRuntimeException extends InferenceException {
+  const BrokerRuntimeException(
+    String message, {
+    InferenceFailureKind kind = InferenceFailureKind.engine,
+    super.cause,
+  }) : super(kind, message);
 }
 
 abstract interface class BrokerRuntime {
@@ -219,19 +222,46 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
   }
 
   static BrokerRuntimeException _translated(InfernoException error) =>
-      BrokerRuntimeException(switch (error.code) {
-        InfernoErrorCode.invalidModelPath =>
+      switch (error.code) {
+        InfernoErrorCode.invalidModelPath => BrokerRuntimeException(
           'The model file could not be found on this device.',
-        InfernoErrorCode.corruptModel || InfernoErrorCode.incompatibleModel =>
+          cause: error,
+        ),
+        InfernoErrorCode.corruptModel ||
+        InfernoErrorCode.incompatibleModel => BrokerRuntimeException(
           'The model on this device is damaged or not compatible '
-              'with this build.',
-        InfernoErrorCode.loadFailed => 'The model could not be loaded.',
-        InfernoErrorCode.generationFailed =>
+          'with this build.',
+          cause: error,
+        ),
+        InfernoErrorCode.loadFailed => BrokerRuntimeException(
+          'The model could not be loaded.',
+          cause: error,
+        ),
+        InfernoErrorCode.generationFailed => BrokerRuntimeException(
           'The local engine failed while generating a response.',
-        InfernoErrorCode.cancelled => 'Generation was cancelled.',
+          cause: error,
+        ),
+        InfernoErrorCode.contextExhausted => BrokerRuntimeException(
+          'This conversation no longer fits the model’s context '
+          'window. Start a new chat to continue.',
+          kind: InferenceFailureKind.contextExhausted,
+          cause: error,
+        ),
+        InfernoErrorCode.outOfMemory => BrokerRuntimeException(
+          'The model ran out of memory while responding. Close other '
+          'apps and try again, or lower the context length in Settings.',
+          kind: InferenceFailureKind.outOfMemory,
+          cause: error,
+        ),
+        InfernoErrorCode.cancelled => BrokerRuntimeException(
+          'Generation was cancelled.',
+          cause: error,
+        ),
         InfernoErrorCode.nativeUnavailable ||
         InfernoErrorCode.invalidState ||
-        InfernoErrorCode.internal =>
+        InfernoErrorCode.internal => BrokerRuntimeException(
           'The local inference runtime hit an internal error.',
-      }, cause: error);
+          cause: error,
+        ),
+      };
 }

@@ -604,10 +604,13 @@ class ChatController extends _$ChatController {
         state = AsyncData(
           _value.copyWith(
             generation: GenerationPhase.failed,
-            failure:
-                'The local model is not downloaded on this device yet. '
-                'Download it to start chatting.',
-            missingModelArtifactKey: backend.artifactKey,
+            failure: ChatFailure(
+              kind: ChatFailureKind.missingModel,
+              message:
+                  'The local model is not downloaded on this device yet. '
+                  'Download it to start chatting.',
+              artifactKey: backend.artifactKey,
+            ),
           ),
         );
         return;
@@ -701,13 +704,37 @@ class ChatController extends _$ChatController {
         state = AsyncData(
           _replaceActive(current.copyWith(messages: messages)).copyWith(
             generation: GenerationPhase.failed,
-            failure: error.toString().replaceFirst('Bad state: ', ''),
+            failure: _classifiedFailure(error),
             hasUnsavedAssistant: true,
           ),
         );
       }
     }
   }
+
+  /// Maps a thrown error to the typed banner failure. Typed inference
+  /// exceptions carry their own user copy and recovery kind; anything
+  /// else gets fixed generic copy — raw exception text never reaches the
+  /// banner (§19.4).
+  static ChatFailure _classifiedFailure(Object error) => switch (error) {
+    InferenceException(:final kind, :final message) => ChatFailure(
+      kind: switch (kind) {
+        InferenceFailureKind.contextExhausted =>
+          ChatFailureKind.contextExhausted,
+        InferenceFailureKind.outOfMemory => ChatFailureKind.outOfMemory,
+        InferenceFailureKind.insufficientMemory =>
+          ChatFailureKind.insufficientMemory,
+        InferenceFailureKind.engine ||
+        InferenceFailureKind.budgetExhaustedBeforeAnswer =>
+          ChatFailureKind.generic,
+      },
+      message: message,
+    ),
+    _ => const ChatFailure(
+      kind: ChatFailureKind.generic,
+      message: 'Something went wrong while generating a response.',
+    ),
+  };
 
   /// Whether the active artifact is installed, or null when model state is
   /// unavailable — then generation proceeds and prepare() stays the loud
@@ -828,6 +855,15 @@ class ChatController extends _$ChatController {
     );
     state = AsyncData(next);
     await _persist(next);
+  }
+
+  /// The context-exhausted recovery: retrying can never fit the same
+  /// conversation back into the window, so the banner offers a fresh chat
+  /// instead. Discards the failed draft like [discardFailure], then
+  /// creates and activates a new conversation.
+  Future<void> startFreshChatFromFailure() async {
+    await discardFailure();
+    await newChat();
   }
 
   ChatState _replaceActive(ChatConversation conversation) => _value.copyWith(
@@ -1035,6 +1071,42 @@ class ModelController extends _$ModelController {
         if (!ref.mounted) return;
         state = AsyncData(value);
       }
+    } finally {
+      _busy = false;
+    }
+  }
+
+  /// Frees the engine on an OS memory-pressure signal or backgrounding —
+  /// the app must never hold multi-gigabyte weights it is not actively
+  /// using while the platform is reclaiming memory. Only when idle: an
+  /// advisory signal never cancels a visible stream (the typed OOM path
+  /// reports honestly if generation truly cannot continue), and the busy
+  /// guard keeps this off an in-flight model operation. Failures stay
+  /// silent — the next explicit operation reports normally.
+  Future<void> releaseEngineWhileInactive() async {
+    if (_busy) return;
+    final current = state.value;
+    if (current == null) return;
+    final chat = ref.read(chatControllerProvider).value;
+    if (chat != null && chat.generation != GenerationPhase.idle) return;
+    _busy = true;
+    try {
+      final inference = ref.read(inferenceRepositoryProvider);
+      // Residency decides, not the catalog phase: an operator-supplied
+      // GOLEM_MODEL_PATH load is outside the catalog's phase tracking
+      // (reflectEngineLoaded skips it), yet its weights are just as
+      // resident and just as liable to be jetsammed.
+      final loaded = current.runtime == RuntimePhase.loaded;
+      if (!loaded && inference.residentModelKey.value == null) return;
+      await inference.unload();
+      if (!ref.mounted || !loaded) return;
+      final value = await ref
+          .read(modelManagementRepositoryProvider)
+          .recordRuntime(RuntimePhase.unloaded);
+      if (!ref.mounted) return;
+      state = AsyncData(value);
+    } catch (_) {
+      // Advisory signal: no user-visible failure state.
     } finally {
       _busy = false;
     }

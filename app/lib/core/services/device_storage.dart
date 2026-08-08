@@ -22,6 +22,15 @@ abstract interface class DeviceMemoryProbe {
   Future<int?> physicalMemoryBytes();
 }
 
+/// Memory the process can still allocate right now, for the model-load
+/// preflight: `os_proc_available_memory` (the jetsam headroom) on iOS,
+/// `ActivityManager.MemoryInfo.availMem` on Android. Returns null when the
+/// platform cannot report it — "unknown" must let the load proceed and
+/// keep the engine's own failure the loud path, never invent a refusal.
+abstract interface class AvailableMemoryProbe {
+  Future<int?> availableMemoryBytes();
+}
+
 /// Total capacity of the volume containing a path, for the drawer's
 /// storage meter. Returns null when the platform cannot report it — the
 /// meter hides rather than invent a denominator.
@@ -34,6 +43,7 @@ final class DeviceStorageChannel
         DiskSpaceProbe,
         BackupExclusion,
         DeviceMemoryProbe,
+        AvailableMemoryProbe,
         DiskCapacityProbe {
   const DeviceStorageChannel();
 
@@ -50,6 +60,10 @@ final class DeviceStorageChannel
   @override
   Future<int?> physicalMemoryBytes() =>
       _channel.invokeMethod<int>('physicalMemoryBytes');
+
+  @override
+  Future<int?> availableMemoryBytes() =>
+      _channel.invokeMethod<int>('availableMemoryBytes');
 
   @override
   Future<int?> totalBytes(String path) =>
