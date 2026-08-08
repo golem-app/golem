@@ -13,6 +13,7 @@ import 'package:golem_flutter/broker/gemma4_chat_template.dart';
 import 'package:golem_flutter/broker/hash.dart';
 import 'package:golem_flutter/broker/inferno_inference_repository.dart';
 import 'package:golem_flutter/broker/model_profile.dart';
+import 'package:golem_flutter/broker/model_runtime_config.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/models.dart';
@@ -147,7 +148,6 @@ void main() {
       modelPath: '/local/model',
       seed: 9,
     );
-    await repository.prepare();
     await repository.prepare();
     final events = await repository
         .generate(
@@ -635,4 +635,166 @@ void main() {
       'hi system\nobey',
     );
   });
+
+  group('residency (#42)', () {
+    InfernoInferenceRepository buildRepository(_ResidencyRuntime runtime) =>
+        InfernoInferenceRepository(
+          runtime,
+          engine: BrokerEngine.llamaCpp,
+          profile: const Gemma4Profile(),
+          modelPath: '/local/gemma.gguf',
+          initialCatalogKey: 'gemma4-gguf',
+          documentsDirectory: '/docs',
+          resolveConfig: (key) => switch (key) {
+            'qwen35-gguf' => const ModelRuntimeConfig(
+              catalogKey: 'qwen35-gguf',
+              engine: BrokerEngine.llamaCpp,
+              modelPath: 'documents:models/qwen35-gguf/qwen.gguf',
+              profile: Qwen35Profile(),
+            ),
+            _ => throw StateError('Unknown catalog key "$key".'),
+          },
+        );
+
+    test('generate activates the addressed configuration', () async {
+      final runtime = _ResidencyRuntime();
+      final repository = buildRepository(runtime);
+      await repository.prepare();
+      expect(repository.residentModelKey.value, 'gemma4-gguf');
+
+      await repository
+          .generate(
+            context: const [
+              {'role': 'user', 'content': 'Hello'},
+            ],
+            reasoningEnabled: false,
+            modelKey: 'qwen35-gguf',
+          )
+          .drain<void>();
+
+      expect(runtime.loadedPaths, [
+        '/local/gemma.gguf',
+        '/docs/models/qwen35-gguf/qwen.gguf',
+      ]);
+      expect(runtime.unloads, 1);
+      expect(repository.residentModelKey.value, 'qwen35-gguf');
+      // The Qwen profile rendered the prompt: its template, not Gemma's.
+      expect(runtime.request?.prompt, contains('<|im_start|>'));
+    });
+
+    test('the default route joins an already-resident keyed model', () async {
+      final runtime = _ResidencyRuntime();
+      final repository = buildRepository(runtime);
+      await repository.prepare(modelKey: 'gemma4-gguf');
+      expect(runtime.loadedPaths, ['/local/gemma.gguf']);
+
+      await repository.prepare();
+      expect(runtime.loadedPaths, ['/local/gemma.gguf']);
+      expect(runtime.unloads, 0);
+    });
+
+    test('generate with the resident key does not reload', () async {
+      final runtime = _ResidencyRuntime();
+      final repository = buildRepository(runtime);
+      await repository.prepare(modelKey: 'gemma4-gguf');
+      expect(runtime.loadedPaths, ['/local/gemma.gguf']);
+
+      await repository
+          .generate(
+            context: const [
+              {'role': 'user', 'content': 'Hello'},
+            ],
+            reasoningEnabled: false,
+            modelKey: 'gemma4-gguf',
+          )
+          .drain<void>();
+      expect(runtime.loadedPaths, ['/local/gemma.gguf']);
+      expect(runtime.unloads, 0);
+    });
+
+    test('unload clears the resident key', () async {
+      final runtime = _ResidencyRuntime();
+      final repository = buildRepository(runtime);
+      await repository.prepare();
+      expect(repository.residentModelKey.value, 'gemma4-gguf');
+
+      await repository.unload();
+      expect(repository.residentModelKey.value, isNull);
+      expect(runtime.unloads, 1);
+    });
+
+    test('generate reactivates lazily after an unload', () async {
+      final runtime = _ResidencyRuntime();
+      final repository = buildRepository(runtime);
+      await repository.prepare();
+      expect(runtime.loadedPaths, ['/local/gemma.gguf']);
+
+      await repository.unload();
+      expect(repository.residentModelKey.value, isNull);
+
+      await repository
+          .generate(
+            context: const [
+              {'role': 'user', 'content': 'Hello'},
+            ],
+            reasoningEnabled: false,
+          )
+          .drain<void>();
+      expect(runtime.loadedPaths, ['/local/gemma.gguf', '/local/gemma.gguf']);
+      expect(repository.residentModelKey.value, 'gemma4-gguf');
+    });
+
+    test('concurrent activation of one key joins a single load', () async {
+      final runtime = _ResidencyRuntime()..gate = Completer<void>();
+      final repository = buildRepository(runtime);
+      final first = repository.prepare(modelKey: 'qwen35-gguf');
+      final second = repository.prepare(modelKey: 'qwen35-gguf');
+      runtime.gate!.complete();
+      await Future.wait([first, second]);
+      expect(runtime.loadedPaths, ['/docs/models/qwen35-gguf/qwen.gguf']);
+    });
+
+    test('a failed activation leaves nothing resident and can retry', () async {
+      final runtime = _ResidencyRuntime()..failNextLoad = true;
+      final repository = buildRepository(runtime);
+      await expectLater(repository.prepare(), throwsStateError);
+      expect(repository.residentModelKey.value, isNull);
+      await repository.prepare();
+      expect(repository.residentModelKey.value, 'gemma4-gguf');
+    });
+  });
+}
+
+final class _ResidencyRuntime implements BrokerRuntime {
+  final List<String> loadedPaths = [];
+  int unloads = 0;
+  bool failNextLoad = false;
+  Completer<void>? gate;
+  BrokerGenerationRequest? request;
+
+  @override
+  Future<void> load({
+    required BrokerEngine engine,
+    required String modelPath,
+  }) async {
+    if (gate != null) await gate!.future;
+    if (failNextLoad) {
+      failNextLoad = false;
+      throw StateError('injected load failure');
+    }
+    loadedPaths.add(modelPath);
+  }
+
+  @override
+  Future<void> unload() async => unloads++;
+
+  @override
+  Future<void> cancel() async {}
+
+  @override
+  Stream<BrokerRuntimeEvent> generate(BrokerGenerationRequest request) async* {
+    this.request = request;
+    yield const BrokerTextDelta('Visible answer.');
+    yield const BrokerGenerationCompleted(BrokerStopReason.endOfSequence);
+  }
 }

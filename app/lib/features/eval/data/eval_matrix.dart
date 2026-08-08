@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:golem_flutter/broker/runtime.dart';
 
-import 'eval_runner.dart';
+import '../application/eval_runner.dart';
 
 List<String> _segments(String path) => path
     .split(Platform.pathSeparator)

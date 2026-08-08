@@ -480,26 +480,12 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   }
 
   @override
-  Future<ModelState> loadRuntime() async {
-    if (!_state.activeModelInstalled) {
-      return _persist(
-        _state.copyWith(
-          runtime: RuntimePhase.failed,
-          failure: activeArtifactKey == null
-              ? 'Inference is a build-time opt-in; no backend is configured.'
-              : 'Download and install the active model first.',
-        ),
+  Future<ModelState> recordRuntime(RuntimePhase phase, {String? failure}) =>
+      _persist(
+        failure == null
+            ? _state.copyWith(runtime: phase, clearFailure: true)
+            : _state.copyWith(runtime: phase, failure: failure),
       );
-    }
-    await _persist(
-      _state.copyWith(runtime: RuntimePhase.loading, clearFailure: true),
-    );
-    return _persist(_state.copyWith(runtime: RuntimePhase.loaded));
-  }
-
-  @override
-  Future<ModelState> unloadRuntime() =>
-      _persist(_state.copyWith(runtime: RuntimePhase.unloaded));
 
   @override
   Future<ModelState> addModel(ModelCatalogEntry entry) async {

@@ -45,6 +45,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
       backend: ref.watch(inferenceBackendProvider),
       catalog: ref.watch(modelCatalogEntriesProvider),
       modelKey: widget.chat.active?.modelKey,
+      residentModelKey: ref.watch(residentModelKeyProvider),
     );
     final backend = ref.watch(inferenceBackendProvider);
     final ink = CupertinoDynamicColor.resolve(GolemTheme.drawerInk, context);

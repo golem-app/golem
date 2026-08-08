@@ -113,7 +113,10 @@ void main() {
     final file = File('${tempDir().path}/model.json');
     final first = _fakeModels(file);
     await first.load();
-    final failed = await first.loadRuntime();
+    final failed = await first.recordRuntime(
+      RuntimePhase.failed,
+      failure: 'Install the selected simulated model first.',
+    );
     expect(failed.runtime, RuntimePhase.failed);
     expect(failed.failure, isNotNull);
 
@@ -330,7 +333,7 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 30));
 
     // A subsequent repository operation must not resurrect "downloading".
-    final after = await repository.unloadRuntime();
+    final after = await repository.recordRuntime(RuntimePhase.unloaded);
     expect(after.statusOf('test-mlx').phase, ArtifactPhase.paused);
   });
 

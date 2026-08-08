@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
@@ -32,14 +33,21 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   final bool failUnload;
   SamplingOverrides? lastOverrides;
   String? lastModelKey;
+  String? lastPrepareModelKey;
   String? lastSystemPrompt;
   int prepares = 0;
   int unloads = 0;
+  final ValueNotifier<String?> _residentKey = ValueNotifier<String?>(null);
 
   @override
-  Future<void> prepare() async {
+  ValueListenable<String?> get residentModelKey => _residentKey;
+
+  @override
+  Future<void> prepare({String? modelKey}) async {
     prepares++;
+    lastPrepareModelKey = modelKey;
     if (failPrepare) throw StateError('injected prepare failure');
+    if (modelKey != null) _residentKey.value = modelKey;
   }
 
   @override
@@ -87,9 +95,8 @@ final class _StaticState implements ModelManagementRepository {
   @override
   Future<ModelState> load() async => state;
   @override
-  Future<ModelState> loadRuntime() async => state;
-  @override
-  Future<ModelState> unloadRuntime() async => state;
+  Future<ModelState> recordRuntime(RuntimePhase phase, {String? failure}) =>
+      Future.value(state);
   @override
   Stream<ModelState> download(String artifactKey) => Stream.value(state);
   @override
@@ -557,7 +564,7 @@ void main() {
     expect(state.active!.messages.map((m) => m.id), [userId]);
   });
 
-  test('the conversation model key reaches generation', () async {
+  test('preparation and generation address the same model', () async {
     final inference = _RecordingInferenceRepository();
     final container = ProviderContainer(
       overrides: [
@@ -572,6 +579,7 @@ void main() {
     final controller = container.read(chatControllerProvider.notifier);
     await controller.send('Hello');
     expect(inference.lastModelKey, isNull);
+    expect(inference.lastPrepareModelKey, isNull);
 
     final activeId = container
         .read(chatControllerProvider)
@@ -585,6 +593,10 @@ void main() {
     );
     await controller.regenerate();
     expect(inference.lastModelKey, 'qwen35-gguf');
+    // Preparation must address the same model the stream will: a keyless
+    // prepare here would load the boot artifact and generate() would then
+    // swap it out, loading twice for one answer.
+    expect(inference.lastPrepareModelKey, 'qwen35-gguf');
   });
 
   test('the OOM injection surfaces the design failure copy', () async {
@@ -714,6 +726,57 @@ void main() {
       container.read(modelControllerProvider).requireValue.runtime,
       RuntimePhase.unloaded,
     );
+  });
+
+  test('toggling without an installed model refuses per backend', () async {
+    final directory = Directory.systemTemp.createTempSync('golem-refuse-test-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final inference = _RecordingInferenceRepository();
+
+    // Fake backend copy: nothing installed yet, fake wording.
+    final fakeContainer = ProviderContainer(
+      overrides: [
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+      ],
+    );
+    addTearDown(fakeContainer.dispose);
+    await fakeContainer.read(modelControllerProvider.future);
+    await fakeContainer.read(modelControllerProvider.notifier).toggleRuntime();
+    final refused = fakeContainer.read(modelControllerProvider).requireValue;
+    expect(refused.runtime, RuntimePhase.failed);
+    expect(refused.failure, 'Install the selected simulated model first.');
+    expect(inference.prepares, 0, reason: 'the engine is never touched');
+
+    // Real backend copy: the same refusal names the download instead.
+    final realContainer = ProviderContainer(
+      overrides: [
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        inferenceBackendProvider.overrideWithValue(
+          const InferenceBackendConfig(
+            kind: InferenceBackendKind.llama,
+            profileKey: 'gemma4',
+            artifactKey: 'test-mlx',
+            modelPath: 'documents:models/test-mlx',
+            modelPathFromCatalog: true,
+          ),
+        ),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+      ],
+    );
+    addTearDown(realContainer.dispose);
+    await realContainer.read(modelControllerProvider.future);
+    await realContainer.read(modelControllerProvider.notifier).toggleRuntime();
+    final realRefused = realContainer
+        .read(modelControllerProvider)
+        .requireValue;
+    expect(realRefused.runtime, RuntimePhase.failed);
+    expect(realRefused.failure, 'Download and install the active model first.');
+    expect(inference.prepares, 0);
   });
 
   test('an engine load failure surfaces without persisting loaded', () async {

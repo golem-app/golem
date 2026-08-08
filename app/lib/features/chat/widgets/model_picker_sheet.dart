@@ -43,6 +43,7 @@ final class _ModelPickerContent extends ConsumerWidget {
       backend: backend,
       catalog: catalog,
       modelKey: modelKey,
+      residentModelKey: ref.watch(residentModelKeyProvider),
     );
     return SafeArea(
       top: false,
@@ -92,7 +93,7 @@ final class _ModelPickerContent extends ConsumerWidget {
                 padding: const EdgeInsets.only(top: GolemSpace.s1),
                 child: Text(
                   'Golem is running '
-                  '${chatModelLabel(backend: backend, catalog: catalog, modelKey: null)}. '
+                  '${chatModelLabel(backend: backend, catalog: catalog, modelKey: null, residentModelKey: ref.watch(residentModelKeyProvider))}. '
                   'Per-chat model switching arrives in a future update.',
                   style: GolemText.caption.copyWith(
                     color: CupertinoDynamicColor.resolve(

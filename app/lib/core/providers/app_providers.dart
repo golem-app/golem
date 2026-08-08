@@ -70,6 +70,24 @@ DiskSpaceProbe diskFreeSpaceProbe(Ref ref) =>
 InferenceBackendConfig inferenceBackend(Ref ref) =>
     const InferenceBackendConfig.fake();
 
+/// The catalog key of the model currently resident in the engine, straight
+/// from the residency owner (#42). Null while the engine is empty — label
+/// helpers fall back to the configured artifact then, so a lazy first load
+/// does not blank the chrome. Under a simulated backend this is always
+/// null without touching the repository seam: fake labels follow the
+/// per-chat choice, and label-only widget containers must not need an
+/// inference repository just to render chrome (the same discipline
+/// exception [inferenceBackend] documents).
+@Riverpod(keepAlive: true)
+String? residentModelKey(Ref ref) {
+  if (ref.watch(inferenceBackendProvider).simulatedInference) return null;
+  final listenable = ref.watch(inferenceRepositoryProvider).residentModelKey;
+  void onChange() => ref.invalidateSelf();
+  listenable.addListener(onChange);
+  ref.onDispose(() => listenable.removeListener(onChange));
+  return listenable.value;
+}
+
 @Riverpod(keepAlive: true)
 DiskCapacityProbe deviceCapacityProbe(Ref ref) =>
     throw UnimplementedError('Override deviceCapacityProbeProvider at startup');
@@ -613,7 +631,14 @@ class ChatController extends _$ChatController {
       ),
     );
     try {
-      await ref.read(inferenceRepositoryProvider).prepare();
+      // Address the conversation's own model, not the boot configuration:
+      // generate() below activates `active.modelKey`, so a keyless prepare
+      // would load the initial model only for the stream to unload it and
+      // load another — two multi-gigabyte loads per send, with the second
+      // preflight failing after preparation already reported success.
+      await ref
+          .read(inferenceRepositoryProvider)
+          .prepare(modelKey: active.modelKey);
       if (!ref.mounted || epoch != _generationEpoch) return;
       // The lazy load must keep the persisted RuntimePhase honest in both
       // directions: after this prepare() the engine holds weights, so
@@ -913,7 +938,7 @@ class ModelController extends _$ModelController {
     try {
       final value = await ref
           .read(modelManagementRepositoryProvider)
-          .loadRuntime();
+          .recordRuntime(RuntimePhase.loaded);
       if (!ref.mounted) return;
       state = AsyncData(value);
     } catch (_) {
@@ -954,9 +979,11 @@ class ModelController extends _$ModelController {
 
   /// The persisted RuntimePhase must reflect the engine, not bookkeeping:
   /// Load drives a real `prepare()` before `loaded` is recorded, Unload a
-  /// real `unload()` before `unloaded` — the deferred #37 finding. Engine
-  /// failures stay in-memory as a failed phase with the message; the
-  /// repository's stale-`loading` reconciliation already covers crashes.
+  /// real `unload()` before `unloaded` — the deferred #37 finding. The
+  /// inference repository is the only component touching the engine (#42);
+  /// the management repository just records the phase. Engine failures
+  /// stay in-memory as a failed phase with the message; the repository's
+  /// stale-`loading` reconciliation already covers crashes.
   Future<void> toggleRuntime() async {
     if (_busy) return;
     _busy = true;
@@ -974,7 +1001,7 @@ class ModelController extends _$ModelController {
           return;
         }
         if (!ref.mounted) return;
-        final value = await repository.unloadRuntime();
+        final value = await repository.recordRuntime(RuntimePhase.unloaded);
         if (!ref.mounted) return;
         state = AsyncData(value);
       } else {
@@ -984,9 +1011,12 @@ class ModelController extends _$ModelController {
           current.copyWith(runtime: RuntimePhase.loading, clearFailure: true),
         );
         if (!current.activeModelInstalled) {
-          // The repository refuses with a persisted failed phase and a
-          // clear message; the engine is never touched.
-          final value = await repository.loadRuntime();
+          // Refuse with a persisted failed phase and a clear message; the
+          // engine is never touched.
+          final value = await repository.recordRuntime(
+            RuntimePhase.failed,
+            failure: _installFirstFailure(current),
+          );
           if (!ref.mounted) return;
           state = AsyncData(value);
           return;
@@ -1001,13 +1031,25 @@ class ModelController extends _$ModelController {
           return;
         }
         if (!ref.mounted) return;
-        final value = await repository.loadRuntime();
+        final value = await repository.recordRuntime(RuntimePhase.loaded);
         if (!ref.mounted) return;
         state = AsyncData(value);
       }
     } finally {
       _busy = false;
     }
+  }
+
+  /// The load-refusal copy for a not-installed active model. Owned here
+  /// since #42: the management repository records phases and no longer
+  /// knows why a load was refused.
+  String _installFirstFailure(ModelState current) {
+    if (current.activeArtifactKey == null) {
+      return 'Inference is a build-time opt-in; no backend is configured.';
+    }
+    return ref.read(inferenceBackendProvider).simulatedInference
+        ? 'Install the selected simulated model first.'
+        : 'Download and install the active model first.';
   }
 }
 

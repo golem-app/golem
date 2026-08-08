@@ -498,6 +498,73 @@ final class InferenceBackendProvider
 
 String _$inferenceBackendHash() => r'679d3dfd7f9bdcc675a964fdfe9368052cc0b632';
 
+/// The catalog key of the model currently resident in the engine, straight
+/// from the residency owner (#42). Null while the engine is empty — label
+/// helpers fall back to the configured artifact then, so a lazy first load
+/// does not blank the chrome. Under a simulated backend this is always
+/// null without touching the repository seam: fake labels follow the
+/// per-chat choice, and label-only widget containers must not need an
+/// inference repository just to render chrome (the same discipline
+/// exception [inferenceBackend] documents).
+
+@ProviderFor(residentModelKey)
+const residentModelKeyProvider = ResidentModelKeyProvider._();
+
+/// The catalog key of the model currently resident in the engine, straight
+/// from the residency owner (#42). Null while the engine is empty — label
+/// helpers fall back to the configured artifact then, so a lazy first load
+/// does not blank the chrome. Under a simulated backend this is always
+/// null without touching the repository seam: fake labels follow the
+/// per-chat choice, and label-only widget containers must not need an
+/// inference repository just to render chrome (the same discipline
+/// exception [inferenceBackend] documents).
+
+final class ResidentModelKeyProvider
+    extends $FunctionalProvider<String?, String?, String?>
+    with $Provider<String?> {
+  /// The catalog key of the model currently resident in the engine, straight
+  /// from the residency owner (#42). Null while the engine is empty — label
+  /// helpers fall back to the configured artifact then, so a lazy first load
+  /// does not blank the chrome. Under a simulated backend this is always
+  /// null without touching the repository seam: fake labels follow the
+  /// per-chat choice, and label-only widget containers must not need an
+  /// inference repository just to render chrome (the same discipline
+  /// exception [inferenceBackend] documents).
+  const ResidentModelKeyProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'residentModelKeyProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$residentModelKeyHash();
+
+  @$internal
+  @override
+  $ProviderElement<String?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String? create(Ref ref) {
+    return residentModelKey(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String?>(value),
+    );
+  }
+}
+
+String _$residentModelKeyHash() => r'06d40b724654be95583dd2adef25a96f7354b1f3';
+
 @ProviderFor(deviceCapacityProbe)
 const deviceCapacityProbeProvider = DeviceCapacityProbeProvider._();
 
@@ -1084,7 +1151,7 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'0fe753ec45bf7ac5918ad1712f13074e56567507';
+String _$modelControllerHash() => r'2531c7b1fa3078e8cb7deb25e21b3464698df9cb';
 
 abstract class _$ModelController extends $AsyncNotifier<ModelState> {
   FutureOr<ModelState> build();

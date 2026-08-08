@@ -211,23 +211,10 @@ final class FakeModelManagementRepository implements ModelManagementRepository {
   }
 
   @override
-  Future<ModelState> loadRuntime() async {
-    if (!_state.activeModelInstalled) {
-      return _persist(
-        _state.copyWith(
-          runtime: RuntimePhase.failed,
-          failure: 'Install the selected simulated model first.',
-        ),
+  Future<ModelState> recordRuntime(RuntimePhase phase, {String? failure}) =>
+      _persist(
+        failure == null
+            ? _state.copyWith(runtime: phase, clearFailure: true)
+            : _state.copyWith(runtime: phase, failure: failure),
       );
-    }
-    await _persist(
-      _state.copyWith(runtime: RuntimePhase.loading, clearFailure: true),
-    );
-    await Future<void>.delayed(stepDelay * 3);
-    return _persist(_state.copyWith(runtime: RuntimePhase.loaded));
-  }
-
-  @override
-  Future<ModelState> unloadRuntime() =>
-      _persist(_state.copyWith(runtime: RuntimePhase.unloaded));
 }

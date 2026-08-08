@@ -144,8 +144,11 @@ void main() {
       File('${temp.path}/documents/models/test-mlx/$_fileTwo').existsSync(),
       isTrue,
     );
-    // Installed and active: the runtime now loads.
-    expect((await repo.loadRuntime()).runtime, RuntimePhase.loaded);
+    // Installed and active: a reported loaded phase persists.
+    expect(
+      (await repo.recordRuntime(RuntimePhase.loaded)).runtime,
+      RuntimePhase.loaded,
+    );
   });
 
   test('skip-if-valid never re-downloads verified files', () async {
@@ -331,7 +334,10 @@ void main() {
       final repo = repository(activeKey: 'test-mlx');
       await repo.load();
       await repo.download('test-mlx').drain<void>();
-      expect((await repo.loadRuntime()).runtime, RuntimePhase.loaded);
+      expect(
+        (await repo.recordRuntime(RuntimePhase.loaded)).runtime,
+        RuntimePhase.loaded,
+      );
 
       final deleted = await repo.delete('test-mlx');
       expect(deleted.statusOf('test-mlx').phase, ArtifactPhase.notDownloaded);
@@ -342,7 +348,7 @@ void main() {
 
       // Relaunch reconciliation applies the same rule to persisted state.
       await repo.download('test-mlx').drain<void>();
-      await repo.loadRuntime();
+      await repo.recordRuntime(RuntimePhase.loaded);
       Directory(
         '${temp.path}/documents/models/test-mlx',
       ).deleteSync(recursive: true);
@@ -356,7 +362,10 @@ void main() {
     final repo = repository(activeKey: 'test-mlx');
     await repo.load();
     await repo.download('test-mlx').drain<void>();
-    expect((await repo.loadRuntime()).runtime, RuntimePhase.loaded);
+    expect(
+      (await repo.recordRuntime(RuntimePhase.loaded)).runtime,
+      RuntimePhase.loaded,
+    );
 
     // The engine died with the process even though the install still
     // verifies: loaded is a claim about the engine and must reconcile to
@@ -375,17 +384,20 @@ void main() {
     expect(states.last.statusOf('test-mlx').phase, ArtifactPhase.installed);
   });
 
-  test('runtime refuses to load without an installed active model', () async {
-    final unconfigured = repository();
-    await unconfigured.load();
-    final noBackend = await unconfigured.loadRuntime();
-    expect(noBackend.runtime, RuntimePhase.failed);
-    expect(noBackend.failure, contains('build-time opt-in'));
+  test('a recorded failed phase persists with its message', () async {
+    // The refusal decision lives in ModelController since #42 (covered in
+    // controllers_test); the repository just records what it is told.
+    final repo = repository();
+    await repo.load();
+    final failed = await repo.recordRuntime(
+      RuntimePhase.failed,
+      failure: 'Inference is a build-time opt-in; no backend is configured.',
+    );
+    expect(failed.runtime, RuntimePhase.failed);
+    expect(failed.failure, contains('build-time opt-in'));
 
-    final configured = repository(activeKey: 'test-mlx');
-    await configured.load();
-    final notInstalled = await configured.loadRuntime();
-    expect(notInstalled.runtime, RuntimePhase.failed);
-    expect(notInstalled.failure, contains('install the active model'));
+    final cleared = await repo.recordRuntime(RuntimePhase.unloaded);
+    expect(cleared.runtime, RuntimePhase.unloaded);
+    expect(cleared.failure, isNull);
   });
 }

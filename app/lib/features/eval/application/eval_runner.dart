@@ -1,8 +1,8 @@
-import 'package:golem_flutter/broker/hash.dart';
-import 'package:golem_flutter/broker/model_profile.dart';
-import 'package:golem_flutter/broker/runtime.dart';
-
-import 'eval_spec.dart';
+import '../../../broker/runtime.dart';
+import '../../../core/domain/generation_settings.dart';
+import '../../../core/domain/models.dart';
+import '../../../core/repositories/contracts.dart';
+import '../domain/eval_spec.dart';
 
 /// One artifact × engine cell of the evaluation matrix.
 final class EvalCombo {
@@ -48,7 +48,7 @@ final class EvalPromptResult {
   final String? stopReason;
   final String? rawTextHash;
   final int rawTextLength;
-  final BrokerRuntimeMetrics? metrics;
+  final InferenceMetrics? metrics;
   final List<EvalCheckResult> checkResults;
   final String? error;
 
@@ -82,19 +82,33 @@ final class EvalComboResult {
   ];
 }
 
-/// Loads the combo's artifact, runs every prompt through the same broker
-/// path the app uses, and unloads. A failed generation becomes an error row
-/// and the remaining prompts still run; a failed load propagates, because
-/// nothing after it could mean anything.
+/// The single sampling seed a prompt set shares. The harness pins seeds at
+/// repository construction (the app's own seed channel), so a spec mixing
+/// seeds cannot be represented — refuse it loudly instead of mis-recording.
+int uniformEvalSeed(List<EvalPrompt> prompts) {
+  final seeds = prompts.map((prompt) => prompt.seed).toSet();
+  if (seeds.length != 1) {
+    throw StateError(
+      'Eval prompts must share one seed; found ${seeds.join(', ')}.',
+    );
+  }
+  return seeds.single;
+}
+
+/// Loads the combo's artifact and runs every prompt through the app's own
+/// [InferenceRepository] — template rendering, sampling enforcement,
+/// reasoning parsing, and stop policy are exactly what ships (#42). A
+/// failed generation becomes an error row and the remaining prompts still
+/// run; a failed load propagates, because nothing after it could mean
+/// anything.
 Future<EvalComboResult> runEvalCombo({
-  required BrokerRuntime runtime,
+  required InferenceRepository repository,
   required EvalCombo combo,
-  required ModelProfile profile,
   required List<EvalPrompt> prompts,
   void Function(String message)? onProgress,
 }) async {
   final loadWatch = Stopwatch()..start();
-  await runtime.load(engine: combo.engine, modelPath: combo.path);
+  await repository.prepare();
   loadWatch.stop();
   final results = <EvalPromptResult>[];
   for (final prompt in prompts) {
@@ -102,9 +116,9 @@ Future<EvalComboResult> runEvalCombo({
       '[${combo.label} · ${combo.engine.name}] ${prompt.id} '
       '(${results.length + 1}/${prompts.length})',
     );
-    results.add(await _runPrompt(runtime, profile, prompt));
+    results.add(await _runPrompt(repository, prompt));
   }
-  await runtime.unload();
+  await repository.unload();
   return EvalComboResult(
     combo: combo,
     loadSeconds: loadWatch.elapsedMilliseconds / 1000,
@@ -113,58 +127,43 @@ Future<EvalComboResult> runEvalCombo({
 }
 
 Future<EvalPromptResult> _runPrompt(
-  BrokerRuntime runtime,
-  ModelProfile profile,
+  InferenceRepository repository,
   EvalPrompt prompt,
 ) async {
-  final parser = profile.newParser(reasoningEnabled: prompt.reasoningEnabled);
-  final raw = StringBuffer();
   final answer = StringBuffer();
   final reasoning = StringBuffer();
-  BrokerRuntimeMetrics? metrics;
-  String? stopReason;
-
-  void applyDelta(ReasoningStreamDelta delta) {
-    if (delta.resetAnswer) answer.clear();
-    reasoning.write(delta.reasoning);
-    answer.write(delta.answer);
-  }
+  InferenceMetrics? metrics;
+  InferenceStopReason? stopReason;
+  String? rawTextHash;
+  var rawTextLength = 0;
 
   try {
-    final events = runtime.generate(
-      BrokerGenerationRequest(
-        prompt: profile.render(
-          prompt.messages,
-          reasoningEnabled: prompt.reasoningEnabled,
-        ),
-        // Per-prompt sampling overrides pin evidence (the determinism
-        // anchor); everything else evaluates at the profile's shipped
-        // mode-specific defaults, so the report reflects app behavior.
-        sampling: () {
-          final defaults = profile.sampling(
-            reasoningEnabled: prompt.reasoningEnabled,
-          );
-          return BrokerSamplingParameters(
-            maxTokens: prompt.maxTokens ?? defaults.maxTokens,
-            temperature: prompt.temperature ?? defaults.temperature,
-            topP: prompt.topP ?? defaults.topP,
-            seed: prompt.seed,
-            stopSequences: profile.stopSequences,
-            stopTokenIds: profile.stopTokenIds,
-          );
-        }(),
+    final events = repository.generate(
+      context: prompt.messages,
+      reasoningEnabled: prompt.reasoningEnabled,
+      // Per-prompt sampling rides the same sparse-override channel user
+      // settings use; unset fields fall to the profile's shipped
+      // mode-specific defaults, so the report reflects app behavior.
+      overrides: SamplingOverrides(
+        maxTokens: prompt.maxTokens,
+        temperature: prompt.temperature,
+        topP: prompt.topP,
       ),
     );
     await for (final event in events) {
       switch (event) {
-        case BrokerTextDelta():
-          raw.write(event.text);
-          applyDelta(parser.consume(event.text));
-        case BrokerMetricsDelta():
+        case ReasoningDelta():
+          reasoning.write(event.text);
+        case AnswerDelta():
+          answer.write(event.text);
+        case AnswerResetEvent():
+          answer.clear();
+        case MetricsEvent():
           metrics = event.metrics;
-        case BrokerGenerationCompleted():
-          applyDelta(parser.finish());
-          stopReason = event.reason.name;
+        case CompletedEvent():
+          stopReason = event.stopReason;
+          rawTextHash = event.rawTextHash;
+          rawTextLength = event.rawTextLength ?? 0;
       }
     }
   } on Exception catch (error) {
@@ -176,9 +175,9 @@ Future<EvalPromptResult> _runPrompt(
     promptId: prompt.id,
     answer: answerText,
     reasoning: reasoning.toString().trim(),
-    stopReason: stopReason,
-    rawTextHash: fnv1a64(raw.toString()),
-    rawTextLength: raw.length,
+    stopReason: stopReason?.name,
+    rawTextHash: rawTextHash,
+    rawTextLength: rawTextLength,
     metrics: metrics,
     checkResults: [
       for (final check in prompt.checks)
@@ -194,7 +193,7 @@ Future<EvalPromptResult> _runPrompt(
       EvalCheckResult(
         description: 'stopped before the token budget [informational]',
         required: false,
-        passed: stopReason != BrokerStopReason.maxTokens.name,
+        passed: stopReason != InferenceStopReason.maxTokens,
       ),
     ],
   );

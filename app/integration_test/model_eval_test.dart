@@ -2,15 +2,15 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/broker/configured_inference_repository.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 import 'package:integration_test/integration_test.dart';
 
 import 'package:golem_flutter/broker/model_profile.dart';
-
-import 'eval/eval_matrix.dart';
-import 'eval/eval_report.dart';
-import 'eval/eval_runner.dart';
-import 'eval/eval_spec.dart';
+import 'package:golem_flutter/features/eval/application/eval_runner.dart';
+import 'package:golem_flutter/features/eval/data/eval_matrix.dart';
+import 'package:golem_flutter/features/eval/data/eval_report.dart';
+import 'package:golem_flutter/features/eval/domain/eval_spec.dart';
 
 /// The model-evaluation harness: runs the fixed prompt set against every
 /// requested artifact × engine combo on macOS and writes a machine- and
@@ -84,13 +84,28 @@ void main() {
                 'GOLEM_EVAL_TEMPLATE is "$_templateKey"',
           );
         }
+        // The combo runs through the app's own repository (#42): same
+        // template, sampling enforcement, parser, and stop policy that
+        // ship. The adapter is constructed here only so its native
+        // listener can be disposed once the combo is finished.
         final adapter = InfernoRuntimeAdapter.native();
+        final repository = selectInferenceRepository(
+          backend: switch (combo.engine) {
+            BrokerEngine.llamaCpp => 'llama',
+            BrokerEngine.mlx => 'mlx',
+          },
+          modelPath: combo.path,
+          modelProfile: _templateKey,
+          fakeStreamDelay: Duration.zero,
+          documentsDirectory: '',
+          createRuntime: () => adapter,
+          samplingSeed: uniformEvalSeed(defaultEvalPrompts),
+        );
         EvalComboResult result;
         try {
           result = await runEvalCombo(
-            runtime: adapter,
+            repository: repository,
             combo: combo,
-            profile: profile!,
             prompts: defaultEvalPrompts,
             onProgress: debugPrint,
           );

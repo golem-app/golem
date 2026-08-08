@@ -151,8 +151,12 @@ void main() {
       final initial = await repository.load();
       expect(initial.simulated, isTrue);
       expect(initial.activeArtifactKey, 'test-mlx');
-      // The runtime refuses to load before the active artifact is installed.
-      final refused = await repository.loadRuntime();
+      // A refused load records a failed phase with its message (the
+      // refusal decision itself lives in ModelController since #42).
+      final refused = await repository.recordRuntime(
+        RuntimePhase.failed,
+        failure: 'Install the selected simulated model first.',
+      );
       expect(refused.runtime, RuntimePhase.failed);
       expect(refused.failure, contains('simulated model'));
       final subscription = repository.download('test-mlx').listen((_) {});
@@ -166,8 +170,14 @@ void main() {
       final completed = await repository.download('test-mlx').last;
       expect(completed.statusOf('test-mlx').phase, ArtifactPhase.installed);
       expect(completed.statusOf('test-mlx').downloadedBytes, 1200);
-      expect((await repository.loadRuntime()).runtime, RuntimePhase.loaded);
-      expect((await repository.unloadRuntime()).runtime, RuntimePhase.unloaded);
+      expect(
+        (await repository.recordRuntime(RuntimePhase.loaded)).runtime,
+        RuntimePhase.loaded,
+      );
+      expect(
+        (await repository.recordRuntime(RuntimePhase.unloaded)).runtime,
+        RuntimePhase.unloaded,
+      );
       final reloaded = await FakeModelManagementRepository(
         file,
         catalog: _catalog,
@@ -220,7 +230,10 @@ void main() {
     );
     await repository.load();
     await repository.download('test-mlx').drain<void>();
-    expect((await repository.loadRuntime()).runtime, RuntimePhase.loaded);
+    expect(
+      (await repository.recordRuntime(RuntimePhase.loaded)).runtime,
+      RuntimePhase.loaded,
+    );
     final deleted = await repository.delete('test-mlx');
     expect(deleted.statusOf('test-mlx').phase, ArtifactPhase.notDownloaded);
     expect(deleted.runtime, RuntimePhase.unloaded);

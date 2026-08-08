@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 import '../core/app_identity.dart';
 import '../core/domain/inference_backend.dart';
 import '../core/repositories/contracts.dart';
@@ -7,6 +5,7 @@ import '../core/repositories/fake_inference_repository.dart';
 import '../core/services/device_storage.dart';
 import 'backend_policy.dart';
 import 'inferno_inference_repository.dart';
+import 'model_catalog.dart';
 import 'model_profile.dart';
 import 'runtime.dart';
 
@@ -48,8 +47,9 @@ InferenceRepository createConfiguredInferenceRepository({
 );
 
 /// The dart-define values arrive as compile-time constants, so the selection
-/// logic takes them as parameters to stay reachable from tests.
-@visibleForTesting
+/// logic takes them as parameters — reachable from tests, and the
+/// construction surface the eval harness uses to run combos through the
+/// app's own repository (#42).
 InferenceRepository selectInferenceRepository({
   required String backend,
   required String modelPath,
@@ -90,6 +90,11 @@ InferenceRepository selectInferenceRepository({
     engine: engine,
     modelPath: resolvedModelPath,
     profile: profile,
+    initialCatalogKey: activeArtifactKeyFor(
+      backend: backend,
+      modelProfile: modelProfile,
+    ),
+    documentsDirectory: documentsDirectory,
     seed: samplingSeed == 0 ? null : samplingSeed,
   );
 }

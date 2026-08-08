@@ -38,6 +38,7 @@ class Composer extends ConsumerWidget {
       backend: backend,
       catalog: catalog,
       modelKey: modelKey,
+      residentModelKey: ref.watch(residentModelKeyProvider),
     );
     return Padding(
       padding: EdgeInsets.fromLTRB(

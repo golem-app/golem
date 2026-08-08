@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
+
 import '../domain/app_preferences.dart';
 import '../domain/generation_settings.dart';
 import '../domain/model_catalog.dart';
@@ -13,17 +15,28 @@ abstract interface class ChatHistoryRepository {
 }
 
 abstract interface class InferenceRepository {
-  Future<void> prepare();
+  /// Ensures a model is resident: the configuration for [modelKey] when
+  /// given, otherwise this process's initial configuration. Loading is
+  /// single-flight — concurrent callers join the activation in flight
+  /// rather than tripping the engine's single-operation lifecycle.
+  Future<void> prepare({String? modelKey});
   Future<void> unload();
   Future<void> cancel();
+
+  /// The catalog key of the model currently resident in the engine, or
+  /// null when nothing is loaded. This repository is the only component
+  /// that loads or unloads weights (#42), so honesty labels follow this
+  /// signal rather than the boot-resolved configuration.
+  ValueListenable<String?> get residentModelKey;
 
   /// [overrides] are the user's sparse per-model settings; a real backend
   /// merges them onto its profile's recommended defaults, the fake ignores
   /// them (simulated output has no sampling to steer).
   ///
   /// [modelKey] is the conversation's chosen catalog model. The fake
-  /// varies its simulated voice and metrics per key; real engines run
-  /// their configured model regardless until per-chat switching (#20).
+  /// varies its simulated voice and metrics per key; real engines
+  /// activate the requested configuration when it is not already resident,
+  /// then generate. Chat-side switching UX and its guards remain with #20.
   ///
   /// [systemPrompt] is the user's custom system prompt (Advanced mode).
   /// Real backends render it as the leading system turn of the chat
@@ -72,8 +85,11 @@ abstract interface class ModelManagementRepository {
   /// Removes an installed artifact from disk.
   Future<ModelState> delete(String artifactKey);
 
-  Future<ModelState> loadRuntime();
-  Future<ModelState> unloadRuntime();
+  /// Persists the runtime phase the residency owner reports — bookkeeping
+  /// only. Loading and unloading weights is the inference repository's job
+  /// alone (#42); this repository never touches the engine. A null
+  /// [failure] clears any recorded one.
+  Future<ModelState> recordRuntime(RuntimePhase phase, {String? failure});
 
   /// Registers a hand-added catalog entry (Advanced mode's custom
   /// repository). The fake simulates its download like any pinned entry;

@@ -164,6 +164,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           backend: ref.watch(inferenceBackendProvider),
                           catalog: ref.watch(modelCatalogEntriesProvider),
                           modelKey: chat.active?.modelKey,
+                          residentModelKey: ref.watch(residentModelKeyProvider),
                         ),
                         // Contained glass buttons follow the iOS 26
                         // toolbar style; bare nav-bar glyphs read too
