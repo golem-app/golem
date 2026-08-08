@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../core/domain/generation_settings.dart';
 import '../core/domain/models.dart';
 import '../core/repositories/contracts.dart';
+import 'context_window.dart';
 import 'hash.dart';
 import 'model_profile.dart';
 import 'model_runtime_config.dart';
@@ -152,20 +153,31 @@ final class InfernoInferenceRepository implements InferenceRepository {
     final target = _targetFor(modelKey);
     await _ensureResident(target);
     final profile = target.profile;
-    // Both profile templates accept an optional leading system turn; the
-    // custom prompt becomes exactly that, ahead of the conversation.
-    final renderedContext = systemPrompt == null || systemPrompt.isEmpty
-        ? context
-        : [
-            {'role': 'system', 'content': systemPrompt},
-            ...context,
-          ];
     final parser = profile.newParser(reasoningEnabled: reasoningEnabled);
     final (sampling, overridesApplied) = _effectiveSampling(
       profile,
       profile.sampling(reasoningEnabled: reasoningEnabled),
       overrides,
     );
+    // Window the conversation before rendering: newest turns that fit the
+    // budget, typed contextExhausted when even the final turn cannot. The
+    // engines' own budget check stays the backstop for estimation drift.
+    final windowed = windowedContext(
+      context: context,
+      contextLength:
+          sampling.contextLength ??
+          profile.sampling(reasoningEnabled: reasoningEnabled).contextLength,
+      maxTokens: sampling.maxTokens,
+      systemPrompt: systemPrompt,
+    );
+    // Both profile templates accept an optional leading system turn; the
+    // custom prompt becomes exactly that, ahead of the conversation.
+    final renderedContext = systemPrompt == null || systemPrompt.isEmpty
+        ? windowed
+        : [
+            {'role': 'system', 'content': systemPrompt},
+            ...windowed,
+          ];
     BrokerRuntimeMetrics? finalMetrics;
     var sawAnswer = false;
     final probe = seed == null ? null : StringBuffer();
@@ -217,6 +229,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
             throw const BrokerRuntimeException(
               'The response used its whole token budget before reaching an '
               'answer. Try again, or turn reasoning off.',
+              kind: InferenceFailureKind.budgetExhaustedBeforeAnswer,
             );
           }
           yield CompletedEvent(

@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
+import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_model_management_repository.dart';
@@ -93,7 +94,7 @@ void main() {
               systemPrompt: 'Answer briefly.',
             )
             .forEach(failed.add),
-        throwsA(isA<StateError>()),
+        throwsA(isA<InferenceException>()),
       );
       expect(
         failed.whereType<AnswerDelta>().map((event) => event.text).join(),
@@ -130,7 +131,7 @@ void main() {
             reasoningEnabled: false,
           )
           .toList(),
-      throwsA(isA<StateError>()),
+      throwsA(isA<InferenceException>()),
     );
   });
 

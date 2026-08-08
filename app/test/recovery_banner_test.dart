@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
@@ -42,8 +43,12 @@ void main() {
           path: '/',
           builder: (context, state) => const CupertinoPageScaffold(
             child: RecoveryBanner(
-              message: 'The local model is not downloaded on this device yet.',
-              missingModelArtifactKey: 'test-gguf',
+              failure: ChatFailure(
+                kind: ChatFailureKind.missingModel,
+                message:
+                    'The local model is not downloaded on this device yet.',
+                artifactKey: 'test-gguf',
+              ),
             ),
           ),
         ),
@@ -95,12 +100,63 @@ void main() {
       const ProviderScope(
         child: CupertinoApp(
           home: CupertinoPageScaffold(
-            child: RecoveryBanner(message: 'Something failed.'),
+            child: RecoveryBanner(
+              failure: ChatFailure(
+                kind: ChatFailureKind.generic,
+                message: 'Something failed.',
+              ),
+            ),
           ),
         ),
       ),
     );
     expect(find.byKey(const Key('download-active-model')), findsNothing);
     expect(find.byKey(const Key('retry-generation')), findsOneWidget);
+    expect(find.byKey(const Key('start-new-chat')), findsNothing);
+  });
+
+  testWidgets('memory failures keep Retry — retrying can succeed', (
+    tester,
+  ) async {
+    for (final kind in [
+      ChatFailureKind.outOfMemory,
+      ChatFailureKind.insufficientMemory,
+    ]) {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: CupertinoApp(
+            home: CupertinoPageScaffold(
+              child: RecoveryBanner(
+                failure: ChatFailure(kind: kind, message: 'Memory copy.'),
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(find.byKey(const Key('retry-generation')), findsOneWidget);
+      expect(find.byKey(const Key('start-new-chat')), findsNothing);
+    }
+  });
+
+  testWidgets('context exhaustion offers New chat and never Retry', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: CupertinoApp(
+          home: CupertinoPageScaffold(
+            child: RecoveryBanner(
+              failure: ChatFailure(
+                kind: ChatFailureKind.contextExhausted,
+                message: 'This conversation no longer fits.',
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.byKey(const Key('retry-generation')), findsNothing);
+    expect(find.byKey(const Key('start-new-chat')), findsOneWidget);
+    expect(find.byKey(const Key('discard-generation')), findsOneWidget);
   });
 }

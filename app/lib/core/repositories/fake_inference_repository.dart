@@ -87,7 +87,10 @@ final class FakeInferenceRepository implements InferenceRepository {
     if (prompt.contains('[fail]')) {
       if (reasoningEnabled) yield const ReasoningDelta('A partial thought…');
       yield const AnswerDelta('A partial simulated response');
-      throw StateError('Injected simulated generation failure.');
+      throw const InferenceException(
+        InferenceFailureKind.engine,
+        'Injected simulated generation failure.',
+      );
     }
     if (prompt.contains('[oom]')) {
       // Metrics land before the failure so the transcript can render the
@@ -101,9 +104,19 @@ final class FakeInferenceRepository implements InferenceRepository {
           elapsedSeconds: 41 / profile.decodeRate,
         ),
       );
-      throw StateError(
+      throw const InferenceException(
+        InferenceFailureKind.outOfMemory,
         'Ran out of memory at 4,096 tokens. Lower the context length or '
         'pick a smaller model.',
+      );
+    }
+    if (prompt.contains('[context]')) {
+      // The typed failure whose banner action is New chat, never Retry —
+      // provable in QA without filling a real context window.
+      throw const InferenceException(
+        InferenceFailureKind.contextExhausted,
+        'This conversation no longer fits the model’s context window. '
+        'Start a new chat to continue.',
       );
     }
     if (reasoningEnabled) {

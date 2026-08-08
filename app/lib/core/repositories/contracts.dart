@@ -14,6 +14,46 @@ abstract interface class ChatHistoryRepository {
   Future<int> storedBytes();
 }
 
+/// Semantic classification of an inference failure, stable across fake and
+/// real backends so the recovery banner can pick actions without parsing
+/// copy (§19.1). The kinds are recovery categories, not engine codes:
+/// [contextExhausted] is the one failure Retry can never fix.
+enum InferenceFailureKind {
+  /// Engine or runtime failure with no better classification; Retry is a
+  /// reasonable action.
+  engine,
+
+  /// The conversation no longer fits the model's context window; retrying
+  /// the identical request is guaranteed to fail again.
+  contextExhausted,
+
+  /// The engine ran out of memory mid-operation; retrying after freeing
+  /// memory can succeed.
+  outOfMemory,
+
+  /// The load preflight found too little free memory to even try.
+  insufficientMemory,
+
+  /// The whole token budget went to reasoning and no answer surfaced.
+  budgetExhaustedBeforeAnswer,
+}
+
+/// A typed inference failure whose [message] is user-presentable copy;
+/// `toString` is the message so no surface ever shows a package exception
+/// verbatim. Thrown by fake and real repositories alike (§19.2).
+class InferenceException implements Exception {
+  const InferenceException(this.kind, this.message, {this.cause});
+
+  final InferenceFailureKind kind;
+  final String message;
+
+  /// The underlying vendor error, for logs and failure metrics only.
+  final Object? cause;
+
+  @override
+  String toString() => message;
+}
+
 abstract interface class InferenceRepository {
   /// Ensures a model is resident: the configuration for [modelKey] when
   /// given, otherwise this process's initial configuration. Loading is

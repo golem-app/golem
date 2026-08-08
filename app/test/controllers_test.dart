@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
+import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
@@ -608,10 +609,11 @@ void main() {
     final state = container.read(chatControllerProvider).requireValue;
     expect(state.generation, GenerationPhase.failed);
     expect(
-      state.failure,
+      state.failure?.message,
       'Ran out of memory at 4,096 tokens. Lower the context length or '
       'pick a smaller model.',
     );
+    expect(state.failure?.kind, ChatFailureKind.outOfMemory);
   });
 
   FakeModelManagementRepository fakeModels(Directory directory) =>
@@ -682,19 +684,14 @@ void main() {
 
     final state = container.read(chatControllerProvider).requireValue;
     expect(state.generation, GenerationPhase.failed);
-    expect(state.missingModelArtifactKey, 'test-mlx');
-    expect(state.failure, contains('not downloaded'));
+    expect(state.failure?.kind, ChatFailureKind.missingModel);
+    expect(state.failure?.artifactKey, 'test-mlx');
+    expect(state.failure?.message, contains('not downloaded'));
     // The engine was never touched: no hang-like prepare, no cryptic error.
     expect(inference.prepares, 0);
-    // Discard clears the typed marker with the failure.
+    // Discard clears the typed failure whole.
     await container.read(chatControllerProvider.notifier).discardFailure();
-    expect(
-      container
-          .read(chatControllerProvider)
-          .requireValue
-          .missingModelArtifactKey,
-      isNull,
-    );
+    expect(container.read(chatControllerProvider).requireValue.failure, isNull);
   });
 
   test('runtime toggle drives real engine load and unload', () async {
@@ -864,7 +861,7 @@ void main() {
     // The send reached the engine (the probe/sideload contract) instead of
     // dead-ending on a download it never asked for.
     expect(inference.prepares, 1);
-    expect(state.missingModelArtifactKey, isNull);
+    expect(state.failure, isNull);
     expect(state.generation, GenerationPhase.idle);
   });
 
