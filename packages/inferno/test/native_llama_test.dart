@@ -44,6 +44,43 @@ void main() {
     await inferno.unload();
   }, skip: skipReason);
 
+  test('ABI-2 load options apply against the real engine', () async {
+    // Full tensor validation, an explicit thread count, CPU-only layers
+    // (#13), and full-size SWA cache at once: the proof is that load and
+    // a short generation still complete — each option feeds a different
+    // llama.cpp code path that would reject invalid values. The q8_0 KV
+    // knob is deliberately absent: the toy fixture's 4-wide heads cannot
+    // take a 32-block quantized cache (a real model's 256-wide heads
+    // can), so that knob is validated against the pinned Gemma instead.
+    final inferno = Inferno.native();
+    await inferno.load(
+      engine: InfernoEngineKind.llamaCpp,
+      modelPath: modelPath!,
+      options: const InfernoLoadOptions(
+        checkTensors: true,
+        threadCount: 2,
+        gpuLayers: 0,
+        swaFull: true,
+      ),
+    );
+    final events = await inferno
+        .generate(
+          const InfernoGenerationRequest(
+            prompt: 'Hello',
+            sampling: InfernoSamplingParameters(
+              maxTokens: 8,
+              temperature: 0.2,
+              topP: 0.9,
+              seed: 7,
+            ),
+          ),
+        )
+        .toList();
+    expect(events.whereType<InfernoTextDelta>(), isNotEmpty);
+    expect(events.last, isA<InfernoGenerationCompleted>());
+    await inferno.unload();
+  }, skip: skipReason);
+
   test(
     'the runtime survives load, unload, and reload in one process',
     () async {

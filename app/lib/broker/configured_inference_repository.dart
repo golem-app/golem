@@ -44,6 +44,16 @@ InferenceRepository createConfiguredInferenceRepository({
   fakeStreamDelay: fakeStreamDelay,
   documentsDirectory: documentsDirectory,
   createRuntime: InfernoRuntimeAdapter.native,
+  // Measurement and triage hatches (house pattern: dart-defines, no UI —
+  // evidence decides defaults before any knob earns a settings row).
+  loadOptions: const BrokerLoadOptions(
+    checkTensors: bool.fromEnvironment('GOLEM_CHECK_TENSORS'),
+    quantizedKvCache: String.fromEnvironment('GOLEM_KV_CACHE_TYPE') == 'q8_0',
+    threadCount: int.fromEnvironment('GOLEM_THREAD_COUNT') == 0
+        ? null
+        : int.fromEnvironment('GOLEM_THREAD_COUNT'),
+    forceCpu: bool.fromEnvironment('INFERNO_FORCE_CPU'),
+  ),
 );
 
 /// The dart-define values arrive as compile-time constants, so the selection
@@ -58,6 +68,7 @@ InferenceRepository selectInferenceRepository({
   required String documentsDirectory,
   required BrokerRuntime Function() createRuntime,
   required int samplingSeed,
+  BrokerLoadOptions loadOptions = const BrokerLoadOptions(),
 }) {
   if (backend == 'fake') {
     return FakeInferenceRepository(eventDelay: fakeStreamDelay);
@@ -96,6 +107,7 @@ InferenceRepository selectInferenceRepository({
     ),
     documentsDirectory: documentsDirectory,
     availableMemoryBytes: const DeviceStorageChannel().availableMemoryBytes,
+    loadOptions: loadOptions,
     seed: samplingSeed == 0 ? null : samplingSeed,
   );
 }

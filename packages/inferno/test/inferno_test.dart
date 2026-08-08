@@ -14,6 +14,49 @@ void main() {
 
   tearDown(() => temporary.delete(recursive: true));
 
+  test('load options round-trip to the backend with engine defaults', () async {
+    final model = File('${temporary.path}/toy.gguf');
+    await model.writeAsBytes([0x47, 0x47, 0x55, 0x46]);
+    final backend = MockInfernoBackend();
+    final inferno = Inferno.withBackend(backend);
+
+    await inferno.load(engine: InfernoEngineKind.mock, modelPath: model.path);
+    // Defaults are the ABI-2 contract: check_tensors off (upstream
+    // default), f16 KV, engine-default threads and GPU layers, SWA
+    // window-sized.
+    expect(backend.lastLoadOptions?.checkTensors, isFalse);
+    expect(backend.lastLoadOptions?.kvCacheType, InfernoKvCacheType.f16);
+    expect(backend.lastLoadOptions?.threadCount, isNull);
+    expect(backend.lastLoadOptions?.gpuLayers, isNull);
+    expect(backend.lastLoadOptions?.swaFull, isFalse);
+    await inferno.unload();
+
+    await inferno.load(
+      engine: InfernoEngineKind.mock,
+      modelPath: model.path,
+      options: const InfernoLoadOptions(
+        checkTensors: true,
+        kvCacheType: InfernoKvCacheType.q8_0,
+        threadCount: 6,
+        gpuLayers: 0,
+        swaFull: true,
+      ),
+    );
+    expect(backend.lastLoadOptions?.checkTensors, isTrue);
+    expect(backend.lastLoadOptions?.kvCacheType, InfernoKvCacheType.q8_0);
+    expect(backend.lastLoadOptions?.threadCount, 6);
+    expect(backend.lastLoadOptions?.gpuLayers, 0);
+    expect(backend.lastLoadOptions?.swaFull, isTrue);
+    // The JSON shape is the ABI contract both shims parse.
+    expect(backend.lastLoadOptions?.toJson(), {
+      'checkTensors': true,
+      'kvCacheType': 'q8_0',
+      'threadCount': 6,
+      'gpuLayers': 0,
+      'swaFull': true,
+    });
+  });
+
   test('probe, load, stream metrics, and unload form one lifecycle', () async {
     final model = File('${temporary.path}/toy.gguf');
     await model.writeAsBytes([0x47, 0x47, 0x55, 0x46]);

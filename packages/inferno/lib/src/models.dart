@@ -27,6 +27,58 @@ final class InfernoDeviceProbe {
       engines.any((probe) => probe.engine == engine && probe.available);
 }
 
+/// KV-cache element type for engines that support quantized caches.
+/// `f16` is every engine's default; `q8_0` halves KV memory (llama.cpp
+/// quantizes both cache halves and requires flash attention for the value
+/// half; MLX maps it to an 8-bit quantized cache).
+enum InfernoKvCacheType { f16, q8_0 }
+
+/// Load-time engine configuration, sent across the ABI as one JSON payload
+/// alongside the model path (ABI 2). Null fields keep the engine's own
+/// default; engines ignore fields that do not apply to them.
+final class InfernoLoadOptions {
+  const InfernoLoadOptions({
+    this.checkTensors = false,
+    this.kvCacheType = InfernoKvCacheType.f16,
+    this.threadCount,
+    this.gpuLayers,
+    this.swaFull = false,
+  }) : assert(
+         threadCount == null || threadCount > 0,
+         'threadCount must be positive when set',
+       );
+
+  /// Validate every tensor on load. Upstream llama.cpp defaults to false;
+  /// true forces a full page-in of the mmapped weights — a triage tool,
+  /// not a production default.
+  final bool checkTensors;
+
+  final InfernoKvCacheType kvCacheType;
+
+  /// Decode/prefill thread count; null keeps the engine default.
+  final int? threadCount;
+
+  /// GPU offload override for llama.cpp (0 = CPU only, the #13 escape
+  /// hatch); null keeps the build's default (all layers on Metal, none
+  /// elsewhere).
+  final int? gpuLayers;
+
+  /// Size sliding-window-attention layers' KV cache at the full context
+  /// instead of the window. Off by default, matching llama.cpp's own
+  /// tooling: the full-size cache buys only cache-rollback ability that
+  /// per-generate contexts never use, at real KV memory cost on SWA
+  /// models like Gemma.
+  final bool swaFull;
+
+  Map<String, Object?> toJson() => {
+    'checkTensors': checkTensors,
+    'kvCacheType': kvCacheType.name,
+    'threadCount': threadCount,
+    'gpuLayers': gpuLayers,
+    'swaFull': swaFull,
+  };
+}
+
 final class InfernoSamplingParameters {
   const InfernoSamplingParameters({
     this.maxTokens = 512,

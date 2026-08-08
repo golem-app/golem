@@ -274,6 +274,13 @@ Future<List<String>> _targetCmakeArguments(CodeConfig config) async {
       // Inferno is emitted as one native asset. Linking the NDK runtime
       // statically avoids a second, unregistered code asset dependency.
       '-DANDROID_STL=c++_static',
+      // With GGML_NATIVE off (cross-compile), ggml only emits dotprod and
+      // i8mm matmul kernels when the arch is set explicitly; the toolchain
+      // baseline (armv8-a) leaves them off. armv8.2-a+dotprod+i8mm is the
+      // documented device floor (docs/device_floor.md) — 64-bit Android
+      // phones in the app's supported tier all have both.
+      if (config.targetArchitecture == Architecture.arm64)
+        '-DGGML_CPU_ARM_ARCH=armv8.2-a+dotprod+i8mm',
     ];
   }
   if (config.targetOS == OS.iOS) {

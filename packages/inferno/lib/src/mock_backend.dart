@@ -32,13 +32,17 @@ final class MockInfernoBackend implements InfernoBackend {
     ],
   );
 
+  InfernoLoadOptions? lastLoadOptions;
+
   @override
   Future<void> load({
     required InfernoEngineKind engine,
     required String modelPath,
+    InfernoLoadOptions options = const InfernoLoadOptions(),
   }) async {
     if (failLoad case final failure?) throw failure;
     lastModelPath = modelPath;
+    lastLoadOptions = options;
     _loaded = true;
   }
 

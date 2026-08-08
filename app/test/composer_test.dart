@@ -83,14 +83,19 @@ void main() {
           .onPressed,
       isNotNull,
     );
+    // Same-engine alternatives render but stay disabled…
     expect(
       tester
           .widget<CupertinoButton>(
-            find.byKey(const Key('model-picker-qwen35-gguf')),
+            find.byKey(const Key('model-picker-qwen35-mlx')),
           )
           .onPressed,
       isNull,
     );
+    // …while artifacts this build's engine can never load are hidden
+    // outright (#63): no dead multi-gigabyte options.
+    expect(find.byKey(const Key('model-picker-qwen35-gguf')), findsNothing);
+    expect(find.byKey(const Key('model-picker-gemma4-gguf')), findsNothing);
     expect(find.textContaining('Golem is running Gemma 4 E2B'), findsOneWidget);
   });
 

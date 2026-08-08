@@ -24,6 +24,7 @@ final class Inferno {
   Future<void> load({
     required InfernoEngineKind engine,
     required String modelPath,
+    InfernoLoadOptions options = const InfernoLoadOptions(),
   }) async {
     if (_state != _RuntimeState.unloaded) {
       throw InfernoException(
@@ -34,7 +35,11 @@ final class Inferno {
     await _validateModelPath(engine, modelPath);
     _state = _RuntimeState.loading;
     try {
-      await _backend.load(engine: engine, modelPath: modelPath);
+      await _backend.load(
+        engine: engine,
+        modelPath: modelPath,
+        options: options,
+      );
       _state = _RuntimeState.loaded;
     } catch (error) {
       _state = _RuntimeState.unloaded;

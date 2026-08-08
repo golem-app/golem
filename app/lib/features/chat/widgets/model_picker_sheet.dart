@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/chrome/golem_sheet.dart';
+import '../../../core/domain/inference_backend.dart';
 import '../../../core/domain/model_catalog.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
@@ -45,6 +46,20 @@ final class _ModelPickerContent extends ConsumerWidget {
       modelKey: modelKey,
       residentModelKey: ref.watch(residentModelKeyProvider),
     );
+    // Real builds hide artifacts their composed engine can never load
+    // (#63) — the fake keeps the full catalog for its simulated switch.
+    final visible = backend.simulatedInference
+        ? catalog
+        : catalog
+              .where(
+                (entry) => switch (backend.kind) {
+                  InferenceBackendKind.fake => true,
+                  InferenceBackendKind.llama =>
+                    entry.engine == ModelEngine.gguf,
+                  InferenceBackendKind.mlx => entry.engine == ModelEngine.mlx,
+                },
+              )
+              .toList();
     return SafeArea(
       top: false,
       child: Padding(
@@ -64,7 +79,7 @@ final class _ModelPickerContent extends ConsumerWidget {
               style: GolemText.cardTitle,
             ),
             const SizedBox(height: GolemSpace.s4),
-            for (final entry in catalog) ...[
+            for (final entry in visible) ...[
               _ModelRow(
                 entry: entry,
                 selected: entry.key == selected,
