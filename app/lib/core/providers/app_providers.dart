@@ -1086,13 +1086,20 @@ class ModelController extends _$ModelController {
   Future<void> releaseEngineWhileInactive() async {
     if (_busy) return;
     final current = state.value;
-    if (current == null || current.runtime != RuntimePhase.loaded) return;
+    if (current == null) return;
     final chat = ref.read(chatControllerProvider).value;
     if (chat != null && chat.generation != GenerationPhase.idle) return;
     _busy = true;
     try {
-      await ref.read(inferenceRepositoryProvider).unload();
-      if (!ref.mounted) return;
+      final inference = ref.read(inferenceRepositoryProvider);
+      // Residency decides, not the catalog phase: an operator-supplied
+      // GOLEM_MODEL_PATH load is outside the catalog's phase tracking
+      // (reflectEngineLoaded skips it), yet its weights are just as
+      // resident and just as liable to be jetsammed.
+      final loaded = current.runtime == RuntimePhase.loaded;
+      if (!loaded && inference.residentModelKey.value == null) return;
+      await inference.unload();
+      if (!ref.mounted || !loaded) return;
       final value = await ref
           .read(modelManagementRepositoryProvider)
           .recordRuntime(RuntimePhase.unloaded);

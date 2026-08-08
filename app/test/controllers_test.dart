@@ -38,6 +38,7 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   String? lastSystemPrompt;
   int prepares = 0;
   int unloads = 0;
+  String initialResidentKey = 'test-mlx';
   final ValueNotifier<String?> _residentKey = ValueNotifier<String?>(null);
 
   @override
@@ -48,13 +49,16 @@ final class _RecordingInferenceRepository implements InferenceRepository {
     prepares++;
     lastPrepareModelKey = modelKey;
     if (failPrepare) throw StateError('injected prepare failure');
-    if (modelKey != null) _residentKey.value = modelKey;
+    // Mirrors the real repository: a keyless prepare makes the initial
+    // configuration resident, sideloaded path or not.
+    _residentKey.value = modelKey ?? initialResidentKey;
   }
 
   @override
   Future<void> unload() async {
     unloads++;
     if (failUnload) throw StateError('injected unload failure');
+    _residentKey.value = null;
   }
 
   @override
@@ -953,6 +957,50 @@ void main() {
     expect(inference.prepares, 1);
     expect(state.failure, isNull);
     expect(state.generation, GenerationPhase.idle);
+  });
+
+  test('memory pressure releases a sideloaded model too', () async {
+    final directory = Directory.systemTemp.createTempSync('golem-side2-test-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final inference = _RecordingInferenceRepository();
+    final container = ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        inferenceBackendProvider.overrideWithValue(
+          const InferenceBackendConfig(
+            kind: InferenceBackendKind.llama,
+            profileKey: 'gemma4',
+            artifactKey: 'test-mlx',
+            modelPath: '/sideloaded/model.gguf',
+          ),
+        ),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(chatControllerProvider.future);
+    // A sideload is outside the catalog, so the lazy load leaves the
+    // persisted phase at unloaded — while the engine holds the weights.
+    await container.read(chatControllerProvider.notifier).send('Hello');
+    await container.read(modelControllerProvider.future);
+    final models = container.read(modelControllerProvider.notifier);
+    expect(
+      container.read(modelControllerProvider).requireValue.runtime,
+      RuntimePhase.unloaded,
+    );
+
+    await models.releaseEngineWhileInactive();
+    expect(inference.unloads, 1, reason: 'resident weights must be released');
+
+    // And the phase it never claimed is not rewritten on the way out.
+    expect((await fakeModels(directory).load()).runtime, RuntimePhase.unloaded);
+    await models.releaseEngineWhileInactive();
+    expect(inference.unloads, 1, reason: 'nothing resident: a no-op');
   });
 
   test('lazy engine load reflects into the persisted runtime phase', () async {
