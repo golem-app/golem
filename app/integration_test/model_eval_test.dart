@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/configured_inference_repository.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'package:golem_flutter/broker/model_profile.dart';
 import 'package:golem_flutter/features/eval/application/eval_runner.dart';
@@ -39,90 +40,153 @@ const _templateKey = String.fromEnvironment(
   defaultValue: 'gemma4',
 );
 
+/// Device mode (#63): comma-separated catalog keys resolved against the
+/// app's own documents directory, so the eval runs on a phone against the
+/// installed artifacts — no host paths involved:
+///
+/// ```sh
+/// flutter test integration_test/model_eval_test.dart -d <device> \
+///   --flavor qa --dart-define=GOLEM_EVAL_INSTALLED=gemma4-gguf
+/// ```
+const _installed = String.fromEnvironment('GOLEM_EVAL_INSTALLED');
+
+Future<List<EvalCombo>> _installedCombos() async {
+  if (_installed.isEmpty) return const [];
+  return installedEvalCombos(
+    installedDefine: _installed,
+    documentsDirectory: (await getApplicationDocumentsDirectory()).path,
+  );
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  final combos = evalMatrixFromDefines(ggufDefine: _gguf, mlxDefine: _mlx);
+  final defineCombos = evalMatrixFromDefines(
+    ggufDefine: _gguf,
+    mlxDefine: _mlx,
+  );
   // Self-skips when no artifact is requested, so a plain integration-test
   // run (and CI, which never sets the defines) cannot start a model run.
-  if (combos.isEmpty) {
+  if (defineCombos.isEmpty && _installed.isEmpty) {
     test(
       'model evaluation',
       () {},
       skip:
-          'Set GOLEM_EVAL_GGUF (files) and/or GOLEM_EVAL_MLX (directories) '
-          'to comma-separated absolute paths to run the evaluation harness.',
+          'Set GOLEM_EVAL_GGUF/GOLEM_EVAL_MLX (absolute paths) or '
+          'GOLEM_EVAL_INSTALLED (catalog keys) to run the evaluation '
+          'harness.',
     );
     return;
   }
   final results = <EvalComboResult>[];
+  late final List<EvalCombo> combos;
 
-  for (final combo in combos) {
-    test(
-      'evaluates ${combo.label} on ${combo.engine.name}',
-      () async {
-        final profile = modelProfiles[_templateKey];
+  setUpAll(() async {
+    combos = [...defineCombos, ...await _installedCombos()];
+  });
+
+  final installedKeys = _installed
+      .split(',')
+      .where((key) => key.trim().isNotEmpty)
+      .map((key) => key.trim())
+      .toList();
+  for (
+    var index = 0;
+    index < defineCombos.length + installedKeys.length;
+    index++
+  ) {
+    final describe = index < defineCombos.length
+        ? '${defineCombos[index].label} on ${defineCombos[index].engine.name}'
+        : 'installed ${installedKeys[index - defineCombos.length]}';
+    test('evaluates $describe', () async {
+      final combo = combos[index];
+      // A catalog install knows its own family, so it runs under its own
+      // profile; a bare path define does not, so it takes the run's
+      // template.
+      final profileKey = combo.profileKey ?? _templateKey;
+      final profile = modelProfiles[profileKey];
+      expect(
+        profile,
+        isNotNull,
+        reason:
+            'Unknown GOLEM_EVAL_TEMPLATE "$_templateKey"; '
+            'known: ${modelProfiles.keys.join(', ')}',
+      );
+      // A pin-cited artifact evaluated under another family's profile
+      // would produce numbers that describe nothing — refuse to record
+      // them. Unpinned artifacts cannot be family-checked and pass.
+      final pinnedFamily = profileKeyForPinnedRepository(
+        describeArtifact(combo).pinnedRepository,
+      );
+      if (pinnedFamily != null) {
         expect(
-          profile,
-          isNotNull,
+          pinnedFamily,
+          profileKey,
           reason:
-              'Unknown GOLEM_EVAL_TEMPLATE "$_templateKey"; '
-              'known: ${modelProfiles.keys.join(', ')}',
+              '${combo.label} is a pinned $pinnedFamily artifact but '
+              'it would run under the "$profileKey" profile',
         );
-        // A pin-cited artifact evaluated under another family's profile
-        // would produce numbers that describe nothing — refuse to record
-        // them. Unpinned artifacts cannot be family-checked and pass.
-        final pinnedFamily = profileKeyForPinnedRepository(
-          describeArtifact(combo).pinnedRepository,
+      }
+      // The combo runs through the app's own repository (#42): same
+      // template, sampling enforcement, parser, and stop policy that
+      // ship. The adapter is constructed here only so its native
+      // listener can be disposed once the combo is finished.
+      final adapter = InfernoRuntimeAdapter.native();
+      final repository = selectInferenceRepository(
+        backend: switch (combo.engine) {
+          BrokerEngine.llamaCpp => 'llama',
+          BrokerEngine.mlx => 'mlx',
+        },
+        modelPath: combo.path,
+        modelProfile: profileKey,
+        fakeStreamDelay: Duration.zero,
+        documentsDirectory: '',
+        createRuntime: () => adapter,
+        samplingSeed: uniformEvalSeed(defaultEvalPrompts),
+      );
+      EvalComboResult result;
+      try {
+        result = await runEvalCombo(
+          repository: repository,
+          combo: combo,
+          prompts: defaultEvalPrompts,
+          onProgress: debugPrint,
         );
-        if (pinnedFamily != null) {
-          expect(
-            pinnedFamily,
-            _templateKey,
-            reason:
-                '${combo.label} is a pinned $pinnedFamily artifact but '
-                'GOLEM_EVAL_TEMPLATE is "$_templateKey"',
-          );
-        }
-        // The combo runs through the app's own repository (#42): same
-        // template, sampling enforcement, parser, and stop policy that
-        // ship. The adapter is constructed here only so its native
-        // listener can be disposed once the combo is finished.
-        final adapter = InfernoRuntimeAdapter.native();
-        final repository = selectInferenceRepository(
-          backend: switch (combo.engine) {
-            BrokerEngine.llamaCpp => 'llama',
-            BrokerEngine.mlx => 'mlx',
-          },
-          modelPath: combo.path,
-          modelProfile: _templateKey,
-          fakeStreamDelay: Duration.zero,
-          documentsDirectory: '',
-          createRuntime: () => adapter,
-          samplingSeed: uniformEvalSeed(defaultEvalPrompts),
+      } finally {
+        await adapter.dispose();
+      }
+      // Record before asserting so a failing combo still lands in the
+      // report — failures are exactly the evidence worth keeping.
+      results.add(result);
+      // Greppable per-prompt evidence for device runs, where the file
+      // report lands inside the app sandbox: one line per prompt plus a
+      // summary, same key=value grammar as INFERNO_METRICS.
+      for (final row in result.promptResults) {
+        debugPrint(
+          'EVAL_RESULT combo=${combo.label}'
+          ' profile=$profileKey'
+          ' id=${row.promptId}'
+          ' pass=${row.passed}'
+          ' stopReason=${row.stopReason}'
+          ' decodeTokensPerSecond=${row.metrics?.decodeTokensPerSecond.toStringAsFixed(2)}'
+          ' promptTokenCount=${row.metrics?.promptTokenCount}'
+          ' peakPhysicalFootprintBytes=${row.metrics?.peakPhysicalFootprintBytes}'
+          ' fnv1a64=${row.rawTextHash}',
         );
-        EvalComboResult result;
-        try {
-          result = await runEvalCombo(
-            repository: repository,
-            combo: combo,
-            prompts: defaultEvalPrompts,
-            onProgress: debugPrint,
-          );
-        } finally {
-          await adapter.dispose();
-        }
-        // Record before asserting so a failing combo still lands in the
-        // report — failures are exactly the evidence worth keeping.
-        results.add(result);
-        expect(
-          result.failures,
-          isEmpty,
-          reason: 'Required checks failed:\n${result.failures.join('\n')}',
-        );
-      },
-      timeout: const Timeout(Duration(minutes: 20)),
-    );
+      }
+      debugPrint(
+        'EVAL_SUMMARY combo=${combo.label}'
+        ' profile=$profileKey'
+        ' total=${result.promptResults.length}'
+        ' passed=${result.promptResults.where((row) => row.passed).length}'
+        ' loadSeconds=${result.loadSeconds.toStringAsFixed(2)}',
+      );
+      expect(
+        result.failures,
+        isEmpty,
+        reason: 'Required checks failed:\n${result.failures.join('\n')}',
+      );
+    }, timeout: const Timeout(Duration(minutes: 20)));
   }
 
   tearDownAll(() {

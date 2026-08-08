@@ -121,8 +121,35 @@ final class BrokerRuntimeException extends InferenceException {
   }) : super(kind, message);
 }
 
+/// Load-time engine configuration, mirrored from the Inferno options so
+/// application code stays package-blind. Defaults are the engine
+/// defaults; every knob exists for measurement and triage, not UI.
+final class BrokerLoadOptions {
+  const BrokerLoadOptions({
+    this.checkTensors = false,
+    this.quantizedKvCache = false,
+    this.threadCount,
+    this.forceCpu = false,
+  });
+
+  final bool checkTensors;
+
+  /// q8_0 KV cache on llama.cpp (forces flash attention), 8-bit quantized
+  /// cache on MLX.
+  final bool quantizedKvCache;
+
+  final int? threadCount;
+
+  /// The #13 escape hatch: keep every layer off the GPU on Metal builds.
+  final bool forceCpu;
+}
+
 abstract interface class BrokerRuntime {
-  Future<void> load({required BrokerEngine engine, required String modelPath});
+  Future<void> load({
+    required BrokerEngine engine,
+    required String modelPath,
+    BrokerLoadOptions options = const BrokerLoadOptions(),
+  });
   Future<void> unload();
   Stream<BrokerRuntimeEvent> generate(BrokerGenerationRequest request);
   Future<void> cancel();
@@ -141,6 +168,7 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
   Future<void> load({
     required BrokerEngine engine,
     required String modelPath,
+    BrokerLoadOptions options = const BrokerLoadOptions(),
   }) => _translating(
     () => _inferno.load(
       engine: switch (engine) {
@@ -148,6 +176,14 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
         BrokerEngine.mlx => InfernoEngineKind.mlx,
       },
       modelPath: modelPath,
+      options: InfernoLoadOptions(
+        checkTensors: options.checkTensors,
+        kvCacheType: options.quantizedKvCache
+            ? InfernoKvCacheType.q8_0
+            : InfernoKvCacheType.f16,
+        threadCount: options.threadCount,
+        gpuLayers: options.forceCpu ? 0 : null,
+      ),
     ),
   );
 
@@ -251,6 +287,11 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
           'The model ran out of memory while responding. Close other '
           'apps and try again, or lower the context length in Settings.',
           kind: InferenceFailureKind.outOfMemory,
+          cause: error,
+        ),
+        InfernoErrorCode.unsupportedDevice => BrokerRuntimeException(
+          'This device’s processor is missing an instruction set the '
+          'local engine needs, so it cannot run models here.',
           cause: error,
         ),
         InfernoErrorCode.cancelled => BrokerRuntimeException(

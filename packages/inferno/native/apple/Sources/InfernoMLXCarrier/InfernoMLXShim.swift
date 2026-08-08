@@ -7,7 +7,7 @@ import MLXLMCommon
 import MLXLLM
 import Tokenizers
 
-private let infernoMlxABI: UInt32 = 1
+private let infernoMlxABI: UInt32 = 2
 
 private enum EventKind {
     static let textDelta: Int32 = 1
@@ -110,6 +110,11 @@ private final class InfernoMlxEngine: @unchecked Sendable {
     private var busy = false
     private var operation: Task<Void, Never>?
     private var model: ModelContainer?
+
+    /// KV-cache bits from the ABI-2 load options (nil = unquantized).
+    /// Written by the load worker before the container publishes, read by
+    /// generate when building GenerateParameters.
+    var kvBits: Int?
 
     func start(
         _ body: @escaping @Sendable (InfernoMlxEngine) async -> Void
@@ -329,7 +334,20 @@ public func infernoMlxEngineLoad(
           let callback,
           engine.container() == nil
     else { return -1 }
-    let path = String(cString: modelPath)
+    // ABI 2: one JSON payload carries the path and the load options.
+    // llama-only fields (checkTensors, threadCount, gpuLayers, swaFull)
+    // are ignored here; kvCacheType q8_0 maps to an 8-bit quantized KV
+    // cache at generate time.
+    let encoded = String(cString: modelPath)
+    let path: String
+    if let data = encoded.data(using: .utf8),
+       let request = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+       let modelPathValue = request["modelPath"] as? String {
+        path = modelPathValue
+        engine.kvBits = (request["kvCacheType"] as? String) == "q8_0" ? 8 : nil
+    } else {
+        return -1
+    }
     let sink = EventSink(
         operationID: operationID,
         callback: callback,
@@ -474,7 +492,7 @@ public func infernoMlxEngineGenerate(
                 // Tokens stay 1-D: the iterator adds the batch dimension,
                 // and a pre-batched array reaches the model double-batched.
                 let input = LMInput(tokens: MLXArray(promptTokenIDs))
-                let parameters = GenerateParameters(
+                var parameters = GenerateParameters(
                     maxTokens: request.maxTokens,
                     temperature: request.temperature,
                     topP: request.topP,
@@ -482,6 +500,9 @@ public func infernoMlxEngineGenerate(
                     topK: request.topK ?? 0,
                     seed: request.seed.map { UInt64(bitPattern: $0) }
                 )
+                // ABI-2 load option: an 8-bit quantized KV cache roughly
+                // quarters cache memory versus fp16 on long generations.
+                parameters.kvBits = engine.kvBits
                 var generationContext = context
                 generationContext.configuration.eosTokenIds = Set(request.stopTokenIds)
                 generationContext.configuration.stopStrings = []

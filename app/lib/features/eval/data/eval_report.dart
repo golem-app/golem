@@ -136,9 +136,11 @@ final class EvalRunReport {
   final DateTime createdAt;
   final String host;
 
-  /// The profile is an experimental variable — mode-specific sampling alone
-  /// swings a run between an answer and a budget-exhausted think loop — so
-  /// the evidence must record it.
+  /// The run's template profile — an experimental variable, since
+  /// mode-specific sampling alone swings a run between an answer and a
+  /// budget-exhausted think loop, so the evidence must record it. Combos
+  /// that know their own family (catalog installs) record theirs per
+  /// result and this one only covers the rest.
   final ModelProfile profile;
   final List<EvalComboResult> results;
   final Map<String, EvalArtifactRecord> artifacts;
@@ -187,6 +189,7 @@ final class EvalRunReport {
         {
           'artifact': combo.combo.label,
           'engine': combo.combo.engine.name,
+          'profile': combo.combo.profileKey ?? profile.key,
           'loadSeconds': combo.loadSeconds,
           'passed': combo.failures.isEmpty,
           'prompts': [
@@ -239,7 +242,7 @@ final class EvalRunReport {
       ..writeln()
       ..writeln('- Host: $host')
       ..writeln(
-        '- Profile: `${profile.key}` — '
+        '- Template profile: `${profile.key}` — '
         'thinking ${_sampling(profile.sampling(reasoningEnabled: true))}, '
         'direct ${_sampling(profile.sampling(reasoningEnabled: false))}; '
         'stop `${profile.stopSequences.join(' ')}` '
@@ -266,6 +269,7 @@ final class EvalRunReport {
           '${artifact?.sizeBytes == null ? '' : ' (${_gib(artifact!.sizeBytes!)} GiB)'}'
           ' — ${artifact?.pinSummary ?? 'unknown'}',
         )
+        ..writeln('- Profile: `${combo.combo.profileKey ?? profile.key}`')
         ..writeln('- Load: ${combo.loadSeconds.toStringAsFixed(1)} s')
         ..writeln(
           '- Result: ${combo.failures.isEmpty ? 'PASS' : 'FAIL'}'

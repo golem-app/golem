@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/app_version.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
+import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
@@ -213,6 +214,79 @@ void main() {
       scrollable: scrollable,
     );
     expect(find.text('tiny-model-GGUF'), findsOneWidget);
+  }, variant: iosChrome);
+
+  testWidgets('a llama build hides MLX cards it can never load', (
+    tester,
+  ) async {
+    // Real llama-only builds must not offer multi-gigabyte MLX downloads
+    // that `auto` can never load (#63) — the cards disappear entirely.
+    await pumpWithRepositories(
+      tester,
+      backend: const InferenceBackendConfig(
+        kind: InferenceBackendKind.llama,
+        profileKey: 'gemma4',
+        artifactKey: 'gemma4-gguf',
+        modelPath: 'documents:models/gemma4-gguf/x.gguf',
+        modelPathFromCatalog: true,
+      ),
+      model: const ModelState(),
+      child: const ModelsScreen(),
+    );
+    expect(find.byKey(const Key('model-card-gemma4-gguf')), findsOneWidget);
+    expect(find.byKey(const Key('model-card-gemma4-mlx')), findsNothing);
+    expect(find.byKey(const Key('model-card-qwen35-mlx')), findsNothing);
+
+    // An already-installed MLX leftover stays visible for deletion.
+    await pumpWithRepositories(
+      tester,
+      backend: const InferenceBackendConfig(
+        kind: InferenceBackendKind.llama,
+        profileKey: 'gemma4',
+        artifactKey: 'gemma4-gguf',
+        modelPath: 'documents:models/gemma4-gguf/x.gguf',
+        modelPathFromCatalog: true,
+      ),
+      model: const ModelState(
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(
+            phase: ArtifactPhase.installed,
+            downloadedBytes: 100,
+          ),
+        },
+      ),
+      child: const ModelsScreen(),
+    );
+    expect(find.byKey(const Key('model-card-gemma4-mlx')), findsOneWidget);
+  }, variant: iosChrome);
+
+  testWidgets('the fake backend keeps the whole catalog visible', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      model: const ModelState(simulated: true),
+      child: const ModelsScreen(),
+    );
+    for (final key in const [
+      'gemma4-mlx',
+      'gemma4-gguf',
+      'qwen35-mlx',
+      'qwen35-gguf',
+    ]) {
+      final scrollable = find
+          .descendant(
+            of: find.byKey(const Key('models-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.byKey(Key('model-card-$key')),
+        240,
+        scrollable: scrollable,
+      );
+      expect(find.byKey(Key('model-card-$key')), findsOneWidget);
+    }
   }, variant: iosChrome);
 
   testWidgets('a real download backend keeps custom repositories inert', (

@@ -25,11 +25,17 @@ final class _RecordingRuntime implements BrokerRuntime {
   int loads = 0;
   int cancels = 0;
 
+  BrokerLoadOptions? lastLoadOptions;
+
   @override
   Future<void> load({
     required BrokerEngine engine,
     required String modelPath,
-  }) async => loads++;
+    BrokerLoadOptions options = const BrokerLoadOptions(),
+  }) async {
+    loads++;
+    lastLoadOptions = options;
+  }
 
   @override
   Future<void> unload() async {}
@@ -81,6 +87,7 @@ final class _SlowLoadRuntime extends _RecordingRuntime {
   Future<void> load({
     required BrokerEngine engine,
     required String modelPath,
+    BrokerLoadOptions options = const BrokerLoadOptions(),
   }) async {
     loads++;
     await loading.future;
@@ -686,6 +693,9 @@ void main() {
       InfernoErrorCode.outOfMemory:
           'The model ran out of memory while responding. Close other '
           'apps and try again, or lower the context length in Settings.',
+      InfernoErrorCode.unsupportedDevice:
+          'This device’s processor is missing an instruction set the '
+          'local engine needs, so it cannot run models here.',
       InfernoErrorCode.cancelled: 'Generation was cancelled.',
       InfernoErrorCode.nativeUnavailable:
           'The local inference runtime hit an internal error.',
@@ -903,6 +913,107 @@ void main() {
     });
   });
 
+  group('load options (#63)', () {
+    test('defaults reach the runtime as engine defaults', () async {
+      final runtime = _RecordingRuntime();
+      final repository = InfernoInferenceRepository(
+        runtime,
+        engine: BrokerEngine.llamaCpp,
+        profile: const Gemma4Profile(),
+        modelPath: '/local/model.gguf',
+      );
+      await repository.prepare();
+      expect(runtime.lastLoadOptions?.checkTensors, isFalse);
+      expect(runtime.lastLoadOptions?.quantizedKvCache, isFalse);
+      expect(runtime.lastLoadOptions?.threadCount, isNull);
+      expect(runtime.lastLoadOptions?.forceCpu, isFalse);
+    });
+
+    test('configured knobs ride every load this repository performs', () async {
+      final runtime = _RecordingRuntime();
+      final repository = InfernoInferenceRepository(
+        runtime,
+        engine: BrokerEngine.llamaCpp,
+        profile: const Gemma4Profile(),
+        modelPath: '/local/model.gguf',
+        loadOptions: const BrokerLoadOptions(
+          checkTensors: true,
+          quantizedKvCache: true,
+          threadCount: 6,
+          forceCpu: true,
+        ),
+      );
+      await repository.prepare();
+      expect(runtime.lastLoadOptions?.checkTensors, isTrue);
+      expect(runtime.lastLoadOptions?.quantizedKvCache, isTrue);
+      expect(runtime.lastLoadOptions?.threadCount, 6);
+      expect(runtime.lastLoadOptions?.forceCpu, isTrue);
+    });
+
+    test('the adapter maps broker knobs onto Inferno load options', () async {
+      final directory = Directory.systemTemp.createTempSync('golem-opts-');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final file = File('${directory.path}/model.gguf')
+        ..writeAsStringSync('stub');
+      final backend = MockInfernoBackend();
+      final adapter = InfernoRuntimeAdapter(Inferno.withBackend(backend));
+      await adapter.load(
+        engine: BrokerEngine.llamaCpp,
+        modelPath: file.path,
+        options: const BrokerLoadOptions(
+          checkTensors: true,
+          quantizedKvCache: true,
+          threadCount: 4,
+          forceCpu: true,
+        ),
+      );
+      expect(backend.lastLoadOptions?.checkTensors, isTrue);
+      expect(backend.lastLoadOptions?.kvCacheType, InfernoKvCacheType.q8_0);
+      expect(backend.lastLoadOptions?.threadCount, 4);
+      expect(backend.lastLoadOptions?.gpuLayers, 0, reason: 'forceCpu (#13)');
+    });
+  });
+
+  test('failures leave an INFERNO_FAILURE line', () async {
+    final lines = <String>[];
+    final original = debugPrint;
+    debugPrint = (String? message, {int? wrapWidth}) {
+      if (message != null) lines.add(message);
+    };
+    addTearDown(() => debugPrint = original);
+
+    final repository = InfernoInferenceRepository(
+      _RecordingRuntime(),
+      engine: BrokerEngine.llamaCpp,
+      profile: const Gemma4Profile(),
+      modelPath: '/local/model.gguf',
+    );
+    await repository.prepare();
+    await expectLater(
+      repository
+          .generate(
+            context: [
+              {'role': 'user', 'content': 'x' * 100000},
+            ],
+            reasoningEnabled: false,
+          )
+          .drain<void>(),
+      throwsA(isA<InferenceException>()),
+    );
+    final line = lines.singleWhere(
+      (entry) => entry.startsWith('INFERNO_FAILURE'),
+    );
+    // Same key=value grammar as INFERNO_METRICS: greppable evidence for
+    // paths that never reach a completion event.
+    expect(line, contains(' engine=llamaCpp'));
+    expect(line, contains(' phase=generate'));
+    expect(line, contains(' code=contextExhausted'));
+    expect(line, contains(' promptChars=100000'));
+    expect(line, contains(' contextLength=8192'));
+    expect(line, contains(' maxTokens=2048'));
+    expect(line, contains(' windowedMessages=0'));
+  });
+
   group('memory preflight (#62)', () {
     InfernoInferenceRepository buildRepository(
       _ResidencyRuntime runtime, {
@@ -995,6 +1106,7 @@ final class _ResidencyRuntime implements BrokerRuntime {
   Future<void> load({
     required BrokerEngine engine,
     required String modelPath,
+    BrokerLoadOptions options = const BrokerLoadOptions(),
   }) async {
     if (gate != null) await gate!.future;
     if (failNextLoad) {

@@ -25,6 +25,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
     this.resolveConfig = resolveModelRuntimeConfig,
     this.availableMemoryBytes,
     this.modelSizeBytes = _modelSizeOnDisk,
+    this.loadOptions = const BrokerLoadOptions(),
     this.seed,
   }) : _initial = _Target(
          catalogKey: initialCatalogKey,
@@ -46,6 +47,9 @@ final class InfernoInferenceRepository implements InferenceRepository {
   /// Size of the artifact at a resolved path; null skips the preflight.
   final Future<int?> Function(String path) modelSizeBytes;
 
+  /// Engine knobs applied to every load this repository performs.
+  final BrokerLoadOptions loadOptions;
+
   /// Headroom the preflight demands beyond the weights themselves: KV
   /// cache (low hundreds of MB at the 8192 budget per ADR 0003) plus
   /// runtime overhead. Deliberately conservative-but-modest; the typed
@@ -66,6 +70,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
   _Target? _resident;
   Future<void>? _activating;
   String? _activatingKey;
+  int? _lastAvailableReading;
   final ValueNotifier<String?> _residentKey = ValueNotifier<String?>(null);
 
   @override
@@ -138,8 +143,22 @@ final class InfernoInferenceRepository implements InferenceRepository {
         _residentKey.value = null;
       }
       final path = _resolvePath(target.modelPath);
-      await _preflightMemory(path);
-      await _runtime.load(engine: target.engine, modelPath: path);
+      try {
+        await _preflightMemory(path);
+      } catch (error) {
+        _logFailure(target.engine, phase: 'preflight', error: error);
+        rethrow;
+      }
+      try {
+        await _runtime.load(
+          engine: target.engine,
+          modelPath: path,
+          options: loadOptions,
+        );
+      } catch (error) {
+        _logFailure(target.engine, phase: 'load', error: error);
+        rethrow;
+      }
       _resident = target;
       _residentKey.value = target.catalogKey;
     }();
@@ -173,6 +192,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
     } catch (_) {
       return;
     }
+    _lastAvailableReading = available;
     if (available == null || required == null) return;
     if (available < required + loadHeadroomBytes) {
       throw const InferenceException(
@@ -223,17 +243,34 @@ final class InfernoInferenceRepository implements InferenceRepository {
       profile.sampling(reasoningEnabled: reasoningEnabled),
       overrides,
     );
+    final promptChars = context.fold<int>(
+      0,
+      (sum, message) => sum + (message['content']?.length ?? 0),
+    );
     // Window the conversation before rendering: newest turns that fit the
     // budget, typed contextExhausted when even the final turn cannot. The
     // engines' own budget check stays the backstop for estimation drift.
-    final windowed = windowedContext(
-      context: context,
-      contextLength:
-          sampling.contextLength ??
-          profile.sampling(reasoningEnabled: reasoningEnabled).contextLength,
-      maxTokens: sampling.maxTokens,
-      systemPrompt: systemPrompt,
-    );
+    final List<Map<String, String>> windowed;
+    try {
+      windowed = windowedContext(
+        context: context,
+        contextLength:
+            sampling.contextLength ??
+            profile.sampling(reasoningEnabled: reasoningEnabled).contextLength,
+        maxTokens: sampling.maxTokens,
+        systemPrompt: systemPrompt,
+      );
+    } catch (error) {
+      _logFailure(
+        target.engine,
+        phase: 'generate',
+        error: error,
+        sampling: sampling,
+        promptChars: promptChars,
+        windowedMessages: 0,
+      );
+      rethrow;
+    }
     // Both profile templates accept an optional leading system turn; the
     // custom prompt becomes exactly that, ahead of the conversation.
     final renderedContext = systemPrompt == null || systemPrompt.isEmpty
@@ -245,63 +282,77 @@ final class InfernoInferenceRepository implements InferenceRepository {
     BrokerRuntimeMetrics? finalMetrics;
     var sawAnswer = false;
     final probe = seed == null ? null : StringBuffer();
-    await for (final event in _runtime.generate(
-      BrokerGenerationRequest(
-        prompt: profile.render(
-          renderedContext,
-          reasoningEnabled: reasoningEnabled,
+    try {
+      await for (final event in _runtime.generate(
+        BrokerGenerationRequest(
+          prompt: profile.render(
+            renderedContext,
+            reasoningEnabled: reasoningEnabled,
+          ),
+          sampling: sampling,
         ),
-        sampling: sampling,
-      ),
-    )) {
-      switch (event) {
-        case BrokerTextDelta():
-          probe?.write(event.text);
-          for (final domainEvent in _domainEvents(parser.consume(event.text))) {
-            if (domainEvent is AnswerDelta) sawAnswer = true;
-            if (domainEvent is AnswerResetEvent) sawAnswer = false;
-            yield domainEvent;
-          }
-        case BrokerMetricsDelta():
-          final metrics = event.metrics;
-          finalMetrics = metrics;
-          yield MetricsEvent(
-            InferenceMetrics(
-              promptTokensPerSecond: metrics.promptTokensPerSecond,
-              decodeTokensPerSecond: metrics.decodeTokensPerSecond,
-              tokenCount: metrics.generatedTokenCount,
-              elapsedSeconds: metrics.elapsedSeconds,
-              promptTokenCount: metrics.promptTokenCount,
-              timeToFirstTokenSeconds: metrics.timeToFirstTokenSeconds,
-              peakPhysicalFootprintBytes: metrics.peakPhysicalFootprintBytes,
-            ),
-          );
-        case BrokerGenerationCompleted():
-          _logMetrics(
-            target.engine,
-            finalMetrics,
-            event.reason,
-            sampling,
-            overridesApplied,
-          );
-          if (probe != null) _logProbe(target.engine, probe.toString());
-          for (final domainEvent in _domainEvents(parser.finish())) {
-            if (domainEvent is AnswerDelta) sawAnswer = true;
-            yield domainEvent;
-          }
-          if (event.reason == BrokerStopReason.maxTokens && !sawAnswer) {
-            throw const BrokerRuntimeException(
-              'The response used its whole token budget before reaching an '
-              'answer. Try again, or turn reasoning off.',
-              kind: InferenceFailureKind.budgetExhaustedBeforeAnswer,
+      )) {
+        switch (event) {
+          case BrokerTextDelta():
+            probe?.write(event.text);
+            for (final domainEvent in _domainEvents(
+              parser.consume(event.text),
+            )) {
+              if (domainEvent is AnswerDelta) sawAnswer = true;
+              if (domainEvent is AnswerResetEvent) sawAnswer = false;
+              yield domainEvent;
+            }
+          case BrokerMetricsDelta():
+            final metrics = event.metrics;
+            finalMetrics = metrics;
+            yield MetricsEvent(
+              InferenceMetrics(
+                promptTokensPerSecond: metrics.promptTokensPerSecond,
+                decodeTokensPerSecond: metrics.decodeTokensPerSecond,
+                tokenCount: metrics.generatedTokenCount,
+                elapsedSeconds: metrics.elapsedSeconds,
+                promptTokenCount: metrics.promptTokenCount,
+                timeToFirstTokenSeconds: metrics.timeToFirstTokenSeconds,
+                peakPhysicalFootprintBytes: metrics.peakPhysicalFootprintBytes,
+              ),
             );
-          }
-          yield CompletedEvent(
-            stopReason: _stopReason(event.reason),
-            rawTextHash: probe == null ? null : fnv1a64(probe.toString()),
-            rawTextLength: probe?.length,
-          );
+          case BrokerGenerationCompleted():
+            _logMetrics(
+              target.engine,
+              finalMetrics,
+              event.reason,
+              sampling,
+              overridesApplied,
+            );
+            if (probe != null) _logProbe(target.engine, probe.toString());
+            for (final domainEvent in _domainEvents(parser.finish())) {
+              if (domainEvent is AnswerDelta) sawAnswer = true;
+              yield domainEvent;
+            }
+            if (event.reason == BrokerStopReason.maxTokens && !sawAnswer) {
+              throw const BrokerRuntimeException(
+                'The response used its whole token budget before reaching an '
+                'answer. Try again, or turn reasoning off.',
+                kind: InferenceFailureKind.budgetExhaustedBeforeAnswer,
+              );
+            }
+            yield CompletedEvent(
+              stopReason: _stopReason(event.reason),
+              rawTextHash: probe == null ? null : fnv1a64(probe.toString()),
+              rawTextLength: probe?.length,
+            );
+        }
       }
+    } catch (error) {
+      _logFailure(
+        target.engine,
+        phase: 'generate',
+        error: error,
+        sampling: sampling,
+        promptChars: promptChars,
+        windowedMessages: windowed.length,
+      );
+      rethrow;
     }
   }
 
@@ -373,6 +424,31 @@ final class InfernoInferenceRepository implements InferenceRepository {
       ' contextLength=${sampling.contextLength}'
       ' seed=${sampling.seed}'
       ' overridesApplied=$overridesApplied',
+    );
+  }
+
+  /// One greppable line per failure — the counterpart of INFERNO_METRICS
+  /// for paths that never reach a completion event, so failed loads and
+  /// generations leave evidence too (#63). Same space-separated key=value
+  /// grammar; user copy never rides here, only classification.
+  void _logFailure(
+    BrokerEngine engine, {
+    required String phase,
+    required Object error,
+    BrokerSamplingParameters? sampling,
+    int? promptChars,
+    int? windowedMessages,
+  }) {
+    final code = error is InferenceException ? error.kind.name : 'unknown';
+    debugPrint(
+      'INFERNO_FAILURE engine=${engine.name}'
+      ' phase=$phase'
+      ' code=$code'
+      ' promptChars=$promptChars'
+      ' contextLength=${sampling?.contextLength}'
+      ' maxTokens=${sampling?.maxTokens}'
+      ' windowedMessages=$windowedMessages'
+      ' availableMemoryBytes=$_lastAvailableReading',
     );
   }
 

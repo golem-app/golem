@@ -7,6 +7,7 @@ abstract interface class InfernoBackend {
   Future<void> load({
     required InfernoEngineKind engine,
     required String modelPath,
+    InfernoLoadOptions options = const InfernoLoadOptions(),
   });
 
   Future<void> unload();

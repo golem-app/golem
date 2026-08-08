@@ -7,6 +7,7 @@ import '../../core/chrome/golem_button.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_toast.dart';
 import '../../core/domain/app_preferences.dart';
+import '../../core/domain/inference_backend.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
@@ -78,9 +79,22 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
         .where((entry) => entry.value.phase == ArtifactPhase.downloading)
         .map((entry) => entry.key)
         .firstOrNull;
+    // Real builds hide artifacts their composed engine can never load —
+    // an enabled multi-gigabyte MLX download on a llama-only build would
+    // be dead disk (#63). Installed leftovers stay visible (and
+    // deletable) here and in Storage; the fake keeps the whole catalog.
+    final backend = ref.watch(inferenceBackendProvider);
+    final loadable = catalog
+        .where(
+          (entry) =>
+              simulatedInference ||
+              model.statusOf(entry.key).phase == ArtifactPhase.installed ||
+              _engineLoadable(backend.kind, entry.engine),
+        )
+        .toList();
     final visible = _tab == _CatalogTab.all
-        ? catalog
-        : catalog
+        ? loadable
+        : loadable
               .where(
                 (entry) =>
                     model.statusOf(entry.key).phase == ArtifactPhase.installed,
@@ -156,6 +170,16 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
       ],
     );
   }
+
+  /// Whether this build's composed engine can load artifacts of [engine].
+  /// The fake never reaches here; explicit `mlx` builds mirror the rule
+  /// for GGUF entries.
+  static bool _engineLoadable(InferenceBackendKind kind, ModelEngine engine) =>
+      switch (kind) {
+        InferenceBackendKind.fake => true,
+        InferenceBackendKind.llama => engine == ModelEngine.gguf,
+        InferenceBackendKind.mlx => engine == ModelEngine.mlx,
+      };
 }
 
 class _RuntimeCard extends ConsumerWidget {

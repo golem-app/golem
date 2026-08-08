@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:golem_flutter/broker/model_runtime_config.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 
 import '../application/eval_runner.dart';
@@ -39,6 +40,31 @@ List<EvalCombo> evalMatrixFromDefines({
   ]);
 }
 
+/// Resolves comma-separated catalog keys against the app's own documents
+/// directory, so a device run evaluates the artifacts actually installed
+/// there. Each combo carries its own profile: a Qwen artifact rendered and
+/// stopped with the Gemma template would produce numbers that describe
+/// nothing, and the pin guard cannot catch it (installed combos are named
+/// by catalog key, not by pinned filename). Unknown or `custom-*` keys
+/// throw out of [resolveModelRuntimeConfig] — loudly, at collection.
+List<EvalCombo> installedEvalCombos({
+  required String installedDefine,
+  required String documentsDirectory,
+}) => [
+  for (final key in installedDefine.split(','))
+    if (key.trim().isNotEmpty) _installedCombo(key.trim(), documentsDirectory),
+];
+
+EvalCombo _installedCombo(String key, String documentsDirectory) {
+  final config = resolveModelRuntimeConfig(key);
+  return EvalCombo(
+    label: config.catalogKey,
+    path: config.modelPath.replaceFirst('documents:', '$documentsDirectory/'),
+    engine: config.engine,
+    profileKey: config.profile.key,
+  );
+}
+
 /// Quant comparisons may point at same-named artifacts in different
 /// directories; identical labels would silently merge their report rows, so
 /// colliding labels are prefixed with their parent directory (and numbered
@@ -55,6 +81,7 @@ List<EvalCombo> _disambiguated(List<EvalCombo> combos) {
         label: _uniqueLabel(combo, counts, used),
         path: combo.path,
         engine: combo.engine,
+        profileKey: combo.profileKey,
       ),
   ];
 }

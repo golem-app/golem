@@ -2,6 +2,9 @@
 
 Status: decided on `feat/19-generation-settings-flavor-defaults` (issue #19)
 
+The install-time device floor that complements this composition policy is
+documented in `../device_floor.md` (added with epic #61).
+
 ## The composition rule, stated once
 
 - The `qa` flavor and the flavorless test identity wire **all fakes** —

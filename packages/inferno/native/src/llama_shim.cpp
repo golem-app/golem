@@ -23,6 +23,13 @@
 #include <mach/mach.h>
 #endif
 
+#if defined(__linux__) && defined(__aarch64__)
+#include <sys/auxv.h>
+#ifndef HWCAP_ASIMDDP
+#define HWCAP_ASIMDDP (1 << 20)
+#endif
+#endif
+
 using json = nlohmann::json;
 using steady_clock = std::chrono::steady_clock;
 
@@ -33,6 +40,11 @@ struct inferno_engine {
   std::atomic<bool> cancel_requested{false};
   std::atomic<bool> busy{false};
   llama_model *model = nullptr;
+  // Load options that apply per generation context (ABI 2). Written once
+  // by the load worker before `model` becomes non-null, read by generate.
+  ggml_type kv_cache_type = GGML_TYPE_F16;
+  int32_t thread_count = 0;  // 0 = engine default
+  bool swa_full = false;
 };
 
 namespace {
@@ -58,6 +70,19 @@ std::string with_log_detail(const std::string &message) {
   const std::string detail = consume_log_error();
   if (detail.empty()) return message;
   return message + " [" + detail + "]";
+}
+
+// ggml selects its ARM kernels at compile time, so the Android arm64 build
+// bakes in the extensions its `-march` names (docs/device_floor.md): a
+// device without them would not run slower, it would take SIGILL inside the
+// first matmul. Refuse the load instead, while the failure can still be
+// reported. Other targets build at their toolchain baseline and pass.
+bool cpu_meets_floor() {
+#if defined(__linux__) && defined(__aarch64__)
+  return (getauxval(AT_HWCAP) & HWCAP_ASIMDDP) != 0;
+#else
+  return true;
+#endif
 }
 
 void initialize_backend() {
@@ -340,13 +365,46 @@ inferno_engine *inferno_engine_create(const char *engine_name) {
 }
 
 int32_t inferno_engine_load(inferno_engine *engine,
-                            const char *model_path,
+                            const char *load_json,
                             uint64_t operation_id,
                             inferno_event_callback callback,
                             void *user_data) {
-  if (engine == nullptr || model_path == nullptr || engine->model != nullptr) return -1;
-  const std::string path(model_path);
+  if (engine == nullptr || load_json == nullptr || engine->model != nullptr) return -1;
+  const std::string encoded(load_json);
   return start_worker(engine, [=] {
+    if (!cpu_meets_floor()) {
+      emit_error(callback,
+                 operation_id,
+                 "unsupported_device",
+                 "This device's processor lacks the ARM dot-product "
+                 "extension the local engine requires.",
+                 user_data);
+      return;
+    }
+    std::string path;
+    bool check_tensors = false;
+    int32_t gpu_layers_override = INT32_MIN;
+    try {
+      const json request = json::parse(encoded);
+      path = request.at("modelPath").get<std::string>();
+      check_tensors = request.value("checkTensors", false);
+      const std::string kv = request.value("kvCacheType", "f16");
+      engine->kv_cache_type = kv == "q8_0" ? GGML_TYPE_Q8_0 : GGML_TYPE_F16;
+      if (request.contains("threadCount") && !request["threadCount"].is_null()) {
+        engine->thread_count = request["threadCount"].get<int32_t>();
+      }
+      if (request.contains("gpuLayers") && !request["gpuLayers"].is_null()) {
+        gpu_layers_override = request["gpuLayers"].get<int32_t>();
+      }
+      engine->swa_full = request.value("swaFull", false);
+    } catch (const std::exception &error) {
+      emit_error(callback,
+                 operation_id,
+                 "load_failed",
+                 std::string("The load request is invalid: ") + error.what(),
+                 user_data);
+      return;
+    }
     std::string code;
     std::string message;
     if (!read_gguf_header(path, code, message)) {
@@ -359,7 +417,13 @@ int32_t inferno_engine_load(inferno_engine *engine,
 #else
     params.n_gpu_layers = 0;
 #endif
-    params.check_tensors = true;
+    if (gpu_layers_override != INT32_MIN) {
+      // The #13 escape hatch: 0 forces CPU-only on Metal builds.
+      params.n_gpu_layers = gpu_layers_override;
+    }
+    // Upstream default (false). True validates every tensor — a full
+    // page-in of the mmapped weights — kept as an opt-in triage tool.
+    params.check_tensors = check_tensors;
     params.progress_callback = [](float, void *context) {
       return !static_cast<inferno_engine *>(context)->cancel_requested.load();
     };
@@ -493,6 +557,22 @@ int32_t inferno_engine_generate(inferno_engine *engine,
         std::max<size_t>(1, std::min<size_t>(prompt_tokens.size(), 512)));
     context_params.n_ubatch = context_params.n_batch;
     context_params.no_perf = false;
+    // Load-time knobs stored on the engine (ABI 2). A quantized value
+    // cache requires flash attention; AUTO may fall back to CPU-off
+    // paths, so force it on when q8_0 is requested.
+    context_params.type_k = engine->kv_cache_type;
+    context_params.type_v = engine->kv_cache_type;
+    if (engine->kv_cache_type != GGML_TYPE_F16) {
+      context_params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_ENABLED;
+    }
+    if (engine->thread_count > 0) {
+      context_params.n_threads = engine->thread_count;
+      context_params.n_threads_batch = engine->thread_count;
+    }
+    // Off by default (upstream tooling default): a full-size SWA cache
+    // buys only rollback ability these per-generate contexts never use,
+    // at real KV cost on SWA models like Gemma.
+    context_params.swa_full = engine->swa_full;
     context_params.abort_callback = [](void *context) {
       return static_cast<inferno_engine *>(context)->cancel_requested.load();
     };

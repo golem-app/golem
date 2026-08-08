@@ -389,10 +389,10 @@ final class _PendingGeneration extends _PendingOperation {
 final class NativeInfernoBackend implements InfernoBackend {
   NativeInfernoBackend() : _llamaApi = _LlamaNativeApi() {
     final version = _llamaApi.abiVersion();
-    if (version != 1) {
+    if (version != 2) {
       throw InfernoException(
         InfernoErrorCode.nativeUnavailable,
-        'Unsupported native ABI $version (expected 1).',
+        'Unsupported native ABI $version (expected 2).',
       );
     }
     _callback = NativeCallable<_NativeCallback>.listener(_handleNativeEvent);
@@ -451,6 +451,7 @@ final class NativeInfernoBackend implements InfernoBackend {
   Future<void> load({
     required InfernoEngineKind engine,
     required String modelPath,
+    InfernoLoadOptions options = const InfernoLoadOptions(),
   }) async {
     if (_engine != nullptr) {
       throw const InfernoException(
@@ -475,10 +476,10 @@ final class NativeInfernoBackend implements InfernoBackend {
       ),
     };
     final version = api.abiVersion();
-    if (version != 1) {
+    if (version != 2) {
       throw InfernoException(
         InfernoErrorCode.nativeUnavailable,
-        'Unsupported $name native ABI $version (expected 1).',
+        'Unsupported $name native ABI $version (expected 2).',
       );
     }
     _activeApi = api;
@@ -496,13 +497,18 @@ final class NativeInfernoBackend implements InfernoBackend {
       );
     }
 
-    final path = modelPath.toNativeUtf8();
+    // ABI 2: the load argument is one JSON payload carrying the path and
+    // the engine options, mirroring how generate crosses the boundary.
+    final payload = jsonEncode({
+      'modelPath': modelPath,
+      ...options.toJson(),
+    }).toNativeUtf8();
     try {
       await _startFuture(
         api,
         (operationId) => api.load(
           _engine,
-          path,
+          payload,
           operationId,
           _callback.nativeFunction,
           nullptr,
@@ -514,7 +520,7 @@ final class NativeInfernoBackend implements InfernoBackend {
       _activeApi = null;
       rethrow;
     } finally {
-      malloc.free(path);
+      malloc.free(payload);
     }
   }
 
@@ -799,6 +805,7 @@ final class NativeInfernoBackend implements InfernoBackend {
         'generation_failed' => InfernoErrorCode.generationFailed,
         'context_exhausted' => InfernoErrorCode.contextExhausted,
         'out_of_memory' => InfernoErrorCode.outOfMemory,
+        'unsupported_device' => InfernoErrorCode.unsupportedDevice,
         'cancelled' => InfernoErrorCode.cancelled,
         _ => InfernoErrorCode.internal,
       }, json['message']! as String);

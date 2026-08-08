@@ -43,4 +43,39 @@ void main() {
     );
     expect(combos.map((c) => c.label), ['m/model.gguf', 'm/model.gguf#2']);
   });
+
+  test('path defines carry no profile, so the run template applies', () {
+    final combos = evalMatrixFromDefines(
+      ggufDefine: '/models/a.gguf',
+      mlxDefine: '/models/mlx-dir/',
+    );
+    expect(combos.map((c) => c.profileKey), [isNull, isNull]);
+  });
+
+  test('installed keys resolve their own profile, engine, and path', () {
+    final combos = installedEvalCombos(
+      installedDefine: ' qwen35-gguf , gemma4-mlx ',
+      documentsDirectory: '/docs',
+    );
+    // The profile follows the artifact, never the run template: Qwen
+    // rendered and stopped as Gemma would measure nothing.
+    expect(combos.map((c) => c.label), ['qwen35-gguf', 'gemma4-mlx']);
+    expect(combos.map((c) => c.profileKey), ['qwen35', 'gemma4']);
+    expect(combos.map((c) => c.engine), [
+      BrokerEngine.llamaCpp,
+      BrokerEngine.mlx,
+    ]);
+    expect(combos.first.path, startsWith('/docs/models/qwen35-gguf/'));
+    expect(combos.last.path, '/docs/models/gemma4-mlx');
+  });
+
+  test('an unactivatable installed key fails loudly at collection', () {
+    expect(
+      () => installedEvalCombos(
+        installedDefine: 'custom-something',
+        documentsDirectory: '/docs',
+      ),
+      throwsStateError,
+    );
+  });
 }

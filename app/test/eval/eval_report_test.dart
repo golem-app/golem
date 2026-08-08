@@ -107,6 +107,33 @@ void main() {
     expect(markdown, isNot(contains('/private/somewhere')));
   });
 
+  test('a combo records its own profile, not the run template', () {
+    // Device runs mix installed artifacts with the run's template; the
+    // evidence must say which profile produced which numbers.
+    final report = EvalRunReport(
+      createdAt: DateTime.utc(2026, 8, 5, 12),
+      host: 'android test-host',
+      profile: const Gemma4Profile(),
+      results: [
+        EvalComboResult(
+          combo: const EvalCombo(
+            label: 'qwen35-gguf',
+            path: '/docs/models/qwen35-gguf/model.gguf',
+            engine: BrokerEngine.llamaCpp,
+            profileKey: 'qwen35',
+          ),
+          loadSeconds: 1.5,
+          promptResults: const [],
+        ),
+      ],
+      artifacts: const {},
+    );
+    final result = (report.toJson()['results']! as List).single as Map;
+    expect(result['profile'], 'qwen35');
+    expect(report.renderMarkdown(), contains('- Profile: `qwen35`'));
+    expect(report.renderMarkdown(), contains('- Template profile: `gemma4`'));
+  });
+
   test('pinned repositories map to their profile family', () {
     expect(
       profileKeyForPinnedRepository('YoozLabs/Qwen3.5-4B-qat-GGUF'),

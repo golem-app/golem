@@ -14,6 +14,12 @@ enum InfernoErrorCode {
   /// The engine could not allocate the memory a load or generation needs;
   /// retrying after freeing memory can succeed.
   outOfMemory,
+
+  /// The device's CPU lacks an instruction-set extension this build's
+  /// kernels were compiled for. Refused before the first kernel runs, so
+  /// the alternative is an illegal-instruction crash, not a slower answer;
+  /// no retry on this device can succeed.
+  unsupportedDevice,
   cancelled,
   internal,
 }

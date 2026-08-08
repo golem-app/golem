@@ -25,6 +25,7 @@ final class _ScriptedRuntime implements BrokerRuntime {
   Future<void> load({
     required BrokerEngine engine,
     required String modelPath,
+    BrokerLoadOptions options = const BrokerLoadOptions(),
   }) async {
     loads += 1;
   }

@@ -14,7 +14,13 @@
 extern "C" {
 #endif
 
-#define INFERNO_ABI_VERSION 1
+/// ABI 2: `inferno_engine_load` receives one JSON payload instead of a raw
+/// path — {"modelPath": string, "checkTensors": bool, "kvCacheType":
+/// "f16"|"q8_0", "threadCount": int|null, "gpuLayers": int|null,
+/// "swaFull": bool} — mirroring how generate crosses the boundary. Engines
+/// ignore fields that do not apply to them. Error codes remain JSON
+/// strings inside INFERNO_EVENT_ERROR payloads.
+#define INFERNO_ABI_VERSION 2
 
 typedef struct inferno_engine inferno_engine;
 
