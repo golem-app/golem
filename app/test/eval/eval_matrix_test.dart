@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 
-import '../../integration_test/eval/eval_matrix.dart';
+import 'package:golem_flutter/features/eval/data/eval_matrix.dart';
 
 void main() {
   test('degenerate paths are dropped instead of throwing', () {

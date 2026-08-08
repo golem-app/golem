@@ -3,9 +3,10 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_profile.dart';
 import 'package:golem_flutter/broker/runtime.dart';
+import 'package:golem_flutter/core/domain/models.dart';
 
-import '../../integration_test/eval/eval_report.dart';
-import '../../integration_test/eval/eval_runner.dart';
+import 'package:golem_flutter/features/eval/application/eval_runner.dart';
+import 'package:golem_flutter/features/eval/data/eval_report.dart';
 
 const _combo = EvalCombo(
   label: 'model.gguf',
@@ -28,10 +29,10 @@ EvalRunReport _fixtureReport() => EvalRunReport(
           stopReason: 'stopToken',
           rawTextHash: 'd710455907eadf55',
           rawTextLength: 8,
-          metrics: BrokerRuntimeMetrics(
+          metrics: InferenceMetrics(
             decodeTokensPerSecond: 48.2,
             promptTokensPerSecond: 120,
-            generatedTokenCount: 14,
+            tokenCount: 14,
             elapsedSeconds: 0.4,
             promptTokenCount: 18,
             timeToFirstTokenSeconds: 0.119,

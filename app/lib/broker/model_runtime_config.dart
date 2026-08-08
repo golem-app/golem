@@ -38,7 +38,9 @@ BrokerEngine brokerEngineFor(ModelEngine engine) => switch (engine) {
 /// activation arrive with the custom-repository work), and unknown keys
 /// are a caller bug.
 ModelRuntimeConfig resolveModelRuntimeConfig(String catalogKey) {
-  final entry = modelCatalog.where((item) => item.key == catalogKey).firstOrNull;
+  final entry = modelCatalog
+      .where((item) => item.key == catalogKey)
+      .firstOrNull;
   if (entry == null) {
     throw StateError(
       catalogKey.startsWith('custom-')

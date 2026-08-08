@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:golem_flutter/broker/model_profile.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 
-import 'eval_runner.dart';
+import '../application/eval_runner.dart';
 
 /// The pinned artifacts the report can auto-cite.
 const _knownArtifacts = <InfernoModelArtifact>[
@@ -205,7 +205,7 @@ final class EvalRunReport {
                   final m => {
                     'decodeTokensPerSecond': m.decodeTokensPerSecond,
                     'promptTokensPerSecond': m.promptTokensPerSecond,
-                    'generatedTokenCount': m.generatedTokenCount,
+                    'generatedTokenCount': m.tokenCount,
                     'promptTokenCount': m.promptTokenCount,
                     'timeToFirstTokenSeconds': m.timeToFirstTokenSeconds,
                     'elapsedSeconds': m.elapsedSeconds,
@@ -286,7 +286,7 @@ final class EvalRunReport {
           '| ${m?.promptTokensPerSecond.toStringAsFixed(1) ?? '—'} '
           '| ${m?.timeToFirstTokenSeconds?.toStringAsFixed(3) ?? '—'} '
           '| ${m?.peakPhysicalFootprintBytes == null ? '—' : _gib(m!.peakPhysicalFootprintBytes!)} '
-          '| ${m?.generatedTokenCount ?? '—'} '
+          '| ${m?.tokenCount ?? '—'} '
           '| ${result.stopReason ?? '—'} '
           '| ${result.rawTextHash == null ? '—' : '`${result.rawTextHash}`'} |',
         );

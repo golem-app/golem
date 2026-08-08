@@ -1,11 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/hash.dart';
+import 'package:golem_flutter/broker/inferno_inference_repository.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 
 import 'package:golem_flutter/broker/model_profile.dart';
-
-import '../../integration_test/eval/eval_runner.dart';
-import '../../integration_test/eval/eval_spec.dart';
+import 'package:golem_flutter/features/eval/application/eval_runner.dart';
+import 'package:golem_flutter/features/eval/domain/eval_spec.dart';
 
 /// Replays one scripted event list per generate call, recording lifecycle
 /// calls and rendered prompts, so runner behavior is testable without models.
@@ -64,13 +64,20 @@ const _metrics = BrokerRuntimeMetrics(
   peakPhysicalFootprintBytes: 1024,
 );
 
+/// The runner drives the app's own repository over the scripted runtime
+/// (#42), so these tests also cover the repository's event translation.
 Future<EvalComboResult> _run(
   _ScriptedRuntime runtime,
   List<EvalPrompt> prompts,
 ) => runEvalCombo(
-  runtime: runtime,
+  repository: InfernoInferenceRepository(
+    runtime,
+    engine: BrokerEngine.llamaCpp,
+    modelPath: '/local/model.gguf',
+    profile: const Gemma4Profile(),
+    seed: uniformEvalSeed(prompts),
+  ),
   combo: _combo,
-  profile: const Gemma4Profile(),
   prompts: prompts,
 );
 
@@ -247,6 +254,9 @@ void main() {
       (prompt) => prompt.id == evalAnchorPromptId,
     );
     expect(anchor.seed, 7);
+    // The harness pins one seed per run at repository construction; the
+    // shipped spec must stay representable.
+    expect(uniformEvalSeed(defaultEvalPrompts), 7);
     expect(anchor.temperature, 1);
     expect(anchor.topP, 0.95);
     expect(anchor.maxTokens, 2048);

@@ -1,7 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart'
-    show ValueListenable, ValueNotifier;
+import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
 
 import '../domain/generation_settings.dart';
 import '../domain/models.dart';

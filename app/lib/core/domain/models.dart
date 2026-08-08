@@ -249,17 +249,29 @@ final class InferenceMetrics {
     required this.decodeTokensPerSecond,
     required this.tokenCount,
     required this.elapsedSeconds,
+    this.promptTokenCount,
+    this.timeToFirstTokenSeconds,
+    this.peakPhysicalFootprintBytes,
   });
   final double promptTokensPerSecond;
   final double decodeTokensPerSecond;
   final int tokenCount;
   final double elapsedSeconds;
 
+  /// Measurement-grade fields a real engine reports and the fake leaves
+  /// null; serialized sparsely so persisted history stays stable.
+  final int? promptTokenCount;
+  final double? timeToFirstTokenSeconds;
+  final int? peakPhysicalFootprintBytes;
+
   Map<String, Object> toJson() => {
     'promptTokensPerSecond': promptTokensPerSecond,
     'decodeTokensPerSecond': decodeTokensPerSecond,
     'tokenCount': tokenCount,
     'elapsedSeconds': elapsedSeconds,
+    'promptTokenCount': ?promptTokenCount,
+    'timeToFirstTokenSeconds': ?timeToFirstTokenSeconds,
+    'peakPhysicalFootprintBytes': ?peakPhysicalFootprintBytes,
   };
 
   factory InferenceMetrics.fromJson(
@@ -269,7 +281,20 @@ final class InferenceMetrics {
     decodeTokensPerSecond: (json['decodeTokensPerSecond']! as num).toDouble(),
     tokenCount: json['tokenCount']! as int,
     elapsedSeconds: (json['elapsedSeconds']! as num).toDouble(),
+    promptTokenCount: json['promptTokenCount'] as int?,
+    timeToFirstTokenSeconds: (json['timeToFirstTokenSeconds'] as num?)
+        ?.toDouble(),
+    peakPhysicalFootprintBytes: json['peakPhysicalFootprintBytes'] as int?,
   );
+}
+
+/// Why a generation ended, mirrored from the engine's stop policy.
+enum InferenceStopReason {
+  endOfSequence,
+  stopSequence,
+  stopToken,
+  maxTokens,
+  cancelled,
 }
 
 sealed class InferenceEvent {
@@ -296,7 +321,17 @@ final class MetricsEvent extends InferenceEvent {
 }
 
 final class CompletedEvent extends InferenceEvent {
-  const CompletedEvent();
+  const CompletedEvent({this.stopReason, this.rawTextHash, this.rawTextLength});
+
+  /// Null when the source does not report one (the fake, cancellations
+  /// resolved above the engine).
+  final InferenceStopReason? stopReason;
+
+  /// FNV-1a 64 hash and length of the raw pre-parser text, present only
+  /// when a fixed sampling seed is configured (determinism probes and the
+  /// eval harness); never the transcript itself.
+  final String? rawTextHash;
+  final int? rawTextLength;
 }
 
 final class ArtifactStatus {

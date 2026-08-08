@@ -195,6 +195,9 @@ final class InfernoInferenceRepository implements InferenceRepository {
               decodeTokensPerSecond: metrics.decodeTokensPerSecond,
               tokenCount: metrics.generatedTokenCount,
               elapsedSeconds: metrics.elapsedSeconds,
+              promptTokenCount: metrics.promptTokenCount,
+              timeToFirstTokenSeconds: metrics.timeToFirstTokenSeconds,
+              peakPhysicalFootprintBytes: metrics.peakPhysicalFootprintBytes,
             ),
           );
         case BrokerGenerationCompleted():
@@ -216,7 +219,11 @@ final class InfernoInferenceRepository implements InferenceRepository {
               'answer. Try again, or turn reasoning off.',
             );
           }
-          yield const CompletedEvent();
+          yield CompletedEvent(
+            stopReason: _stopReason(event.reason),
+            rawTextHash: probe == null ? null : fnv1a64(probe.toString()),
+            rawTextLength: probe?.length,
+          );
       }
     }
   }
@@ -304,6 +311,15 @@ final class InfernoInferenceRepository implements InferenceRepository {
       ' fnv1a64=${fnv1a64(rawText)}',
     );
   }
+
+  static InferenceStopReason _stopReason(BrokerStopReason reason) =>
+      switch (reason) {
+        BrokerStopReason.endOfSequence => InferenceStopReason.endOfSequence,
+        BrokerStopReason.stopSequence => InferenceStopReason.stopSequence,
+        BrokerStopReason.stopToken => InferenceStopReason.stopToken,
+        BrokerStopReason.maxTokens => InferenceStopReason.maxTokens,
+        BrokerStopReason.cancelled => InferenceStopReason.cancelled,
+      };
 
   static Iterable<InferenceEvent> _domainEvents(
     ReasoningStreamDelta delta,

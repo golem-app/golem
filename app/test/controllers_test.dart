@@ -764,7 +764,9 @@ void main() {
     addTearDown(realContainer.dispose);
     await realContainer.read(modelControllerProvider.future);
     await realContainer.read(modelControllerProvider.notifier).toggleRuntime();
-    final realRefused = realContainer.read(modelControllerProvider).requireValue;
+    final realRefused = realContainer
+        .read(modelControllerProvider)
+        .requireValue;
     expect(realRefused.runtime, RuntimePhase.failed);
     expect(realRefused.failure, 'Download and install the active model first.');
     expect(inference.prepares, 0);
