@@ -23,6 +23,13 @@
 #include <mach/mach.h>
 #endif
 
+#if defined(__linux__) && defined(__aarch64__)
+#include <sys/auxv.h>
+#ifndef HWCAP_ASIMDDP
+#define HWCAP_ASIMDDP (1 << 20)
+#endif
+#endif
+
 using json = nlohmann::json;
 using steady_clock = std::chrono::steady_clock;
 
@@ -63,6 +70,19 @@ std::string with_log_detail(const std::string &message) {
   const std::string detail = consume_log_error();
   if (detail.empty()) return message;
   return message + " [" + detail + "]";
+}
+
+// ggml selects its ARM kernels at compile time, so the Android arm64 build
+// bakes in the extensions its `-march` names (docs/device_floor.md): a
+// device without them would not run slower, it would take SIGILL inside the
+// first matmul. Refuse the load instead, while the failure can still be
+// reported. Other targets build at their toolchain baseline and pass.
+bool cpu_meets_floor() {
+#if defined(__linux__) && defined(__aarch64__)
+  return (getauxval(AT_HWCAP) & HWCAP_ASIMDDP) != 0;
+#else
+  return true;
+#endif
 }
 
 void initialize_backend() {
@@ -352,6 +372,15 @@ int32_t inferno_engine_load(inferno_engine *engine,
   if (engine == nullptr || load_json == nullptr || engine->model != nullptr) return -1;
   const std::string encoded(load_json);
   return start_worker(engine, [=] {
+    if (!cpu_meets_floor()) {
+      emit_error(callback,
+                 operation_id,
+                 "unsupported_device",
+                 "This device's processor lacks the ARM dot-product "
+                 "extension the local engine requires.",
+                 user_data);
+      return;
+    }
     std::string path;
     bool check_tensors = false;
     int32_t gpu_layers_override = INT32_MIN;

@@ -693,6 +693,9 @@ void main() {
       InfernoErrorCode.outOfMemory:
           'The model ran out of memory while responding. Close other '
           'apps and try again, or lower the context length in Settings.',
+      InfernoErrorCode.unsupportedDevice:
+          'This device’s processor is missing an instruction set the '
+          'local engine needs, so it cannot run models here.',
       InfernoErrorCode.cancelled: 'Generation was cancelled.',
       InfernoErrorCode.nativeUnavailable:
           'The local inference runtime hit an internal error.',

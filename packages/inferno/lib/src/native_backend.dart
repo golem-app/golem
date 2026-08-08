@@ -805,6 +805,7 @@ final class NativeInfernoBackend implements InfernoBackend {
         'generation_failed' => InfernoErrorCode.generationFailed,
         'context_exhausted' => InfernoErrorCode.contextExhausted,
         'out_of_memory' => InfernoErrorCode.outOfMemory,
+        'unsupported_device' => InfernoErrorCode.unsupportedDevice,
         'cancelled' => InfernoErrorCode.cancelled,
         _ => InfernoErrorCode.internal,
       }, json['message']! as String);

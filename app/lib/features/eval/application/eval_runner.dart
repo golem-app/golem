@@ -10,11 +10,17 @@ final class EvalCombo {
     required this.label,
     required this.path,
     required this.engine,
+    this.profileKey,
   });
 
   final String label;
   final String path;
   final BrokerEngine engine;
+
+  /// The broker profile this artifact must run under, when the combo knows
+  /// its own identity (catalog installs do). Null for bare path defines,
+  /// which carry no family — those fall back to the run's template.
+  final String? profileKey;
 }
 
 final class EvalCheckResult {

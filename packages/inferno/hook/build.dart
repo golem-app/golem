@@ -274,13 +274,20 @@ Future<List<String>> _targetCmakeArguments(CodeConfig config) async {
       // Inferno is emitted as one native asset. Linking the NDK runtime
       // statically avoids a second, unregistered code asset dependency.
       '-DANDROID_STL=c++_static',
-      // With GGML_NATIVE off (cross-compile), ggml only emits dotprod and
-      // i8mm matmul kernels when the arch is set explicitly; the toolchain
-      // baseline (armv8-a) leaves them off. armv8.2-a+dotprod+i8mm is the
-      // documented device floor (docs/device_floor.md) — 64-bit Android
-      // phones in the app's supported tier all have both.
+      // With GGML_NATIVE off (cross-compile), ggml only emits dotprod
+      // kernels when the arch says so; the toolchain baseline (armv8-a)
+      // leaves them off. Exactly one extension over that baseline, because
+      // ggml picks ARM kernels at compile time and this build ships as a
+      // single static asset — every instruction here is a hard requirement
+      // on every device that installs the APK, enforced at load by the
+      // shim's HWCAP check (docs/device_floor.md). i8mm is deliberately
+      // not enabled: it would emit SMMLA and raise the floor to armv8.6,
+      // excluding armv8.2 parts (Snapdragon 855/865/888-class) that are
+      // squarely inside the supported 8 GB tier. Neither is the armv8.2-a
+      // baseline itself, whose mandatory LSE atomics land in ggml_barrier
+      // and would trap on armv8.0 devices.
       if (config.targetArchitecture == Architecture.arm64)
-        '-DGGML_CPU_ARM_ARCH=armv8.2-a+dotprod+i8mm',
+        '-DGGML_CPU_ARM_ARCH=armv8-a+dotprod',
     ];
   }
   if (config.targetOS == OS.iOS) {

@@ -289,6 +289,11 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
           kind: InferenceFailureKind.outOfMemory,
           cause: error,
         ),
+        InfernoErrorCode.unsupportedDevice => BrokerRuntimeException(
+          'This device’s processor is missing an instruction set the '
+          'local engine needs, so it cannot run models here.',
+          cause: error,
+        ),
         InfernoErrorCode.cancelled => BrokerRuntimeException(
           'Generation was cancelled.',
           cause: error,

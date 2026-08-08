@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/configured_inference_repository.dart';
-import 'package:golem_flutter/broker/model_runtime_config.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:path_provider/path_provider.dart';
@@ -53,19 +52,10 @@ const _installed = String.fromEnvironment('GOLEM_EVAL_INSTALLED');
 
 Future<List<EvalCombo>> _installedCombos() async {
   if (_installed.isEmpty) return const [];
-  final documents = (await getApplicationDocumentsDirectory()).path;
-  return [
-    for (final key in _installed.split(','))
-      if (key.trim().isNotEmpty)
-        () {
-          final config = resolveModelRuntimeConfig(key.trim());
-          return EvalCombo(
-            label: config.catalogKey,
-            path: config.modelPath.replaceFirst('documents:', '$documents/'),
-            engine: config.engine,
-          );
-        }(),
-  ];
+  return installedEvalCombos(
+    installedDefine: _installed,
+    documentsDirectory: (await getApplicationDocumentsDirectory()).path,
+  );
 }
 
 void main() {
@@ -110,7 +100,11 @@ void main() {
         : 'installed ${installedKeys[index - defineCombos.length]}';
     test('evaluates $describe', () async {
       final combo = combos[index];
-      final profile = modelProfiles[_templateKey];
+      // A catalog install knows its own family, so it runs under its own
+      // profile; a bare path define does not, so it takes the run's
+      // template.
+      final profileKey = combo.profileKey ?? _templateKey;
+      final profile = modelProfiles[profileKey];
       expect(
         profile,
         isNotNull,
@@ -127,10 +121,10 @@ void main() {
       if (pinnedFamily != null) {
         expect(
           pinnedFamily,
-          _templateKey,
+          profileKey,
           reason:
               '${combo.label} is a pinned $pinnedFamily artifact but '
-              'GOLEM_EVAL_TEMPLATE is "$_templateKey"',
+              'it would run under the "$profileKey" profile',
         );
       }
       // The combo runs through the app's own repository (#42): same
@@ -144,7 +138,7 @@ void main() {
           BrokerEngine.mlx => 'mlx',
         },
         modelPath: combo.path,
-        modelProfile: _templateKey,
+        modelProfile: profileKey,
         fakeStreamDelay: Duration.zero,
         documentsDirectory: '',
         createRuntime: () => adapter,
@@ -170,6 +164,7 @@ void main() {
       for (final row in result.promptResults) {
         debugPrint(
           'EVAL_RESULT combo=${combo.label}'
+          ' profile=$profileKey'
           ' id=${row.promptId}'
           ' pass=${row.passed}'
           ' stopReason=${row.stopReason}'
@@ -181,6 +176,7 @@ void main() {
       }
       debugPrint(
         'EVAL_SUMMARY combo=${combo.label}'
+        ' profile=$profileKey'
         ' total=${result.promptResults.length}'
         ' passed=${result.promptResults.where((row) => row.passed).length}'
         ' loadSeconds=${result.loadSeconds.toStringAsFixed(2)}',

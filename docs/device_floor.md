@@ -20,13 +20,33 @@ this floor is #27.
 
 ## Android
 
-- **arm64 with dotprod and i8mm** (armv8.2-a): the Inferno build hook
-  passes `-DGGML_CPU_ARM_ARCH=armv8.2-a+dotprod+i8mm` for arm64, because
-  with `GGML_NATIVE OFF` (cross-compilation) ggml otherwise emits only
-  baseline armv8-a kernels and leaves the int8 matmul paths off. Every
-  SoC in the app's supported 8 GB tier (Snapdragon 7/8 series,
-  Dimensity 8000/9000 era and later) has both extensions; pre-armv8.2
-  devices lose the real backend and are outside the floor.
+- **arm64 with dotprod** (`FEAT_DotProd`, ARMv8.2 optional / 8.4
+  mandatory): the Inferno build hook passes
+  `-DGGML_CPU_ARM_ARCH=armv8-a+dotprod` for arm64, because with
+  `GGML_NATIVE OFF` (cross-compilation) ggml otherwise emits only
+  baseline armv8-a kernels. ggml chooses its ARM kernels at compile
+  time and Inferno ships as one statically linked asset, so whatever
+  the flag names is a hard requirement of the binary — not a fast path
+  it can fall back from. Hence exactly one extension over the baseline.
+- **Enforced at load, not assumed**: the llama shim checks `AT_HWCAP`
+  for `ASIMDDP` before the first model load and fails with
+  `unsupported_device` ("this device's processor is missing an
+  instruction set the local engine needs"). Without it, a device below
+  the floor would install cleanly and then take `SIGILL` inside the
+  first matmul — `minSdk` is 24, the APK carries no `abiFilters` and no
+  CPU `<uses-feature>` (none exists for ISA extensions), so the store
+  offers it to every arm64 device. Store-side gating is #27.
+- **Deliberately excluded from the floor**: `i8mm` (`FEAT_MatMul_INT8`,
+  ARMv8.6) would let ggml emit `SMMLA` in the repacked GEMM and
+  `nrows = 2` vec-dot kernels — a large prefill win, but the resulting
+  binary requires an ARMv9-era core, cutting out Snapdragon
+  855/865/888, Tensor G1/G2, Dimensity 1000/1200 and other 8 GB parts
+  inside the supported tier. Raising the baseline to `armv8.2-a` is
+  excluded for the same reason: it makes LSE atomics mandatory (clang
+  emits `ldaddal` in `ggml_barrier`), which traps on ARMv8.0 devices.
+  Recovering i8mm needs runtime dispatch — `GGML_CPU_ALL_VARIANTS` with
+  `GGML_BACKEND_DL`, i.e. several shared libraries instead of one code
+  asset — which is a separate piece of work, not a compile flag.
 - The `armeabi-v7a` and `x86_64` targets build at their toolchain
   baselines and exist for emulators and compatibility, not for the
   supported real-inference tier.
