@@ -913,7 +913,7 @@ class ModelController extends _$ModelController {
     try {
       final value = await ref
           .read(modelManagementRepositoryProvider)
-          .loadRuntime();
+          .recordRuntime(RuntimePhase.loaded);
       if (!ref.mounted) return;
       state = AsyncData(value);
     } catch (_) {
@@ -954,9 +954,11 @@ class ModelController extends _$ModelController {
 
   /// The persisted RuntimePhase must reflect the engine, not bookkeeping:
   /// Load drives a real `prepare()` before `loaded` is recorded, Unload a
-  /// real `unload()` before `unloaded` — the deferred #37 finding. Engine
-  /// failures stay in-memory as a failed phase with the message; the
-  /// repository's stale-`loading` reconciliation already covers crashes.
+  /// real `unload()` before `unloaded` — the deferred #37 finding. The
+  /// inference repository is the only component touching the engine (#42);
+  /// the management repository just records the phase. Engine failures
+  /// stay in-memory as a failed phase with the message; the repository's
+  /// stale-`loading` reconciliation already covers crashes.
   Future<void> toggleRuntime() async {
     if (_busy) return;
     _busy = true;
@@ -974,7 +976,7 @@ class ModelController extends _$ModelController {
           return;
         }
         if (!ref.mounted) return;
-        final value = await repository.unloadRuntime();
+        final value = await repository.recordRuntime(RuntimePhase.unloaded);
         if (!ref.mounted) return;
         state = AsyncData(value);
       } else {
@@ -984,9 +986,12 @@ class ModelController extends _$ModelController {
           current.copyWith(runtime: RuntimePhase.loading, clearFailure: true),
         );
         if (!current.activeModelInstalled) {
-          // The repository refuses with a persisted failed phase and a
-          // clear message; the engine is never touched.
-          final value = await repository.loadRuntime();
+          // Refuse with a persisted failed phase and a clear message; the
+          // engine is never touched.
+          final value = await repository.recordRuntime(
+            RuntimePhase.failed,
+            failure: _installFirstFailure(current),
+          );
           if (!ref.mounted) return;
           state = AsyncData(value);
           return;
@@ -1001,13 +1006,25 @@ class ModelController extends _$ModelController {
           return;
         }
         if (!ref.mounted) return;
-        final value = await repository.loadRuntime();
+        final value = await repository.recordRuntime(RuntimePhase.loaded);
         if (!ref.mounted) return;
         state = AsyncData(value);
       }
     } finally {
       _busy = false;
     }
+  }
+
+  /// The load-refusal copy for a not-installed active model. Owned here
+  /// since #42: the management repository records phases and no longer
+  /// knows why a load was refused.
+  String _installFirstFailure(ModelState current) {
+    if (current.activeArtifactKey == null) {
+      return 'Inference is a build-time opt-in; no backend is configured.';
+    }
+    return ref.read(inferenceBackendProvider).simulatedInference
+        ? 'Install the selected simulated model first.'
+        : 'Download and install the active model first.';
   }
 }
 

@@ -312,9 +312,8 @@ final class StaticModels implements ModelManagementRepository {
   @override
   Future<ModelState> load() async => state;
   @override
-  Future<ModelState> loadRuntime() async => state;
-  @override
-  Future<ModelState> unloadRuntime() async => state;
+  Future<ModelState> recordRuntime(RuntimePhase phase, {String? failure}) =>
+      Future.value(state);
   @override
   Stream<ModelState> download(String artifactKey) => Stream.value(state);
   @override

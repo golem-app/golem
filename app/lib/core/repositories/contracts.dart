@@ -85,8 +85,11 @@ abstract interface class ModelManagementRepository {
   /// Removes an installed artifact from disk.
   Future<ModelState> delete(String artifactKey);
 
-  Future<ModelState> loadRuntime();
-  Future<ModelState> unloadRuntime();
+  /// Persists the runtime phase the residency owner reports — bookkeeping
+  /// only. Loading and unloading weights is the inference repository's job
+  /// alone (#42); this repository never touches the engine. A null
+  /// [failure] clears any recorded one.
+  Future<ModelState> recordRuntime(RuntimePhase phase, {String? failure});
 
   /// Registers a hand-added catalog entry (Advanced mode's custom
   /// repository). The fake simulates its download like any pinned entry;
