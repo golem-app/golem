@@ -49,6 +49,7 @@ class EmptyChat extends ConsumerWidget {
       modelKey: ref.watch(
         chatControllerProvider.select((state) => state.value?.active?.modelKey),
       ),
+      residentModelKey: ref.watch(residentModelKeyProvider),
     );
     return Center(
       child: SingleChildScrollView(

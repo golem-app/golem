@@ -70,6 +70,24 @@ DiskSpaceProbe diskFreeSpaceProbe(Ref ref) =>
 InferenceBackendConfig inferenceBackend(Ref ref) =>
     const InferenceBackendConfig.fake();
 
+/// The catalog key of the model currently resident in the engine, straight
+/// from the residency owner (#42). Null while the engine is empty — label
+/// helpers fall back to the configured artifact then, so a lazy first load
+/// does not blank the chrome. Under a simulated backend this is always
+/// null without touching the repository seam: fake labels follow the
+/// per-chat choice, and label-only widget containers must not need an
+/// inference repository just to render chrome (the same discipline
+/// exception [inferenceBackend] documents).
+@Riverpod(keepAlive: true)
+String? residentModelKey(Ref ref) {
+  if (ref.watch(inferenceBackendProvider).simulatedInference) return null;
+  final listenable = ref.watch(inferenceRepositoryProvider).residentModelKey;
+  void onChange() => ref.invalidateSelf();
+  listenable.addListener(onChange);
+  ref.onDispose(() => listenable.removeListener(onChange));
+  return listenable.value;
+}
+
 @Riverpod(keepAlive: true)
 DiskCapacityProbe deviceCapacityProbe(Ref ref) =>
     throw UnimplementedError('Override deviceCapacityProbeProvider at startup');

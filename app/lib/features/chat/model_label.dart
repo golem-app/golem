@@ -3,18 +3,20 @@ import '../../core/domain/model_catalog.dart';
 
 /// The catalog key a conversation effectively runs.
 ///
-/// A real engine runs its configured artifact no matter what the
-/// conversation stored (per-chat switching arrives with #20), so on real
-/// backends the per-chat choice must never outrank [InferenceBackendConfig.artifactKey]
-/// — every label derived from this would otherwise name a model that is
-/// not running. Only the fake, which honors [modelKey] in generation,
-/// lets the stored choice win.
+/// On real backends the label follows actual residency (#42): the model
+/// the engine holds right now ([residentModelKey]) outranks everything,
+/// and the boot-configured [InferenceBackendConfig.artifactKey] fills in
+/// while the engine is still empty before the lazy first load. The stored
+/// per-chat choice never outranks residency there — a label naming a
+/// model that is not running would lie. Only the fake, which honors
+/// [modelKey] in generation, lets the stored choice win.
 String effectiveModelKey({
   required InferenceBackendConfig backend,
   required List<ModelCatalogEntry> catalog,
   String? modelKey,
+  String? residentModelKey,
 }) =>
-    (backend.simulatedInference ? modelKey : null) ??
+    (backend.simulatedInference ? modelKey : residentModelKey) ??
     backend.artifactKey ??
     (catalog.any((entry) => entry.key == 'gemma4-mlx')
         ? 'gemma4-mlx'
@@ -26,11 +28,13 @@ String chatModelLabel({
   required InferenceBackendConfig backend,
   required List<ModelCatalogEntry> catalog,
   String? modelKey,
+  String? residentModelKey,
 }) {
   final key = effectiveModelKey(
     backend: backend,
     catalog: catalog,
     modelKey: modelKey,
+    residentModelKey: residentModelKey,
   );
   return catalog.where((entry) => entry.key == key).firstOrNull?.displayName ??
       key;
@@ -42,11 +46,13 @@ String chatModelSubtitle({
   required InferenceBackendConfig backend,
   required List<ModelCatalogEntry> catalog,
   String? modelKey,
+  String? residentModelKey,
 }) {
   final label = chatModelLabel(
     backend: backend,
     catalog: catalog,
     modelKey: modelKey,
+    residentModelKey: residentModelKey,
   );
   return backend.simulatedInference
       ? '$label · simulated'

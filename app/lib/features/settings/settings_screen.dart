@@ -46,7 +46,11 @@ class SettingsScreen extends ConsumerWidget {
                 SettingsNavRow(
                   key: const Key('settings-model-row'),
                   label: 'Model',
-                  value: chatModelLabel(backend: backend, catalog: catalog),
+                  value: chatModelLabel(
+                    backend: backend,
+                    catalog: catalog,
+                    residentModelKey: ref.watch(residentModelKeyProvider),
+                  ),
                   onTap: () => context.push('/settings/models'),
                 ),
                 SettingsNavRow(
