@@ -83,6 +83,14 @@ void main() {
       addTearDown(() => debugPrint = original);
 
       await app.main();
+      // The probe test's discipline: the chat tree mounts beneath the
+      // splash overlay, so wait for the composer to exist AND the splash
+      // to leave before the first tap.
+      await _pumpUntil(
+        tester,
+        'the composer to mount',
+        () => find.byKey(const Key('chat-composer')).evaluate().isNotEmpty,
+      );
       await _pumpUntil(
         tester,
         'the launch splash to dismiss',
