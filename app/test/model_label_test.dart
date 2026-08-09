@@ -51,7 +51,7 @@ void main() {
         catalog: modelCatalog,
         residentModelKey: 'qwen35-gguf',
       ),
-      'Qwen 3.5 4B QAT · on device',
+      'Qwen 3.5 4B · on device',
     );
     // An empty engine (lazy first load pending) falls back to the boot
     // artifact rather than blanking the chrome.
@@ -94,7 +94,7 @@ void main() {
         catalog: modelCatalog,
         modelKey: 'qwen35-gguf',
       ),
-      'Qwen 3.5 4B QAT · simulated',
+      'Qwen 3.5 4B · simulated',
     );
     expect(
       chatModelSubtitle(backend: fake, catalog: modelCatalog, modelKey: null),

@@ -21,6 +21,8 @@ final class InfernoInferenceRepository implements InferenceRepository {
     required String modelPath,
     required ModelProfile profile,
     String? initialCatalogKey,
+    String? initialProjectorPath,
+    bool initialSupportsImages = false,
     this.documentsDirectory = '',
     this.resolveConfig = resolveModelRuntimeConfig,
     this.availableMemoryBytes,
@@ -33,6 +35,8 @@ final class InfernoInferenceRepository implements InferenceRepository {
          engine: engine,
          modelPath: modelPath,
          profile: profile,
+         projectorPath: initialProjectorPath,
+         supportsImages: initialSupportsImages,
        );
 
   final BrokerRuntime _runtime;

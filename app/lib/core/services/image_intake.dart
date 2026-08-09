@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -38,13 +39,11 @@ final class ImageRejectedException implements Exception {
 /// Validates, bounds, and measures an image chosen for a chat.
 ///
 /// Deliberately no image-processing dependency: `dart:ui`'s codec is the
-/// platform decoder Flutter already ships, it applies EXIF orientation, and
-/// `targetWidth`/`targetHeight` downscale during decode rather than after —
-/// so a 48-megapixel photo never materializes at full size.
-///
-/// Bytes are otherwise passed through untouched. Re-encoding a photo that is
-/// already within bounds would cost quality for nothing; the vision encoder
-/// resamples to its own resolution anyway.
+/// platform decoder Flutter already ships. Every accepted image is decoded
+/// and written as canonical PNG pixels, which applies EXIF orientation once
+/// and removes the platform-dependent metadata before either native engine
+/// sees it. `targetWidth`/`targetHeight` downscale during decode rather than
+/// after, so a 48-megapixel photo never materializes at full size.
 final class ImageIntake {
   const ImageIntake();
 
@@ -61,6 +60,12 @@ final class ImageIntake {
   /// encoders tile to a few hundred pixels, so more only costs memory.
   static const maxDimension = 2048;
 
+  /// Total decoded pixels kept. Qwen's proven processor path is capped at one
+  /// megapixel and the broker reserves 1,280 visual tokens per image; keeping
+  /// a multi-megapixel photo would violate both that memory and context
+  /// contract even when neither edge exceeds [maxDimension].
+  static const maxPixelCount = 1024 * 1024;
+
   Future<PreparedImage> prepare(
     Uint8List bytes, {
     required String mimeType,
@@ -72,47 +77,35 @@ final class ImageIntake {
       throw const ImageRejectedException(ImageRejection.tooLarge);
     }
 
-    final ui.ImageDescriptor descriptor;
-    try {
-      final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
-      descriptor = await ui.ImageDescriptor.encoded(buffer);
-    } catch (_) {
-      throw const ImageRejectedException(ImageRejection.undecodable);
-    }
-
-    final width = descriptor.width;
-    final height = descriptor.height;
-    if (width <= 0 || height <= 0) {
-      descriptor.dispose();
-      throw const ImageRejectedException(ImageRejection.undecodable);
-    }
-    if (width <= maxDimension && height <= maxDimension) {
-      descriptor.dispose();
-      return PreparedImage(
-        bytes: bytes,
-        mimeType: mimeType,
-        width: width,
-        height: height,
-      );
-    }
-
-    // Oversized: decode straight to the bound and re-encode as PNG, the one
-    // format `toByteData` guarantees.
-    final scale = maxDimension / (width > height ? width : height);
-    final targetWidth = (width * scale).round().clamp(1, maxDimension);
-    final targetHeight = (height * scale).round().clamp(1, maxDimension);
-    descriptor.dispose();
-
+    ui.ImmutableBuffer? buffer;
+    ui.ImageDescriptor? descriptor;
     ui.Codec? codec;
     ui.Image? image;
     try {
-      final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
-      final scaled = await ui.ImageDescriptor.encoded(buffer);
-      codec = await scaled.instantiateCodec(
+      buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
+      descriptor = await ui.ImageDescriptor.encoded(buffer);
+      final width = descriptor.width;
+      final height = descriptor.height;
+      if (width <= 0 || height <= 0) {
+        throw const ImageRejectedException(ImageRejection.undecodable);
+      }
+
+      final longestEdge = math.max(width, height);
+      final edgeScale = maxDimension / longestEdge;
+      final pixelScale = math.sqrt(maxPixelCount / (width * height));
+      final scale = math.min(1.0, math.min(edgeScale, pixelScale));
+      int? targetWidth;
+      int? targetHeight;
+      if (scale < 1) {
+        // Floor rather than round: the prepared image must never cross the
+        // advertised pixel ceiling because of two independent round-ups.
+        targetWidth = (width * scale).floor().clamp(1, maxDimension);
+        targetHeight = (height * scale).floor().clamp(1, maxDimension);
+      }
+      codec = await descriptor.instantiateCodec(
         targetWidth: targetWidth,
         targetHeight: targetHeight,
       );
-      scaled.dispose();
       final frame = await codec.getNextFrame();
       image = frame.image;
       final encoded = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -132,6 +125,8 @@ final class ImageIntake {
     } finally {
       image?.dispose();
       codec?.dispose();
+      descriptor?.dispose();
+      buffer?.dispose();
     }
   }
 }

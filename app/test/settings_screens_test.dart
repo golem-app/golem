@@ -271,6 +271,8 @@ void main() {
     for (final key in const [
       'gemma4-mlx',
       'gemma4-gguf',
+      'qwen35-2b-mlx',
+      'qwen35-2b-gguf',
       'qwen35-mlx',
       'qwen35-gguf',
     ]) {

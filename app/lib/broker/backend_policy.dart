@@ -4,7 +4,7 @@ import 'model_catalog.dart';
 
 /// Devices reporting at least this much physical memory default to
 /// Gemma 4 E2B; below it — or when memory is unknown — the lighter
-/// Qwen 3.5 4B. The threshold is 7 GiB rather than a literal 8 GB because
+/// Qwen 3.5 2B. The threshold is 7 GiB rather than a literal 8 GB because
 /// Android's totalMem reports net of kernel/firmware reservations (a
 /// nominal 8 GB phone reads ~7.5 GB); the policy classifies nominal
 /// capacity, not reported bytes. Rationale:
@@ -48,19 +48,23 @@ Future<InferenceBackendConfig> resolveBackendPolicy({
       );
     case 'llama' || 'mlx':
       final profileKey = explicitProfile ?? 'gemma4';
+      final artifactKey = activeArtifactKeyFor(
+        backend: backend,
+        modelProfile: profileKey,
+      )!;
       return InferenceBackendConfig(
         kind: backend == 'llama'
             ? InferenceBackendKind.llama
             : InferenceBackendKind.mlx,
         profileKey: profileKey,
-        artifactKey: activeArtifactKeyFor(
-          backend: backend,
-          modelProfile: profileKey,
-        ),
-        // Deliberately not defaulted: today's explicit opt-in contract
-        // requires the operator to supply the path, and a missing one
-        // stays a loud launch-time error.
-        modelPath: modelPathDefine,
+        artifactKey: artifactKey,
+        // An engine override without a path still names an exact pinned
+        // artifact, so use its catalog install path and retain capability
+        // provenance. Supplying a path is the distinct sideload contract.
+        modelPath: modelPathDefine.isEmpty
+            ? primaryModelPathFor(artifactKey)
+            : modelPathDefine,
+        modelPathFromCatalog: modelPathDefine.isEmpty,
       );
     case 'auto':
       final memory = memoryOverrideBytes > 0
@@ -71,7 +75,11 @@ Future<InferenceBackendConfig> resolveBackendPolicy({
           (memory != null && memory >= deviceMemoryThresholdBytes
               ? 'gemma4'
               : 'qwen35');
-      final artifactKey = '$profileKey-gguf';
+      // Explicit qwen35 remains the established 4B choice. Only the
+      // automatic low-memory branch opts into the new 2B artifact.
+      final artifactKey = explicitProfile == null && profileKey == 'qwen35'
+          ? 'qwen35-2b-gguf'
+          : '$profileKey-gguf';
       return InferenceBackendConfig(
         kind: InferenceBackendKind.llama,
         profileKey: profileKey,

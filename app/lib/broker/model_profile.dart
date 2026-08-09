@@ -200,6 +200,14 @@ const qwen35ProfileSpec = ModelProfileSpec(
     pinned: true,
   ),
   directSampling: ProfileSampling(maxTokens: 2048, temperature: 0.7, topP: 0.8),
+  // Both pinned MLX snapshots carry the Qwen 3.5 vision tower and processor.
+  // Artifact capability is still declared separately in the catalog, so the
+  // GGUF variants remain text-only until a projector pairing is proven.
+  inputModalities: {ModelInputModality.text, ModelInputModality.image},
+  // The native processor caps each image at one megapixel. Reserve the worst
+  // observed visual-token footprint rather than allowing context windowing to
+  // undercount an image before the processor expands its placeholder.
+  imageTokenCost: 1280,
 );
 
 /// Named aliases for the two pinned profiles. They are ordinary data-backed

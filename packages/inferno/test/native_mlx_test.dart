@@ -89,7 +89,7 @@ void main() {
                 .having(
                   (error) => error.code,
                   'code',
-                  InfernoErrorCode.generationFailed,
+                  InfernoErrorCode.contextExhausted,
                 )
                 .having(
                   (error) => error.message,

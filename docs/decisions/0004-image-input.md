@@ -55,9 +55,10 @@ Capability is never inferred from a model name, repository slug, file name, or
 engine. Two independent facts have to agree:
 
 - **The catalog entry** says what *this exact artifact on this exact engine* has
-  been proven to accept. `gemma4-gguf` declares images; `gemma4-mlx` shares the
-  same image-capable template and stays text-only until its own path is
-  validated.
+  been proven to accept. Gemma's MLX and GGUF artifacts and Qwen 3.5's 2B/4B
+  MLX and GGUF artifacts declare images after independent bake-offs. Each Qwen
+  GGUF entry pins its own selected projector; cross-size projectors are
+  rejected during native load.
 - **The profile** says whether its *template* can express an image, and how —
   the media marker, and the conservative per-image token cost windowing needs.
 
@@ -97,9 +98,18 @@ A model is re-fetchable from Hugging Face; a user's photo is not.
 
 No image-processing package. `dart:ui`'s codec is the decoder Flutter already
 ships, it applies EXIF orientation, and `targetWidth`/`targetHeight` downscale
-*during* decode — so an oversized photo never materializes at full size. Bytes
-within bounds pass through untouched: re-encoding costs quality for nothing,
-since the vision encoder resamples to its own resolution anyway.
+*during* decode — so an oversized photo never materializes at full size. Every
+accepted input is encoded once as canonical PNG. This makes the oriented pixels
+durable and strips source metadata rather than retaining EXIF/location data in
+the app-owned attachment store.
+
+Intake enforces both a 2,048-pixel edge ceiling and a one-megapixel total-pixel
+ceiling, preserving aspect ratio and using the stricter scale. The pixel bound
+matches the proven Qwen processor path and the broker's conservative visual
+token reservation. An edge-only limit would still admit roughly four-megapixel
+phone photos and make CPU image prefill disproportionately slow. Physical
+OnePlus 12R acceptance for both Qwen GGUF sizes is recorded in
+`docs/evals/2026-08-09-qwen35-mmproj-selection.md`.
 
 `image_picker` and `file_selector` are both flutter.dev packages. The photo
 library needs no Android permission because the picker runs out of process

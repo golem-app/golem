@@ -28,12 +28,19 @@ final class ModelArtifactFile {
     required this.bytes,
     required this.sha256,
     this.role = ModelFileRole.snapshot,
+    this.repository,
+    this.revision,
   });
 
   final String path;
   final int bytes;
   final String sha256;
   final ModelFileRole role;
+
+  /// Overrides the artifact-level source when this file is published in a
+  /// different repository. Multimodal projectors commonly have this shape.
+  final String? repository;
+  final String? revision;
 }
 
 final class ModelCatalogEntry {
@@ -79,6 +86,15 @@ final class ModelCatalogEntry {
 
   Uri get repositoryUrl =>
       Uri.https('huggingface.co', '/$repository/tree/$revision');
+
+  /// Immutable download location for one file. Building this structurally
+  /// keeps an individual projector's source attached to the file instead of
+  /// accidentally fetching it from the language-model repository.
+  Uri resolveUrlFor(ModelArtifactFile file) => Uri.https(
+    'huggingface.co',
+    '/${file.repository ?? repository}'
+        '/resolve/${file.revision ?? revision}/${file.path}',
+  );
 
   /// Install location relative to the app documents directory, matching the
   /// `documents:` model-path convention used by the inference configuration.

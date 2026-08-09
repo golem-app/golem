@@ -1,10 +1,12 @@
 import Darwin
+import CoreImage
 import Foundation
 import HuggingFace
 import MLX
 import MLXHuggingFace
 import MLXLMCommon
 import MLXLLM
+import MLXVLM
 import Tokenizers
 
 private let infernoMlxABI: UInt32 = 3
@@ -105,11 +107,23 @@ private struct GenerationRequest: Decodable, Sendable {
     let stopTokenIds: [Int]
 }
 
+/// Swift mirror of ABI-3's borrowed `inferno_image_input`.
+private struct InfernoImageInput {
+    let bytes: UnsafePointer<UInt8>?
+    let length: Int
+}
+
+private enum VisionAdapter: Sendable {
+    case gemma4(Gemma4ProcessorConfiguration)
+    case qwen35(Qwen3VLProcessorConfiguration)
+}
+
 private final class InfernoMlxEngine: @unchecked Sendable {
     private let condition = NSCondition()
     private var busy = false
     private var operation: Task<Void, Never>?
     private var model: ModelContainer?
+    private var visionAdapter: VisionAdapter?
 
     /// KV-cache bits from the ABI-2 load options (nil = unquantized).
     /// Written by the load worker before the container publishes, read by
@@ -172,9 +186,19 @@ private final class InfernoMlxEngine: @unchecked Sendable {
         return model
     }
 
-    func setContainer(_ container: ModelContainer?) {
+    func adapter() -> VisionAdapter? {
+        condition.lock()
+        defer { condition.unlock() }
+        return visionAdapter
+    }
+
+    func setContainer(
+        _ container: ModelContainer?,
+        visionAdapter: VisionAdapter? = nil
+    ) {
         condition.lock()
         model = container
+        self.visionAdapter = visionAdapter
         condition.unlock()
     }
 }
@@ -211,6 +235,251 @@ private func modelDirectoryError(_ path: String) -> (String, String)? {
         return ("corrupt_model", "The MLX model directory has no safetensors weights.")
     }
     return nil
+}
+
+private func visionAdapter(at path: String) throws -> VisionAdapter? {
+    let directory = URL(fileURLWithPath: path, isDirectory: true)
+    let configData = try Data(contentsOf: directory.appendingPathComponent("config.json"))
+    guard let config = try JSONSerialization.jsonObject(with: configData) as? [String: Any],
+          let modelType = config["model_type"] as? String
+    else { return nil }
+
+    let preprocessor = directory.appendingPathComponent("preprocessor_config.json")
+    let processor = directory.appendingPathComponent("processor_config.json")
+    let processorURL = FileManager.default.fileExists(atPath: preprocessor.path)
+        ? preprocessor : processor
+    guard FileManager.default.fileExists(atPath: processorURL.path) else { return nil }
+    let processorData = try Data(contentsOf: processorURL)
+    switch modelType {
+    case "gemma4":
+        return .gemma4(try JSONDecoder().decode(
+            Gemma4ProcessorConfiguration.self,
+            from: processorData
+        ))
+    case "qwen3_5":
+        return .qwen35(try JSONDecoder().decode(
+            Qwen3VLProcessorConfiguration.self,
+            from: processorData
+        ))
+    default:
+        return nil
+    }
+}
+
+private let mediaMarker = "<__media__>"
+
+private func markerCount(in prompt: String) -> Int {
+    prompt.components(separatedBy: mediaMarker).count - 1
+}
+
+private func tokenRanges(of needle: [Int], in haystack: [Int]) -> [Range<Int>] {
+    guard !needle.isEmpty, needle.count <= haystack.count else { return [] }
+    var ranges: [Range<Int>] = []
+    var start = 0
+    while start <= haystack.count - needle.count {
+        let end = start + needle.count
+        if haystack[start ..< end].elementsEqual(needle) {
+            ranges.append(start ..< end)
+            start = end
+        } else {
+            start += 1
+        }
+    }
+    return ranges
+}
+
+private func replaceQwenPaddingTokens(
+    in promptTokens: [Int],
+    frames: [THW],
+    mergeSize: Int,
+    tokenizer: any MLXLMCommon.Tokenizer
+) throws -> [Int] {
+    let placeholder = tokenizer.encode(
+        text: "<|vision_start|><|image_pad|><|vision_end|>",
+        addSpecialTokens: false
+    )
+    let ranges = tokenRanges(of: placeholder, in: promptTokens)
+    guard ranges.count == frames.count else {
+        throw NSError(
+            domain: "InfernoMLX",
+            code: 4,
+            userInfo: [
+                NSLocalizedDescriptionKey:
+                    "The rendered prompt's image markers do not match its images."
+            ]
+        )
+    }
+    let mergeLength = mergeSize * mergeSize
+    let replacements = frames.map { frame in
+        tokenizer.encode(
+            text: "<|vision_start|>"
+                + String(repeating: "<|image_pad|>", count: frame.product / mergeLength)
+                + "<|vision_end|>",
+            addSpecialTokens: false
+        )
+    }
+    var result: [Int] = []
+    var current = 0
+    for (range, replacement) in zip(ranges, replacements) {
+        result.append(contentsOf: promptTokens[current ..< range.lowerBound])
+        result.append(contentsOf: replacement)
+        current = range.upperBound
+    }
+    result.append(contentsOf: promptTokens[current...])
+    return result
+}
+
+private func preparedInput(
+    prompt: String,
+    imageData: [Data],
+    adapter: VisionAdapter?,
+    context: ModelContext
+) throws -> (LMInput, [Int]) {
+    guard markerCount(in: prompt) == imageData.count else {
+        throw NSError(
+            domain: "InfernoMLX",
+            code: 4,
+            userInfo: [
+                NSLocalizedDescriptionKey:
+                    "The rendered prompt's image markers do not match its images."
+            ]
+        )
+    }
+    guard !imageData.isEmpty else {
+        let tokens = context.tokenizer.encode(text: prompt, addSpecialTokens: false)
+        if adapter == nil {
+            return (LMInput(tokens: MLXArray(tokens)), tokens)
+        }
+        let array = MLXArray(tokens).expandedDimensions(axis: 0)
+        return (
+            LMInput(text: .init(tokens: array, mask: ones(like: array).asType(.int8))),
+            tokens
+        )
+    }
+    guard let adapter else {
+        throw NSError(
+            domain: "InfernoMLX",
+            code: 4,
+            userInfo: [NSLocalizedDescriptionKey: "This MLX model has no image processor."]
+        )
+    }
+    let images = try imageData.map { data -> CIImage in
+        guard let image = CIImage(data: data), !image.extent.isEmpty else {
+            throw NSError(
+                domain: "InfernoMLX",
+                code: 4,
+                userInfo: [NSLocalizedDescriptionKey: "An attached image could not be decoded."]
+            )
+        }
+        return image
+    }
+
+    let promptTokens: [Int]
+    let processedImage: LMInput.ProcessedImage
+    switch adapter {
+    case .gemma4(let config):
+        guard let processor = context.processor as? Gemma4Processor else {
+            throw NSError(
+                domain: "InfernoMLX",
+                code: 4,
+                userInfo: [NSLocalizedDescriptionKey: "The Gemma image processor is unavailable."]
+            )
+        }
+        let prepared = try images.map {
+            try processor.preprocess(image: $0, processing: nil)
+        }
+        let frames = prepared.map { $0.1 }
+        let maxHeight = frames.map(\.h).max() ?? 0
+        let maxWidth = frames.map(\.w).max() ?? 0
+        let paddedPixels = prepared.map { pixels, frame in
+            frame.h == maxHeight && frame.w == maxWidth
+                ? pixels
+                : MLX.padded(
+                    pixels,
+                    widths: [
+                        0, 0,
+                        .init((0, maxHeight - frame.h)),
+                        .init((0, maxWidth - frame.w)),
+                    ]
+                )
+        }
+        processedImage = .init(
+            pixels: concatenated(paddedPixels),
+            frames: frames
+        )
+        var tokens = context.tokenizer.encode(
+            text: prompt.replacingOccurrences(of: mediaMarker, with: "<|image|>"),
+            addSpecialTokens: false
+        )
+        guard tokens.filter({ $0 == config.imageTokenId }).count == images.count else {
+            throw NSError(
+                domain: "InfernoMLX",
+                code: 4,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "The Gemma image tokens do not match the attached images."
+                ]
+            )
+        }
+        var expanded: [Int] = []
+        var imageIndex = 0
+        for token in tokens {
+            guard token == config.imageTokenId else {
+                expanded.append(token)
+                continue
+            }
+            expanded.append(config.boiTokenId)
+            expanded.append(contentsOf: Array(
+                repeating: config.imageTokenId,
+                count: config.softTokenCount(
+                    height: frames[imageIndex].h,
+                    width: frames[imageIndex].w
+                )
+            ))
+            if let eoiTokenId = config.eoiTokenId {
+                expanded.append(eoiTokenId)
+            }
+            imageIndex += 1
+        }
+        tokens = expanded
+        promptTokens = tokens
+    case .qwen35(let config):
+        guard let processor = context.processor as? Qwen3VLProcessor else {
+            throw NSError(
+                domain: "InfernoMLX",
+                code: 4,
+                userInfo: [NSLocalizedDescriptionKey: "The Qwen image processor is unavailable."]
+            )
+        }
+        let processing = UserInput.Processing(maxPixels: 1_048_576)
+        let prepared = try images.map {
+            try processor.preprocess(images: [$0], processing: processing)
+        }
+        let frames = prepared.map { $0.1 }
+        processedImage = .init(
+            pixels: concatenated(prepared.map { $0.0 }),
+            frames: frames
+        )
+        let tokens = context.tokenizer.encode(
+            text: prompt.replacingOccurrences(
+                of: mediaMarker,
+                with: "<|vision_start|><|image_pad|><|vision_end|>"
+            ),
+            addSpecialTokens: false
+        )
+        promptTokens = try replaceQwenPaddingTokens(
+            in: tokens,
+            frames: frames,
+            mergeSize: config.mergeSize,
+            tokenizer: context.tokenizer
+        )
+    }
+    let promptArray = MLXArray(promptTokens).expandedDimensions(axis: 0)
+    let mask = ones(like: promptArray).asType(.int8)
+    return (
+        LMInput(text: .init(tokens: promptArray, mask: mask), image: processedImage),
+        promptTokens
+    )
 }
 
 private func physicalFootprintBytes() -> UInt64 {
@@ -301,7 +570,7 @@ public func infernoMlxProbeJSON() -> UnsafePointer<CChar>? {
         "engines": [[
             "name": "mlx",
             "available": true,
-            "detail": "MLX Swift LM 3.31.4 / MLX Swift 0.31.6",
+            "detail": "MLX Swift LM 3.31.4+31.g60bd0d78 / MLX Swift 0.31.6",
         ]],
     ]
     guard let data = try? JSONSerialization.data(withJSONObject: payload),
@@ -360,15 +629,24 @@ public func infernoMlxEngineLoad(
         }
         do {
             MLX.Memory.cacheLimit = 64 * 1024 * 1024
-            let container = try await LLMModelFactory.shared.loadContainer(
-                from: URL(fileURLWithPath: path, isDirectory: true),
-                using: #huggingFaceTokenizerLoader()
-            )
+            let adapter = try visionAdapter(at: path)
+            let modelURL = URL(fileURLWithPath: path, isDirectory: true)
+            let container = if adapter == nil {
+                try await LLMModelFactory.shared.loadContainer(
+                    from: modelURL,
+                    using: #huggingFaceTokenizerLoader()
+                )
+            } else {
+                try await VLMModelFactory.shared.loadContainer(
+                    from: modelURL,
+                    using: #huggingFaceTokenizerLoader()
+                )
+            }
             if Task.isCancelled {
                 sink.fail(code: "cancelled", message: "Model loading was cancelled.")
                 return
             }
-            engine.setContainer(container)
+            engine.setContainer(container, visionAdapter: adapter)
             sink.emit(EventKind.operationCompleted)
         } catch {
             sink.fail(error: error, fallback: "incompatible_model")
@@ -425,16 +703,22 @@ public func infernoMlxEngineGenerate(
         callback: callback,
         userData: userData
     )
-    // ABI 3 carries images for every engine, but this shim declares no
-    // vision path yet (#18c). Refusing here keeps the failure typed and
-    // local instead of silently answering a question about a picture the
-    // model never saw.
-    if imageCount > 0 {
-        sink.fail(
-            code: "generation_failed",
-            message: "This engine cannot accept images."
-        )
-        return 0
+    guard imageCount == 0 || images != nil else { return -1 }
+    // ABI-3 buffers are borrowed only for this call; copy them before the
+    // detached generation task starts.
+    let imageData: [Data]
+    if imageCount == 0 {
+        imageData = []
+    } else {
+        let inputs = images!.assumingMemoryBound(to: InfernoImageInput.self)
+        var copied: [Data] = []
+        copied.reserveCapacity(imageCount)
+        for index in 0 ..< imageCount {
+            let input = inputs[index]
+            guard let bytes = input.bytes, input.length > 0 else { return -1 }
+            copied.append(Data(bytes: bytes, count: input.length))
+        }
+        imageData = copied
     }
     let request: GenerationRequest
     do {
@@ -457,12 +741,15 @@ public func infernoMlxEngineGenerate(
         return 0
     }
 
+    let adapter = engine.adapter()
     return engine.start { engine in
         do {
             try await container.perform(values: request) { context, request in
-                let promptTokenIDs = context.tokenizer.encode(
-                    text: request.prompt,
-                    addSpecialTokens: false
+                let (input, promptTokenIDs) = try preparedInput(
+                    prompt: request.prompt,
+                    imageData: imageData,
+                    adapter: adapter,
+                    context: context
                 )
                 guard !promptTokenIDs.isEmpty else {
                     throw NSError(
@@ -502,9 +789,6 @@ public func infernoMlxEngineGenerate(
                     )
                 }
 
-                // Tokens stay 1-D: the iterator adds the batch dimension,
-                // and a pre-batched array reaches the model double-batched.
-                let input = LMInput(tokens: MLXArray(promptTokenIDs))
                 var parameters = GenerateParameters(
                     maxTokens: request.maxTokens,
                     temperature: request.temperature,

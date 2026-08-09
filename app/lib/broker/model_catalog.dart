@@ -13,6 +13,7 @@ final List<ModelCatalogEntry> modelCatalog = [
     quantization: '4-bit',
     artifact: gemma4E2BMlx4Bit,
     profileKey: 'gemma4',
+    inputModalities: const {ModelInputModality.text, ModelInputModality.image},
   ),
   _entry(
     key: 'gemma4-gguf',
@@ -21,27 +22,45 @@ final List<ModelCatalogEntry> modelCatalog = [
     quantization: 'Q4_K_XL',
     artifact: gemma4E2BGgufQ4,
     profileKey: 'gemma4',
-    // The one path proven for images so far: llama.cpp/libmtmd with the
-    // pinned projector (#18 bake-off). The MLX entry below stays text-only
-    // until its own vision path is validated — capability belongs to the
-    // artifact, not the family.
+    // llama.cpp/libmtmd with the pinned projector passed the #18 bake-off.
+    // Capability belongs to this exact artifact, not the whole family.
+    inputModalities: const {ModelInputModality.text, ModelInputModality.image},
+  ),
+  _entry(
+    key: 'qwen35-2b-mlx',
+    displayName: 'Qwen 3.5 2B',
+    engine: ModelEngine.mlx,
+    quantization: '4-bit',
+    artifact: qwen35TwoBMlx4Bit,
+    profileKey: 'qwen35',
+    inputModalities: const {ModelInputModality.text, ModelInputModality.image},
+  ),
+  _entry(
+    key: 'qwen35-2b-gguf',
+    displayName: 'Qwen 3.5 2B',
+    engine: ModelEngine.gguf,
+    quantization: 'Q4_0',
+    artifact: qwen35TwoBGgufQ4,
+    profileKey: 'qwen35',
     inputModalities: const {ModelInputModality.text, ModelInputModality.image},
   ),
   _entry(
     key: 'qwen35-mlx',
-    displayName: 'Qwen 3.5 4B QAT',
+    displayName: 'Qwen 3.5 4B',
     engine: ModelEngine.mlx,
     quantization: '4-bit',
     artifact: qwen35Mlx4Bit,
     profileKey: 'qwen35',
+    inputModalities: const {ModelInputModality.text, ModelInputModality.image},
   ),
   _entry(
     key: 'qwen35-gguf',
-    displayName: 'Qwen 3.5 4B QAT',
+    displayName: 'Qwen 3.5 4B',
     engine: ModelEngine.gguf,
     quantization: 'Q4_0',
     artifact: qwen35GgufQ4,
     profileKey: 'qwen35',
+    inputModalities: const {ModelInputModality.text, ModelInputModality.image},
   ),
 ];
 
@@ -137,6 +156,8 @@ ModelCatalogEntry _entry({
         path: file.path,
         bytes: file.bytes,
         sha256: file.sha256,
+        repository: file.repository,
+        revision: file.revision,
         role: switch (file.role) {
           InfernoFileRole.weights => ModelFileRole.weights,
           InfernoFileRole.projector => ModelFileRole.projector,

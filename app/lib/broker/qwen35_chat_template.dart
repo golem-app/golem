@@ -18,6 +18,7 @@ const qwen35TemplateSpec = ChatTemplateSpec(
   reasoningPrimer: '${Qwen35ChatTemplate.thinkStart}\n',
   directPrimer:
       '${Qwen35ChatTemplate.thinkStart}\n\n${Qwen35ChatTemplate.thinkEnd}\n\n',
+  mediaMarker: '<__media__>',
   historyStrip: HistoryStripMode.thinkBlocks,
 );
 

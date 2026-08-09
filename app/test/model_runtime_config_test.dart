@@ -79,14 +79,25 @@ void main() {
       expect(config.modelPath, endsWith('.gguf'));
     });
 
-    test('every other pinned artifact stays text-only', () {
-      // Capability is per artifact: Gemma through MLX shares the same
-      // image-capable template and is still text-only until that path is
-      // validated (#18c).
-      for (final key in ['gemma4-mlx', 'qwen35-mlx', 'qwen35-gguf']) {
+    test('the proven MLX vision artifacts declare images', () {
+      for (final key in ['gemma4-mlx', 'qwen35-2b-mlx', 'qwen35-mlx']) {
         final config = resolveModelRuntimeConfig(key);
-        expect(config.supportsImages, isFalse, reason: key);
+        expect(config.supportsImages, isTrue, reason: key);
         expect(config.projectorPath, isNull, reason: key);
+      }
+    });
+
+    test('the proven Qwen GGUF artifacts resolve their exact projectors', () {
+      for (final key in ['qwen35-2b-gguf', 'qwen35-gguf']) {
+        final config = resolveModelRuntimeConfig(key);
+        expect(config.supportsImages, isTrue, reason: key);
+        expect(
+          config.projectorPath,
+          startsWith('documents:models/$key/'),
+          reason: key,
+        );
+        expect(config.projectorPath, contains('mmproj'), reason: key);
+        expect(config.modelPath, isNot(contains('mmproj')), reason: key);
       }
     });
 

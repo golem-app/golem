@@ -7,6 +7,7 @@ import 'backend_policy.dart';
 import 'inferno_inference_repository.dart';
 import 'model_catalog.dart';
 import 'model_profile.dart';
+import 'model_runtime_config.dart';
 import 'runtime.dart';
 
 /// Resolves this process's effective backend from the dart-defines, the
@@ -35,28 +36,40 @@ InferenceRepository createConfiguredInferenceRepository({
   required Duration fakeStreamDelay,
   required String documentsDirectory,
   Future<List<int>?> Function(String attachmentId)? readAttachment,
-}) => selectInferenceRepository(
-  backend: config.kind.name,
-  modelPath: config.modelPath ?? '',
-  modelProfile: config.profileKey,
-  // A fixed seed pins sampling for cross-device determinism probes; regular
-  // builds leave it unset (0 sentinel -> engine-default seeding).
-  samplingSeed: const int.fromEnvironment('GOLEM_SAMPLING_SEED'),
-  fakeStreamDelay: fakeStreamDelay,
-  documentsDirectory: documentsDirectory,
-  createRuntime: InfernoRuntimeAdapter.native,
-  readAttachment: readAttachment,
-  // Measurement and triage hatches (house pattern: dart-defines, no UI —
-  // evidence decides defaults before any knob earns a settings row).
-  loadOptions: const BrokerLoadOptions(
-    checkTensors: bool.fromEnvironment('GOLEM_CHECK_TENSORS'),
-    quantizedKvCache: String.fromEnvironment('GOLEM_KV_CACHE_TYPE') == 'q8_0',
-    threadCount: int.fromEnvironment('GOLEM_THREAD_COUNT') == 0
-        ? null
-        : int.fromEnvironment('GOLEM_THREAD_COUNT'),
-    forceCpu: bool.fromEnvironment('INFERNO_FORCE_CPU'),
-  ),
-);
+}) {
+  // Only a catalog-derived startup path inherits the catalog's projector and
+  // capability proof. An operator-supplied sideload remains text-only until
+  // its own artifact/profile pairing has been validated.
+  final initialRuntime =
+      config.modelPathFromCatalog && config.artifactKey != null
+      ? resolveModelRuntimeConfig(config.artifactKey!)
+      : null;
+  return selectInferenceRepository(
+    backend: config.kind.name,
+    modelPath: config.modelPath ?? '',
+    modelProfile: config.profileKey,
+    initialCatalogKey: config.artifactKey,
+    initialProjectorPath: initialRuntime?.projectorPath,
+    initialSupportsImages: initialRuntime?.supportsImages ?? false,
+    // A fixed seed pins sampling for cross-device determinism probes; regular
+    // builds leave it unset (0 sentinel -> engine-default seeding).
+    samplingSeed: const int.fromEnvironment('GOLEM_SAMPLING_SEED'),
+    fakeStreamDelay: fakeStreamDelay,
+    documentsDirectory: documentsDirectory,
+    createRuntime: InfernoRuntimeAdapter.native,
+    readAttachment: readAttachment,
+    // Measurement and triage hatches (house pattern: dart-defines, no UI —
+    // evidence decides defaults before any knob earns a settings row).
+    loadOptions: const BrokerLoadOptions(
+      checkTensors: bool.fromEnvironment('GOLEM_CHECK_TENSORS'),
+      quantizedKvCache: String.fromEnvironment('GOLEM_KV_CACHE_TYPE') == 'q8_0',
+      threadCount: int.fromEnvironment('GOLEM_THREAD_COUNT') == 0
+          ? null
+          : int.fromEnvironment('GOLEM_THREAD_COUNT'),
+      forceCpu: bool.fromEnvironment('INFERNO_FORCE_CPU'),
+    ),
+  );
+}
 
 /// The dart-define values arrive as compile-time constants, so the selection
 /// logic takes them as parameters — reachable from tests, and the
@@ -66,6 +79,9 @@ InferenceRepository selectInferenceRepository({
   required String backend,
   required String modelPath,
   required String modelProfile,
+  String? initialCatalogKey,
+  String? initialProjectorPath,
+  bool initialSupportsImages = false,
   required Duration fakeStreamDelay,
   required String documentsDirectory,
   required BrokerRuntime Function() createRuntime,
@@ -104,10 +120,11 @@ InferenceRepository selectInferenceRepository({
     engine: engine,
     modelPath: resolvedModelPath,
     profile: profile,
-    initialCatalogKey: activeArtifactKeyFor(
-      backend: backend,
-      modelProfile: modelProfile,
-    ),
+    initialCatalogKey:
+        initialCatalogKey ??
+        activeArtifactKeyFor(backend: backend, modelProfile: modelProfile),
+    initialProjectorPath: initialProjectorPath,
+    initialSupportsImages: initialSupportsImages,
     documentsDirectory: documentsDirectory,
     availableMemoryBytes: const DeviceStorageChannel().availableMemoryBytes,
     loadOptions: loadOptions,

@@ -74,6 +74,21 @@ difference between comfortable and memory-pressured.
 The BF16 file remains an evaluation input in the manifest. Only Q8_0 is pinned
 as a `projector`-role file on `gemma4E2BGgufQ4` and enters normal download.
 
+## Physical Android acceptance
+
+The selected Q8_0 projector was accepted through the shipping app path on a
+OnePlus 12R running Android 16, using the separate `app.golem.qa` package. The
+app downloaded and verified both catalog files (3.18 GB total) before the
+request was retried; no sideload or receipt edit bypassed model management.
+
+Using Android's system photo picker, the fourth gallery image—an apple on a
+wooden table—was attached through the composer, persisted into the chat, and
+sent to the catalog-backed Gemma GGUF runtime. For the prompt “What fruit is
+shown in this image? Answer with one word.” the settled response was `Apple`,
+one generated token at 10.5 tok/s. This exercises the Android picker, intake
+normalization, attachment store, broker prompt, ABI 3 image array, `libmtmd`,
+and the selected cross-repository projector as one end-to-end path.
+
 ## Recorded grounding failure
 
 **Chart reading fails, identically on both projectors.** All three cold runs of

@@ -140,7 +140,7 @@ void main() {
       'qwen35',
     );
     expect(
-      profileKeyForPinnedRepository('YoozLabs/Qwen3.5-4B-qat-lean-4bit-mlx'),
+      profileKeyForPinnedRepository('mlx-community/Qwen3.5-4B-MLX-4bit'),
       'qwen35',
     );
     expect(

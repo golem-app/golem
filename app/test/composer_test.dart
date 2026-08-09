@@ -1,7 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
+import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 
@@ -38,8 +40,8 @@ void main() {
     expect(find.byKey(const Key('model-picker-sheet')), findsNothing);
     final active = container.read(chatControllerProvider).requireValue.active!;
     expect(active.modelKey, 'qwen35-gguf');
-    expect(find.text('Qwen 3.5 4B QAT'), findsOneWidget);
-    expect(find.text('Qwen 3.5 4B QAT · simulated'), findsAtLeastNWidgets(1));
+    expect(find.text('Qwen 3.5 4B'), findsOneWidget);
+    expect(find.text('Qwen 3.5 4B · simulated'), findsAtLeastNWidgets(1));
   });
 
   testWidgets('picking a model on a fresh session materializes the chat', (
@@ -115,9 +117,42 @@ void main() {
   });
 
   testWidgets('a text-only model disables every attach row', (tester) async {
-    // The default chat runs gemma4-mlx, which is text-only until its vision
-    // path is validated — so the refusal happens before a picker opens.
-    await pumpWithRepositories(tester, child: const ChatScreen());
+    // Capability belongs to the injected artifact, not merely its Qwen
+    // profile. Keep an explicit text-only entry in this test even though all
+    // current built-ins have now passed a vision path.
+    final source = modelCatalog.firstWhere(
+      (entry) => entry.key == 'qwen35-gguf',
+    );
+    final textOnly = ModelCatalogEntry(
+      key: source.key,
+      displayName: source.displayName,
+      engine: source.engine,
+      quantization: source.quantization,
+      repository: source.repository,
+      revision: source.revision,
+      files: source.files,
+      profileKey: source.profileKey,
+    );
+    await pumpWithRepositories(
+      tester,
+      catalog: [
+        for (final entry in modelCatalog)
+          if (entry.key == source.key) textOnly else entry,
+      ],
+      history: ChatHistorySnapshot(
+        activeId: 'chat',
+        conversations: [
+          ChatConversation(
+            id: 'chat',
+            title: 'Text only',
+            updatedAt: DateTime.utc(2026, 8, 9),
+            messages: const [],
+            modelKey: 'qwen35-gguf',
+          ),
+        ],
+      ),
+      child: const ChatScreen(),
+    );
     await tester.tap(find.byKey(const Key('composer-attach')));
     await tester.pumpAndSettle();
 
@@ -146,7 +181,7 @@ void main() {
             title: 'Pictures',
             updatedAt: DateTime.utc(2026, 8, 9),
             messages: const [],
-            // The one artifact proven image-capable (#18).
+            // One of the exact artifacts proven image-capable (#18).
             modelKey: 'gemma4-gguf',
           ),
         ],

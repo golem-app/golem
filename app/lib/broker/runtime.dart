@@ -19,6 +19,8 @@ export 'package:inferno/inferno.dart'
         llamaCppRevision,
         mlxSwiftLmVersion,
         mlxSwiftVersion,
+        qwen35TwoBGgufQ4,
+        qwen35TwoBMlx4Bit,
         qwen35GgufQ4,
         qwen35Mlx4Bit;
 

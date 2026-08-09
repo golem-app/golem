@@ -10,7 +10,11 @@ const _artifacts = <String, InfernoModelArtifact>{
   'gguf': gemma4E2BGgufQ4,
   'qwen-mlx': qwen35Mlx4Bit,
   'qwen-gguf': qwen35GgufQ4,
+  'qwen-2b-mlx': qwen35TwoBMlx4Bit,
+  'qwen-2b-gguf': qwen35TwoBGgufQ4,
   'gemma-mmproj': gemma4E2BMmprojCandidates,
+  'qwen-2b-mmproj': qwen35TwoBMmprojCandidates,
+  'qwen-mmproj': qwen35MmprojCandidates,
 };
 
 /// Downloads a pinned model artifact for local benching and device

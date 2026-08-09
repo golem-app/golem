@@ -41,6 +41,7 @@ void main() {
     test('control markers match the sets the hand-written templates used', () {
       // Gemma stripped bos, both turn markers, the thought control, and both
       // channel markers; Qwen stripped both turn markers and both think tags.
+      // Both also strip the broker-only media marker from pasted text.
       expect(gemma4ProfileSpec.template.controlMarkers, [
         Gemma4ChatTemplate.bos,
         Gemma4ChatTemplate.turnStart,
@@ -57,19 +58,20 @@ void main() {
         Qwen35ChatTemplate.imEnd,
         Qwen35ChatTemplate.thinkStart,
         Qwen35ChatTemplate.thinkEnd,
+        '<__media__>',
       ]);
     });
 
-    test('only the Gemma template can express an image', () {
+    test('both pinned templates can express an image', () {
       // A profile says what its *template* can express; whether a given
       // artifact accepts one is the catalog entry's call (#18).
       expect(gemma4ProfileSpec.supportsImages, isTrue);
       expect(gemma4ProfileSpec.template.mediaMarker, '<__media__>');
       expect(gemma4ProfileSpec.imageTokenCost, greaterThan(0));
 
-      expect(qwen35ProfileSpec.supportsImages, isFalse);
-      expect(qwen35ProfileSpec.template.mediaMarker, isNull);
-      expect(qwen35ProfileSpec.imageTokenCost, 0);
+      expect(qwen35ProfileSpec.supportsImages, isTrue);
+      expect(qwen35ProfileSpec.template.mediaMarker, '<__media__>');
+      expect(qwen35ProfileSpec.imageTokenCost, 1280);
     });
 
     test('sampling follows the reasoning mode', () {

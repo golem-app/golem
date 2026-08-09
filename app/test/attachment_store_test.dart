@@ -186,6 +186,27 @@ void main() {
       expect(await attachments.read(dropped.id), isNull);
     });
 
+    test(
+      'startup collects bytes no restored conversation references',
+      () async {
+        final attachments = InMemoryAttachmentRepository();
+        final kept = await attachments.store(const [1], mimeType: 'image/jpeg');
+        final orphan = await attachments.store(const [
+          2,
+        ], mimeType: 'image/jpeg');
+        final container = containerWith(
+          attachments,
+          history: historyWith([kept.id]),
+        );
+        addTearDown(container.dispose);
+
+        await container.read(chatControllerProvider.future);
+
+        expect(await attachments.read(kept.id), isNotNull);
+        expect(await attachments.read(orphan.id), isNull);
+      },
+    );
+
     test('deleting every chat collects every attachment', () async {
       final attachments = InMemoryAttachmentRepository();
       final stored = await attachments.store(const [1], mimeType: 'image/png');

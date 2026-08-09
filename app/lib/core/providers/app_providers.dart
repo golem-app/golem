@@ -368,6 +368,7 @@ class ChatController extends _$ChatController {
   Future<ChatState> build() async {
     ref.onDispose(() => _generationEpoch++);
     final snapshot = await ref.read(chatHistoryRepositoryProvider).load();
+    await _retainReferenced(_attachments, snapshot.conversations);
     return ChatState(
       conversations: snapshot.conversations,
       activeId: snapshot.activeId,

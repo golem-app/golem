@@ -231,9 +231,7 @@ final class RealModelManagementRepository implements ModelManagementRepository {
         await File('${_rootFor(entry)}/${spec.path}').delete();
       }
 
-      final url =
-          'https://huggingface.co/${entry.repository}'
-          '/resolve/${entry.revision}/${spec.path}';
+      final url = entry.resolveUrlFor(spec).toString();
       ArtifactFileEvent fileOutcome = const ArtifactFileComplete();
       var lastReceived = 0;
       await for (final event in downloader.download(

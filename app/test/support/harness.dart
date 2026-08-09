@@ -25,6 +25,8 @@ import 'in_memory_chat_history_repository.dart';
 import 'in_memory_preferences_repository.dart';
 import 'in_memory_settings_repository.dart';
 
+export 'image_fixtures.dart';
+
 /// The iPhone 17 logical viewport every widget/golden suite renders in.
 const viewport = Size(402, 874);
 
@@ -84,6 +86,7 @@ final class FakeDiskSpace implements DiskSpaceProbe {
 ProviderContainer buildContainer({
   ChatHistorySnapshot? history,
   ModelState model = const ModelState(),
+  List<ModelCatalogEntry>? catalog,
   InferenceBackendConfig? backend,
   SettingsRepository? settings,
   PreferencesRepository? preferences,
@@ -114,7 +117,7 @@ ProviderContainer buildContainer({
       settingsRepositoryProvider.overrideWithValue(
         settings ?? InMemorySettingsRepository(),
       ),
-      modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
+      modelCatalogEntriesProvider.overrideWithValue(catalog ?? modelCatalog),
       modelManagementRepositoryProvider.overrideWithValue(StaticModels(model)),
       benchmarkRepositoryProvider.overrideWithValue(
         FakeBenchmarkRepository(
@@ -133,6 +136,7 @@ Future<void> pumpWithRepositories(
   Brightness brightness = Brightness.light,
   ChatHistorySnapshot? history,
   ModelState model = const ModelState(),
+  List<ModelCatalogEntry>? catalog,
   InferenceBackendConfig? backend,
   PreferencesRepository? preferences,
 }) async {
@@ -140,6 +144,7 @@ Future<void> pumpWithRepositories(
   final container = buildContainer(
     history: history,
     model: model,
+    catalog: catalog,
     backend: backend,
     preferences: preferences,
   );
@@ -330,81 +335,3 @@ final class StaticModels implements ModelManagementRepository {
   @override
   Future<ModelState> addModel(ModelCatalogEntry entry) async => state;
 }
-
-/// A real 2x2 red PNG: small enough to inline, valid enough that the
-/// platform codec decodes it in widget tests.
-final tinyPngBytes = Uint8List.fromList(const [
-  137,
-  80,
-  78,
-  71,
-  13,
-  10,
-  26,
-  10,
-  0,
-  0,
-  0,
-  13,
-  73,
-  72,
-  68,
-  82,
-  0,
-  0,
-  0,
-  2,
-  0,
-  0,
-  0,
-  2,
-  8,
-  2,
-  0,
-  0,
-  0,
-  253,
-  212,
-  154,
-  115,
-  0,
-  0,
-  0,
-  16,
-  73,
-  68,
-  65,
-  84,
-  120,
-  218,
-  99,
-  248,
-  207,
-  192,
-  0,
-  68,
-  12,
-  16,
-  10,
-  0,
-  31,
-  238,
-  3,
-  253,
-  99,
-  94,
-  187,
-  91,
-  0,
-  0,
-  0,
-  0,
-  73,
-  69,
-  78,
-  68,
-  174,
-  66,
-  96,
-  130,
-]);

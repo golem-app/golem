@@ -21,8 +21,16 @@ import 'core/repositories/real_model_management_repository.dart';
 import 'core/services/artifact_downloader.dart';
 import 'core/services/cache_probe.dart';
 import 'core/services/device_storage.dart';
+import 'features/chat/widgets/attach_sheet.dart';
 
-Future<void> main() async {
+Future<void> main() => launch();
+
+/// Composes and launches the app. The picker seam lets the integration
+/// journey exercise the complete attach sheet and composer flow without
+/// handing control to an OS photo-library UI; production uses the default.
+Future<void> launch({
+  AttachmentPicker picker = const AttachmentPicker(),
+}) async {
   WidgetsFlutterBinding.ensureInitialized();
   const streamDelayMilliseconds = int.fromEnvironment(
     'GOLEM_STREAM_DELAY_MS',
@@ -123,7 +131,7 @@ Future<void> main() async {
           ),
         ),
       ],
-      child: const GolemApp(),
+      child: GolemApp(picker: picker),
     ),
   );
 }
