@@ -13,6 +13,7 @@ import '../domain/response_style_mapping.dart';
 import '../repositories/contracts.dart';
 import '../services/cache_probe.dart';
 import '../services/device_storage.dart';
+import '../services/image_intake.dart';
 import '../startup/startup_sequence.dart';
 
 part 'app_providers.g.dart';
@@ -419,6 +420,26 @@ class ChatController extends _$ChatController {
     } catch (_) {}
   }
 
+  /// Copies one prepared image into the attachment store and describes it as
+  /// a message part.
+  Future<ImagePart> _storeAttachment(PreparedImage image) async {
+    final attachments = _attachments;
+    if (attachments == null) {
+      throw StateError('No attachment store is wired.');
+    }
+    final stored = await attachments.store(
+      image.bytes,
+      mimeType: image.mimeType,
+    );
+    return ImagePart(
+      attachmentId: stored.id,
+      mimeType: stored.mimeType,
+      width: image.width,
+      height: image.height,
+      byteCount: stored.byteCount,
+    );
+  }
+
   /// Re-persists the in-memory state; the save-history re-enable path.
   Future<void> persistCurrent() async {
     if (!state.hasValue) return;
@@ -562,18 +583,52 @@ class ChatController extends _$ChatController {
     await _persist(next);
   }
 
-  Future<void> send(String rawText) async {
+  /// Sends a turn. [images] are attachments the composer has already
+  /// validated; their bytes are copied into the attachment store here, so the
+  /// message references ids rather than anything the picker handed over.
+  Future<void> send(
+    String rawText, {
+    List<PreparedImage> images = const [],
+  }) async {
     final text = rawText.trim();
-    if (text.isEmpty || _value.generation != GenerationPhase.idle) return;
+    // An image alone is a complete turn — "what is this?" is implied.
+    if ((text.isEmpty && images.isEmpty) ||
+        _value.generation != GenerationPhase.idle) {
+      return;
+    }
     if (_value.active == null) await newChat();
     final active = _value.active!;
-    final user = ChatMessage.text(
+
+    final List<MessagePart> parts;
+    try {
+      parts = [
+        for (final image in images) await _storeAttachment(image),
+        if (text.isNotEmpty) TextPart(text),
+      ];
+    } catch (error, stackTrace) {
+      // The bytes never reached disk, so nothing is half-sent: surface the
+      // failure and keep the composer's content for another try.
+      state = AsyncData(
+        _value.copyWith(
+          failure: const ChatFailure(
+            kind: ChatFailureKind.generic,
+            message: 'That image could not be saved. Try attaching it again.',
+          ),
+        ),
+      );
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+    if (!ref.mounted) return;
+
+    final user = ChatMessage(
       id: newId(),
       role: MessageRole.user,
-      text: text,
+      parts: parts,
       createdAt: DateTime.now(),
     );
-    final title = active.messages.isEmpty ? normalizeTitle(text) : active.title;
+    final title = active.messages.isEmpty
+        ? normalizeTitle(text.isEmpty ? 'Image' : text)
+        : active.title;
     final updated = active.copyWith(
       title: title,
       messages: [...active.messages, user],

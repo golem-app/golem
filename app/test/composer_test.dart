@@ -5,6 +5,10 @@ import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 
+import 'package:golem_flutter/core/domain/models.dart';
+import 'package:golem_flutter/core/services/image_intake.dart';
+import 'package:golem_flutter/features/chat/widgets/attach_sheet.dart';
+
 import 'support/harness.dart';
 
 void main() {
@@ -110,17 +114,128 @@ void main() {
     expect(field.focusNode!.hasFocus, isTrue);
   });
 
-  testWidgets('the attach sheet is inert and its rows dismiss', (tester) async {
+  testWidgets('a text-only model disables every attach row', (tester) async {
+    // The default chat runs gemma4-mlx, which is text-only until its vision
+    // path is validated — so the refusal happens before a picker opens.
     await pumpWithRepositories(tester, child: const ChatScreen());
     await tester.tap(find.byKey(const Key('composer-attach')));
     await tester.pumpAndSettle();
+
     expect(find.byKey(const Key('attach-sheet')), findsOneWidget);
-    expect(
-      find.textContaining('Attachments are read on device'),
-      findsOneWidget,
+    expect(find.textContaining('handles text only'), findsOneWidget);
+    for (final key in const [
+      'attach-photo-library',
+      'attach-take-photo',
+      'attach-files',
+    ]) {
+      final button = tester.widget<CupertinoButton>(find.byKey(Key(key)));
+      expect(button.onPressed, isNull, reason: key);
+    }
+  });
+
+  testWidgets('an image-capable model attaches, trays, and sends', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      history: ChatHistorySnapshot(
+        activeId: 'chat',
+        conversations: [
+          ChatConversation(
+            id: 'chat',
+            title: 'Pictures',
+            updatedAt: DateTime.utc(2026, 8, 9),
+            messages: const [],
+            // The one artifact proven image-capable (#18).
+            modelKey: 'gemma4-gguf',
+          ),
+        ],
+      ),
+      child: ChatScreen(picker: _StubPicker()),
     );
+
+    await tester.tap(find.byKey(const Key('composer-attach')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('can see them'), findsOneWidget);
     await tester.tap(find.byKey(const Key('attach-photo-library')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('attach-sheet')), findsNothing);
+
+    // The picked image shows in the tray, and send is now reachable with no
+    // text typed at all.
+    expect(find.byKey(const Key('composer-attachments')), findsOneWidget);
+    final send = tester.widget<CupertinoButton>(
+      find.byKey(const Key('send-button')),
+    );
+    expect(send.onPressed, isNotNull);
+
+    await tester.tap(find.byKey(const Key('send-button')));
+    await tester.pumpAndSettle();
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ChatScreen)),
+    );
+    final messages = container
+        .read(chatControllerProvider)
+        .requireValue
+        .active!
+        .messages;
+    final user = messages.first;
+    expect(user.hasImages, isTrue);
+    expect(user.images.single.width, 2);
+    expect(user.images.single.height, 2);
+    // The tray empties once the turn is sent.
+    expect(find.byKey(const Key('composer-attachments')), findsNothing);
   });
+
+  testWidgets('a rejected image toasts and attaches nothing', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      history: ChatHistorySnapshot(
+        activeId: 'chat',
+        conversations: [
+          ChatConversation(
+            id: 'chat',
+            title: 'Pictures',
+            updatedAt: DateTime.utc(2026, 8, 9),
+            messages: const [],
+            modelKey: 'gemma4-gguf',
+          ),
+        ],
+      ),
+      child: ChatScreen(
+        picker: _StubPicker(rejection: ImageRejection.unsupportedType),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('composer-attach')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('attach-photo-library')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('golem-toast')), findsOneWidget);
+    expect(find.textContaining('not supported'), findsOneWidget);
+    expect(find.byKey(const Key('composer-attachments')), findsNothing);
+    // Let the toast's own dismiss timer run out.
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+  });
+}
+
+/// A picker that never touches a plugin: it returns a 2x2 PNG, or raises the
+/// rejection under test.
+final class _StubPicker extends AttachmentPicker {
+  const _StubPicker({this.rejection});
+
+  final ImageRejection? rejection;
+
+  @override
+  Future<PreparedImage?> pick(AttachSource source) async {
+    if (rejection != null) throw ImageRejectedException(rejection!);
+    return PreparedImage(
+      bytes: tinyPngBytes,
+      mimeType: 'image/png',
+      width: 2,
+      height: 2,
+    );
+  }
 }

@@ -49,6 +49,13 @@ dependencies:
   url_launcher: ^6.3.2
   markdown: ^7.3.1
   highlight: ^0.7.0
+  # Image attachment intake (#18). Both are flutter.dev packages: image_picker
+  # uses PHPicker on iOS and the Android Photo Picker on Android 13+, so the
+  # library path needs no read permission and the plugin handles EXIF
+  # orientation and native downscaling; file_selector covers the Files option
+  # and macOS.
+  image_picker: ^1.2.3
+  file_selector: ^1.1.0
 
 dev_dependencies:
   flutter_test:

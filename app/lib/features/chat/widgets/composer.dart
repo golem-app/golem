@@ -4,12 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/services/image_intake.dart';
+import '../../../core/chrome/golem_toast.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../model_label.dart';
 import 'attach_sheet.dart';
 import 'model_picker_sheet.dart';
 
-class Composer extends ConsumerWidget {
+class Composer extends ConsumerStatefulWidget {
   const Composer({
     required this.controller,
     required this.focus,
@@ -17,6 +19,7 @@ class Composer extends ConsumerWidget {
     required this.generation,
     required this.activeId,
     required this.modelKey,
+    this.picker = const AttachmentPicker(),
     super.key,
   });
   final TextEditingController controller;
@@ -29,16 +32,139 @@ class Composer extends ConsumerWidget {
   final String? activeId;
   final String? modelKey;
 
+  /// Injectable so widget tests exercise the attach flow without a plugin.
+  final AttachmentPicker picker;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<Composer> createState() => _ComposerState();
+}
+
+class _ComposerState extends ConsumerState<Composer> {
+  /// Images chosen but not yet sent. Composition state, like the draft text:
+  /// nothing durable exists until send copies the bytes into the store.
+  final List<PreparedImage> _pending = [];
+
+  /// Opens the sheet and keeps whatever came back. Rejections surface as a
+  /// toast rather than a banner: nothing was sent, and the user's next move is
+  /// simply to pick a different picture.
+  Future<void> _attach(String modelLabel, bool supportsImages) async {
+    try {
+      final source = await showAttachSheet(
+        context,
+        modelLabel: modelLabel,
+        supportsImages: supportsImages,
+      );
+      if (source == null || !mounted) return;
+      final picked = await widget.picker.pick(source);
+      if (picked == null || !mounted) return;
+      setState(() => _pending.add(picked));
+    } on ImageRejectedException catch (error) {
+      if (!mounted) return;
+      showGolemToast(context, switch (error.reason) {
+        ImageRejection.unsupportedType =>
+          'That file type is not supported. Use a JPEG, PNG, or WebP image.',
+        ImageRejection.tooLarge => 'That image is too large to attach.',
+        ImageRejection.undecodable => 'That image could not be read.',
+      });
+    }
+  }
+
+  /// Thumbnails of what is attached but not yet sent, each removable.
+  Widget _tray(BuildContext context) => Padding(
+    key: const Key('composer-attachments'),
+    padding: const EdgeInsets.only(top: GolemSpace.s3, bottom: GolemSpace.s1),
+    child: Row(
+      children: [
+        for (var index = 0; index < _pending.length; index++)
+          Padding(
+            padding: const EdgeInsets.only(right: GolemSpace.s2),
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(GolemRadius.field),
+                  child: Image.memory(
+                    _pending[index].bytes,
+                    width: 56,
+                    height: 56,
+                    fit: BoxFit.cover,
+                    // A decorative thumbnail: the remove button beside it
+                    // carries the accessible name.
+                    excludeFromSemantics: true,
+                  ),
+                ),
+                Positioned(
+                  top: -6,
+                  right: -6,
+                  child: CupertinoButton(
+                    key: Key('composer-attachment-remove-$index'),
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(
+                      GolemSize.hitTarget,
+                      GolemSize.hitTarget,
+                    ),
+                    onPressed: () => setState(() => _pending.removeAt(index)),
+                    child: Semantics(
+                      button: true,
+                      label: 'Remove attached image',
+                      child: Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: CupertinoDynamicColor.resolve(
+                            GolemTheme.surface,
+                            context,
+                          ),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: CupertinoDynamicColor.resolve(
+                              GolemTheme.divider,
+                              context,
+                            ),
+                          ),
+                        ),
+                        child: Icon(
+                          CupertinoIcons.xmark,
+                          size: 12,
+                          color: CupertinoDynamicColor.resolve(
+                            GolemTheme.mutedInk,
+                            context,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    ),
+  );
+
+  TextEditingController get controller => widget.controller;
+  FocusNode get focus => widget.focus;
+  bool get reasoningEnabled => widget.reasoningEnabled;
+  GenerationPhase get generation => widget.generation;
+  String? get activeId => widget.activeId;
+  String? get modelKey => widget.modelKey;
+
+  @override
+  Widget build(BuildContext context) {
     final generating = generation != GenerationPhase.idle;
     final backend = ref.watch(inferenceBackendProvider);
     final catalog = ref.watch(modelCatalogEntriesProvider);
+    final resident = ref.watch(residentModelKeyProvider);
     final modelLabel = chatModelLabel(
       backend: backend,
       catalog: catalog,
       modelKey: modelKey,
-      residentModelKey: ref.watch(residentModelKeyProvider),
+      residentModelKey: resident,
+    );
+    final supportsImages = chatModelSupportsImages(
+      backend: backend,
+      catalog: catalog,
+      modelKey: modelKey,
+      residentModelKey: resident,
     );
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -65,6 +191,7 @@ class Composer extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (_pending.isNotEmpty) _tray(context),
               CupertinoTextField.borderless(
                 key: const Key('chat-composer'),
                 controller: controller,
@@ -98,10 +225,7 @@ class Composer extends ConsumerWidget {
                           semanticLabel: 'Add to this chat',
                           onPressed: generating
                               ? null
-                              : () => showAttachSheet(
-                                  context,
-                                  modelLabel: modelLabel,
-                                ),
+                              : () => _attach(modelLabel, supportsImages),
                           child: _circle(
                             context,
                             child: Icon(
@@ -258,6 +382,8 @@ class Composer extends ConsumerWidget {
                     listenable: controller,
                     builder: (context, _) {
                       final hasText = controller.text.trim().isNotEmpty;
+                      // An image alone is a complete turn.
+                      final canSend = hasText || _pending.isNotEmpty;
                       return CupertinoButton(
                         key: Key(generating ? 'stop-button' : 'send-button'),
                         padding: EdgeInsets.zero,
@@ -266,11 +392,13 @@ class Composer extends ConsumerWidget {
                             ? () => ref
                                   .read(chatControllerProvider.notifier)
                                   .stop()
-                            : !hasText
+                            : !canSend
                             ? null
                             : () {
                                 final text = controller.text;
+                                final images = List.of(_pending);
                                 controller.clear();
+                                setState(_pending.clear);
                                 if (ref
                                         .read(preferencesControllerProvider)
                                         .value
@@ -280,13 +408,13 @@ class Composer extends ConsumerWidget {
                                 }
                                 ref
                                     .read(chatControllerProvider.notifier)
-                                    .send(text);
+                                    .send(text, images: images);
                               },
                         child: Container(
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: generating || hasText
+                            color: generating || canSend
                                 ? CupertinoDynamicColor.resolve(
                                     GolemTheme.accent,
                                     context,

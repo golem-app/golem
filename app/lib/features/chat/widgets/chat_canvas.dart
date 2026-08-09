@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/domain/app_state.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/theme/golem_theme.dart';
+import 'attach_sheet.dart';
 import 'composer.dart';
 import 'empty_chat.dart';
 import 'message_bubble.dart';
@@ -20,6 +21,7 @@ class ChatCanvas extends ConsumerWidget {
     required this.onUserScroll,
     required this.onScrollMetrics,
     required this.showJump,
+    this.picker = const AttachmentPicker(),
     super.key,
   });
   final ChatState chat;
@@ -30,6 +32,7 @@ class ChatCanvas extends ConsumerWidget {
   final ValueChanged<ScrollDirection> onUserScroll;
   final VoidCallback onScrollMetrics;
   final bool showJump;
+  final AttachmentPicker picker;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -121,6 +124,7 @@ class ChatCanvas extends ConsumerWidget {
         ),
         if (chat.failure != null) RecoveryBanner(failure: chat.failure!),
         Composer(
+          picker: picker,
           controller: composer,
           focus: focus,
           reasoningEnabled: active?.reasoningEnabled ?? false,
