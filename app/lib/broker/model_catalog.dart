@@ -12,6 +12,7 @@ final List<ModelCatalogEntry> modelCatalog = [
     engine: ModelEngine.mlx,
     quantization: '4-bit',
     artifact: gemma4E2BMlx4Bit,
+    profileKey: 'gemma4',
   ),
   _entry(
     key: 'gemma4-gguf',
@@ -19,6 +20,7 @@ final List<ModelCatalogEntry> modelCatalog = [
     engine: ModelEngine.gguf,
     quantization: 'Q4_K_XL',
     artifact: gemma4E2BGgufQ4,
+    profileKey: 'gemma4',
   ),
   _entry(
     key: 'qwen35-mlx',
@@ -26,6 +28,7 @@ final List<ModelCatalogEntry> modelCatalog = [
     engine: ModelEngine.mlx,
     quantization: '4-bit',
     artifact: qwen35Mlx4Bit,
+    profileKey: 'qwen35',
   ),
   _entry(
     key: 'qwen35-gguf',
@@ -33,6 +36,7 @@ final List<ModelCatalogEntry> modelCatalog = [
     engine: ModelEngine.gguf,
     quantization: 'Q4_0',
     artifact: qwen35GgufQ4,
+    profileKey: 'qwen35',
   ),
 ];
 
@@ -57,17 +61,28 @@ String primaryModelPathFor(String key) {
     (item) => item.key == key,
     orElse: () => throw ArgumentError.value(key, 'key', 'Unknown catalog key'),
   );
+  final path = modelPathForEntry(entry);
+  if (path == null) {
+    final weights = entry.files.where((file) => file.path.endsWith('.gguf'));
+    throw StateError(
+      'Catalog entry $key must pin exactly one .gguf file, '
+      'found ${weights.length}.',
+    );
+  }
+  return path;
+}
+
+/// The `documents:`-relative path for any catalog entry — pinned or resolved
+/// custom — or null when the entry does not describe one loadable artifact.
+/// Runtime activation turns that null into a typed, actionable failure rather
+/// than a raw [StateError]; see `model_runtime_config.dart`.
+String? modelPathForEntry(ModelCatalogEntry entry) {
   switch (entry.engine) {
     case ModelEngine.gguf:
       final weights = entry.files
           .where((file) => file.path.endsWith('.gguf'))
           .toList();
-      if (weights.length != 1) {
-        throw StateError(
-          'Catalog entry $key must pin exactly one .gguf file, '
-          'found ${weights.length}.',
-        );
-      }
+      if (weights.length != 1) return null;
       return 'documents:${entry.installDirectory}/${weights.single.path}';
     case ModelEngine.mlx:
       return 'documents:${entry.installDirectory}';
@@ -80,6 +95,7 @@ ModelCatalogEntry _entry({
   required ModelEngine engine,
   required String quantization,
   required InfernoModelArtifact artifact,
+  required String profileKey,
 }) => ModelCatalogEntry(
   key: key,
   displayName: displayName,
@@ -87,6 +103,7 @@ ModelCatalogEntry _entry({
   quantization: quantization,
   repository: artifact.repository,
   revision: artifact.revision,
+  profileKey: profileKey,
   files: [
     for (final file in artifact.files)
       ModelArtifactFile(

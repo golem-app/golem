@@ -275,7 +275,7 @@ void main() {
     // Only non-default values reach disk, so future default changes reach
     // users who never touched a control.
     final raw = jsonDecode(await file.readAsString()) as Map<String, Object?>;
-    expect(raw['schemaVersion'], 1);
+    expect(raw['schemaVersion'], 2);
     expect(raw.containsKey('hapticsOnSend'), isFalse);
     expect(raw.containsKey('saveHistory'), isFalse);
     expect((raw['responseStyles'] as Map).keys, ['gemma4']);
@@ -285,12 +285,82 @@ void main() {
     expect((await repository.load()).responseStyles, isEmpty);
   });
 
+  test(
+    'schema-v1 app preferences migrate to v2 without losing a repository',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'golem-ui-prefs-v1-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File('${directory.path}/ui-prefs.json');
+      // Exactly what a pre-#43 install wrote: no profile on the repository.
+      await file.writeAsString('''
+{
+  "schemaVersion": 1,
+  "advancedMode": true,
+  "customModels": [
+    {"repository": "mlx-community/awesome-model", "engine": "mlx"}
+  ]
+}
+''');
+
+      final repository = FilePreferencesRepository(file);
+      final loaded = await repository.load();
+      expect(File('${file.path}.corrupt').existsSync(), isFalse);
+      expect(loaded.advancedMode, isTrue);
+      final spec = loaded.customModels.single;
+      expect(spec.repository, 'mlx-community/awesome-model');
+      expect(spec.engine, ModelEngine.mlx);
+      expect(spec.revision, 'main');
+      // Unresolved: it lists and deletes, but cannot be activated.
+      expect(spec.profile, isNull);
+      expect(spec.toCatalogEntry().profileKey, unresolvedProfileKey);
+
+      await repository.save(loaded);
+      final raw = jsonDecode(await file.readAsString()) as Map<String, Object?>;
+      expect(raw['schemaVersion'], 2);
+      expect((raw['customModels']! as List).single, {
+        'repository': 'mlx-community/awesome-model',
+        'engine': 'mlx',
+      });
+    },
+  );
+
+  test(
+    'a stored profile that no longer parses degrades to unresolved',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'golem-ui-prefs-bad-profile-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File('${directory.path}/ui-prefs.json');
+      await file.writeAsString('''
+{
+  "schemaVersion": 2,
+  "customModels": [
+    {
+      "repository": "someone/model",
+      "engine": "gguf",
+      "profile": {"schemaVersion": 1, "key": "broken", "parser": "thinkTags"}
+    }
+  ]
+}
+''');
+
+      final loaded = await FilePreferencesRepository(file).load();
+      // The whole file must not be quarantined over one unusable profile.
+      expect(File('${file.path}.corrupt').existsSync(), isFalse);
+      expect(loaded.customModels.single.repository, 'someone/model');
+      expect(loaded.customModels.single.profile, isNull);
+    },
+  );
+
   test('unreadable or unknown-schema app preferences recover', () async {
     final directory = await Directory.systemTemp.createTemp(
       'golem-ui-prefs-test-',
     );
     addTearDown(() => directory.delete(recursive: true));
-    for (final content in ['not json at all', '{"schemaVersion": 2}']) {
+    for (final content in ['not json at all', '{"schemaVersion": 99}']) {
       final file = File('${directory.path}/ui-prefs.json');
       await file.writeAsString(content);
       final repository = FilePreferencesRepository(file);

@@ -637,6 +637,7 @@ void main() {
             quantization: '4-bit',
             repository: 'example/test-mlx',
             revision: '0123456789abcdef',
+            profileKey: 'gemma4',
             files: [
               ModelArtifactFile(
                 path: 'model.safetensors',

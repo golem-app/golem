@@ -28,6 +28,7 @@ const _catalog = [
     quantization: '4-bit',
     repository: 'example/test-mlx',
     revision: '0123456789abcdef',
+    profileKey: 'gemma4',
     files: [
       ModelArtifactFile(path: 'model.safetensors', bytes: 1200, sha256: 'aa'),
     ],
@@ -39,6 +40,7 @@ const _catalog = [
     quantization: 'Q4_0',
     repository: 'example/test-gguf',
     revision: 'fedcba9876543210',
+    profileKey: 'gemma4',
     files: [ModelArtifactFile(path: 'model.gguf', bytes: 600, sha256: 'bb')],
   ),
 ];
