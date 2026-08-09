@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:typed_data';
 
 enum InfernoEngineKind { llamaCpp, mlx, mock }
 
@@ -114,15 +115,29 @@ final class InfernoSamplingParameters {
   final List<int> stopTokenIds;
 }
 
+/// One encoded image handed to an engine: the file's own bytes (PNG, JPEG,
+/// WebP), decoded natively rather than in Dart.
+final class InfernoImageInput {
+  const InfernoImageInput(this.bytes);
+
+  final Uint8List bytes;
+}
+
 /// Input to an engine. The prompt is already rendered by the caller.
 final class InfernoGenerationRequest {
   const InfernoGenerationRequest({
     required this.prompt,
     this.sampling = const InfernoSamplingParameters(),
+    this.images = const [],
   });
 
   final String prompt;
   final InfernoSamplingParameters sampling;
+
+  /// Ordered images for this generation. The rendered [prompt] must carry one
+  /// media marker per entry, in this order — the engine substitutes each
+  /// marker with that image's encoded tokens.
+  final List<InfernoImageInput> images;
 }
 
 enum InfernoStopReason {

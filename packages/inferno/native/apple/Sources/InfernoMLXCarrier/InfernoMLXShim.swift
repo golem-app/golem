@@ -7,7 +7,7 @@ import MLXLMCommon
 import MLXLLM
 import Tokenizers
 
-private let infernoMlxABI: UInt32 = 2
+private let infernoMlxABI: UInt32 = 3
 
 private enum EventKind {
     static let textDelta: Int32 = 1
@@ -408,6 +408,8 @@ public func infernoMlxEngineTokenize(
 public func infernoMlxEngineGenerate(
     _ rawEngine: UnsafeMutableRawPointer?,
     _ requestJSON: UnsafePointer<CChar>?,
+    _ images: UnsafeRawPointer?,
+    _ imageCount: Int,
     _ operationID: UInt64,
     _ callback: InfernoMlxEventCallback?,
     _ userData: UnsafeMutableRawPointer?
@@ -423,6 +425,17 @@ public func infernoMlxEngineGenerate(
         callback: callback,
         userData: userData
     )
+    // ABI 3 carries images for every engine, but this shim declares no
+    // vision path yet (#18c). Refusing here keeps the failure typed and
+    // local instead of silently answering a question about a picture the
+    // model never saw.
+    if imageCount > 0 {
+        sink.fail(
+            code: "generation_failed",
+            message: "This engine cannot accept images."
+        )
+        return 0
+    }
     let request: GenerationRequest
     do {
         request = try JSONDecoder().decode(GenerationRequest.self, from: encoded)
