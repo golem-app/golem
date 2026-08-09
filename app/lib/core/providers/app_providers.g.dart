@@ -345,6 +345,54 @@ final class PreferencesRepositoryProvider
 String _$preferencesRepositoryHash() =>
     r'84f12c67b0492c83d2e641eac794500552c759e5';
 
+@ProviderFor(attachmentRepository)
+const attachmentRepositoryProvider = AttachmentRepositoryProvider._();
+
+final class AttachmentRepositoryProvider
+    extends
+        $FunctionalProvider<
+          AttachmentRepository,
+          AttachmentRepository,
+          AttachmentRepository
+        >
+    with $Provider<AttachmentRepository> {
+  const AttachmentRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'attachmentRepositoryProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$attachmentRepositoryHash();
+
+  @$internal
+  @override
+  $ProviderElement<AttachmentRepository> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  AttachmentRepository create(Ref ref) {
+    return attachmentRepository(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(AttachmentRepository value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<AttachmentRepository>(value),
+    );
+  }
+}
+
+String _$attachmentRepositoryHash() =>
+    r'e36781dc865631b0997a4aa474a8c95b401c5d5b';
+
 @ProviderFor(cacheProbe)
 const cacheProbeProvider = CacheProbeProvider._();
 
@@ -771,7 +819,7 @@ final class StorageBreakdownProvider
   }
 }
 
-String _$storageBreakdownHash() => r'4c77a7aac15e06c5068777b13f95507ee6db37f3';
+String _$storageBreakdownHash() => r'7b13bb7429ac20321976a2578dcfac7c1713acfd';
 
 /// The catalog the UI renders: pinned entries plus the user's custom
 /// repositories (Advanced mode), derived — never stored — so the pinned
@@ -1106,7 +1154,7 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'96e2f5a4c3ec8989251696607b8c8b54cb96c4df';
+String _$chatControllerHash() => r'8285c8a7633aab02c760cf34025bfd48935d8d04';
 
 abstract class _$ChatController extends $AsyncNotifier<ChatState> {
   FutureOr<ChatState> build();
@@ -1151,7 +1199,7 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'2531c7b1fa3078e8cb7deb25e21b3464698df9cb';
+String _$modelControllerHash() => r'7be44391a7836ef8069af35ba397942af9d7fb7e';
 
 abstract class _$ModelController extends $AsyncNotifier<ModelState> {
   FutureOr<ModelState> build();

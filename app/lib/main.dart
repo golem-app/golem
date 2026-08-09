@@ -13,6 +13,7 @@ import 'core/providers/app_providers.dart';
 import 'core/repositories/contracts.dart';
 import 'core/repositories/fake_benchmark_repository.dart';
 import 'core/repositories/fake_model_management_repository.dart';
+import 'core/repositories/file_attachment_repository.dart';
 import 'core/repositories/file_chat_history_repository.dart';
 import 'core/repositories/file_preferences_repository.dart';
 import 'core/repositories/file_settings_repository.dart';
@@ -83,6 +84,11 @@ Future<void> main() async {
           FileSettingsRepository(File('${support.path}/flutter-prefs-v1.json')),
         ),
         preferencesRepositoryProvider.overrideWithValue(preferencesRepository),
+        // Beside the other per-flavor stores in application support, so the
+        // container stays self-contained and each flavor keeps its own.
+        attachmentRepositoryProvider.overrideWithValue(
+          FileAttachmentRepository(Directory('${support.path}/attachments')),
+        ),
         cacheProbeProvider.overrideWithValue(
           useFakeModels
               ? FakeCacheProbe()

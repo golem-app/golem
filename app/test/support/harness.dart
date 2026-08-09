@@ -20,6 +20,7 @@ import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/search_screen.dart';
 
+import 'in_memory_attachment_repository.dart';
 import 'in_memory_chat_history_repository.dart';
 import 'in_memory_preferences_repository.dart';
 import 'in_memory_settings_repository.dart';
@@ -86,6 +87,7 @@ ProviderContainer buildContainer({
   InferenceBackendConfig? backend,
   SettingsRepository? settings,
   PreferencesRepository? preferences,
+  AttachmentRepository? attachments,
 }) {
   final directory = Directory.systemTemp.createTempSync('golem-widget-test-');
   return ProviderContainer(
@@ -94,6 +96,9 @@ ProviderContainer buildContainer({
       deviceCapacityProbeProvider.overrideWithValue(const FakeDiskCapacity()),
       diskFreeSpaceProbeProvider.overrideWithValue(const FakeDiskSpace()),
       cacheProbeProvider.overrideWithValue(FakeCacheProbe()),
+      attachmentRepositoryProvider.overrideWithValue(
+        attachments ?? InMemoryAttachmentRepository(),
+      ),
       documentsPathProvider.overrideWithValue(directory.path),
       preferencesRepositoryProvider.overrideWithValue(
         preferences ?? InMemoryPreferencesRepository(),
@@ -211,13 +216,13 @@ ChatHistorySnapshot markdownHistory() {
     title: 'Read a CSV without pandas',
     updatedAt: DateTime.utc(2026, 8, 2),
     messages: [
-      ChatMessage(
+      ChatMessage.text(
         id: 'user-md',
         role: MessageRole.user,
         text: 'Read a CSV in Python without pandas.',
         createdAt: DateTime.utc(2026, 8, 2),
       ),
-      ChatMessage(
+      ChatMessage.text(
         id: 'assistant-md',
         role: MessageRole.assistant,
         text:
@@ -255,7 +260,7 @@ ChatHistorySnapshot bareFenceHistory() {
     title: 'Untagged fence',
     updatedAt: DateTime.utc(2026, 8, 2),
     messages: [
-      ChatMessage(
+      ChatMessage.text(
         id: 'assistant-bare',
         role: MessageRole.assistant,
         text: 'Here you go:\n\n```\n$code\n```\n',
@@ -276,13 +281,13 @@ ChatHistorySnapshot seedHistory() {
     updatedAt: DateTime.utc(2026, 8, 2),
     reasoningEnabled: true,
     messages: [
-      ChatMessage(
+      ChatMessage.text(
         id: 'user-1',
         role: MessageRole.user,
         text: 'Suggest a calm weekend plan close to home.',
         createdAt: DateTime.utc(2026, 8, 2),
       ),
-      ChatMessage(
+      ChatMessage.text(
         id: 'assistant-1',
         role: MessageRole.assistant,
         text:

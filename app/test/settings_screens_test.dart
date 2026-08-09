@@ -395,7 +395,7 @@ void main() {
     setViewport(tester);
     final container = buildContainer();
     addTearDown(container.dispose);
-    ChatMessage message({required bool streaming}) => ChatMessage(
+    ChatMessage message({required bool streaming}) => ChatMessage.text(
       id: 'a1',
       role: MessageRole.assistant,
       text: 'The answer.',

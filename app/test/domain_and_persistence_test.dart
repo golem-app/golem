@@ -39,7 +39,7 @@ void main() {
         id: 'chat-1',
         title: 'Saved chat',
         messages: [
-          ChatMessage(
+          ChatMessage.text(
             id: 'message-1',
             role: MessageRole.user,
             text: 'Hello',
@@ -57,13 +57,160 @@ void main() {
     },
   );
 
+  test('a v1 chat history migrates to parts without losing a turn', () async {
+    final directory = await Directory.systemTemp.createTemp('golem-chat-v1-');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File('${directory.path}/history.json');
+    // Exactly what a pre-#18 install wrote: flat message text, schema v1.
+    await file.writeAsString('''
+{
+  "schemaVersion": 1,
+  "activeConversationId": "chat-1",
+  "conversations": [
+    {
+      "id": "chat-1",
+      "title": "Old chat",
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "messages": [
+        {
+          "id": "u1",
+          "role": "user",
+          "text": "Hello",
+          "createdAt": "2026-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "a1",
+          "role": "assistant",
+          "text": "Hi there",
+          "reasoning": "private",
+          "createdAt": "2026-01-01T00:00:00.000Z"
+        }
+      ]
+    }
+  ]
+}
+''');
+
+    final repository = FileChatHistoryRepository(file);
+    final loaded = await repository.load();
+    expect(
+      File('${file.path}.corrupt').existsSync(),
+      isFalse,
+      reason: 'a v1 history must load, not be quarantined',
+    );
+    final messages = loaded.conversations.single.messages;
+    expect(messages.map((m) => m.text), ['Hello', 'Hi there']);
+    expect(messages.first.parts.single, isA<TextPart>());
+    expect(messages.last.reasoning, 'private');
+    expect(loaded.referencedAttachmentIds, isEmpty);
+
+    // The file is rewritten as v2 on the next ordinary save.
+    await repository.save(loaded);
+    final raw = jsonDecode(await file.readAsString()) as Map<String, Object?>;
+    expect(raw['schemaVersion'], 2);
+    final rewritten =
+        ((raw['conversations']! as List).single as Map)['messages']! as List;
+    expect((rewritten.first as Map)['parts'], [
+      {'type': 'text', 'text': 'Hello'},
+    ]);
+    expect((rewritten.first as Map).containsKey('text'), isFalse);
+  });
+
+  test('image parts round-trip and expose their references', () {
+    final message = ChatMessage(
+      id: 'u1',
+      role: MessageRole.user,
+      parts: const [
+        ImagePart(
+          attachmentId: 'a1.jpg',
+          mimeType: 'image/jpeg',
+          width: 640,
+          height: 480,
+          byteCount: 2048,
+        ),
+        TextPart('What is this?'),
+      ],
+      createdAt: DateTime.utc(2026, 8, 9),
+    );
+
+    final decoded = ChatMessage.fromJson(
+      jsonDecode(jsonEncode(message.toJson())) as Map<String, Object?>,
+    );
+    expect(decoded.parts, hasLength(2));
+    expect(decoded.text, 'What is this?');
+    expect(decoded.hasImages, isTrue);
+    final image = decoded.images.single;
+    expect(image.attachmentId, 'a1.jpg');
+    expect(image.mimeType, 'image/jpeg');
+    expect(image.width, 640);
+    expect(image.height, 480);
+    expect(image.byteCount, 2048);
+
+    // The store id is opaque: a bare file name, never a path into the photo
+    // library or the container, so a transcript cannot leak where it came from.
+    expect(image.attachmentId, isNot(contains('/')));
+    expect(image.attachmentId, isNot(contains(r'\')));
+    expect(jsonEncode(message.toJson()), isNot(contains('file:')));
+
+    final conversation = ChatConversation(
+      id: 'c',
+      title: 'T',
+      updatedAt: DateTime.utc(2026, 8, 9),
+      messages: [decoded],
+    );
+    expect(conversation.attachmentIds, ['a1.jpg']);
+    expect(
+      ChatHistorySnapshot(
+        conversations: [conversation],
+      ).referencedAttachmentIds,
+      {'a1.jpg'},
+    );
+  });
+
+  test('withText keeps images ahead of the replaced text', () {
+    final message = ChatMessage(
+      id: 'u1',
+      role: MessageRole.user,
+      parts: const [
+        TextPart('first'),
+        ImagePart(
+          attachmentId: 'a1.png',
+          mimeType: 'image/png',
+          width: 1,
+          height: 1,
+          byteCount: 1,
+        ),
+      ],
+      createdAt: DateTime.utc(2026, 8, 9),
+    );
+    final updated = message.withText('second');
+    expect(updated.parts.first, isA<ImagePart>());
+    expect(updated.parts.last, isA<TextPart>());
+    expect(updated.text, 'second');
+    expect(updated.images.single.attachmentId, 'a1.png');
+  });
+
+  test('a malformed part fails the file rather than loading half a chat', () {
+    expect(
+      () => ChatMessage.fromJson({
+        'id': 'u1',
+        'role': 'user',
+        'parts': [
+          {'type': 'video', 'url': 'x'},
+        ],
+        'createdAt': DateTime.utc(2026).toIso8601String(),
+      }),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
   test('reasoning is excluded from future prompt context', () {
     final conversation = ChatConversation(
       id: 'chat',
       title: 'Context',
       updatedAt: DateTime.now(),
       messages: [
-        ChatMessage(
+        ChatMessage.text(
           id: 'assistant',
           role: MessageRole.assistant,
           text: 'Public answer',
@@ -108,8 +255,12 @@ void main() {
 
   test('branchUpTo copies the prefix and withoutMessage removes by id', () {
     DateTime at(int day) => DateTime.utc(2026, 8, day);
-    ChatMessage message(String id, MessageRole role) =>
-        ChatMessage(id: id, role: role, text: 'text-$id', createdAt: at(1));
+    ChatMessage message(String id, MessageRole role) => ChatMessage.text(
+      id: id,
+      role: role,
+      text: 'text-$id',
+      createdAt: at(1),
+    );
     final conversation = ChatConversation(
       id: 'chat',
       title: 'Branch me',
@@ -145,20 +296,20 @@ void main() {
       title: 'Weekend plans',
       updatedAt: DateTime.utc(2026, 8, 2),
       messages: [
-        ChatMessage(
+        ChatMessage.text(
           id: 'u1',
           role: MessageRole.user,
           text: 'Any ideas?',
           createdAt: DateTime.utc(2026, 8, 2),
         ),
-        ChatMessage(
+        ChatMessage.text(
           id: 'a1',
           role: MessageRole.assistant,
           text: 'A slow morning walk.',
           reasoning: 'Private chain of thought',
           createdAt: DateTime.utc(2026, 8, 2),
         ),
-        ChatMessage(
+        ChatMessage.text(
           id: 'draft',
           role: MessageRole.assistant,
           text: 'Unfinished',

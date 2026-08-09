@@ -15,7 +15,7 @@ ChatHistorySnapshot _twoChats() {
         title: title,
         updatedAt: at,
         messages: [
-          ChatMessage(
+          ChatMessage.text(
             id: '$id-a',
             role: MessageRole.assistant,
             text: body,

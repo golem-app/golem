@@ -98,6 +98,41 @@ abstract interface class SettingsRepository {
   Future<void> save(GenerationSettings settings);
 }
 
+/// A stored attachment's identity. [id] is opaque and app-owned: the source
+/// path a picture came from never leaves the intake layer.
+final class StoredAttachment {
+  const StoredAttachment({
+    required this.id,
+    required this.mimeType,
+    required this.byteCount,
+  });
+
+  final String id;
+  final String mimeType;
+  final int byteCount;
+}
+
+/// The app-owned store for images the user attached to a chat.
+///
+/// Bytes are copied in on attach so the conversation never depends on a
+/// photo-library entry that can be deleted or revoked. The chat history is the
+/// only owner of references: [retainOnly] is how deletion cascades, so bytes
+/// go away exactly when no conversation mentions them any more.
+abstract interface class AttachmentRepository {
+  /// Copies [bytes] into the store and returns its identity.
+  Future<StoredAttachment> store(List<int> bytes, {required String mimeType});
+
+  /// The stored bytes, or null when the attachment is missing — a message can
+  /// outlive its file if the container was trimmed by the OS.
+  Future<List<int>?> read(String attachmentId);
+
+  /// Drops every attachment whose id is absent from [attachmentIds].
+  Future<void> retainOnly(Set<String> attachmentIds);
+
+  /// Bytes the store occupies, for the Storage screen's breakdown.
+  Future<int> storedBytes();
+}
+
 /// Persisted app-wide preferences (appearance, transcript, privacy,
 /// Advanced mode, response styles, custom repositories) — a separate store
 /// from [SettingsRepository] so neither file's schema constrains the other.
