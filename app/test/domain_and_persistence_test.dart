@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/broker/model_profile.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
+import 'package:golem_flutter/core/domain/resolved_repository.dart';
 import 'package:golem_flutter/core/repositories/file_chat_history_repository.dart';
 import 'package:golem_flutter/core/repositories/file_preferences_repository.dart';
 import 'package:golem_flutter/core/repositories/file_settings_repository.dart';
@@ -425,7 +427,7 @@ void main() {
     // Only non-default values reach disk, so future default changes reach
     // users who never touched a control.
     final raw = jsonDecode(await file.readAsString()) as Map<String, Object?>;
-    expect(raw['schemaVersion'], 2);
+    expect(raw['schemaVersion'], 3);
     expect(raw.containsKey('hapticsOnSend'), isFalse);
     expect(raw.containsKey('saveHistory'), isFalse);
     expect((raw['responseStyles'] as Map).keys, ['gemma4']);
@@ -468,7 +470,7 @@ void main() {
 
       await repository.save(loaded);
       final raw = jsonDecode(await file.readAsString()) as Map<String, Object?>;
-      expect(raw['schemaVersion'], 2);
+      expect(raw['schemaVersion'], 3);
       expect((raw['customModels']! as List).single, {
         'repository': 'mlx-community/awesome-model',
         'engine': 'mlx',
@@ -504,6 +506,193 @@ void main() {
       expect(loaded.customModels.single.profile, isNull);
     },
   );
+
+  group('a resolved custom repository (v3)', () {
+    const resolution = ResolvedRepository(
+      commitSha: 'f6d5376be1edb4d416d56da11e5397a961aca8ae',
+      quantization: 'Q4_0',
+      architecture: 'qwen35',
+      displayName: 'Qwen3.5-2B',
+      files: [
+        ModelArtifactFile(
+          path: 'Qwen3.5-2B-Q4_0.gguf',
+          bytes: 1214873856,
+          sha256:
+              'cd70221bebaee0503e0f6717e174250cd7825aa88438b3aabec9ad55731d9bb1',
+          role: ModelFileRole.weights,
+        ),
+        // No published hash, which is the normal shape for small metadata.
+        ModelArtifactFile(path: 'config.json', bytes: 3113),
+      ],
+    );
+    const spec = CustomModelSpec(
+      repository: 'unsloth/Qwen3.5-2B-GGUF',
+      engine: ModelEngine.gguf,
+      revision: 'main',
+      resolved: resolution,
+    );
+
+    test('its catalog entry pins the commit, not the requested ref', () {
+      final entry = spec.toCatalogEntry();
+      // The ref asked for was `main`; what gets fetched is the commit it named,
+      // so a branch advancing cannot move an installed model.
+      expect(entry.revision, resolution.commitSha);
+      expect(entry.quantization, 'Q4_0');
+      expect(entry.displayName, 'Qwen3.5-2B');
+      expect(entry.totalBytes, 1214873856 + 3113);
+      expect(entry.files.first.role, ModelFileRole.weights);
+      expect(entry.files.last.sha256, isNull);
+      expect(
+        entry.resolveUrlFor(entry.files.first).toString(),
+        'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/'
+        '${resolution.commitSha}/Qwen3.5-2B-Q4_0.gguf',
+      );
+      // Resolution alone is never image capability: that needs a proven path.
+      expect(entry.supportsImages, isFalse);
+      // And without a matched template it still refuses activation.
+      expect(entry.profileKey, unresolvedProfileKey);
+    });
+
+    test('the key is unchanged by resolving, so nothing is orphaned', () {
+      // Resolution must not move an entry's directory or download state.
+      const unresolved = CustomModelSpec(
+        repository: 'unsloth/Qwen3.5-2B-GGUF',
+        engine: ModelEngine.gguf,
+      );
+      expect(spec.key, unresolved.key);
+    });
+
+    test('it survives a save and load unchanged', () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'golem-ui-prefs-resolved-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File('${directory.path}/ui-prefs.json');
+      final repository = FilePreferencesRepository(file);
+      await repository.save(const AppPreferences().withCustomModel(spec));
+
+      final loaded = await repository.load();
+      final stored = loaded.customModels.single.resolved!;
+      expect(stored.commitSha, resolution.commitSha);
+      expect(stored.quantization, 'Q4_0');
+      expect(stored.architecture, 'qwen35');
+      expect(stored.displayName, 'Qwen3.5-2B');
+      expect(stored.totalBytes, resolution.totalBytes);
+      expect(stored.fullyHashed, isFalse);
+      expect(stored.files.map((file) => file.path), [
+        'Qwen3.5-2B-Q4_0.gguf',
+        'config.json',
+      ]);
+      expect(stored.files.first.role, ModelFileRole.weights);
+      expect(stored.files.first.sha256, resolution.files.first.sha256);
+      expect(stored.files.last.sha256, isNull);
+      final raw = jsonDecode(await file.readAsString()) as Map<String, Object?>;
+      expect(raw['schemaVersion'], 3);
+    });
+
+    test('a v1 or v2 entry loads as unresolved rather than failing', () async {
+      // Every version has only added optional keys inside a custom entry, so a
+      // file written before resolution existed reads without rewriting a field.
+      for (final version in [1, 2]) {
+        final directory = await Directory.systemTemp.createTemp(
+          'golem-ui-prefs-v$version-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final file = File('${directory.path}/ui-prefs.json');
+        await file.writeAsString('''
+{
+  "schemaVersion": $version,
+  "advancedMode": true,
+  "customModels": [{"repository": "someone/model", "engine": "gguf"}]
+}
+''');
+        final loaded = await FilePreferencesRepository(file).load();
+        expect(File('${file.path}.corrupt').existsSync(), isFalse);
+        expect(loaded.advancedMode, isTrue, reason: 'v$version');
+        final entry = loaded.customModels.single;
+        expect(entry.resolved, isNull, reason: 'v$version');
+        expect(entry.repository, 'someone/model');
+        // Still listable and deletable, and still refusing activation.
+        expect(entry.toCatalogEntry().profileKey, unresolvedProfileKey);
+      }
+    });
+
+    test('an unparseable resolution is dropped on its own', () async {
+      // A resolution that cannot be read must not also discard a profile that
+      // can, and must not quarantine the rest of the user's preferences.
+      final directory = await Directory.systemTemp.createTemp(
+        'golem-ui-prefs-bad-resolved-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File('${directory.path}/ui-prefs.json');
+      await file.writeAsString('''
+{
+  "schemaVersion": 3,
+  "textScale": 1.2,
+  "customModels": [
+    {
+      "repository": "someone/model",
+      "engine": "gguf",
+      "profile": ${jsonEncode(qwen35ProfileSpec.toJson())},
+      "resolved": {"commitSha": "abc", "files": []}
+    }
+  ]
+}
+''');
+      final loaded = await FilePreferencesRepository(file).load();
+      expect(File('${file.path}.corrupt').existsSync(), isFalse);
+      expect(loaded.textScale, 1.2);
+      final entry = loaded.customModels.single;
+      expect(entry.resolved, isNull);
+      expect(entry.profile?.key, 'qwen35');
+      // With no files to fetch it falls back to the synthetic entry, so the
+      // card still renders and can be deleted.
+      expect(entry.toCatalogEntry().totalBytes, greaterThan(0));
+    });
+
+    test('a malformed resolved payload is refused field by field', () {
+      for (final json in <Map<String, Object?>>[
+        {'files': <Object?>[]},
+        {'commitSha': '', 'files': <Object?>[]},
+        {'commitSha': 'abc', 'files': <Object?>[]},
+        {'commitSha': 'abc', 'files': 'not a list'},
+        {
+          'commitSha': 'abc',
+          'files': [42],
+        },
+        {
+          'commitSha': 'abc',
+          'files': [
+            {'bytes': 1},
+          ],
+        },
+        {
+          'commitSha': 'abc',
+          'files': [
+            {'path': 'a', 'bytes': -1},
+          ],
+        },
+        {
+          'commitSha': 'abc',
+          'files': [
+            {'path': 'a', 'bytes': 'big'},
+          ],
+        },
+        {
+          'commitSha': 'abc',
+          'files': [
+            {'path': 'a', 'bytes': 1, 'role': 'nonsense'},
+          ],
+        },
+      ]) {
+        expect(
+          () => ResolvedRepository.fromJson(json),
+          throwsA(isA<FormatException>()),
+          reason: jsonEncode(json),
+        );
+      }
+    });
+  });
 
   test('unreadable or unknown-schema app preferences recover', () async {
     final directory = await Directory.systemTemp.createTemp(

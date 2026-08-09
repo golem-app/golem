@@ -10,34 +10,33 @@ import '../services/artifact_downloader.dart';
 import '../services/device_storage.dart';
 import 'contracts.dart';
 
-/// Real Hugging Face downloads with the fetch-tool discipline: pinned
-/// repository + revision URLs, per-file SHA-256 verification, skip-if-valid,
-/// and disk-space preflight. Artifacts install under
-/// `<documents>/models/<key>/` so the `documents:` model-path flow loads
-/// them unchanged. Operational failures surface as failed-phase snapshots,
-/// never as thrown errors.
-///
-/// Verification is receipt-backed: every file that passes its SHA-256 gets
-/// an entry in a `.golem-verified.json` receipt beside the install, and only
-/// size + receipt together count as verified on any fast path. A
-/// size-matching file without a receipt entry (a cable-push sideload, or a
-/// download whose verify was interrupted) is hashed before it is trusted.
+/// Real Hugging Face downloads: pinned repository + revision URLs, per-file
+/// SHA-256 verification, skip-if-valid, disk-space preflight. Artifacts install
+/// under `<documents>/models/<key>/` so the `documents:` model-path flow loads
+/// them unchanged. Verification is receipt-backed: a file that passes its
+/// SHA-256 gets an entry in a `.golem-verified.json` beside the install, and
+/// only size + receipt count as verified on a fast path — a size-matching file
+/// without one (sideload, interrupted verify) is hashed before it is trusted.
 final class RealModelManagementRepository implements ModelManagementRepository {
   RealModelManagementRepository({
     required this.stateFile,
     required this.documentsDirectory,
-    required this.catalog,
+    required List<ModelCatalogEntry> catalog,
     required this.downloader,
     required this.diskSpace,
     required this.backupExclusion,
     this.activeArtifactKey,
     this.diskSpaceMargin = 500 * 1024 * 1024,
-  }) {
+  }) : catalog = [...catalog] {
     _state = ModelState(activeArtifactKey: activeArtifactKey);
   }
 
   final File stateFile;
   final String documentsDirectory;
+
+  /// The composition root passes the pinned `modelCatalog`, a shared top-level
+  /// list also handed to `modelCatalogEntriesProvider`; growing it in place
+  /// would leak custom entries into the pinned set, so [addModel] copies it.
   final List<ModelCatalogEntry> catalog;
   final ArtifactFileDownloader downloader;
   final DiskSpaceProbe diskSpace;
@@ -56,8 +55,7 @@ final class RealModelManagementRepository implements ModelManagementRepository {
 
   Future<ModelState> _persist(ModelState value) async {
     _state = value;
-    // Serialized atomic writes, mirroring the fake repository: a kill
-    // mid-write must never leave a truncated file behind.
+    // Serialized atomic writes: a kill mid-write must not truncate the file.
     final write = _writes.then((_) async {
       await stateFile.parent.create(recursive: true);
       final temporary = File('${stateFile.path}.tmp');
@@ -96,19 +94,16 @@ final class RealModelManagementRepository implements ModelManagementRepository {
         simulated: false,
       );
     }
-    // Since #19 the loaded phase is a claim about the engine, and no
-    // engine survives its process: a fresh load() always starts unloaded,
-    // whatever the previous run persisted. Failed stays — the last
-    // attempt's outcome remains accurate across a relaunch.
+    // Since #19 the loaded phase is a claim about the engine, and no engine
+    // survives its process. Failed stays — still accurate across a relaunch.
     if (_state.runtime == RuntimePhase.loading ||
         _state.runtime == RuntimePhase.loaded) {
       _state = _state.copyWith(runtime: RuntimePhase.unloaded);
     }
-    // Disk is truth: persisted phases are reconciled against the files
-    // actually present, so a kill mid-download resumes from real bytes and
-    // an externally removed install stops claiming to exist. "Installed"
-    // additionally requires the verification receipt to cover every file —
-    // size alone never re-earns the verified label.
+    // Disk is truth: persisted phases are reconciled against the files present,
+    // so a kill mid-download resumes from real bytes and an externally removed
+    // install stops claiming to exist. "Installed" also needs the receipt to
+    // cover every file — size alone never re-earns it.
     final artifacts = <String, ArtifactStatus>{};
     for (final entry in catalog) {
       final status = _state.statusOf(entry.key);
@@ -131,8 +126,7 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     return _persist(_state);
   }
 
-  /// Bytes of this artifact's files that are fully present on disk by size —
-  /// a progress hint for the paused card, not a verification verdict.
+  /// Present by size — a progress hint for the paused card, not a verdict.
   Future<int> _presentBytes(ModelCatalogEntry entry) async {
     var bytes = 0;
     for (final spec in entry.files) {
@@ -154,15 +148,11 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   }
 
   /// Whether [receipt] already accounts for [spec] — the only fast path that
-  /// counts as verified without re-hashing gigabytes on every launch.
-  ///
-  /// A pinned file must match the publisher's hash. A file published without
-  /// one is covered by the presence of *any* recorded digest: the receipt is
-  /// scoped to the entry's revision, which for a custom repository is the
-  /// immutable commit it resolved to, so an entry there means these bytes were
-  /// hashed at install from that exact commit. Absent means unverified —
-  /// deliberately not the same as "recorded hash is null", which the previous
-  /// equality check would have conflated.
+  /// counts as verified without re-hashing gigabytes on every launch. A pinned
+  /// file must match the publisher's hash; one published without a hash is
+  /// covered by *any* recorded digest, since the receipt is scoped to the
+  /// entry's revision. Absent means unverified — not the same as a recorded
+  /// null, which an equality check would conflate.
   bool _receiptCovers(Map<String, String> receipt, ModelArtifactFile spec) {
     final recorded = receipt[spec.path];
     if (recorded == null) return false;
@@ -193,9 +183,8 @@ final class RealModelManagementRepository implements ModelManagementRepository {
       }
     }
 
-    // Size-matching unreceipted files will most likely verify in place, so
-    // they do not count against free space; if one turns out corrupt on a
-    // genuinely full disk, the re-download fails cleanly on its own.
+    // Size-matching unreceipted files will most likely verify in place, so they
+    // do not count against free space; a corrupt one fails cleanly later.
     final remaining = entry.totalBytes - verifiedBytes - presentUnverifiedBytes;
     final free = await _freeBytesSafely();
     if (free != null && free < remaining + diskSpaceMargin) {
@@ -225,9 +214,8 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     );
 
     for (final spec in pending) {
-      // Local content first: a size-matching file without a receipt entry
-      // (sideload, or an interrupted verify) is hashed before any network
-      // use — it either verifies in place or is deleted and re-fetched.
+      // Local content first: a size-matching file without a receipt entry is
+      // hashed before any network use, then verifies in place or is re-fetched.
       if (await _sizeMatches(entry, spec)) {
         yield await _persist(
           _state.withArtifact(
@@ -275,10 +263,9 @@ final class RealModelManagementRepository implements ModelManagementRepository {
       }
       switch (fileOutcome) {
         case ArtifactFilePaused(:final userInitiated):
-          // A user pause already persisted its state out of band; an
-          // uncommanded one (network loss, OS timeout the plugin gave up
-          // on) must be persisted here or the card freezes on
-          // "downloading" forever.
+          // A user pause already persisted out of band; an uncommanded one
+          // (network loss, OS timeout) must be persisted here or the card
+          // freezes on "downloading".
           if (!userInitiated && !_stopRequested.contains(artifactKey)) {
             yield await _persist(
               _state.withArtifact(
@@ -293,8 +280,7 @@ final class RealModelManagementRepository implements ModelManagementRepository {
           return;
         case ArtifactFileCanceled(:final userInitiated):
           if (!userInitiated && !_stopRequested.contains(artifactKey)) {
-            // The OS discarded the partial; surface a resumable pause at
-            // the bytes that remain verified on disk.
+            // The OS discarded the partial; pause at the verified bytes.
             yield await _persist(
               _state.withArtifact(
                 artifactKey,
@@ -388,13 +374,8 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     return await file.exists() && await file.length() == spec.bytes;
   }
 
-  /// The installed file's digest when it is acceptable, or null when a pinned
-  /// hash was published and these bytes do not match it.
-  ///
-  /// Returning the digest rather than a bool is what lets a file published
-  /// without a hash still be receipted by content: it is hashed exactly as a
-  /// pinned file is, and the result becomes the record instead of being
-  /// compared to nothing.
+  /// Null when a pinned hash was published and these bytes do not match it. A
+  /// digest rather than a bool so an unhashed file is receipted by content.
   Future<String?> _acceptableDigest(
     ModelCatalogEntry entry,
     ModelArtifactFile spec,
@@ -445,8 +426,8 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   }
 
   Future<int?> _freeBytesSafely() async {
-    // A probe failure must not block downloads; the downloader itself fails
-    // cleanly when the disk actually fills.
+    // A probe failure must not block downloads; the downloader fails cleanly if
+    // the disk actually fills.
     try {
       return await diskSpace.freeBytes(documentsDirectory);
     } catch (_) {
@@ -483,8 +464,7 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   @override
   Future<ModelState> delete(String artifactKey) async {
     final entry = _entry(artifactKey);
-    // Stop any in-flight download first, or bytes keep landing in the
-    // directory that was just removed.
+    // Stop the download first, or bytes land in the directory just removed.
     _stopRequested.add(artifactKey);
     await downloader.cancel();
     await _deleteArtifactFiles(entry);
@@ -519,10 +499,33 @@ final class RealModelManagementRepository implements ModelManagementRepository {
 
   @override
   Future<ModelState> addModel(ModelCatalogEntry entry) async {
-    // Arbitrary-repository downloads need real manifest/verification wiring
-    // (#20); until then the UI keeps Add disabled on this backend and this
-    // deliberately records nothing.
-    return _state;
+    ModelCatalogEntry? previous;
+    for (final item in catalog) {
+      if (item.key == entry.key) previous = item;
+    }
+    catalog.removeWhere((item) => item.key == entry.key);
+    catalog.add(entry);
+
+    // Re-pasting the same artifact keeps its progress and partial download.
+    if (previous != null && previous.revision == entry.revision) {
+      return _state;
+    }
+
+    // Otherwise the entry is new or now pins a different commit, so its phase
+    // is reconciled against disk as load() does — receipts are scoped by
+    // revision, and the same bytes under a new commit are unproven.
+    if (await _installVerified(entry)) {
+      return _persist(
+        _state.withArtifact(
+          entry.key,
+          ArtifactStatus(
+            phase: ArtifactPhase.installed,
+            downloadedBytes: entry.totalBytes,
+          ),
+        ),
+      );
+    }
+    return _persist(_state.withArtifact(entry.key, const ArtifactStatus()));
   }
 }
 

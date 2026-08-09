@@ -144,7 +144,6 @@ void main() {
       'https://huggingface.co/projectors/test-weights/resolve/fedcba9876543210/$_fileTwo',
     ]);
     expect(backup.excluded, ['${temp.path}/documents/models']);
-    // The nested file landed inside the artifact directory.
     expect(
       File('${temp.path}/documents/models/test-mlx/$_fileTwo').existsSync(),
       isTrue,
@@ -404,6 +403,106 @@ void main() {
     final cleared = await repo.recordRuntime(RuntimePhase.unloaded);
     expect(cleared.runtime, RuntimePhase.unloaded);
     expect(cleared.failure, isNull);
+  });
+
+  group('addModel', () {
+    ModelCatalogEntry custom() => ModelCatalogEntry(
+      key: 'custom-example-12345678',
+      displayName: 'Example',
+      engine: ModelEngine.gguf,
+      quantization: 'Q4_0',
+      repository: 'example/custom',
+      revision: 'a' * 40,
+      profileKey: 'gemma4',
+      files: [
+        ModelArtifactFile(
+          path: _fileOne,
+          bytes: _contentOne.length,
+          sha256: sha256.convert(utf8.encode(_contentOne)).toString(),
+          role: ModelFileRole.weights,
+        ),
+      ],
+    );
+
+    test('a registered entry downloads like any pinned one', () async {
+      final repo = repository();
+      await repo.load();
+      final added = await repo.addModel(custom());
+      expect(
+        added.statusOf('custom-example-12345678').phase,
+        ArtifactPhase.notDownloaded,
+      );
+      final states = await repo.download('custom-example-12345678').toList();
+      expect(
+        states.last.statusOf('custom-example-12345678').phase,
+        ArtifactPhase.installed,
+      );
+      expect(
+        downloader.requestedUrls.single,
+        'https://huggingface.co/example/custom/resolve/${'a' * 40}/$_fileOne',
+      );
+    });
+
+    test('the caller\'s catalog list is never grown in place', () async {
+      // main.dart passes the shared top-level `modelCatalog`, which the model
+      // catalog provider also receives; extending it would leak custom entries
+      // into the pinned set and make a top-level value mutable.
+      final pinned = [_entry()];
+      final repo = RealModelManagementRepository(
+        stateFile: File('${temp.path}/state/flutter-model-v2.json'),
+        documentsDirectory: '${temp.path}/documents',
+        catalog: pinned,
+        downloader: downloader,
+        diskSpace: diskSpace,
+        backupExclusion: backup,
+      );
+      await repo.load();
+      await repo.addModel(custom());
+      expect(pinned, hasLength(1));
+      expect(pinned.single.key, 'test-mlx');
+    });
+
+    test('re-adding refreshes the entry without losing its install', () async {
+      final repo = repository();
+      await repo.load();
+      await repo.addModel(custom());
+      await repo.download('custom-example-12345678').drain<void>();
+
+      // A repaste that resolved to the same commit must not present as fresh.
+      final again = await repo.addModel(custom());
+      expect(
+        again.statusOf('custom-example-12345678').phase,
+        ArtifactPhase.installed,
+      );
+      downloader.requestedUrls.clear();
+      await repo.download('custom-example-12345678').drain<void>();
+      expect(downloader.requestedUrls, isEmpty);
+    });
+
+    test('a re-add at a new commit re-earns its verification', () async {
+      final repo = repository();
+      await repo.load();
+      await repo.addModel(custom());
+      await repo.download('custom-example-12345678').drain<void>();
+
+      // Receipts are scoped by revision, so the same bytes at a different
+      // commit are unproven rather than inheriting the previous proof.
+      final moved = ModelCatalogEntry(
+        key: 'custom-example-12345678',
+        displayName: 'Example',
+        engine: ModelEngine.gguf,
+        quantization: 'Q4_0',
+        repository: 'example/custom',
+        revision: 'b' * 40,
+        profileKey: 'gemma4',
+        files: custom().files,
+      );
+      final added = await repo.addModel(moved);
+      expect(
+        added.statusOf('custom-example-12345678').phase,
+        ArtifactPhase.notDownloaded,
+      );
+    });
   });
 
   group('files published without a hash', () {

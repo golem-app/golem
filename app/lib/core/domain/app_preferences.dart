@@ -2,47 +2,47 @@ import 'dart:convert';
 
 import 'model_catalog.dart';
 import 'model_profile_spec.dart';
+import 'resolved_repository.dart';
 
-/// The user's theme choice; [system] follows the platform brightness.
 enum ThemeSetting { system, light, dark }
 
-/// Bounds the appearance slider enforces. The store's leaves stay
-/// deliberately tolerant, so every consumer of [AppPreferences.textScale]
-/// clamps into this range — a hand-edited file must never reach
+/// Consumers clamp [AppPreferences.textScale] into this range: the store's
+/// leaves stay tolerant, so a hand-edited file must never reach
 /// TextScaler.linear with a negative or absurd factor.
 const minTextScale = 0.85;
 const maxTextScale = 1.3;
 
-/// How much room the model gets to improvise. [balanced] means the model
-/// profile's own defaults; the other two map onto explicit sampling values
-/// per profile (see `response_style_mapping.dart`).
+/// [balanced] means the model profile's own sampling defaults; the other two
+/// map onto explicit values per profile (see `response_style_mapping.dart`).
 enum ResponseStyle { precise, balanced, creative }
 
-/// A hand-added Hugging Face repository (Advanced mode). Pure data: the
-/// catalog entry it becomes is derived, and real download wiring for
-/// arbitrary repositories stays with #52.
+/// A hand-added Hugging Face repository (Advanced mode). The catalog entry it
+/// becomes is derived from [resolved], and synthesized until resolution (#52).
 final class CustomModelSpec {
   const CustomModelSpec({
     required this.repository,
     required this.engine,
     this.revision = 'main',
     this.profile,
+    this.resolved,
   });
 
   final String repository;
   final ModelEngine engine;
+
+  /// May be a moving branch or tag; never what is downloaded — see [resolved].
   final String revision;
 
-  /// The broker profile this repository was proven to match, or null while it
-  /// is unresolved. Only a spec that exactly matched a supported template is
-  /// ever stored here; an unresolved entry lists and deletes normally but
-  /// refuses activation (#43).
+  /// The broker profile this repository was proven to match, or null while
+  /// unresolved — such an entry lists and deletes but refuses activation (#43).
   final ModelProfileSpec? profile;
 
-  /// Stable catalog key derived from the repository name. The hash
-  /// suffix keeps repositories whose names differ only in punctuation
-  /// (org/foo_bar vs org/foo-bar) from colliding on one slug and
-  /// silently replacing each other's card and download state.
+  /// What [revision] actually pointed at, and the exact files it names (#52).
+  /// Null is a first-class state, not a half-filled one.
+  final ResolvedRepository? resolved;
+
+  /// Stable catalog key. The hash suffix keeps names that differ only in
+  /// punctuation (org/foo_bar vs org/foo-bar) from colliding on one slug.
   String get key {
     final slug = repository.toLowerCase().replaceAll(RegExp('[^a-z0-9]+'), '-');
     return 'custom-$slug-${_fnv32(repository).toRadixString(16).padLeft(8, '0')}';
@@ -56,16 +56,30 @@ final class CustomModelSpec {
     return hash;
   }
 
-  /// The repository tail, as the display name ("mlx-community/foo" → "foo").
   String get displayName =>
       repository.contains('/') ? repository.split('/').last : repository;
 
-  /// The derived catalog entry the UI and the fake downloader operate on.
-  /// The size is a deterministic synthesis from the repository name (1.2 to
-  /// about 3.2 decimal GB) — nothing was fetched, so nothing real is known;
-  /// stability matters more than truth for goldens and journeys, and the
-  /// real wiring arrives with #20.
+  /// The derived catalog entry the UI and the downloader operate on. Without
+  /// [resolved] it is synthesized with a deterministic size from the repository
+  /// name, so the fake backend's goldens and journeys stay stable.
   ModelCatalogEntry toCatalogEntry() {
+    final resolution = resolved;
+    if (resolution != null) {
+      return ModelCatalogEntry(
+        key: key,
+        displayName: resolution.displayName ?? displayName,
+        engine: engine,
+        quantization: resolution.quantization,
+        repository: repository,
+        // The commit, never the ref: an installed entry cannot be moved
+        // underneath by a branch advancing.
+        revision: resolution.commitSha,
+        files: resolution.files,
+        profileKey: profile?.key ?? unresolvedProfileKey,
+        // No image capability: that needs a proven #18 path for this exact
+        // artifact on this exact engine, which no custom entry has yet.
+      );
+    }
     // FNV-1a over the repository string: stable across runs and platforms.
     var hash = 0xcbf29ce484222325;
     for (final unit in '$repository@$revision'.codeUnits) {
@@ -79,8 +93,7 @@ final class CustomModelSpec {
       quantization: 'custom',
       repository: repository,
       revision: revision,
-      // No hash, because nothing was fetched: null says that, where an empty
-      // string would have claimed a published hash of no bytes.
+      // No hash: nothing was fetched, and '' would claim a published one.
       files: [ModelArtifactFile(path: 'weights.bin', bytes: bytes)],
       profileKey: profile?.key ?? unresolvedProfileKey,
     );
@@ -91,11 +104,11 @@ final class CustomModelSpec {
     'engine': engine.name,
     if (revision != 'main') 'revision': revision,
     if (profile != null) 'profile': profile!.toJson(),
+    if (resolved != null) 'resolved': resolved!.toJson(),
   };
 
-  /// A stored profile that no longer parses is dropped rather than failing
-  /// the whole preferences file: the repository stays listed and deletable,
-  /// and activation refuses it with actionable copy.
+  /// A stored profile or resolution that no longer parses is dropped rather
+  /// than failing the whole file, and dropped independently of each other.
   factory CustomModelSpec.fromJson(Map<String, Object?> json) {
     final rawProfile = json['profile'];
     ModelProfileSpec? profile;
@@ -108,20 +121,30 @@ final class CustomModelSpec {
         profile = null;
       }
     }
+    final rawResolved = json['resolved'];
+    ResolvedRepository? resolved;
+    if (rawResolved is Map) {
+      try {
+        resolved = ResolvedRepository.fromJson(
+          Map<String, Object?>.from(rawResolved),
+        );
+      } on FormatException {
+        resolved = null;
+      }
+    }
     return CustomModelSpec(
       repository: json['repository'] as String,
       engine: ModelEngine.values.byName(json['engine'] as String),
       revision: json['revision'] as String? ?? 'main',
       profile: profile,
+      resolved: resolved,
     );
   }
 }
 
-/// App-wide user preferences: appearance, transcript behavior, privacy,
-/// Advanced mode, response styles, and hand-added repositories. Sparse on
-/// disk — only non-default values are written, so future default changes
-/// reach users who never touched a control. Generation sampling overrides
-/// stay in [GenerationSettings]; this file never duplicates them.
+/// App-wide user preferences. Sparse on disk — only non-default values are
+/// written, so future default changes reach users who never touched a control.
+/// Generation sampling overrides stay in [GenerationSettings].
 final class AppPreferences {
   const AppPreferences({
     this.theme = ThemeSetting.system,
@@ -144,10 +167,9 @@ final class AppPreferences {
   final bool saveHistory;
   final bool advancedMode;
 
-  /// Custom system prompt; null means the model's default behavior.
+  /// Null means the model's default behavior.
   final String? systemPrompt;
 
-  /// Per-profile response style; absent means [ResponseStyle.balanced].
   final Map<String, ResponseStyle> responseStyles;
 
   final List<CustomModelSpec> customModels;
@@ -179,7 +201,6 @@ final class AppPreferences {
     customModels: customModels ?? this.customModels,
   );
 
-  /// Balanced entries are removed, keeping the persisted map sparse.
   AppPreferences withStyle(String profileKey, ResponseStyle style) {
     final next = Map<String, ResponseStyle>.from(responseStyles);
     if (style == ResponseStyle.balanced) {
@@ -190,8 +211,6 @@ final class AppPreferences {
     return copyWith(responseStyles: next);
   }
 
-  /// Appends a custom repository; a re-add of the same derived key replaces
-  /// the earlier spec instead of duplicating the card.
   AppPreferences withCustomModel(CustomModelSpec spec) => copyWith(
     customModels: [
       for (final item in customModels)
@@ -200,10 +219,9 @@ final class AppPreferences {
     ],
   );
 
-  /// v2 added the optional resolved broker profile on each custom repository
-  /// (#43). Everything else is unchanged, so a v1 file loads as-is and is
-  /// rewritten as v2 on the next save.
-  static const schemaVersion = 2;
+  /// v2 added each custom repository's proven profile (#43), v3 its resolved
+  /// commit and files (#52); both additive, so a v1 or v2 file loads as-is.
+  static const schemaVersion = 3;
 
   Map<String, Object?> toJson() => {
     'schemaVersion': schemaVersion,
@@ -227,9 +245,9 @@ final class AppPreferences {
 
   factory AppPreferences.fromJson(Map<String, Object?> json) {
     final version = json['schemaVersion'];
-    // v1 is read directly: the only v2 addition is an optional key inside
-    // each custom repository, so no field has to be rewritten to migrate.
-    if (version != 1 && version != schemaVersion) {
+    // v1 and v2 are read directly: every version since has only added an
+    // optional key inside a custom repository, so an older entry is unresolved.
+    if (version != 1 && version != 2 && version != schemaVersion) {
       throw const FormatException('Unsupported app preferences schema');
     }
     final rawStyles = json['responseStyles'];
