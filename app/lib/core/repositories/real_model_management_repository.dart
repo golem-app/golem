@@ -146,12 +146,28 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   Future<bool> _installVerified(ModelCatalogEntry entry) async {
     final receipt = await _readReceipt(entry);
     for (final spec in entry.files) {
-      if (receipt[spec.path] != spec.sha256 ||
-          !await _sizeMatches(entry, spec)) {
+      if (!_receiptCovers(receipt, spec) || !await _sizeMatches(entry, spec)) {
         return false;
       }
     }
     return true;
+  }
+
+  /// Whether [receipt] already accounts for [spec] — the only fast path that
+  /// counts as verified without re-hashing gigabytes on every launch.
+  ///
+  /// A pinned file must match the publisher's hash. A file published without
+  /// one is covered by the presence of *any* recorded digest: the receipt is
+  /// scoped to the entry's revision, which for a custom repository is the
+  /// immutable commit it resolved to, so an entry there means these bytes were
+  /// hashed at install from that exact commit. Absent means unverified —
+  /// deliberately not the same as "recorded hash is null", which the previous
+  /// equality check would have conflated.
+  bool _receiptCovers(Map<String, String> receipt, ModelArtifactFile spec) {
+    final recorded = receipt[spec.path];
+    if (recorded == null) return false;
+    final expected = spec.sha256;
+    return expected == null || recorded == expected;
   }
 
   @override
@@ -169,7 +185,7 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     final pending = <ModelArtifactFile>[];
     for (final spec in entry.files) {
       final sized = await _sizeMatches(entry, spec);
-      if (sized && receipt[spec.path] == spec.sha256) {
+      if (sized && _receiptCovers(receipt, spec)) {
         verifiedBytes += spec.bytes;
       } else {
         if (sized) presentUnverifiedBytes += spec.bytes;
@@ -222,8 +238,9 @@ final class RealModelManagementRepository implements ModelManagementRepository {
             ),
           ),
         );
-        if (await _hashMatches(entry, spec)) {
-          await _recordVerified(entry, spec);
+        final digest = await _acceptableDigest(entry, spec);
+        if (digest != null) {
+          await _recordVerified(entry, spec, digest);
           verifiedBytes += spec.bytes;
           if (_stopRequested.contains(artifactKey)) return;
           continue;
@@ -314,8 +331,9 @@ final class RealModelManagementRepository implements ModelManagementRepository {
           ),
         ),
       );
-      if (!await _sizeMatches(entry, spec) ||
-          !await _hashMatches(entry, spec)) {
+      final sized = await _sizeMatches(entry, spec);
+      final digest = sized ? await _acceptableDigest(entry, spec) : null;
+      if (digest == null) {
         final file = File('${_rootFor(entry)}/${spec.path}');
         if (await file.exists()) {
           await file.delete();
@@ -326,13 +344,17 @@ final class RealModelManagementRepository implements ModelManagementRepository {
             ArtifactStatus(
               phase: ArtifactPhase.failed,
               downloadedBytes: verifiedBytes,
-              failure: '${spec.path} failed SHA-256 verification.',
+              // A wrong length and wrong content are different facts, and a
+              // file published without a hash can only fail the first.
+              failure: sized
+                  ? '${spec.path} failed SHA-256 verification.'
+                  : '${spec.path} did not arrive at its expected size.',
             ),
           ),
         );
         return;
       }
-      await _recordVerified(entry, spec);
+      await _recordVerified(entry, spec, digest);
       verifiedBytes += spec.bytes;
       if (_stopRequested.contains(artifactKey)) return;
     }
@@ -366,13 +388,22 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     return await file.exists() && await file.length() == spec.bytes;
   }
 
-  Future<bool> _hashMatches(
+  /// The installed file's digest when it is acceptable, or null when a pinned
+  /// hash was published and these bytes do not match it.
+  ///
+  /// Returning the digest rather than a bool is what lets a file published
+  /// without a hash still be receipted by content: it is hashed exactly as a
+  /// pinned file is, and the result becomes the record instead of being
+  /// compared to nothing.
+  Future<String?> _acceptableDigest(
     ModelCatalogEntry entry,
     ModelArtifactFile spec,
   ) async {
     final file = File('${_rootFor(entry)}/${spec.path}');
-    final digest = await sha256.bind(file.openRead()).first;
-    return digest.toString() == spec.sha256;
+    final digest = (await sha256.bind(file.openRead()).first).toString();
+    final expected = spec.sha256;
+    if (expected != null && digest != expected) return null;
+    return digest;
   }
 
   static const _receiptName = '.golem-verified.json';
@@ -399,9 +430,10 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   Future<void> _recordVerified(
     ModelCatalogEntry entry,
     ModelArtifactFile spec,
+    String digest,
   ) async {
     final receipt = await _readReceipt(entry);
-    receipt[spec.path] = spec.sha256;
+    receipt[spec.path] = digest;
     final file = _receiptFile(entry);
     await file.parent.create(recursive: true);
     final temporary = File('${file.path}.tmp');

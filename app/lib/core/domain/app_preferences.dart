@@ -79,7 +79,9 @@ final class CustomModelSpec {
       quantization: 'custom',
       repository: repository,
       revision: revision,
-      files: [ModelArtifactFile(path: 'weights.bin', bytes: bytes, sha256: '')],
+      // No hash, because nothing was fetched: null says that, where an empty
+      // string would have claimed a published hash of no bytes.
+      files: [ModelArtifactFile(path: 'weights.bin', bytes: bytes)],
       profileKey: profile?.key ?? unresolvedProfileKey,
     );
   }

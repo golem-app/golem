@@ -26,7 +26,7 @@ final class ModelArtifactFile {
   const ModelArtifactFile({
     required this.path,
     required this.bytes,
-    required this.sha256,
+    this.sha256,
     this.role = ModelFileRole.snapshot,
     this.repository,
     this.revision,
@@ -34,7 +34,15 @@ final class ModelArtifactFile {
 
   final String path;
   final int bytes;
-  final String sha256;
+
+  /// The publisher's authoritative SHA-256, or null when none was published.
+  ///
+  /// Every pinned artifact supplies one and is verified against it. Null exists
+  /// for a resolved custom repository (#52): Hugging Face returns an LFS hash
+  /// for large files but nothing for small metadata ones, so those are trusted
+  /// through the immutable commit they were fetched from, their declared size,
+  /// and the digest hashed into the install receipt — never through size alone.
+  final String? sha256;
   final ModelFileRole role;
 
   /// Overrides the artifact-level source when this file is published in a
