@@ -1,6 +1,7 @@
 // ReasoningStreamDelta is the broker-wide stream currency; it lives with the
 // first parser that produced it.
 import '../core/domain/model_profile_spec.dart';
+import '../core/domain/models.dart';
 import 'gemma4_chat_template.dart' show ReasoningStreamDelta;
 import 'history_strip.dart' as history;
 
@@ -38,7 +39,7 @@ final class Qwen35ChatTemplate {
   static const endOfTextTokenId = 248044;
 
   static String render(
-    List<Map<String, String>> messages, {
+    List<PromptMessage> messages, {
     required bool reasoningEnabled,
     ChatTemplateSpec spec = qwen35TemplateSpec,
   }) {
@@ -48,19 +49,21 @@ final class Qwen35ChatTemplate {
     final buffer = StringBuffer(spec.bos ?? '');
     for (var i = 0; i < messages.length; i++) {
       final message = messages[i];
-      switch (message['role']) {
+      switch (message.role) {
         case 'system' || 'developer':
           if (i != 0) {
             throw ArgumentError('A system message must come first.');
           }
           buffer.write(
             '${spec.turnOpen}${spec.systemRole}\n'
-            '${_content(message, spec)}${spec.turnClose}\n',
+            '${_renderParts(message, spec, isAssistant: false)}'
+            '${spec.turnClose}\n',
           );
         case 'user':
           buffer.write(
             '${spec.turnOpen}${spec.userRole}\n'
-            '${_content(message, spec)}${spec.turnClose}\n',
+            '${_renderParts(message, spec, isAssistant: false)}'
+            '${spec.turnClose}\n',
           );
         case 'assistant':
           // Upstream strips reasoning from every assistant turn at or before
@@ -68,11 +71,11 @@ final class Qwen35ChatTemplate {
           // history turns carry the visible answer only.
           buffer.write(
             '${spec.turnOpen}${spec.assistantRole}\n'
-            '${sanitize(history.stripHistoryReasoning(message['content'] ?? '', spec), spec).trim()}'
+            '${_renderParts(message, spec, isAssistant: true)}'
             '${spec.turnClose}\n',
           );
         default:
-          throw ArgumentError('Unsupported role: ${message['role']}');
+          throw ArgumentError('Unsupported role: ${message.role}');
       }
     }
     buffer.write('${spec.turnOpen}${spec.assistantRole}\n');
@@ -81,8 +84,28 @@ final class Qwen35ChatTemplate {
     return buffer.toString();
   }
 
-  static String _content(Map<String, String> message, ChatTemplateSpec spec) =>
-      sanitize(message['content'] ?? '', spec).trim();
+  /// Renders a turn's ordered parts. ChatML sanitizes before trimming — the
+  /// opposite order to the Gemma strategy, and preserved exactly — and each
+  /// image becomes one media marker where it sits.
+  static String _renderParts(
+    PromptMessage message,
+    ChatTemplateSpec spec, {
+    required bool isAssistant,
+  }) {
+    final buffer = StringBuffer();
+    for (final part in message.parts) {
+      switch (part) {
+        case TextPart():
+          final text = isAssistant
+              ? history.stripHistoryReasoning(part.text, spec)
+              : part.text;
+          buffer.write(sanitize(text, spec).trim());
+        case ImagePart():
+          if (spec.mediaMarker != null) buffer.write('${spec.mediaMarker}\n');
+      }
+    }
+    return buffer.toString();
+  }
 
   /// Removes every control marker, to a fixpoint so removals cannot splice
   /// two fragments into a live marker.

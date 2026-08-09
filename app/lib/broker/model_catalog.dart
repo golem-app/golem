@@ -21,6 +21,11 @@ final List<ModelCatalogEntry> modelCatalog = [
     quantization: 'Q4_K_XL',
     artifact: gemma4E2BGgufQ4,
     profileKey: 'gemma4',
+    // The one path proven for images so far: llama.cpp/libmtmd with the
+    // pinned projector (#18 bake-off). The MLX entry below stays text-only
+    // until its own vision path is validated — capability belongs to the
+    // artifact, not the family.
+    inputModalities: const {ModelInputModality.text, ModelInputModality.image},
   ),
   _entry(
     key: 'qwen35-mlx',
@@ -72,6 +77,17 @@ String primaryModelPathFor(String key) {
   return path;
 }
 
+/// The `documents:`-relative path of an entry's multimodal projector, or null
+/// when it pins none. A projector is only ever loaded alongside the weights it
+/// was pinned with.
+String? projectorPathForEntry(ModelCatalogEntry entry) {
+  final projectors = entry.files
+      .where((file) => file.role == ModelFileRole.projector)
+      .toList();
+  if (projectors.length != 1) return null;
+  return 'documents:${entry.installDirectory}/${projectors.single.path}';
+}
+
 /// The `documents:`-relative path for any catalog entry — pinned or resolved
 /// custom — or null when the entry does not describe one loadable artifact.
 /// Runtime activation turns that null into a typed, actionable failure rather
@@ -79,9 +95,18 @@ String primaryModelPathFor(String key) {
 String? modelPathForEntry(ModelCatalogEntry entry) {
   switch (entry.engine) {
     case ModelEngine.gguf:
+      // Role, not extension: a multimodal artifact pins two .gguf files and
+      // only one of them is the language model.
       final weights = entry.files
-          .where((file) => file.path.endsWith('.gguf'))
+          .where((file) => file.role == ModelFileRole.weights)
           .toList();
+      if (weights.isEmpty) {
+        final unroled = entry.files
+            .where((file) => file.path.endsWith('.gguf'))
+            .toList();
+        if (unroled.length != 1) return null;
+        return 'documents:${entry.installDirectory}/${unroled.single.path}';
+      }
       if (weights.length != 1) return null;
       return 'documents:${entry.installDirectory}/${weights.single.path}';
     case ModelEngine.mlx:
@@ -96,6 +121,7 @@ ModelCatalogEntry _entry({
   required String quantization,
   required InfernoModelArtifact artifact,
   required String profileKey,
+  Set<ModelInputModality> inputModalities = const {ModelInputModality.text},
 }) => ModelCatalogEntry(
   key: key,
   displayName: displayName,
@@ -104,12 +130,18 @@ ModelCatalogEntry _entry({
   repository: artifact.repository,
   revision: artifact.revision,
   profileKey: profileKey,
+  inputModalities: inputModalities,
   files: [
     for (final file in artifact.files)
       ModelArtifactFile(
         path: file.path,
         bytes: file.bytes,
         sha256: file.sha256,
+        role: switch (file.role) {
+          InfernoFileRole.weights => ModelFileRole.weights,
+          InfernoFileRole.projector => ModelFileRole.projector,
+          InfernoFileRole.snapshot => ModelFileRole.snapshot,
+        },
       ),
   ],
 );

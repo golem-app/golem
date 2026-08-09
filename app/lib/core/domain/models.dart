@@ -108,6 +108,29 @@ int _requireInt(Object? raw, String field) {
   throw FormatException('$field must be an integer');
 }
 
+/// One turn as the inference boundary sees it: a role and ordered content.
+///
+/// Deliberately not [ChatMessage] — ids, timestamps, metrics and streaming
+/// state are presentation concerns an engine has no business receiving. The
+/// system turn a build injects has no [ChatMessage] behind it at all.
+final class PromptMessage {
+  const PromptMessage({required this.role, required this.parts});
+
+  /// `user`, `assistant`, or `system`.
+  final String role;
+  final List<MessagePart> parts;
+
+  /// A turn whose whole content is one run of text.
+  factory PromptMessage.text(String role, String text) =>
+      PromptMessage(role: role, parts: [TextPart(text)]);
+
+  String get text => parts.whereType<TextPart>().map((p) => p.text).join();
+
+  Iterable<ImagePart> get images => parts.whereType<ImagePart>();
+
+  bool get hasImages => parts.any((part) => part is ImagePart);
+}
+
 final class ChatMessage {
   const ChatMessage({
     required this.id,
@@ -299,13 +322,12 @@ final class ChatConversation {
   }
 
   /// Prompt context intentionally excludes private reasoning.
-  ///
-  /// Text-only by construction today: no shipping model declares image input,
-  /// so the composer cannot attach one. Widening this to ordered parts is the
-  /// engine-side half of #18 and lands with the transport that can carry them.
-  List<Map<String, String>> get promptContext => messages
+  List<PromptMessage> get promptContext => messages
       .where((message) => !message.isStreaming)
-      .map((message) => {'role': message.role.name, 'content': message.text})
+      .map(
+        (message) =>
+            PromptMessage(role: message.role.name, parts: message.parts),
+      )
       .toList(growable: false);
 
   /// Every attachment this conversation still references. The attachment store

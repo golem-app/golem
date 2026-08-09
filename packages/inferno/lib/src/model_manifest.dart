@@ -1,13 +1,29 @@
+/// What a pinned file is for. An artifact's loadable path depends on it: the
+/// llama engine needs exactly one [weights] file and at most one [projector],
+/// while an MLX snapshot is a directory of [snapshot] files.
+enum InfernoFileRole { weights, projector, snapshot }
+
 final class InfernoModelFile {
   const InfernoModelFile({
     required this.path,
     required this.bytes,
     required this.sha256,
+    this.role = InfernoFileRole.snapshot,
+    this.repository,
+    this.revision,
   });
 
   final String path;
   final int bytes;
   final String sha256;
+  final InfernoFileRole role;
+
+  /// Where this individual file comes from, when that is not the artifact's
+  /// own repository. A multimodal projector is commonly published separately
+  /// from the quantized weights it pairs with, and pretending otherwise would
+  /// mean pinning a repository that does not contain the file.
+  final String? repository;
+  final String? revision;
 }
 
 final class InfernoModelArtifact {
@@ -81,6 +97,50 @@ const gemma4E2BGgufQ4 = InfernoModelArtifact(
       bytes: 2620370976,
       sha256:
           'e531007218dfab990486a5de7676a6932d6ea8dea233d1f698d7c21cf8a16889',
+      role: InfernoFileRole.weights,
+    ),
+    // Selected over the BF16 reference by the #18 bake-off: identical graded
+    // answers, 423 MB (30%) lower median peak resident memory — decisive on
+    // the 8 GB tier this app supports. Published separately from the QAT
+    // weights, hence its own repository pin.
+    InfernoModelFile(
+      path: 'mmproj-gemma-4-E2B-it-Q8_0.gguf',
+      bytes: 557368064,
+      sha256:
+          '9406f99c16d68cda4f1f0552192dcc99021ea1fc6d2fd50b1dc3ccf30d04b292',
+      role: InfernoFileRole.projector,
+      repository: 'ggml-org/gemma-4-E2B-it-GGUF',
+      revision: '64ef033dc9f85a88f88e70cceb0a7457366bea64',
+    ),
+  ],
+);
+
+/// Gemma 4 E2B multimodal projector candidates (#18).
+///
+/// Evaluation inputs, not a shipping artifact: the 16-bit reference and the
+/// Q8_0 candidate are compared on the production path, and only the selected
+/// one becomes a [InfernoFileRole.projector] file on [gemma4E2BGgufQ4].
+///
+/// They are published by `ggml-org` while the shipping weights are unsloth's
+/// QAT build, so the pairing is a hypothesis this bake-off has to prove, not
+/// something the matching architecture guarantees.
+const gemma4E2BMmprojCandidates = InfernoModelArtifact(
+  repository: 'ggml-org/gemma-4-E2B-it-GGUF',
+  revision: '64ef033dc9f85a88f88e70cceb0a7457366bea64',
+  files: [
+    InfernoModelFile(
+      path: 'mmproj-gemma-4-E2B-it-BF16.gguf',
+      bytes: 986833664,
+      sha256:
+          '711e1e8f43fa0664adbac493129be1e6c25b81af4b4cdea97c7d798b25c0a3a4',
+      role: InfernoFileRole.projector,
+    ),
+    InfernoModelFile(
+      path: 'mmproj-gemma-4-E2B-it-Q8_0.gguf',
+      bytes: 557368064,
+      sha256:
+          '9406f99c16d68cda4f1f0552192dcc99021ea1fc6d2fd50b1dc3ccf30d04b292',
+      role: InfernoFileRole.projector,
     ),
   ],
 );

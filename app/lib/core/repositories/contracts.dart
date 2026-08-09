@@ -83,7 +83,7 @@ abstract interface class InferenceRepository {
   /// template; the fake acknowledges it in its canned reply so the
   /// round-trip is provable without a model.
   Stream<InferenceEvent> generate({
-    required List<Map<String, String>> context,
+    required List<PromptMessage> context,
     required bool reasoningEnabled,
     SamplingOverrides? overrides,
     String? modelKey,

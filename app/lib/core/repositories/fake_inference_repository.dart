@@ -72,7 +72,7 @@ final class FakeInferenceRepository implements InferenceRepository {
 
   @override
   Stream<InferenceEvent> generate({
-    required List<Map<String, String>> context,
+    required List<PromptMessage> context,
     required bool reasoningEnabled,
     // Deliberately unused: deterministic simulation has no sampling.
     SamplingOverrides? overrides,
@@ -83,7 +83,18 @@ final class FakeInferenceRepository implements InferenceRepository {
     final epoch = ++_generationEpoch;
     if (modelKey != null) _residentKey.value = modelKey;
     final profile = _profileFor(modelKey);
-    final prompt = context.lastOrNull?['content'] ?? '';
+    final last = context.lastOrNull;
+    final prompt = last?.text ?? '';
+    // Deterministic acknowledgement so qa journeys and goldens can exercise
+    // an image turn offline, with no model and no bytes decoded.
+    final attachedImages = last?.images.length ?? 0;
+    if (attachedImages > 0) {
+      yield AnswerDelta(
+        attachedImages == 1
+            ? 'I can see the image you attached. '
+            : 'I can see the $attachedImages images you attached. ',
+      );
+    }
     if (prompt.contains('[fail]')) {
       if (reasoningEnabled) yield const ReasoningDelta('A partial thought…');
       yield const AnswerDelta('A partial simulated response');

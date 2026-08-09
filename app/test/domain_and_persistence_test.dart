@@ -219,10 +219,9 @@ void main() {
         ),
       ],
     );
-    expect(conversation.promptContext, [
-      {'role': 'assistant', 'content': 'Public answer'},
-    ]);
-    expect(conversation.promptContext.toString(), isNot(contains('Private')));
+    expect(conversation.promptContext.single.role, 'assistant');
+    expect(conversation.promptContext.single.text, 'Public answer');
+    expect(conversation.promptContext.single.hasImages, isFalse);
   });
 
   test('pinned and modelKey round-trip and default on legacy JSON', () async {

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:inferno/inferno.dart';
 
 import '../core/repositories/contracts.dart'
@@ -8,6 +10,7 @@ import '../core/repositories/contracts.dart'
 /// without importing package:inferno across the boundary.
 export 'package:inferno/inferno.dart'
     show
+        InfernoFileRole,
         InfernoModelArtifact,
         InfernoModelFile,
         gemma4E2BGgufQ4,
@@ -49,11 +52,26 @@ final class BrokerSamplingParameters {
   final List<int> stopTokenIds;
 }
 
+/// One encoded image for a generation, already read from the attachment
+/// store. Engines decode the bytes themselves.
+final class BrokerImageInput {
+  const BrokerImageInput(this.bytes);
+
+  final Uint8List bytes;
+}
+
 final class BrokerGenerationRequest {
-  const BrokerGenerationRequest({required this.prompt, required this.sampling});
+  const BrokerGenerationRequest({
+    required this.prompt,
+    required this.sampling,
+    this.images = const [],
+  });
 
   final String prompt;
   final BrokerSamplingParameters sampling;
+
+  /// Ordered images; the rendered [prompt] carries one media marker each.
+  final List<BrokerImageInput> images;
 }
 
 final class BrokerRuntimeMetrics {
@@ -145,10 +163,13 @@ final class BrokerLoadOptions {
 }
 
 abstract interface class BrokerRuntime {
+  /// [projectorPath] is the multimodal projector pinned with these weights,
+  /// or null for a text-only artifact.
   Future<void> load({
     required BrokerEngine engine,
     required String modelPath,
     BrokerLoadOptions options = const BrokerLoadOptions(),
+    String? projectorPath,
   });
   Future<void> unload();
   Stream<BrokerRuntimeEvent> generate(BrokerGenerationRequest request);
@@ -169,6 +190,7 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
     required BrokerEngine engine,
     required String modelPath,
     BrokerLoadOptions options = const BrokerLoadOptions(),
+    String? projectorPath,
   }) => _translating(
     () => _inferno.load(
       engine: switch (engine) {
@@ -177,6 +199,7 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
       },
       modelPath: modelPath,
       options: InfernoLoadOptions(
+        projectorPath: projectorPath,
         checkTensors: options.checkTensors,
         kvCacheType: options.quantizedKvCache
             ? InfernoKvCacheType.q8_0
@@ -214,6 +237,9 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
           stopSequences: request.sampling.stopSequences,
           stopTokenIds: request.sampling.stopTokenIds,
         ),
+        images: [
+          for (final image in request.images) InfernoImageInput(image.bytes),
+        ],
       ),
     );
     try {

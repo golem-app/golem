@@ -1,5 +1,6 @@
 import '../core/domain/model_catalog.dart' show unresolvedProfileKey;
 import '../core/domain/model_profile_spec.dart';
+import '../core/domain/models.dart';
 import 'gemma4_chat_template.dart';
 import 'qwen35_chat_template.dart';
 
@@ -30,10 +31,7 @@ abstract interface class ModelProfile {
   /// Registry key, also the `GOLEM_MODEL_PROFILE` dart-define value.
   String get key;
 
-  String render(
-    List<Map<String, String>> messages, {
-    required bool reasoningEnabled,
-  });
+  String render(List<PromptMessage> messages, {required bool reasoningEnabled});
 
   List<String> get stopSequences;
   List<int> get stopTokenIds;
@@ -68,7 +66,7 @@ base class DataModelProfile implements ModelProfile {
 
   @override
   String render(
-    List<Map<String, String>> messages, {
+    List<PromptMessage> messages, {
     required bool reasoningEnabled,
   }) => switch (spec.template.strategy) {
     ChatTemplateStrategy.gemmaTurns => Gemma4ChatTemplate.render(
@@ -166,6 +164,14 @@ const gemma4ProfileSpec = ModelProfileSpec(
     topP: 0.95,
   ),
   directSampling: ProfileSampling(maxTokens: 2048, temperature: 1, topP: 0.95),
+  // The template can express images; whether a given artifact accepts one is
+  // the catalog entry's call (#18).
+  inputModalities: {ModelInputModality.text, ModelInputModality.image},
+  // Gemma 4 tiles images dynamically, so an image is not a fixed token count:
+  // the #18 bake-off measured 84–130 tokens across the graded fixtures. The
+  // windowing budget takes a deliberately conservative constant above that
+  // range rather than under-reserving and tripping the engine's own check.
+  imageTokenCost: 256,
 );
 
 /// The pinned Qwen 3.5 profile.

@@ -11,6 +11,7 @@ final class _StubRuntime implements BrokerRuntime {
     required BrokerEngine engine,
     required String modelPath,
     BrokerLoadOptions options = const BrokerLoadOptions(),
+    String? projectorPath,
   }) async {}
 
   @override

@@ -44,6 +44,7 @@ final class InfernoLoadOptions {
     this.threadCount,
     this.gpuLayers,
     this.swaFull = false,
+    this.projectorPath,
   }) : assert(
          threadCount == null || threadCount > 0,
          'threadCount must be positive when set',
@@ -71,12 +72,19 @@ final class InfernoLoadOptions {
   /// models like Gemma.
   final bool swaFull;
 
+  /// The multimodal projector paired with this model, or null for a
+  /// text-only load. An engine that cannot use one ignores it; an engine
+  /// that can refuses a projector built for a different model rather than
+  /// loading it and producing noise.
+  final String? projectorPath;
+
   Map<String, Object?> toJson() => {
     'checkTensors': checkTensors,
     'kvCacheType': kvCacheType.name,
     'threadCount': threadCount,
     'gpuLayers': gpuLayers,
     'swaFull': swaFull,
+    'projectorPath': projectorPath,
   };
 }
 

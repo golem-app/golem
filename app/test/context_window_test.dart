@@ -1,11 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/context_window.dart';
+import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 
-Map<String, String> _turn(String role, int chars) => {
-  'role': role,
-  'content': 'x' * chars,
-};
+PromptMessage _turn(String role, int chars) =>
+    PromptMessage.text(role, 'x' * chars);
 
 // One message of 1000 chars estimates to 250 tokens and costs
 // ceil(250 * 5 / 4) + 8 = 321 in the budget math below.
@@ -41,7 +40,7 @@ void main() {
     // Three fit, but the suffix of three would open with an assistant
     // turn (index 3) — the leading-assistant trim drops it.
     expect(windowed, hasLength(2));
-    expect(windowed.first['role'], 'user');
+    expect(windowed.first.role, 'user');
     expect(windowed, context.sublist(4));
   });
 

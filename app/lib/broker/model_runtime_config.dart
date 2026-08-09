@@ -15,6 +15,8 @@ final class ModelRuntimeConfig {
     required this.engine,
     required this.modelPath,
     required this.profile,
+    this.projectorPath,
+    this.supportsImages = false,
   });
 
   final String catalogKey;
@@ -26,6 +28,15 @@ final class ModelRuntimeConfig {
   final String modelPath;
 
   final ModelProfile profile;
+
+  /// The multimodal projector pinned with these weights, or null for a
+  /// text-only artifact. Resolved together with [modelPath] so the pair can
+  /// never disagree.
+  final String? projectorPath;
+
+  /// Whether this exact artifact on this exact engine accepts images. The
+  /// catalog entry decides; the profile only says how an image is expressed.
+  final bool supportsImages;
 }
 
 /// The broker engine that loads artifacts of a catalog engine family.
@@ -94,5 +105,9 @@ ModelRuntimeConfig resolveModelRuntimeConfig(
     engine: brokerEngineFor(entry.engine),
     modelPath: modelPath,
     profile: profile,
+    projectorPath: projectorPathForEntry(entry),
+    // Both halves must agree: the artifact has to be declared image-capable
+    // and the template has to know how to express an image.
+    supportsImages: entry.supportsImages && profile.spec.supportsImages,
   );
 }

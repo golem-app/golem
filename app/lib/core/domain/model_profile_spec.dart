@@ -133,6 +133,7 @@ final class ChatTemplateSpec {
     this.thinkEnd,
     this.reasoningPrimer,
     this.directPrimer,
+    this.mediaMarker,
   });
 
   final ChatTemplateStrategy strategy;
@@ -166,6 +167,14 @@ final class ChatTemplateSpec {
   final String? reasoningPrimer;
   final String? directPrimer;
 
+  /// The placeholder an engine replaces with an image's encoded tokens, one
+  /// per image, at the position it occupies in the turn. Null for a template
+  /// with no proven image path.
+  ///
+  /// It is also stripped from authored content like any other control marker,
+  /// so pasted text cannot claim an image slot that has no picture behind it.
+  final String? mediaMarker;
+
   final HistoryStripMode historyStrip;
 
   /// Every marker that must be stripped from user- or model-authored content
@@ -186,6 +195,7 @@ final class ChatTemplateSpec {
     ?channelEnd,
     ?thinkStart,
     ?thinkEnd,
+    ?mediaMarker,
   ];
 
   Map<String, Object?> toJson() => {
@@ -204,6 +214,7 @@ final class ChatTemplateSpec {
     if (thinkEnd != null) 'thinkEnd': thinkEnd,
     if (reasoningPrimer != null) 'reasoningPrimer': reasoningPrimer,
     if (directPrimer != null) 'directPrimer': directPrimer,
+    if (mediaMarker != null) 'mediaMarker': mediaMarker,
   };
 
   factory ChatTemplateSpec.fromJson(Map<String, Object?> json) {
@@ -234,6 +245,7 @@ final class ChatTemplateSpec {
       thinkEnd: _optionalNonEmpty(json['thinkEnd'], 'thinkEnd'),
       reasoningPrimer: json['reasoningPrimer'] as String?,
       directPrimer: json['directPrimer'] as String?,
+      mediaMarker: _optionalNonEmpty(json['mediaMarker'], 'mediaMarker'),
     );
     spec._validate();
     return spec;
@@ -293,6 +305,7 @@ final class ModelProfileSpec {
     required this.reasoningSampling,
     required this.directSampling,
     this.inputModalities = const {ModelInputModality.text},
+    this.imageTokenCost = 0,
   });
 
   /// Registry key, also the `GOLEM_MODEL_PROFILE` dart-define value for
@@ -312,6 +325,11 @@ final class ModelProfileSpec {
   /// Declared, proven input kinds. Image transport and native execution are
   /// separate work (#18); this field only records what has been validated.
   final Set<ModelInputModality> inputModalities;
+
+  /// Budget tokens one image costs. A vision encoder emits a fixed count per
+  /// picture, unrelated to any string length, so context windowing has to be
+  /// told rather than left to estimate.
+  final int imageTokenCost;
 
   bool get supportsImages => inputModalities.contains(ModelInputModality.image);
 
@@ -334,6 +352,7 @@ final class ModelProfileSpec {
       for (final modality in ModelInputModality.values)
         if (inputModalities.contains(modality)) modality.name,
     ],
+    if (imageTokenCost > 0) 'imageTokenCost': imageTokenCost,
   };
 
   /// Validates an instance built by the const constructor. [fromJson] already
@@ -341,6 +360,11 @@ final class ModelProfileSpec {
   void validate() {
     template.validate();
     _validateParser(parser, template);
+    if (supportsImages && template.mediaMarker == null) {
+      throw const FormatException(
+        'a template declaring image input must define mediaMarker',
+      );
+    }
     if (key.isEmpty) {
       throw const FormatException('key must be a non-empty string');
     }
@@ -387,6 +411,12 @@ final class ModelProfileSpec {
       Map<String, Object?>.from(rawTemplate),
     );
     _validateParser(parser, template);
+    if (modalities.contains(ModelInputModality.image) &&
+        template.mediaMarker == null) {
+      throw const FormatException(
+        'a template declaring image input must define mediaMarker',
+      );
+    }
     return ModelProfileSpec(
       key: _requireNonEmpty(json['key'], 'key'),
       template: template,
@@ -409,6 +439,9 @@ final class ModelProfileSpec {
         Map<String, Object?>.from(rawDirect),
       ),
       inputModalities: modalities,
+      imageTokenCost: json['imageTokenCost'] == null
+          ? 0
+          : _requirePositiveInt(json['imageTokenCost'], 'imageTokenCost'),
     );
   }
 

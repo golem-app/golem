@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/broker/gemma4_chat_template.dart';
 import 'package:golem_flutter/broker/model_profile.dart';
 import 'package:golem_flutter/broker/qwen35_chat_template.dart';
@@ -47,6 +48,9 @@ void main() {
         Gemma4ChatTemplate.thoughtControl,
         ReasoningStreamParser.channelStart,
         ReasoningStreamParser.channelEnd,
+        // The media marker is a control marker too: pasted text must not be
+        // able to claim an image slot with no picture behind it.
+        '<__media__>',
       ]);
       expect(qwen35ProfileSpec.template.controlMarkers, [
         Qwen35ChatTemplate.imStart,
@@ -56,11 +60,16 @@ void main() {
       ]);
     });
 
-    test('both declare text input only until a vision path is proven', () {
-      for (final spec in [gemma4ProfileSpec, qwen35ProfileSpec]) {
-        expect(spec.inputModalities, {ModelInputModality.text});
-        expect(spec.supportsImages, isFalse, reason: spec.key);
-      }
+    test('only the Gemma template can express an image', () {
+      // A profile says what its *template* can express; whether a given
+      // artifact accepts one is the catalog entry's call (#18).
+      expect(gemma4ProfileSpec.supportsImages, isTrue);
+      expect(gemma4ProfileSpec.template.mediaMarker, '<__media__>');
+      expect(gemma4ProfileSpec.imageTokenCost, greaterThan(0));
+
+      expect(qwen35ProfileSpec.supportsImages, isFalse);
+      expect(qwen35ProfileSpec.template.mediaMarker, isNull);
+      expect(qwen35ProfileSpec.imageTokenCost, 0);
     });
 
     test('sampling follows the reasoning mode', () {
@@ -152,6 +161,10 @@ void main() {
       ),
     );
     rejects(
+      'declared image input with no media marker',
+      _validProfile()..['inputModalities'] = ['text', 'image'],
+    );
+    rejects(
       'channel parsing with no channel markers',
       _validProfile()..['parser'] = 'channels',
     );
@@ -185,8 +198,8 @@ void main() {
 
       final profile = DataModelProfile(spec);
       expect(
-        profile.render(const [
-          {'role': 'user', 'content': 'Hi'},
+        profile.render([
+          PromptMessage.text('user', 'Hi'),
         ], reasoningEnabled: true),
         '<|im_start|>user\nHi<|im_end|>\n<|im_start|>assistant\n<think>\n',
       );
@@ -195,10 +208,16 @@ void main() {
     });
 
     test('declared image capability survives serialization', () {
+      // A template that declares image input must say how an image enters
+      // the prompt, so this carries a media marker.
       final spec = ModelProfileSpec.fromJson(
-        _validProfile()..['inputModalities'] = ['text', 'image'],
+        _validProfile(template: _validChatMl()..['mediaMarker'] = '<__media__>')
+          ..['inputModalities'] = ['text', 'image']
+          ..['imageTokenCost'] = 256,
       );
       expect(spec.supportsImages, isTrue);
+      expect(spec.imageTokenCost, 256);
+      expect(spec.template.mediaMarker, '<__media__>');
       expect(ModelProfileSpec.fromJson(spec.toJson()).inputModalities, {
         ModelInputModality.text,
         ModelInputModality.image,
@@ -206,10 +225,10 @@ void main() {
     });
 
     test('historyStrip decides what history keeps, not the strategy', () {
-      const history = [
-        {'role': 'user', 'content': 'Q'},
-        {'role': 'assistant', 'content': '<think>secret</think>A'},
-        {'role': 'user', 'content': 'Q2'},
+      final history = [
+        PromptMessage.text('user', 'Q'),
+        PromptMessage.text('assistant', '<think>secret</think>A'),
+        PromptMessage.text('user', 'Q2'),
       ];
 
       // thinkBlocks: the model's own reasoning never returns to the prompt.
@@ -235,8 +254,8 @@ void main() {
         _validProfile(template: _validChatMl()..['bos'] = '<s>'),
       );
       expect(spec.template.controlMarkers, contains('<s>'));
-      final rendered = DataModelProfile(spec).render(const [
-        {'role': 'user', 'content': 'hi <s> there'},
+      final rendered = DataModelProfile(spec).render([
+        PromptMessage.text('user', 'hi <s> there'),
       ], reasoningEnabled: false);
       // Exactly one BOS: the one the template emitted.
       expect('<s>'.allMatches(rendered).length, 1);

@@ -6,6 +6,10 @@
 /// model knowledge.
 library;
 
+import 'model_profile_spec.dart' show ModelInputModality;
+
+export 'model_profile_spec.dart' show ModelInputModality;
+
 enum ModelEngine { mlx, gguf }
 
 /// [ModelCatalogEntry.profileKey] for an entry that has not yet been resolved
@@ -13,16 +17,23 @@ enum ModelEngine { mlx, gguf }
 /// refuses activation with actionable copy — capability is never assumed.
 const unresolvedProfileKey = 'unresolved';
 
+/// What a downloaded file is for. A GGUF artifact names exactly one
+/// [weights] file and at most one [projector]; an MLX artifact is a directory
+/// of [snapshot] files.
+enum ModelFileRole { weights, projector, snapshot }
+
 final class ModelArtifactFile {
   const ModelArtifactFile({
     required this.path,
     required this.bytes,
     required this.sha256,
+    this.role = ModelFileRole.snapshot,
   });
 
   final String path;
   final int bytes;
   final String sha256;
+  final ModelFileRole role;
 }
 
 final class ModelCatalogEntry {
@@ -35,6 +46,7 @@ final class ModelCatalogEntry {
     required this.revision,
     required this.files,
     required this.profileKey,
+    this.inputModalities = const {ModelInputModality.text},
   });
 
   /// Stable identifier, also the on-disk directory name under `models/`.
@@ -54,6 +66,14 @@ final class ModelCatalogEntry {
   /// Explicit rather than inferred: a repository slug, file name, or engine
   /// is never proof of a chat template (#43).
   final String profileKey;
+
+  /// What this exact artifact on this exact engine has been *proven* to
+  /// accept. Capability belongs to the artifact, not the model family: the
+  /// same profile can be image-capable through one engine and text-only
+  /// through another until that second path is validated (#18).
+  final Set<ModelInputModality> inputModalities;
+
+  bool get supportsImages => inputModalities.contains(ModelInputModality.image);
 
   int get totalBytes => files.fold(0, (sum, file) => sum + file.bytes);
 

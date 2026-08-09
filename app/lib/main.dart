@@ -61,6 +61,12 @@ Future<void> main() async {
     for (final spec in preferences.customModels)
       if (!pinnedKeys.contains(spec.key)) spec.toCatalogEntry(),
   ];
+  // Created before the scope so the inference repository can read the bytes
+  // an image part refers to without going through a provider.
+  final attachments = FileAttachmentRepository(
+    Directory('${support.path}/attachments'),
+  );
+
   final ModelManagementRepository modelManagement = useFakeModels
       ? FakeModelManagementRepository(stateFile, catalog: mergedCatalog)
       : RealModelManagementRepository(
@@ -86,9 +92,7 @@ Future<void> main() async {
         preferencesRepositoryProvider.overrideWithValue(preferencesRepository),
         // Beside the other per-flavor stores in application support, so the
         // container stays self-contained and each flavor keeps its own.
-        attachmentRepositoryProvider.overrideWithValue(
-          FileAttachmentRepository(Directory('${support.path}/attachments')),
-        ),
+        attachmentRepositoryProvider.overrideWithValue(attachments),
         cacheProbeProvider.overrideWithValue(
           useFakeModels
               ? FakeCacheProbe()
@@ -103,6 +107,7 @@ Future<void> main() async {
             config: backendConfig,
             fakeStreamDelay: Duration(milliseconds: streamDelayMilliseconds),
             documentsDirectory: documents.path,
+            readAttachment: attachments.read,
           ),
         ),
         modelCatalogEntriesProvider.overrideWithValue(modelCatalog),

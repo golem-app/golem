@@ -26,6 +26,7 @@ final class _ScriptedRuntime implements BrokerRuntime {
     required BrokerEngine engine,
     required String modelPath,
     BrokerLoadOptions options = const BrokerLoadOptions(),
+    String? projectorPath,
   }) async {
     loads += 1;
   }
@@ -94,7 +95,7 @@ void main() {
           const BrokerGenerationCompleted(BrokerStopReason.stopToken),
         ],
       ]);
-      final result = await _run(runtime, const [
+      final result = await _run(runtime, [
         EvalPrompt(
           id: 'p1',
           messages: [
@@ -146,7 +147,7 @@ void main() {
           const BrokerGenerationCompleted(BrokerStopReason.stopToken),
         ],
       ]);
-      final result = await _run(runtime, const [
+      final result = await _run(runtime, [
         EvalPrompt(
           id: 'wrong-answer',
           messages: [
@@ -184,7 +185,7 @@ void main() {
           const BrokerGenerationCompleted(BrokerStopReason.endOfSequence),
         ],
       ]);
-      final result = await _run(runtime, const [
+      final result = await _run(runtime, [
         EvalPrompt(
           id: 'exploding',
           messages: [
@@ -216,7 +217,7 @@ void main() {
         const BrokerGenerationCompleted(BrokerStopReason.maxTokens),
       ],
     ]);
-    final result = await _run(runtime, const [
+    final result = await _run(runtime, [
       EvalPrompt(
         id: 'truncated',
         messages: [

@@ -1,4 +1,5 @@
 import '../core/domain/model_profile_spec.dart';
+import '../core/domain/models.dart';
 import 'history_strip.dart' as history;
 
 /// The built-in Gemma 4 template description. The literal markers below stay
@@ -16,6 +17,9 @@ const gemma4TemplateSpec = ChatTemplateSpec(
   channelStart: ReasoningStreamParser.channelStart,
   channelEnd: ReasoningStreamParser.channelEnd,
   historyStrip: HistoryStripMode.reasoningChannels,
+  // libmtmd's default media marker; the native suite asserts it matches
+  // `mtmd_default_marker()` so the two can never drift apart.
+  mediaMarker: '<__media__>',
 );
 
 /// Gemma 4 text-chat rendering derived from the pinned model template.
@@ -36,7 +40,7 @@ abstract final class Gemma4ChatTemplate {
   static const turnEndTokenId = 106;
 
   static String render(
-    List<Map<String, String>> messages, {
+    List<PromptMessage> messages, {
     required bool reasoningEnabled,
     ChatTemplateSpec spec = gemma4TemplateSpec,
   }) {
@@ -45,7 +49,7 @@ abstract final class Gemma4ChatTemplate {
     }
     final output = StringBuffer(spec.bos ?? '');
     var start = 0;
-    final firstRole = messages.first['role'];
+    final firstRole = messages.first.role;
     final hasSystem = firstRole == 'system' || firstRole == 'developer';
     if (reasoningEnabled || hasSystem) {
       output.write('${spec.turnOpen}${spec.systemRole}\n');
@@ -53,14 +57,14 @@ abstract final class Gemma4ChatTemplate {
         output.write('${spec.thoughtControl}\n');
       }
       if (hasSystem) {
-        output.write(sanitize(_content(messages.first), spec));
+        output.write(_renderParts(messages.first, spec, isAssistant: false));
         start = 1;
       }
       output.write('${spec.turnClose}\n');
     }
 
     for (final message in messages.skip(start)) {
-      final isAssistant = switch (message['role']) {
+      final isAssistant = switch (message.role) {
         'user' => false,
         'assistant' => true,
         final unsupported => throw ArgumentError.value(
@@ -75,14 +79,7 @@ abstract final class Gemma4ChatTemplate {
         ..write(
           '${spec.turnOpen}${isAssistant ? spec.assistantRole : spec.userRole}\n',
         )
-        ..write(
-          sanitize(
-            isAssistant
-                ? history.stripHistoryReasoning(_content(message), spec)
-                : _content(message),
-            spec,
-          ),
-        )
+        ..write(_renderParts(message, spec, isAssistant: isAssistant))
         ..write('${spec.turnClose}\n');
     }
     output.write('${spec.turnOpen}${spec.assistantRole}\n');
@@ -110,8 +107,36 @@ abstract final class Gemma4ChatTemplate {
     return cleaned;
   }
 
-  static String _content(Map<String, String> message) =>
-      (message['content'] ?? '').trim();
+  /// Renders a turn's ordered parts: text is trimmed, history-stripped for
+  /// assistant turns, then sanitized; each image becomes one media marker at
+  /// the position it occupies. A marker is followed by a newline so the
+  /// question after a picture does not run into it.
+  static String _renderParts(
+    PromptMessage message,
+    ChatTemplateSpec spec, {
+    required bool isAssistant,
+  }) {
+    final buffer = StringBuffer();
+    for (final part in message.parts) {
+      switch (part) {
+        case TextPart():
+          final trimmed = part.text.trim();
+          buffer.write(
+            sanitize(
+              isAssistant
+                  ? history.stripHistoryReasoning(trimmed, spec)
+                  : trimmed,
+              spec,
+            ),
+          );
+        case ImagePart():
+          // A template with no proven image path renders nothing rather than
+          // inventing a marker the engine would not understand.
+          if (spec.mediaMarker != null) buffer.write('${spec.mediaMarker}\n');
+      }
+    }
+    return buffer.toString();
+  }
 
   static String stripReasoningChannels(
     String text, [

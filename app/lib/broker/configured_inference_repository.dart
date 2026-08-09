@@ -34,6 +34,7 @@ InferenceRepository createConfiguredInferenceRepository({
   required InferenceBackendConfig config,
   required Duration fakeStreamDelay,
   required String documentsDirectory,
+  Future<List<int>?> Function(String attachmentId)? readAttachment,
 }) => selectInferenceRepository(
   backend: config.kind.name,
   modelPath: config.modelPath ?? '',
@@ -44,6 +45,7 @@ InferenceRepository createConfiguredInferenceRepository({
   fakeStreamDelay: fakeStreamDelay,
   documentsDirectory: documentsDirectory,
   createRuntime: InfernoRuntimeAdapter.native,
+  readAttachment: readAttachment,
   // Measurement and triage hatches (house pattern: dart-defines, no UI —
   // evidence decides defaults before any knob earns a settings row).
   loadOptions: const BrokerLoadOptions(
@@ -67,6 +69,7 @@ InferenceRepository selectInferenceRepository({
   required Duration fakeStreamDelay,
   required String documentsDirectory,
   required BrokerRuntime Function() createRuntime,
+  Future<List<int>?> Function(String attachmentId)? readAttachment,
   required int samplingSeed,
   BrokerLoadOptions loadOptions = const BrokerLoadOptions(),
 }) {
@@ -109,5 +112,6 @@ InferenceRepository selectInferenceRepository({
     availableMemoryBytes: const DeviceStorageChannel().availableMemoryBytes,
     loadOptions: loadOptions,
     seed: samplingSeed == 0 ? null : samplingSeed,
+    readAttachment: readAttachment,
   );
 }
