@@ -5,9 +5,8 @@ import 'package:inferno/inferno.dart';
 import '../core/repositories/contracts.dart'
     show InferenceException, InferenceFailureKind;
 
-/// Pinned-artifact and engine-pin metadata, re-exported so evaluation and
-/// measurement code outside the broker can cite pins in evidence reports
-/// without importing package:inferno across the boundary.
+/// Pinned-artifact and engine-pin metadata, re-exported so measurement code
+/// outside the broker can cite pins without importing package:inferno.
 export 'package:inferno/inferno.dart'
     show
         InfernoFileRole,
@@ -45,8 +44,7 @@ final class BrokerSamplingParameters {
   /// Null keeps top-k filtering out of the engine's sampler chain.
   final int? topK;
 
-  /// Token budget over prompt plus generation, enforced by the engines;
-  /// null falls back to the engine's own bound (llama's trained context).
+  /// Null falls back to the engine's own bound (llama's trained context).
   final int? contextLength;
 
   final int? seed;
@@ -54,8 +52,7 @@ final class BrokerSamplingParameters {
   final List<int> stopTokenIds;
 }
 
-/// One encoded image for a generation, already read from the attachment
-/// store. Engines decode the bytes themselves.
+/// One encoded image, already read from the attachment store; engines decode.
 final class BrokerImageInput {
   const BrokerImageInput(this.bytes);
 
@@ -72,7 +69,6 @@ final class BrokerGenerationRequest {
   final String prompt;
   final BrokerSamplingParameters sampling;
 
-  /// Ordered images; the rendered [prompt] carries one media marker each.
   final List<BrokerImageInput> images;
 }
 
@@ -129,10 +125,9 @@ final class BrokerGenerationCompleted extends BrokerRuntimeEvent {
   final BrokerStopReason reason;
 }
 
-/// A runtime failure with user-presentable text; `toString` is the message
-/// so the recovery banner never shows a package exception verbatim. The
-/// broker's subtype of the app-level [InferenceException] so controllers
-/// catch one type across fake and real backends (§19.2).
+/// `toString` is the user-facing message, so a banner never shows a package
+/// exception verbatim. The broker's subtype of the app-level
+/// [InferenceException] so controllers catch one type across backends (§19.2).
 final class BrokerRuntimeException extends InferenceException {
   const BrokerRuntimeException(
     String message, {
@@ -141,9 +136,8 @@ final class BrokerRuntimeException extends InferenceException {
   }) : super(kind, message);
 }
 
-/// Load-time engine configuration, mirrored from the Inferno options so
-/// application code stays package-blind. Defaults are the engine
-/// defaults; every knob exists for measurement and triage, not UI.
+/// Mirrors the Inferno load options so application code stays package-blind.
+/// Every knob exists for measurement and triage, not UI.
 final class BrokerLoadOptions {
   const BrokerLoadOptions({
     this.checkTensors = false,
@@ -165,8 +159,6 @@ final class BrokerLoadOptions {
 }
 
 abstract interface class BrokerRuntime {
-  /// [projectorPath] is the multimodal projector pinned with these weights,
-  /// or null for a text-only artifact.
   Future<void> load({
     required BrokerEngine engine,
     required String modelPath,
@@ -218,10 +210,9 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
   @override
   Future<void> cancel() => _translating(_inferno.cancel);
 
-  /// Closes the underlying runtime, including its native-callback listener.
-  /// The app keeps one adapter alive for its whole lifetime and never calls
-  /// this; harness code that cycles engines in one process must, or the
-  /// listener keeps the isolate alive after the run.
+  /// The app keeps one adapter for its whole lifetime and never calls this;
+  /// harness code that cycles engines in one process must, or the
+  /// native-callback listener keeps the isolate alive after the run.
   Future<void> dispose() => _translating(_inferno.dispose);
 
   @override

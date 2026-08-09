@@ -89,13 +89,12 @@ class _GolemAppState extends ConsumerState<GolemApp>
     super.dispose();
   }
 
-  // The theme brightness comes from the platform dispatcher because no
-  // MediaQuery exists above the app widget; observing the platform keeps it
-  // reactive when the system appearance changes while the app is running.
+  // No MediaQuery exists above the app widget, so brightness comes from the
+  // platform dispatcher; observing it keeps the theme reactive.
   @override
   void didChangePlatformBrightness() => setState(() {});
 
-  // The widget layer only reports OS signals; the controller decides
+  // The widget layer only reports the OS signal; the controller decides
   // whether freeing the engine is safe (never mid-stream, never mid-op).
   @override
   void didHaveMemoryPressure() {
@@ -113,8 +112,7 @@ class _GolemAppState extends ConsumerState<GolemApp>
 
   @override
   Widget build(BuildContext context) {
-    // Appearance preferences resolve here so a change re-themes the live
-    // app. While they load (one frame at most, under the splash) the
+    // While preferences load (one frame at most, under the splash) the
     // platform default applies.
     final preferences = ref.watch(preferencesControllerProvider).value;
     final brightness = switch (preferences?.theme ?? ThemeSetting.system) {
@@ -134,10 +132,9 @@ class _GolemAppState extends ConsumerState<GolemApp>
       debugShowCheckedModeBanner: false,
       routerConfig: _router,
       theme: GolemTheme.theme(brightness),
-      // User-facing copy is intentionally hardcoded English. The global
-      // delegates are still required by the framework widgets themselves —
-      // Material included: text-field selection toolbars resolve to the
-      // Material implementation on Android chrome.
+      // Copy is hardcoded English, but framework widgets still need the
+      // delegates — Material included: text-field selection toolbars resolve
+      // to the Material implementation on Android chrome.
       localizationsDelegates: const [
         GlobalCupertinoLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
@@ -147,11 +144,9 @@ class _GolemAppState extends ConsumerState<GolemApp>
       builder: (context, child) {
         var body = child ?? const SizedBox.shrink();
         if (textScale != 1.0) {
-          // Compose the user's factor onto the system scaler. The system
-          // scaler is effectively linear here (hardcoded-English Cupertino
-          // app); sampling it at a reference size folds any platform factor
-          // in. At the 1.0 default this wrapper is skipped entirely, so
-          // every existing golden stays byte-identical.
+          // The system scaler is effectively linear here, so sampling it at a
+          // reference size folds any platform factor into the user's. Skipped
+          // entirely at 1.0, which keeps every existing golden byte-identical.
           final media = MediaQuery.of(context);
           final systemFactor = media.textScaler.scale(100) / 100;
           body = MediaQuery(

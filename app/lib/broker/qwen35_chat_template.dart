@@ -1,11 +1,10 @@
-// ReasoningStreamDelta is the broker-wide stream currency; it lives with the
-// first parser that produced it.
+// ReasoningStreamDelta is the broker-wide currency, so it stays with the first
+// parser that produced it — hence the cross-template import.
 import '../core/domain/model_profile_spec.dart';
 import '../core/domain/models.dart';
 import 'gemma4_chat_template.dart' show ReasoningStreamDelta;
 import 'history_strip.dart' as history;
 
-/// The built-in Qwen 3.5 template description.
 const qwen35TemplateSpec = ChatTemplateSpec(
   strategy: ChatTemplateStrategy.chatMl,
   turnOpen: Qwen35ChatTemplate.imStart,
@@ -22,15 +21,11 @@ const qwen35TemplateSpec = ChatTemplateSpec(
   historyStrip: HistoryStripMode.thinkBlocks,
 );
 
-/// The pinned Qwen 3.5 `chat_template.jinja` subset used by v0 text chat:
-/// ChatML turns with no BOS anywhere, an optional leading system turn, and a
-/// generation primer that opens a `<think>` block when reasoning is enabled
-/// or closes an empty one when it is not — so streamed output begins inside
-/// the think block and `</think>` is the channel boundary.
-///
-/// Every entry point takes a [ChatTemplateSpec] so a supported custom
-/// repository can reuse this proven algorithm with its own markers and role
-/// names (#43); the default is the built-in Qwen spec.
+/// The pinned Qwen 3.5 `chat_template.jinja` subset: ChatML turns with no BOS
+/// anywhere, an optional leading system turn, and a primer that opens a
+/// `<think>` block when reasoning is on or closes an empty one when it is not —
+/// so output begins inside the block and `</think>` is the channel boundary.
+/// Entry points take a [ChatTemplateSpec] for custom repositories (#43).
 final class Qwen35ChatTemplate {
   static const imStart = '<|im_start|>';
   static const imEnd = '<|im_end|>';
@@ -68,8 +63,7 @@ final class Qwen35ChatTemplate {
           );
         case 'assistant':
           // Upstream strips reasoning from every assistant turn at or before
-          // the latest user query; chat history always precedes it, so
-          // history turns carry the visible answer only.
+          // the latest user query, and history always precedes it.
           buffer.write(
             '${spec.turnOpen}${spec.assistantRole}\n'
             '${_renderParts(message, spec, isAssistant: true)}'
@@ -85,9 +79,8 @@ final class Qwen35ChatTemplate {
     return buffer.toString();
   }
 
-  /// Renders a turn's ordered parts. ChatML sanitizes before trimming — the
-  /// opposite order to the Gemma strategy, and preserved exactly — and each
-  /// image becomes one media marker where it sits.
+  /// ChatML sanitizes before trimming — the opposite order to the Gemma
+  /// strategy, and preserved exactly.
   static String _renderParts(
     PromptMessage message,
     ChatTemplateSpec spec, {
@@ -126,23 +119,17 @@ final class Qwen35ChatTemplate {
     }
   }
 
-  /// Removes complete `<think>…</think>` spans; stray unmatched markers are
-  /// left for [sanitize].
+  /// Complete spans only; stray unmatched markers are left for [sanitize].
   static String stripThinkBlocks(
     String text, [
     ChatTemplateSpec spec = qwen35TemplateSpec,
   ]) => history.stripThinkBlocks(text, spec);
 }
 
-/// Splits a streamed Qwen generation into reasoning and answer channels.
-///
-/// With reasoning enabled the prompt primer already opened a `<think>` block,
-/// so the stream starts in the reasoning channel with no opening marker;
-/// `</think>` switches to the visible answer. A `<think>` appearing in the
-/// visible channel (the model thinking despite a closed primer, or thinking
-/// again late) switches back — and resets a prematurely surfaced answer,
-/// mirroring the Gemma parser's contract. Markers split across engine
-/// callbacks are held back until they resolve.
+/// With reasoning enabled the primer already opened a `<think>` block, so the
+/// stream starts in the reasoning channel with no opening marker. A `<think>` in
+/// the visible channel — thinking despite a closed primer, or thinking again
+/// late — switches back and resets a prematurely surfaced answer.
 final class Qwen35StreamParser {
   Qwen35StreamParser({
     required bool reasoningEnabled,
@@ -150,8 +137,6 @@ final class Qwen35StreamParser {
     this.closeMarker = Qwen35ChatTemplate.thinkEnd,
   }) : _inReasoning = reasoningEnabled;
 
-  /// The reasoning-block delimiters this instance parses. Defaulted to the
-  /// pinned Qwen markers; a supported custom profile supplies its own.
   final String openMarker;
   final String closeMarker;
 
@@ -239,8 +224,8 @@ final class Qwen35StreamParser {
     return ReasoningStreamDelta(answer: held);
   }
 
-  /// The length of the longest suffix of [text] that could still grow into
-  /// one of the markers; that tail is held back until the next callback.
+  /// The longest suffix that could still grow into a marker; that tail is held
+  /// back until the next engine callback.
   int _possibleMarkerPrefixLength(String text) {
     var longest = 0;
     for (final marker in [openMarker, closeMarker]) {

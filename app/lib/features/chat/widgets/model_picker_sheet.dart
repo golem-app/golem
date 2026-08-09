@@ -10,10 +10,10 @@ import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../model_label.dart';
 
-/// The per-chat "Model for this chat" sheet. Selection persists on the
-/// conversation; the fake simulates the switch fully, while a real
-/// engine keeps running its configured model until #20 — the footnote
-/// says so instead of letting the sheet imply a hot swap.
+/// The per-chat model sheet. Selection persists on the conversation; the fake
+/// simulates the switch fully, while a real engine keeps running its
+/// configured model until #20 — the footnote says so rather than let the sheet
+/// imply a hot swap.
 Future<void> showModelPickerSheet(
   BuildContext context, {
   required String conversationId,
@@ -84,10 +84,8 @@ final class _ModelPickerContent extends ConsumerWidget {
                 entry: entry,
                 selected: entry.key == selected,
                 status: _statusLine(entry, models),
-                // A real engine cannot switch models per chat until #20:
-                // only the running artifact's row stays tappable, and the
-                // footnote below explains why. The fake honors the choice
-                // in generation, so every row is live there.
+                // Until #20 only the running artifact's row stays tappable on
+                // a real engine; the footnote below explains why.
                 onTap: backend.simulatedInference || entry.key == selected
                     ? () async {
                         final controller = ref.read(

@@ -6,19 +6,14 @@ import '../../../core/chrome/golem_sheet.dart';
 import '../../../core/services/image_intake.dart';
 import '../../../core/theme/golem_theme.dart';
 
-/// Where an image came from. The sheet returns one of these; reading the bytes
-/// is the caller's job, so this file owns no I/O beyond the platform picker.
 enum AttachSource { photoLibrary, camera, files }
 
-/// The attachment sheet.
+/// The attachment sheet. Reading the image is the caller's job, so the sheet
+/// dismisses first and every rejection is handled in one place.
 ///
-/// Reports which source the user chose, or null when they backed out. Reading
-/// the image is the caller's job, so the sheet dismisses first and any
-/// rejection is handled in one place.
-///
-/// Rows are disabled — with copy naming the model — when the chat's model
-/// cannot read an image, so the refusal happens before a picker ever opens
-/// rather than after the user has chosen a photo.
+/// Rows are disabled when the chat's model cannot read an image, so the
+/// refusal happens before a picker opens rather than after the user has
+/// already chosen a photo.
 Future<AttachSource?> showAttachSheet(
   BuildContext context, {
   required String modelLabel,
@@ -133,8 +128,7 @@ class AttachmentPicker {
   }
 
   /// Platform pickers do not always report a type; the extension is the
-  /// fallback, and an unrecognized one is refused by the intake rather than
-  /// guessed at.
+  /// fallback, and an unrecognized one is left for the intake to refuse.
   static String _mimeFor(String name, String? reported) {
     if (reported != null && ImageIntake.supportedMimeTypes.contains(reported)) {
       return reported;

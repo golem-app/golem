@@ -221,7 +221,6 @@ void main() {
     expect(user.hasImages, isTrue);
     expect(user.images.single.width, 2);
     expect(user.images.single.height, 2);
-    // The tray empties once the turn is sent.
     expect(find.byKey(const Key('composer-attachments')), findsNothing);
   });
 

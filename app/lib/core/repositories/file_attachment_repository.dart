@@ -4,17 +4,14 @@ import '../domain/models.dart' show newId;
 import 'contracts.dart';
 
 /// Attachments on disk, one file per image, under a directory this app owns.
-///
 /// Deliberately *not* excluded from backup, unlike model weights: a model is
-/// re-fetchable from Hugging Face, a user's photo is not. Losing it would tear
-/// a hole in a conversation the user can never repair.
+/// re-fetchable from Hugging Face, a user's photo is not.
 final class FileAttachmentRepository implements AttachmentRepository {
   FileAttachmentRepository(this.directory);
 
   final Directory directory;
 
-  /// Writes are serialized so a save and a cascade delete cannot interleave,
-  /// matching the discipline the other file stores use.
+  /// Serialized so a save and a cascade delete cannot interleave.
   Future<void> _writes = Future.value();
 
   static const _extensions = {
@@ -68,8 +65,7 @@ final class FileAttachmentRepository implements AttachmentRepository {
         try {
           await entity.delete();
         } on FileSystemException {
-          // A file that cannot be removed must not abort the cascade; the
-          // next save retries it.
+          // A file that cannot be removed must not abort the cascade.
         }
       }
     });
@@ -92,8 +88,7 @@ final class FileAttachmentRepository implements AttachmentRepository {
     return total;
   }
 
-  /// Attachment ids address one file in this directory and nothing else.
-  /// A stored id that tries to escape it is treated as missing.
+  /// An id addresses one file here; one trying to escape is treated as missing.
   File? _resolve(String attachmentId) {
     if (attachmentId.isEmpty ||
         attachmentId.contains('/') ||

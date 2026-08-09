@@ -59,9 +59,8 @@ class ChatCanvas extends ConsumerWidget {
                     onUserScroll(notification.direction);
                     return false;
                   },
-                  // Content growth changes the metrics without a scroll,
-                  // which is the only signal while the user is detached
-                  // from a streaming tail.
+                  // Content growth changes the metrics without a scroll — the
+                  // only signal while detached from a streaming tail.
                   child: NotificationListener<ScrollMetricsNotification>(
                     onNotification: (notification) {
                       onScrollMetrics();
@@ -93,8 +92,8 @@ class ChatCanvas extends ConsumerWidget {
                     ),
                   ),
                 ),
-              // Without messages there is no tail to jump to; a stale flag
-              // from a previous conversation must not leave a dead control.
+              // A stale flag from a previous conversation must not leave a
+              // dead control with no tail to jump to.
               if (showJump && hasMessages)
                 Positioned(
                   bottom: 10,

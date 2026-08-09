@@ -1,22 +1,12 @@
-/// Reads a GGUF file's metadata block without downloading the weights (#52).
+/// Reads a GGUF file's metadata block from a window of leading bytes (#52), so
+/// a range request answers what a repository contains without fetching
+/// gigabytes of weights. Declared lengths are checked against the bytes present
+/// and against a ceiling — nothing here trusts the file.
 ///
-/// A GGUF puts its whole metadata key/value block at the head of the file, so
-/// an HTTP range request over the first few mebibytes answers what a custom
-/// repository actually contains: its architecture, its dimensions, and the chat
-/// template embedded by whoever converted the weights. Downloading gigabytes
-/// only to reject the model is not an acceptable alternative.
-///
-/// The block is not small, and the useful keys are not adjacent. Measured on
-/// `unsloth/Qwen3.5-2B-GGUF`: `general.architecture` sits at byte 40, while
-/// `tokenizer.chat_template` is the fortieth pair and lands past 10 MiB, behind
-/// roughly ten mebibytes of token and merge arrays. So [parseGgufHeader]
-/// returns what it found *and* how many bytes it would need to continue, which
-/// lets a caller reject an unsupported architecture after one cheap mebibyte
-/// and only widen the window for a model still worth considering.
-///
-/// Nothing here trusts the file: every declared length is checked against the
-/// bytes actually present and against a sanity ceiling before it is used, so a
-/// truncated or hostile header cannot drive a huge allocation.
+/// The useful keys are not adjacent: measured on `unsloth/Qwen3.5-2B-GGUF`,
+/// `general.architecture` sits at byte 40 while `tokenizer.chat_template` is
+/// the fortieth pair, past 10 MiB behind the token and merge arrays. So a probe
+/// reports what it found *and* what it would need to continue.
 library;
 
 import 'dart:convert';
@@ -53,15 +43,12 @@ enum _GgufType {
   }
 }
 
-/// Ceilings that separate a plausible header from a corrupt or hostile one.
-/// Real files sit far below all three; exceeding one means the bytes are not
-/// describing a GGUF we should keep parsing.
+/// Real files sit far below all three; exceeding one means this is not a GGUF.
 const _maxPairs = 4096;
 const _maxStringBytes = 64 * 1024 * 1024;
 const _maxArrayElements = 8 * 1000 * 1000;
 
-/// What the metadata block said, as far as it was read. Every field is nullable
-/// because a partial read is a normal outcome, not a failure.
+/// Every field is nullable because a partial read is a normal outcome.
 final class GgufMetadata {
   const GgufMetadata({
     this.version,
@@ -79,41 +66,34 @@ final class GgufMetadata {
   final int? tensorCount;
   final int? pairCount;
 
-  /// `general.architecture`, the key llama.cpp itself dispatches on.
+  /// `general.architecture`, the key llama.cpp dispatches on.
   final String? architecture;
 
-  /// `tokenizer.chat_template`, the string a profile fingerprint is taken from.
   final String? chatTemplate;
 
-  /// `<architecture>.embedding_length` — the language projection width a
-  /// multimodal projector has to match.
+  /// The language projection width a multimodal projector has to match.
   final int? embeddingLength;
 
-  /// `<architecture>.block_count`.
   final int? blockCount;
 
-  /// `general.file_type`, the quantization enum. Kept raw: it is display
-  /// metadata, and mapping it to a label is the caller's business.
+  /// `general.file_type`, raw — mapping the enum to a label is the caller's.
   final int? fileType;
 
   final String? name;
 }
 
-/// The outcome of reading a window of bytes from the head of a GGUF.
 sealed class GgufProbe {
   const GgufProbe();
 }
 
-/// The metadata block was read to its end; [metadata] is everything it held.
 final class GgufComplete extends GgufProbe {
   const GgufComplete(this.metadata);
 
   final GgufMetadata metadata;
 }
 
-/// The window ended mid-block. [partial] is what was already readable — often
-/// enough to reject the file — and [atLeastBytes] is a *lower* bound on the
-/// window needed to get further, never a promise that it will be enough.
+/// [atLeastBytes] is a *lower* bound on the window needed to get further,
+/// never a promise that it will be enough.
 final class GgufIncomplete extends GgufProbe {
   const GgufIncomplete({required this.atLeastBytes, required this.partial});
 
@@ -121,35 +101,26 @@ final class GgufIncomplete extends GgufProbe {
   final GgufMetadata partial;
 }
 
-/// The bytes are not a GGUF header this reader will parse. [reason] is for
-/// logs and typed failure mapping, never for display.
+/// [reason] is for logs and failure mapping, never for display.
 final class GgufUnreadable extends GgufProbe {
   const GgufUnreadable(this.reason);
 
   final String reason;
 }
 
-/// Versions whose key/value encoding this reader implements. v1 sized its
-/// strings and arrays with 32-bit counts; nothing this app would load still
-/// ships it.
+/// v1 sized its strings with 32-bit counts; nothing this app loads ships it.
 const _supportedVersions = {2, 3};
 
-/// Parses the metadata block at the head of [window].
-///
-/// [window] must start at byte zero of the file. Passing more bytes than the
-/// block needs is fine and normal.
+/// [window] must start at byte zero; passing more than the block needs is fine.
 GgufProbe parseGgufHeader(Uint8List window) {
   final data = ByteData.sublistView(window);
   var offset = 0;
 
-  // Set by the first read that runs past the window, to the exact number of
-  // bytes from the start of the file that read would have needed. It is a
-  // lower bound on progress, not on completion: a shortfall reached partway
-  // through a quarter-million-element token array names that element's end, so
-  // a caller that grew by this alone would creep. See [ggufProbeWindows].
+  // A lower bound on progress, not completion: a shortfall inside a
+  // quarter-million-element token array names only that element's end, so
+  // growing by it alone would creep. See [ggufProbeWindows].
   int? shortfall;
 
-  /// True when [need] more bytes are not available; records the shortfall.
   bool short(int need) {
     if (offset + need <= window.length) return false;
     shortfall ??= offset + need;
@@ -198,11 +169,9 @@ GgufProbe parseGgufHeader(Uint8List window) {
     name: name,
   );
 
-  // A malformed value short-circuits here, because more bytes cannot help.
+  // Set when more bytes cannot help.
   GgufUnreadable? failure;
 
-  /// Null when the window is short (see [shortfall]) or the value is refused
-  /// (see [failure]).
   String? readString() {
     if (short(8)) return null;
     final length = data.getUint64(offset, Endian.little);
@@ -225,8 +194,7 @@ GgufProbe parseGgufHeader(Uint8List window) {
     }
   }
 
-  /// Advances past one value of [type], materializing only strings. Returns
-  /// false when the value could not be consumed.
+  /// Advances past one value of [type], materializing only strings.
   bool skipValue(_GgufType type, {void Function(Object value)? capture}) {
     switch (type) {
       case _GgufType.string:
@@ -256,9 +224,8 @@ GgufProbe parseGgufHeader(Uint8List window) {
         }
         offset += 12;
         if (element == _GgufType.string) {
-          // Every element carries its own length, so the only way past a
-          // string array is to walk it. This is what puts the chat template
-          // ten mebibytes into a real tokenizer's header.
+          // Each element carries its own length, so the only way past is to
+          // walk it — which is what pushes the chat template ten mebibytes in.
           for (var index = 0; index < count; index++) {
             if (readString() == null) {
               if (failure == null) offset = start;
@@ -300,8 +267,6 @@ GgufProbe parseGgufHeader(Uint8List window) {
 
   GgufProbe stopped() {
     if (failure != null) return failure!;
-    // Every short read records its own requirement, so a bound is always
-    // available by the time this is reached.
     return GgufIncomplete(
       atLeastBytes: shortfall ?? window.length + 8,
       partial: snapshot(),
@@ -333,8 +298,7 @@ GgufProbe parseGgufHeader(Uint8List window) {
       case 'tokenizer.chat_template':
         if (value is String) chatTemplate = value;
       default:
-        // Dimension keys are namespaced by architecture, which the file
-        // declares in its first pair rather than in the key itself.
+        // Dimension keys are namespaced by the declared architecture.
         if (architecture != null && value is int) {
           if (key == '$architecture.embedding_length') {
             embeddingLength = value;
@@ -347,20 +311,11 @@ GgufProbe parseGgufHeader(Uint8List window) {
   return GgufComplete(snapshot());
 }
 
-/// Window sizes to try in order when probing a remote GGUF.
-///
-/// The first is deliberately tiny: `general.architecture` is the first pair, so
-/// an unsupported model costs one mebibyte instead of the sixteen a template
-/// read needs. The ceiling bounds a hostile or unusually large header.
-///
-/// A caller should request `max(next window, atLeastBytes)`. The ladder is what
-/// guarantees convergence — growing by [GgufIncomplete.atLeastBytes] alone can
-/// crawl one token at a time through a large array — while the reported bound
-/// lets a single long value be skipped straight past.
-///
-/// Measured KV block sizes for the artifacts this app ships: 10.44 MiB for both
-/// Qwen 3.5 GGUFs and 15.05 MiB for Gemma 4 E2B QAT. The 16 MiB step covers all
-/// three; the last step exists for headers with larger vocabularies.
+/// Window sizes to try in order, smallest first so an unsupported architecture
+/// costs one mebibyte rather than the sixteen a template read needs. A caller
+/// should request `max(next window, atLeastBytes)`: the ladder guarantees
+/// convergence, the bound only skips a single long value. Measured blocks:
+/// 10.44 MiB for both Qwen 3.5 GGUFs, 15.05 MiB for Gemma 4 E2B QAT.
 const ggufProbeWindows = [
   1024 * 1024,
   4 * 1024 * 1024,

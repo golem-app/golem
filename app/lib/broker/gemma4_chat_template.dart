@@ -2,9 +2,8 @@ import '../core/domain/model_profile_spec.dart';
 import '../core/domain/models.dart';
 import 'history_strip.dart' as history;
 
-/// The built-in Gemma 4 template description. The literal markers below stay
-/// as named constants because tests, the parity fixture, and
-/// `docs/architecture/inferno.md` all cite them by name.
+/// The built-in Gemma 4 template. The markers stay named constants because
+/// tests, the parity fixture, and `docs/architecture/inferno.md` cite them.
 const gemma4TemplateSpec = ChatTemplateSpec(
   strategy: ChatTemplateStrategy.gemmaTurns,
   bos: Gemma4ChatTemplate.bos,
@@ -22,15 +21,11 @@ const gemma4TemplateSpec = ChatTemplateSpec(
   mediaMarker: '<__media__>',
 );
 
-/// Gemma 4 text-chat rendering derived from the pinned model template.
-///
-/// The broker emits BOS exactly once. Both engines must tokenize this with
-/// add-BOS disabled; see `docs/architecture/inferno.md`.
-///
-/// Every entry point takes a [ChatTemplateSpec] so a supported custom
-/// repository can reuse this proven algorithm with its own markers and role
-/// names (#43). The default is the built-in Gemma spec, so existing callers
-/// and the recorded fixtures render byte for byte as before.
+/// Gemma 4 text-chat rendering derived from the pinned model template. Every
+/// entry point takes a [ChatTemplateSpec] so a custom repository can reuse the
+/// algorithm with its own markers (#43). The broker emits BOS exactly once:
+/// both engines must tokenize this with add-BOS disabled
+/// (`docs/architecture/inferno.md`).
 abstract final class Gemma4ChatTemplate {
   static const bos = '<bos>';
   static const turnStart = '<|turn>';
@@ -73,8 +68,7 @@ abstract final class Gemma4ChatTemplate {
           'must be user or assistant after the optional leading system turn',
         ),
       };
-      // Model turns lose their reasoning before sanitizing, so the markers are
-      // still present to delimit what gets removed.
+      // Reasoning is stripped before sanitizing, so its markers still delimit it.
       output
         ..write(
           '${spec.turnOpen}${isAssistant ? spec.assistantRole : spec.userRole}\n',
@@ -86,11 +80,9 @@ abstract final class Gemma4ChatTemplate {
     return output.toString();
   }
 
-  /// Pasted content must not be able to close the current turn or open a new
-  /// one, so every control marker is stripped before rendering. Stripping
-  /// runs to a fixpoint: removing an inner marker can splice its neighbours
-  /// into a live one (`<|turn<turn|>>` → `<|turn>`), so one pass is not
-  /// enough.
+  /// Pasted content must not be able to close or open a turn, so every control
+  /// marker is stripped — to a fixpoint, because removing an inner marker can
+  /// splice its neighbours into a live one (`<|turn<turn|>>` → `<|turn>`).
   static String sanitize(
     String text, [
     ChatTemplateSpec spec = gemma4TemplateSpec,
@@ -107,10 +99,9 @@ abstract final class Gemma4ChatTemplate {
     return cleaned;
   }
 
-  /// Renders a turn's ordered parts: text is trimmed, history-stripped for
-  /// assistant turns, then sanitized; each image becomes one media marker at
-  /// the position it occupies. A marker is followed by a newline so the
-  /// question after a picture does not run into it.
+  /// Text is trimmed before sanitizing here — the opposite order to the ChatML
+  /// strategy, and preserved exactly. A media marker gets a trailing newline so
+  /// the question after a picture does not run into it.
   static String _renderParts(
     PromptMessage message,
     ChatTemplateSpec spec, {
@@ -130,8 +121,7 @@ abstract final class Gemma4ChatTemplate {
             ),
           );
         case ImagePart():
-          // A template with no proven image path renders nothing rather than
-          // inventing a marker the engine would not understand.
+          // No proven image path: render nothing rather than invent a marker.
           if (spec.mediaMarker != null) buffer.write('${spec.mediaMarker}\n');
       }
     }
@@ -168,8 +158,6 @@ final class ReasoningStreamParser {
   static const channelStart = '<|channel>';
   static const channelEnd = '<channel|>';
 
-  /// The channel delimiters this instance parses. Defaulted to the pinned
-  /// Gemma markers; a supported custom profile supplies its own.
   final String openMarker;
   final String closeMarker;
 

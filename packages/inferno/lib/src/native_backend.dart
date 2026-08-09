@@ -59,9 +59,8 @@ typedef _StringFreeNative = Void Function(Pointer<Utf8>);
 const _llamaAssetId = 'package:inferno/inferno.dart';
 const _mlxAssetId = 'package:inferno/inferno_mlx.dart';
 
-/// The C ABI revision this package speaks. Both shims report it from
-/// `INFERNO_ABI_VERSION`, and a mismatch fails before any native object is
-/// created rather than crashing inside one.
+/// The C ABI revision this package speaks. A mismatch fails before any native
+/// object is created rather than crashing inside one.
 const infernoAbiVersion = 3;
 
 @Native<Uint32 Function()>(
@@ -435,7 +434,6 @@ final class _PendingGeneration extends _PendingOperation {
   }
 }
 
-/// Dart FFI binding for the shared asynchronous Inferno C ABI.
 final class NativeInfernoBackend implements InfernoBackend {
   NativeInfernoBackend() : _llamaApi = _LlamaNativeApi() {
     final version = _llamaApi.abiVersion();
@@ -547,8 +545,7 @@ final class NativeInfernoBackend implements InfernoBackend {
       );
     }
 
-    // ABI 2: the load argument is one JSON payload carrying the path and
-    // the engine options, mirroring how generate crosses the boundary.
+    // ABI 2: one JSON payload carries the path and the engine options.
     final payload = jsonEncode({
       'modelPath': modelPath,
       ...options.toJson(),
@@ -600,9 +597,8 @@ final class NativeInfernoBackend implements InfernoBackend {
           'stopSequences': request.sampling.stopSequences,
           'stopTokenIds': request.sampling.stopTokenIds,
         }).toNativeUtf8();
-        // Image bytes are copied into native memory for the call and freed
-        // as soon as it returns: the shim copies what it needs before its
-        // worker starts, so nothing here has to outlive the call (ABI 3).
+        // The shim copies what it needs before its worker starts, so these
+        // buffers do not have to outlive the call (ABI 3).
         final images = request.images;
         final imageArray = images.isEmpty
             ? nullptr as Pointer<_InfernoImageInput>
@@ -679,8 +675,7 @@ final class NativeInfernoBackend implements InfernoBackend {
       _engine = nullptr;
       _activeApi = null;
     }
-    // Whatever was still in flight can no longer complete once the
-    // listener closes; fail it now instead of leaving callers wedged.
+    // Nothing in flight can complete once the listener closes; fail it now.
     final pending = List.of(_operations.values);
     _operations.clear();
     const failure = InfernoException(
@@ -757,10 +752,8 @@ final class NativeInfernoBackend implements InfernoBackend {
         : Uint8List.fromList(bytes.asTypedList(length));
     final operation = _operations[operationId];
     if (bytes != nullptr) {
-      // Events can still be queued on the listener port after unload() nulls
-      // _activeApi; free through the operation's own engine library. Both
-      // shims allocate with the platform malloc, so the llama fallback frees
-      // correctly even for an already-forgotten operation.
+      // Events can still be queued after unload() nulls _activeApi, so free
+      // through the operation's own library — both shims use platform malloc.
       final api = operation?.api ?? _activeApi ?? _llamaApi;
       api.stringFree(bytes.cast<Utf8>());
     }
@@ -861,10 +854,8 @@ final class NativeInfernoBackend implements InfernoBackend {
   }
 
   static InfernoException _decodeError(String payload) {
-    // A payloadless error event is the shims' emergency path: the event
-    // payload itself could not be allocated, which only happens under
-    // memory exhaustion (the shims deliver the event rather than hang the
-    // completer).
+    // A payloadless error is the shims' emergency path: the payload itself
+    // could not be allocated, which only happens under memory exhaustion.
     if (payload.isEmpty) {
       return const InfernoException(
         InfernoErrorCode.outOfMemory,

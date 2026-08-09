@@ -1,28 +1,22 @@
 /// The Hugging Face Hub read seam (#52).
 ///
-/// Deliberately tiny and transport-only: three GETs, no knowledge of models,
-/// engines or capability. The resolver decides what to ask for and what an
-/// answer means, which keeps every resolution rule testable without a network.
-///
-/// `dart:io`'s `HttpClient` rather than a new dependency — the same choice
-/// `packages/inferno/tool/verify_pins.dart` already makes. Weights do not come
-/// through here: multi-gigabyte transfers stay with `ArtifactFileDownloader`,
-/// which survives backgrounding and can resume.
+/// Transport-only: the resolver decides what to ask for and what an answer
+/// means, which keeps every resolution rule testable without a network. Weights
+/// do not come through here — multi-gigabyte transfers stay with
+/// `ArtifactFileDownloader`, which survives backgrounding and can resume.
+/// `dart:io`'s `HttpClient` rather than a new dependency.
 library;
 
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-/// Why a Hub request could not be answered.
 enum HubErrorKind {
-  /// HTTP 401/404. The Hub answers identically for a repository that does not
-  /// exist and one that is private, so these cannot be told apart and must not
-  /// be reported as if they could.
+  /// HTTP 401/404. The Hub answers identically for a missing repository and a
+  /// private one, so these must not be reported as if they could be told apart.
   notFoundOrPrivate,
 
-  /// HTTP 429 or 503. Retryable, and the user should be told to wait rather
-  /// than that their repository is wrong.
+  /// HTTP 429 or 503. Retryable: tell the user to wait, not that they erred.
   rateLimited,
 
   /// The request never completed: no route, DNS failure, timeout, reset.
@@ -51,17 +45,13 @@ final class HubException implements Exception {
 }
 
 abstract interface class HuggingFaceApi {
-  /// The decoded JSON object at [url].
   Future<Map<String, Object?>> json(Uri url);
 
-  /// The whole document at [url] as text, refused past [maxBytes] so a file
-  /// that is unexpectedly enormous cannot be pulled into memory.
+  /// Refused past [maxBytes] so an enormous file cannot be pulled into memory.
   Future<String> text(Uri url, {int maxBytes});
 
-  /// Bytes `[start, endInclusive]` of [url].
-  ///
-  /// A server that ignores the range and sends the whole file is treated as
-  /// [HubErrorKind.tooLarge] rather than silently downloading it.
+  /// Bytes `[start, endInclusive]` of [url]. A server that ignores the range
+  /// and sends the whole file is [HubErrorKind.tooLarge], never a download.
   Future<Uint8List> range(
     Uri url, {
     required int start,
@@ -69,17 +59,12 @@ abstract interface class HuggingFaceApi {
   });
 }
 
-/// The Hub's public read API. Hosts are fixed here, not taken from input: no
-/// caller can redirect resolution at an arbitrary server.
+/// Fixed here, never from input: no caller can redirect at another server.
 const huggingFaceHost = 'huggingface.co';
 
-/// Builds a Hub URL from discrete segments.
-///
-/// `pathSegments` rather than a joined path string, because a git ref
-/// legitimately contains `/` (`refs/pr/3`, `feature/x`) and must stay one
-/// segment. Pre-encoding it instead would be double-encoded here — `Uri.https`
-/// escapes the `%` — and the request would ask for a ref literally named
-/// `refs%2Fpr%2F3`.
+/// `pathSegments` rather than a joined path, because a git ref legitimately
+/// contains `/` (`refs/pr/3`) and must stay one segment. Pre-encoding would be
+/// double-encoded — `Uri.https` escapes the `%` — asking for `refs%2Fpr%2F3`.
 Uri _hubUrl(List<String> segments, [Map<String, String>? query]) => Uri(
   scheme: 'https',
   host: huggingFaceHost,
@@ -145,8 +130,7 @@ final class HttpClientHuggingFaceApi implements HuggingFaceApi {
     required int endInclusive,
   }) async {
     final span = endInclusive - start + 1;
-    // One extra byte of slack: a server may legitimately return less, and
-    // exactly the span is the normal case, but never more than asked for.
+    // Exactly the span is normal; a server may return less, never more.
     return _get(
       url,
       maxBytes: span,
@@ -167,8 +151,8 @@ final class HttpClientHuggingFaceApi implements HuggingFaceApi {
       request.followRedirects = true;
       response = await request.close().timeout(timeout);
     } on Object catch (error) {
-      // Every transport failure folds to one kind: the distinctions between a
-      // socket error, a timeout and a bad host are not actionable for a user.
+      // Every transport failure folds to one kind: socket error, timeout and
+      // bad host are not actionable distinctions for a user.
       throw HubException(HubErrorKind.network, cause: error);
     }
     final status = response.statusCode;

@@ -25,25 +25,21 @@ class MessageBubble extends ConsumerWidget {
   final ChatMessage message;
   final bool canRegenerate;
 
-  /// Whether generation is idle; actions render only on a settled chat.
   final bool idle;
 
-  /// Token count of a failed generation's partial answer; non-null only
-  /// on the message the failure banner refers to. Ephemeral by design —
-  /// nothing persists a failure marker.
+  /// Token count of a failed generation's partial answer; non-null only on the
+  /// message the failure banner refers to. Ephemeral — nothing persists it.
   final int? stoppedTokens;
 
-  /// Readable measure for a bubble on wide desktop windows; phone layouts
-  /// never reach it (88% of a phone viewport stays below the cap).
+  /// Readable measure on wide desktop windows; a phone's 88% stays under it.
   static const _maxBubbleWidth = GolemSize.bubbleMaxWidth;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isUser = message.role == MessageRole.user;
     // A failed or cancelled generation can leave an assistant message with
-    // no text, reasoning, or metrics behind; rendering it would paint an
-    // empty bubble shell next to the recovery banner. While streaming, the
-    // bubble stays visible as the typing indicator.
+    // nothing in it; rendering it would paint an empty bubble shell next to
+    // the recovery banner. While streaming it stays as the typing indicator.
     final hasContent =
         message.text.isNotEmpty ||
         message.hasImages ||
@@ -91,10 +87,9 @@ class MessageBubble extends ConsumerWidget {
                 text: message.reasoning!,
                 streaming: message.isStreaming && message.text.isEmpty,
                 live: message.isStreaming,
-                // Streaming reasoning is always shown live; settled cards
-                // start collapsed unless the appearance preference says
-                // otherwise. A card opened by streaming latches open when
-                // the run settles (see _ReasoningCardState).
+                // Streaming reasoning is always live; settled cards follow the
+                // appearance preference. A card opened by streaming latches
+                // open when the run settles (see _ReasoningCardState).
                 initiallyExpanded:
                     message.isStreaming ||
                     (ref
@@ -178,8 +173,6 @@ class MessageBubble extends ConsumerWidget {
     );
   }
 
-  /// The ghost action row under a settled assistant message: copy,
-  /// regenerate (tail only), share, and the anchored overflow menu.
   Widget _actionRow(BuildContext context, WidgetRef ref) {
     final tint = CupertinoDynamicColor.resolve(GolemTheme.tertiaryInk, context);
     Widget action({
@@ -289,11 +282,10 @@ class MessageBubble extends ConsumerWidget {
   }
 
   Future<void> _showActions(BuildContext context, WidgetRef ref) async {
-    // Mutating actions are silently rejected by the controller while a
-    // generation is in flight, so don't offer them — a Save that discards
-    // the user's edit is worse than a missing menu entry.
-    // Action handlers pop their own sheet route and then open follow-up
-    // dialogs on the bubble context, which survives the pop.
+    // The controller silently rejects mutating actions while a generation is
+    // in flight, so don't offer them — a Save that discards the user's edit is
+    // worse than a missing menu entry. Handlers pop their own sheet route and
+    // open follow-ups on the bubble context, which survives the pop.
     await showGolemActions(
       context: context,
       title: message.role == MessageRole.user
@@ -399,9 +391,8 @@ class _ReasoningCard extends StatefulWidget {
   final String text;
   final bool streaming;
 
-  /// Whether the owning message is still streaming at all (the reasoning
-  /// header's LIVE state, [streaming], ends earlier — when answer text
-  /// starts).
+  /// Whether the owning message is still streaming at all. The header's LIVE
+  /// state, [streaming], ends earlier — when answer text starts.
   final bool live;
   final bool initiallyExpanded;
 
@@ -410,20 +401,19 @@ class _ReasoningCard extends StatefulWidget {
 }
 
 class _ReasoningCardState extends State<_ReasoningCard> {
-  // Widget-local disclosure: collapsing a reasoning card is ephemeral
-  // presentation state, never persisted. Until the user touches the
-  // card it follows [_ReasoningCard.initiallyExpanded] reactively —
-  // preferences resolve a frame after cold start, and an initial-only
-  // read would freeze on that pre-resolution frame.
+  // Collapsing a card is ephemeral presentation state, never persisted. Until
+  // the user touches it the card follows [_ReasoningCard.initiallyExpanded]
+  // reactively: preferences resolve a frame after cold start, and an
+  // initial-only read would freeze on that pre-resolution frame.
   bool? _userToggle;
   bool get _expanded => _userToggle ?? widget.initiallyExpanded;
 
   @override
   void didUpdateWidget(covariant _ReasoningCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // A card the stream opened stays open when the run settles — the
-    // reader may be mid-thought. Latching only on the live→settled edge
-    // keeps preference toggles reactive for every other card.
+    // A card the stream opened stays open when the run settles — the reader
+    // may be mid-thought. Latching only on the live→settled edge keeps
+    // preference toggles reactive for every other card.
     if (oldWidget.live && !widget.live && _userToggle == null) {
       _userToggle = true;
     }
@@ -492,7 +482,6 @@ class _ReasoningCardState extends State<_ReasoningCard> {
   );
 }
 
-/// The live "Generating · 26.8 tok/s" pill with its blinking dot.
 class _GeneratingPill extends StatelessWidget {
   const _GeneratingPill({required this.metrics});
   final InferenceMetrics metrics;
@@ -583,8 +572,8 @@ class _MetricsPill extends StatelessWidget {
   );
 }
 
-/// The accessible name for a bubble. Images are announced by count so a
-/// screen reader says a picture is present instead of skipping it.
+/// Images are announced by count so a screen reader says a picture is present
+/// instead of skipping it.
 String _semanticLabel(ChatMessage message, {required bool isUser}) {
   final speaker = isUser ? 'You' : 'Golem';
   final images = message.images.length;
@@ -596,8 +585,6 @@ String _semanticLabel(ChatMessage message, {required bool isUser}) {
   return '$speaker: $picture${message.text}';
 }
 
-/// One attached image inside a bubble, loaded from the app-owned store.
-///
 /// A message can outlive its bytes if the OS trims the container, so a missing
 /// attachment renders a labelled placeholder rather than a broken box.
 class _AttachedImage extends ConsumerStatefulWidget {

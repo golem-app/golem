@@ -1,13 +1,9 @@
 /// Turns a Hugging Face repository name into an immutable, inspectable model
 /// configuration, or into a bounded reason why it cannot be one (#52).
 ///
-/// The division of labour matters: this decides *what* may be fetched and pins
-/// it to one commit, while `RealModelManagementRepository` decides whether the
-/// bytes that arrive are good. Neither takes on the other's job.
-///
-/// Everything here fails closed. A repository is refused unless its files, its
-/// architecture and its chat template are all recognized, and no answer is ever
-/// inferred from a repository name, a file name or an engine.
+/// This decides *what* may be fetched and pins it to one commit;
+/// `RealModelManagementRepository` decides whether the bytes that arrive are
+/// good. Fails closed, and never infers from a name, a file name or an engine.
 library;
 
 import 'dart:typed_data';
@@ -19,10 +15,8 @@ import 'chat_template_fingerprint.dart';
 import 'gguf_header.dart';
 import 'hugging_face_api.dart';
 
-/// Why a repository cannot become a model, with the copy the user sees.
-///
-/// Every value is a distinct, actionable outcome. There is no catch-all
-/// "invalid repository", because that tells a user nothing about what to change.
+/// Why a repository cannot become a model, with the copy the user sees. No
+/// catch-all "invalid repository": that tells a user nothing to change.
 enum RepositoryRejection {
   malformedIdentifier(
     'Enter a public repository as owner/name, for example '
@@ -68,8 +62,7 @@ enum RepositoryRejection {
 
   const RepositoryRejection(this.message);
 
-  /// User-presentable copy. Never contains an identifier, a URL or a status
-  /// code; those belong on [RepositoryRejected.cause].
+  /// Never an identifier, a URL or a status code — those belong on the cause.
   final String message;
 }
 
@@ -77,9 +70,8 @@ sealed class RepositoryResolution {
   const RepositoryResolution();
 }
 
-/// The repository resolved. [profile] is null when nothing about its chat
-/// template proved a broker profile — a normal outcome, and the entry is still
-/// listable, downloadable and deletable while refusing activation.
+/// [profile] is null when nothing about the chat template proved a broker
+/// profile — normal; the entry still lists and downloads, but cannot activate.
 final class RepositoryResolved extends RepositoryResolution {
   const RepositoryResolved({
     required this.resolved,
@@ -97,8 +89,7 @@ final class RepositoryResolved extends RepositoryResolution {
   bool get profileResolved => profile != null;
 }
 
-/// Several loadable weight files exist and only the user can say which. Carried
-/// as a distinct outcome rather than guessed at.
+/// Several loadable weight files exist; the user picks, this never guesses.
 final class RepositoryNeedsWeightChoice extends RepositoryResolution {
   const RepositoryNeedsWeightChoice(this.candidates);
 
@@ -123,22 +114,18 @@ final class RepositoryRejected extends RepositoryResolution {
   String get message => reason.message;
 }
 
-/// The architectures each engine has been *proven* to load here, taken from the
-/// artifacts this app ships.
-///
-/// The two engines spell the same model differently: GGUF metadata declares
-/// `qwen35` while an MLX `config.json` declares `qwen3_5`, so one shared set
-/// would have rejected every Qwen MLX repository. Widening either set is a
-/// claim about what the bundled engine can load and needs evidence, not a
-/// guess from a model card.
+/// The architectures each engine has been *proven* to load here, from the
+/// artifacts this app ships. Widening either set needs evidence, not a guess
+/// from a model card. Note the engines spell the same model differently: GGUF
+/// declares `qwen35` while an MLX `config.json` declares `qwen3_5`, so one
+/// shared set would have rejected every Qwen MLX repository.
 const supportedArchitectures = <ModelEngine, Set<String>>{
   ModelEngine.gguf: {'gemma4', 'qwen35'},
   ModelEngine.mlx: {'gemma4', 'qwen3_5'},
 };
 
-/// Metadata files an MLX snapshot may contain. An allowlist, so a repository
-/// cannot get arbitrary files written into the app container by publishing
-/// them; anything unlisted is simply not fetched.
+/// An allowlist, so a repository cannot get arbitrary files written into the
+/// app container by publishing them; anything unlisted is simply not fetched.
 const _mlxMetadataFiles = {
   'added_tokens.json',
   'chat_template.jinja',
@@ -194,12 +181,9 @@ final class HuggingFaceRepositoryResolver {
 
   final Map<ModelEngine, Set<String>> architectures;
 
-  /// Resolves [repository] at [ref] for [engine].
-  ///
-  /// [existingKeys] are the catalog keys already present, so a repository that
-  /// would collide is refused before anything is written. [weightsFile] picks
-  /// one of several GGUF payloads; without it, an ambiguous repository comes
-  /// back as [RepositoryNeedsWeightChoice] rather than being chosen for.
+  /// [existingKeys] are the keys already present, so a colliding repository is
+  /// refused before anything is written. [weightsFile] picks one of several
+  /// GGUF payloads; without it, ambiguity comes back as a needs-choice outcome.
   Future<RepositoryResolution> resolve({
     required String repository,
     required ModelEngine engine,
@@ -222,8 +206,8 @@ final class HuggingFaceRepositoryResolver {
     }
 
     // Gating is readable from the body: the API answers 200 for a gated
-    // repository and only its file downloads 401, so refusing here costs
-    // nothing and gives the accurate reason instead of "not found".
+    // repository and only its downloads 401, so this reports the accurate
+    // reason instead of "not found".
     final gated = info['gated'];
     if (gated != false && gated != null) {
       return const RepositoryRejected(RepositoryRejection.gated);
@@ -269,8 +253,7 @@ final class HuggingFaceRepositoryResolver {
         .where((file) => file.path.toLowerCase().endsWith('.gguf'))
         .toList();
     // A projector is a .gguf too, and pairing one with weights is a proven
-    // capability (#18), never an inference from a file name. Custom entries
-    // stay text-only, so projectors are excluded rather than adopted.
+    // capability (#18): custom entries stay text-only, so projectors are cut.
     final payloads = ggufs
         .where((file) => !_looksLikeProjector(file.path))
         .toList();
@@ -333,11 +316,9 @@ final class HuggingFaceRepositoryResolver {
     );
   }
 
-  /// Grows the window until the metadata block is readable, or gives up.
-  ///
-  /// Returns either a [GgufComplete] or a [RepositoryRejected]. The first
-  /// window is deliberately small so an unsupported architecture — the file's
-  /// first metadata pair — is rejected without fetching the rest.
+  /// Grows the window until the metadata block is readable, returning either a
+  /// [GgufComplete] or a [RepositoryRejected]. The first window is deliberately
+  /// small so an unsupported architecture — the first pair — costs little.
   Future<Object> _probeGgufHeader(
     String repository,
     String sha,
@@ -386,8 +367,7 @@ final class HuggingFaceRepositoryResolver {
           if (index >= ggufProbeWindows.length) {
             return const RepositoryRejected(RepositoryRejection.headerTooLarge);
           }
-          // The ladder guarantees convergence; the reported bound lets a single
-          // long value be skipped in one step instead of doubling towards it.
+          // The bound skips one long value in a step; the ladder converges.
           window = ggufProbeWindows[index] > atLeastBytes
               ? ggufProbeWindows[index]
               : atLeastBytes;
@@ -565,8 +545,7 @@ final class HuggingFaceRepositoryResolver {
     );
   }
 
-  /// Distinguishes "publishes weights we refuse to load" from "publishes no
-  /// weights at all", because only the first tells the user something useful.
+  /// "Weights we refuse to load" and "no weights" are different, useful facts.
   RepositoryRejection _unsafeOrMissing(List<_Sibling> siblings) {
     final unsafe = siblings.any(
       (file) => _unsafeWeightExtensions.any(
@@ -591,8 +570,7 @@ final class HuggingFaceRepositoryResolver {
       final lfs = item['lfs'];
       final declared = item['size'];
       final lfsSize = lfs is Map ? lfs['size'] : null;
-      // Two sources for one fact; a disagreement means the listing cannot be
-      // trusted to pin anything.
+      // Two sources for one fact: a disagreement means nothing can be pinned.
       if (declared is int && lfsSize is int && declared != lfsSize) return null;
       files.add(
         _Sibling(
@@ -606,11 +584,8 @@ final class HuggingFaceRepositoryResolver {
   }
 }
 
-/// The catalog key a custom repository takes.
-///
-/// Hashed on top of a slug so two repositories whose names differ only in
-/// punctuation (`org/foo_bar` and `org/foo-bar`) cannot collapse onto one
-/// directory and silently replace each other.
+/// Hashed on top of a slug so two names differing only in punctuation
+/// (`org/foo_bar` and `org/foo-bar`) cannot collapse onto one directory.
 String customCatalogKeyFor(String repository) {
   final slug = repository.toLowerCase().replaceAll(RegExp('[^a-z0-9]+'), '-');
   var hash = 0x811c9dc5;
@@ -636,8 +611,7 @@ bool _validRef(String ref) =>
     ref.length <= 128 &&
     !ref.codeUnits.any((unit) => unit < 0x20 || unit == 0x7f);
 
-/// Rejects anything that could escape the install directory or address a
-/// device path: traversal, absolute paths, Windows separators, empty segments.
+/// Rejects anything that could escape the install directory.
 bool _safeRelativePath(String path) {
   if (path.isEmpty || path.length > 255) return false;
   if (path.startsWith('/') || path.contains('\\')) return false;
@@ -673,11 +647,8 @@ String _mlxQuantization(Map<String, Object?> config) {
   return 'custom';
 }
 
-/// Maps a transport outcome to the reason a user is shown.
-///
-/// [HubErrorKind.notFoundOrPrivate] deliberately keeps its ambiguity: the Hub
-/// answers the same way for a repository that does not exist and one that is
-/// private, so claiming either specifically would be a guess.
+/// Maps a transport outcome to the reason a user is shown;
+/// [HubErrorKind.notFoundOrPrivate] deliberately keeps its ambiguity.
 RepositoryRejection _rejectionFor(HubException error) => switch (error.kind) {
   HubErrorKind.notFoundOrPrivate => RepositoryRejection.notFoundOrPrivate,
   HubErrorKind.rateLimited => RepositoryRejection.rateLimited,

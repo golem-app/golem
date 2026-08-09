@@ -1,18 +1,11 @@
 /// What a Hugging Face repository turned out to actually contain (#52).
-///
-/// A [CustomModelSpec] is the user's *request*: a repository name, an engine,
-/// and a ref that may move. This is the answer to it — pinned to one immutable
-/// commit, naming the exact files that will be fetched with the sizes and
-/// hashes the Hub published for them.
-///
-/// Kept separate from the request so an unresolved entry remains a first-class
-/// state rather than a half-filled one: a repository the app cannot resolve
-/// still lists, still deletes, and refuses activation with actionable copy.
+/// `CustomModelSpec` is the user's *request*; this is the answer, pinned to one
+/// immutable commit. Kept separate so an unresolved entry stays a first-class
+/// state: it still lists, still deletes, and refuses activation.
 library;
 
 import 'model_catalog.dart';
 
-/// A resolved repository's file list and provenance.
 final class ResolvedRepository {
   const ResolvedRepository({
     required this.commitSha,
@@ -22,17 +15,14 @@ final class ResolvedRepository {
     this.displayName,
   });
 
-  /// The immutable commit the requested ref pointed at when this resolved.
-  ///
-  /// Everything downstream addresses this, never the ref: a branch that moves
-  /// afterwards cannot silently change the model under an installed entry.
+  /// The immutable commit the requested ref pointed at. Everything downstream
+  /// addresses this, so a moving branch cannot change an installed model.
   final String commitSha;
 
   /// Exactly the files to fetch — never a whole repository by guesswork.
   final List<ModelArtifactFile> files;
 
-  /// Display label such as `Q4_0` or `4-bit`. Metadata, never a capability
-  /// claim.
+  /// Display label such as `Q4_0` or `4-bit`; never a capability claim.
   final String quantization;
 
   /// The architecture the artifact declared: `general.architecture` for GGUF,
@@ -40,8 +30,6 @@ final class ResolvedRepository {
   /// decided by the chat-template fingerprint alone.
   final String? architecture;
 
-  /// The repository's own model name when it published one, else null and the
-  /// caller falls back to the repository tail.
   final String? displayName;
 
   int get totalBytes => files.fold(0, (sum, file) => sum + file.bytes);
@@ -66,8 +54,7 @@ final class ResolvedRepository {
     ],
   };
 
-  /// Throws [FormatException] on anything malformed, so a corrupt stored entry
-  /// can be dropped to unresolved rather than trusted.
+  /// Throws [FormatException] so a corrupt entry drops to unresolved.
   factory ResolvedRepository.fromJson(Map<String, Object?> json) {
     final commitSha = json['commitSha'];
     if (commitSha is! String || commitSha.isEmpty) {

@@ -22,9 +22,8 @@ final class FakeInferenceRepository implements InferenceRepository {
     'Then I’ll keep the answer concise and useful.',
   ];
 
-  // Markdown-bearing on purpose: the transcript renderer, goldens, and
-  // journeys all exercise paragraphs, inline code, a fenced block, and a
-  // list from this one deterministic reply.
+  // Markdown-bearing on purpose: renderer, goldens and journeys all exercise
+  // paragraphs, inline code, a fenced block and a list from this one reply.
   static const _answer = <String>[
     'This is a deterministic response from Golem’s simulated backend — '
         'no model is loaded and nothing measures this device.\n\n',
@@ -38,8 +37,7 @@ final class FakeInferenceRepository implements InferenceRepository {
     '- Swap in **DictReader** if the file has a header row.',
   ];
 
-  /// Simulated per-model voice and speed, so the per-chat model picker is
-  /// provable end to end without a real engine.
+  /// Simulated per-model voice and speed, so the picker is provable.
   static ({String name, double decodeRate}) _profileFor(String? modelKey) =>
       switch (modelKey) {
         final key? when key.startsWith('qwen35') => (
@@ -85,8 +83,7 @@ final class FakeInferenceRepository implements InferenceRepository {
     final profile = _profileFor(modelKey);
     final last = context.lastOrNull;
     final prompt = last?.text ?? '';
-    // Deterministic acknowledgement so qa journeys and goldens can exercise
-    // an image turn offline, with no model and no bytes decoded.
+    // Deterministic ack so journeys can exercise an image turn offline.
     final attachedImages = last?.images.length ?? 0;
     if (attachedImages > 0) {
       yield AnswerDelta(
@@ -122,8 +119,7 @@ final class FakeInferenceRepository implements InferenceRepository {
       );
     }
     if (prompt.contains('[context]')) {
-      // The typed failure whose banner action is New chat, never Retry —
-      // provable in QA without filling a real context window.
+      // Banner action is New chat, never Retry — provable without a window.
       throw const InferenceException(
         InferenceFailureKind.contextExhausted,
         'This conversation no longer fits the model’s context window. '
@@ -140,11 +136,9 @@ final class FakeInferenceRepository implements InferenceRepository {
         yield ReasoningDelta(part);
       }
     }
-    // A custom system prompt is acknowledged so its round-trip is provable
-    // in QA without a real model — but only here, after the failure
-    // branches and the reasoning loop: answer text arriving while
-    // reasoning still streams would end the reasoning card's live state,
-    // and the failure injections must stay pristine.
+    // Acknowledged here, after the failure branches and the reasoning loop:
+    // answer text arriving while reasoning still streams would end the
+    // reasoning card's live state, and the injections must stay pristine.
     if (systemPrompt != null && systemPrompt.isNotEmpty) {
       yield const AnswerDelta(
         'Simulated note: your custom system prompt is applied.\n\n',

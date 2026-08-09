@@ -412,7 +412,6 @@ void main() {
           .read(preferencesControllerProvider.notifier)
           .addCustomModel(spec);
 
-      // The derived entry joins the effective catalog and can download.
       final effective = container.read(effectiveModelCatalogProvider);
       expect(effective.map((e) => e.key), contains(spec.key));
       await container.read(modelControllerProvider.notifier).download(spec.key);
@@ -651,7 +650,6 @@ void main() {
         stepDelay: Duration.zero,
       );
 
-  /// Installs the fake active artifact through the simulated download.
   Future<void> installActiveModel(ProviderContainer container) async {
     await container.read(modelControllerProvider.future);
     await container.read(modelControllerProvider.notifier).download('test-mlx');
@@ -700,7 +698,6 @@ void main() {
     expect(state.failure?.message, contains('not downloaded'));
     // The engine was never touched: no hang-like prepare, no cryptic error.
     expect(inference.prepares, 0);
-    // Discard clears the typed failure whole.
     await container.read(chatControllerProvider.notifier).discardFailure();
     expect(container.read(chatControllerProvider).requireValue.failure, isNull);
   });
