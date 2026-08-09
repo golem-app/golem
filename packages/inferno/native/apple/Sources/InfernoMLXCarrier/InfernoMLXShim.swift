@@ -451,7 +451,12 @@ private func preparedInput(
                 userInfo: [NSLocalizedDescriptionKey: "The Qwen image processor is unavailable."]
             )
         }
-        let processing = UserInput.Processing(maxPixels: 1_048_576)
+        // A one-megapixel Qwen frame is correct but pushes the 4B path past
+        // iOS's foreground memory budget during vision prefill. 512² keeps
+        // the documented aspect-preserving processor path while bounding
+        // visual activations; the app's one-megapixel intake cap remains the
+        // broader cross-engine decode boundary.
+        let processing = UserInput.Processing(maxPixels: 262_144)
         let prepared = try images.map {
             try processor.preprocess(images: [$0], processing: processing)
         }

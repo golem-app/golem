@@ -23,6 +23,10 @@ documented in `../device_floor.md` (added with epic #61).
   exact pinned catalog artifact and retains its capability proof. Supplying a
   path is the separate operator-sideload contract and does not inherit catalog
   projectors or image capability.
+- `GOLEM_MODEL_ARTIFACT` selects an exact catalog key independently from its
+  prompt-family profile. This is how builds select Qwen 2B versus 4B without
+  inventing a second Qwen template. The artifact must match the selected
+  engine and profile, and cannot be combined with the sideload path override.
 - Coherence corollary (caught in device QA): overriding a qa build to real
   inference carries **model management** to the real implementation as
   well. A real engine fed by the download simulation would "install"

@@ -111,6 +111,18 @@ phone photos and make CPU image prefill disproportionately slow. Physical
 OnePlus 12R acceptance for both Qwen GGUF sizes is recorded in
 `docs/evals/2026-08-09-qwen35-mmproj-selection.md`.
 
+Qwen's MLX processor applies a second, engine-specific 262,144-pixel ceiling.
+The broader intake ceiling remains shared with GGUF, while this lower bound
+keeps Qwen 4B vision below iOS's foreground memory limit. Both Qwen MLX sizes
+were rerun against the complete grounded fixture matrix after that change; the
+quality outcomes were unchanged, and physical iPhone acceptance is recorded in
+`docs/evals/2026-08-09-mlx-vision-matrix.md`.
+
+Once sent, a bubble owns one cached attachment-read future and one decoded byte
+identity for that message image. Streaming state rebuilds therefore retain the
+completed frame instead of replacing the future with a fresh loading state—the
+former behavior visibly blinked the photo twice at the start of generation.
+
 `image_picker` and `file_selector` are both flutter.dev packages. The photo
 library needs no Android permission because the picker runs out of process
 (the Android Photo Picker on 13+), so the app never gains gallery read access.

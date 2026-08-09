@@ -204,9 +204,9 @@ const qwen35ProfileSpec = ModelProfileSpec(
   // Artifact capability is still declared separately in the catalog, so the
   // GGUF variants remain text-only until a projector pairing is proven.
   inputModalities: {ModelInputModality.text, ModelInputModality.image},
-  // The native processor caps each image at one megapixel. Reserve the worst
-  // observed visual-token footprint rather than allowing context windowing to
-  // undercount an image before the processor expands its placeholder.
+  // MLX caps Qwen at 262,144 pixels, while GGUF accepts the app's one-megapixel
+  // intake ceiling. Reserve the cross-engine worst case rather than allowing
+  // context windowing to undercount a processor-expanded placeholder.
   imageTokenCost: 1280,
 );
 

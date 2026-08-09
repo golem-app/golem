@@ -19,6 +19,7 @@ Future<InferenceBackendConfig> resolveConfiguredBackend() =>
     resolveBackendPolicy(
       backendDefine: const String.fromEnvironment('GOLEM_INFERENCE_BACKEND'),
       profileDefine: const String.fromEnvironment('GOLEM_MODEL_PROFILE'),
+      artifactDefine: const String.fromEnvironment('GOLEM_MODEL_ARTIFACT'),
       modelPathDefine: const String.fromEnvironment('GOLEM_MODEL_PATH'),
       identity: AppIdentity.current,
       // Test-only escape hatch: forces the device-policy branch (both test

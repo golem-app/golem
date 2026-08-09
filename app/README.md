@@ -108,15 +108,14 @@ no network use (skip-if-valid) — an offline sideload path.
 
 The real local runtime lives in `lib/broker/`, which adapts
 `package:inferno` (see the root README). Under `auto` the model path,
-profile, and artifact resolve together and cannot disagree. The explicit
-`llama|mlx` opt-in keeps today's contract: **`GOLEM_MODEL_PATH` and
-`GOLEM_MODEL_PROFILE` are a matched pair** — the profile
-(`gemma4` default, `qwen35`; registry in `lib/broker/model_profile.dart`)
-supplies the chat template, stop policy, sampling defaults, and
-reasoning parsing, and nothing cross-checks it against the model file —
-pointing a Qwen artifact at the default Gemma profile silently renders
-the wrong template. Explicit real-backend builds must set both. No other
-app code may import Inferno;
+profile, and artifact resolve together and cannot disagree.
+`GOLEM_MODEL_ARTIFACT` selects an exact pinned catalog key (including Qwen
+2B versus 4B), derives its profile when none is supplied, and rejects an
+engine or explicit-profile mismatch. `GOLEM_MODEL_PATH` remains the separate
+operator-sideload contract and must be paired manually with
+`GOLEM_MODEL_PROFILE` (`gemma4` or `qwen35`); because a sideload has no catalog
+proof, it stays text-only. Artifact and path overrides are mutually exclusive.
+No other app code may import Inferno;
 `../tool/check_inferno_imports.dart` and `test/inferno_import_boundary_test.dart`
 enforce that. Benchmark exports contain both:
 

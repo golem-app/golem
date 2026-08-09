@@ -34,14 +34,22 @@ byte count and SHA-256 in Inferno's manifest.
 | Artifact | OCR | Colour | Count | Spatial | Chart | Peak footprint |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Gemma 4 E2B MLX 4-bit | pass | pass | pass | pass | pass | 4.14 GB |
-| Qwen 3.5 2B MLX 4-bit | pass | pass | **fail** | pass | pass | 2.66 GB |
-| Qwen 3.5 4B MLX 4-bit | pass | pass | pass | pass | pass | 4.20 GB |
+| Qwen 3.5 2B MLX 4-bit | pass | pass | **fail** | pass | pass | 2.53 GB |
+| Qwen 3.5 4B MLX 4-bit | pass | pass | pass | pass | pass | 4.05 GB |
 
 Gemma answered the five graded facts as `MEN WALK ON MOON`, `Red`, `3`,
 `left`, and `Right`. Qwen 2B recognized the three squares but over-analysed
 instead of returning the requested count; the other four cases were correct.
 Qwen 4B passed all five. Observed decode rates were about 61–72 tok/s for
 Gemma, 99–122 tok/s for Qwen 2B, and 50–52 tok/s for Qwen 4B.
+
+The final Qwen runs use `UserInput.Processing(maxPixels: 262144)`, an
+aspect-preserving 512²-equivalent ceiling. The original one-megapixel setting
+produced the same Mac answers but made Qwen 4B the largest process on the
+iPhone at 345,364 16 KiB pages (about 5.27 GiB); iOS killed it for
+`vm-pageshortage` during vision prefill. At 262,144 pixels, 2B retained the
+same four passes and the same count miss, while 4B retained all five passes.
+The lower peaks in the table are the final bounded-pixel runs.
 
 ## Gemma loader finding
 
@@ -62,8 +70,9 @@ after image preprocessing. It never applies a second chat template.
 
 ## Decision
 
-Gemma 4 E2B MLX and both Qwen 3.5 MLX artifacts expose image input. The Qwen
-processor is capped at one megapixel per image and context windowing reserves
+Gemma 4 E2B MLX and both Qwen 3.5 MLX artifacts expose image input. Qwen MLX
+processing is capped at 262,144 pixels per image; the app's cross-engine intake
+still caps decoded attachments at one megapixel, and context windowing reserves
 1,280 visual tokens per image. Profile capability alone does not imply artifact
 capability; the separate
 [Qwen GGUF projector bake-off](2026-08-09-qwen35-mmproj-selection.md) later
@@ -75,11 +84,12 @@ allows; 2B remains useful on lower-memory Apple devices.
 
 ## Physical iPhone acceptance
 
-The catalog-backed Gemma MLX path was then accepted through the actual app on
-an iPhone 17 running iOS 26.6, using the separate `app.golem.qa` bundle. The
-snapshot was cable-copied into QA Documents, then the app's normal download
-action hashed all eight files and wrote its verification receipt; no model was
-trusted from size alone.
+All three catalog-backed MLX paths were accepted through the actual app on an
+iPhone 17 running iOS 26.6, using the separate `app.golem.qa` bundle. The
+snapshots were cable-copied into QA Documents, then the app's normal download
+action hashed every pinned file and wrote its verification receipt; no model
+was trusted from size alone. Each Qwen result came from a separately created,
+empty chat whose header named the exact boot-selected catalog artifact.
 
 Through the real iOS photo picker, composer tray, attachment store, persisted
 chat history, broker, ABI, and MLXVLM shim, the model identified the main object
@@ -88,3 +98,15 @@ settled app response reported 25.8 decode tok/s and 19 generated tokens. The
 answer was produced after an app update and relaunch from the attachment in
 chat history, proving durable attachment reads rather than only an in-memory
 picker handoff.
+
+On the final bounded-pixel build, Qwen 2B described the same photo as “A gray
+hatchback car is parked on a paved lot next to a building with a white roller
+door.” It settled at 35.4 decode tok/s for 21 tokens. Qwen 4B identified the
+car more specifically as a Volkswagen Golf Mk2 and remained grounded while
+over-answering the requested brevity; it settled at 16.7 tok/s for 261 tokens.
+
+The first 4B one-megapixel attempt generated the jetsam record described above.
+After reducing only the upstream processor's pixel budget—and rerunning both
+Mac matrices—it completed on the same phone without eviction. The final build
+also kept the sent-image frame mounted across generation-state rebuilds; the
+visible double blink reported during the first runs no longer reproduced.

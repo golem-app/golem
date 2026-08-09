@@ -13,6 +13,7 @@ const _gib = 1024 * 1024 * 1024;
 Future<InferenceBackendConfig> _resolve({
   String backend = '',
   String profile = '',
+  String artifact = '',
   String modelPath = '',
   AppIdentity identity = AppIdentity.production,
   int memoryOverride = 0,
@@ -20,6 +21,7 @@ Future<InferenceBackendConfig> _resolve({
 }) => resolveBackendPolicy(
   backendDefine: backend,
   profileDefine: profile,
+  artifactDefine: artifact,
   modelPathDefine: modelPath,
   identity: identity,
   memoryOverrideBytes: memoryOverride,
@@ -156,6 +158,61 @@ void main() {
     expect(config.modelPath, 'documents:models/sideloaded.gguf');
     // Operator-supplied paths are never install-gated.
     expect(config.modelPathFromCatalog, isFalse);
+  });
+
+  test(
+    'an exact catalog artifact selects size separately from profile',
+    () async {
+      final config = await _resolve(
+        backend: 'mlx',
+        artifact: 'qwen35-2b-mlx',
+        identity: AppIdentity.qa,
+        probe: () async => fail('an exact artifact must not probe memory'),
+      );
+      expect(config.kind, InferenceBackendKind.mlx);
+      expect(config.profileKey, 'qwen35');
+      expect(config.artifactKey, 'qwen35-2b-mlx');
+      expect(config.modelPath, 'documents:models/qwen35-2b-mlx');
+      expect(config.modelPathFromCatalog, isTrue);
+    },
+  );
+
+  test('an exact auto artifact bypasses the device policy', () async {
+    final config = await _resolve(
+      backend: 'auto',
+      artifact: 'qwen35-2b-gguf',
+      probe: () async => fail('an exact artifact must not probe memory'),
+    );
+    expect(config.kind, InferenceBackendKind.llama);
+    expect(config.profileKey, 'qwen35');
+    expect(config.artifactKey, 'qwen35-2b-gguf');
+  });
+
+  test('catalog artifact overrides reject incoherent composition', () async {
+    await expectLater(
+      _resolve(backend: 'mlx', artifact: 'qwen35-2b-gguf'),
+      throwsA(isA<StateError>()),
+    );
+    await expectLater(
+      _resolve(backend: 'mlx', profile: 'gemma4', artifact: 'qwen35-2b-mlx'),
+      throwsA(isA<StateError>()),
+    );
+    await expectLater(
+      _resolve(backend: 'mlx', artifact: 'missing'),
+      throwsA(isA<StateError>()),
+    );
+    await expectLater(
+      _resolve(
+        backend: 'mlx',
+        artifact: 'qwen35-2b-mlx',
+        modelPath: '/tmp/sideload',
+      ),
+      throwsA(isA<StateError>()),
+    );
+    await expectLater(
+      _resolve(backend: 'fake', artifact: 'qwen35-2b-mlx'),
+      throwsA(isA<StateError>()),
+    );
   });
 
   test('an unknown backend value fails loudly', () async {

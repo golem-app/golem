@@ -600,13 +600,36 @@ String _semanticLabel(ChatMessage message, {required bool isUser}) {
 ///
 /// A message can outlive its bytes if the OS trims the container, so a missing
 /// attachment renders a labelled placeholder rather than a broken box.
-class _AttachedImage extends ConsumerWidget {
+class _AttachedImage extends ConsumerStatefulWidget {
   const _AttachedImage({required this.image});
 
   final ImagePart image;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_AttachedImage> createState() => _AttachedImageState();
+}
+
+class _AttachedImageState extends ConsumerState<_AttachedImage> {
+  late Future<Uint8List?> _bytes = _read();
+
+  Future<Uint8List?> _read() async {
+    final bytes = await ref
+        .read(attachmentRepositoryProvider)
+        .read(widget.image.attachmentId);
+    return bytes == null ? null : Uint8List.fromList(bytes);
+  }
+
+  @override
+  void didUpdateWidget(covariant _AttachedImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.image.attachmentId != widget.image.attachmentId) {
+      _bytes = _read();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final image = widget.image;
     final aspect = image.height == 0 ? 1.0 : image.width / image.height;
     return ClipRRect(
       borderRadius: BorderRadius.circular(GolemRadius.field),
@@ -614,10 +637,8 @@ class _AttachedImage extends ConsumerWidget {
         constraints: const BoxConstraints(maxHeight: 260),
         child: AspectRatio(
           aspectRatio: aspect <= 0 ? 1 : aspect,
-          child: FutureBuilder<List<int>?>(
-            future: ref
-                .read(attachmentRepositoryProvider)
-                .read(image.attachmentId),
+          child: FutureBuilder<Uint8List?>(
+            future: _bytes,
             builder: (context, snapshot) {
               final bytes = snapshot.data;
               if (bytes == null) {
@@ -645,7 +666,8 @@ class _AttachedImage extends ConsumerWidget {
                 );
               }
               return Image.memory(
-                Uint8List.fromList(bytes),
+                bytes,
+                key: Key('message-image-${image.attachmentId}'),
                 fit: BoxFit.cover,
                 excludeFromSemantics: true,
               );

@@ -8,10 +8,13 @@ import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 
 import 'package:golem_flutter/core/domain/models.dart';
+import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/services/image_intake.dart';
 import 'package:golem_flutter/features/chat/widgets/attach_sheet.dart';
+import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
 
 import 'support/harness.dart';
+import 'support/in_memory_attachment_repository.dart';
 
 void main() {
   testWidgets('picking a model persists it and relabels chip and nav', (
@@ -254,6 +257,53 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
   });
+
+  testWidgets('a sent image stays mounted across parent rebuilds', (
+    tester,
+  ) async {
+    setViewport(tester);
+    final attachments = _CountingAttachmentRepository();
+    final stored = await attachments.store(tinyPngBytes, mimeType: 'image/png');
+    final container = buildContainer(attachments: attachments);
+    addTearDown(container.dispose);
+    final message = ChatMessage(
+      id: 'image-message',
+      role: MessageRole.user,
+      parts: [
+        ImagePart(
+          attachmentId: stored.id,
+          mimeType: stored.mimeType,
+          width: 2,
+          height: 2,
+          byteCount: stored.byteCount,
+        ),
+      ],
+      createdAt: DateTime.utc(2026, 8, 9),
+    );
+    Widget subject() => UncontrolledProviderScope(
+      container: container,
+      child: wrapApp(
+        child: MessageBubble(
+          message: message,
+          canRegenerate: false,
+          idle: false,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(subject());
+    await tester.pump();
+    final image = find.byKey(Key('message-image-${stored.id}'));
+    expect(image, findsOneWidget);
+    expect(attachments.readCount, 1);
+
+    // Streaming and other chat-state changes rebuild every bubble. The
+    // attachment read and its completed frame must survive that rebuild;
+    // replacing FutureBuilder's future here caused the visible double blink.
+    await tester.pumpWidget(subject());
+    expect(image, findsOneWidget);
+    expect(attachments.readCount, 1);
+  });
 }
 
 /// A picker that never touches a plugin: it returns a 2x2 PNG, or raises the
@@ -273,4 +323,26 @@ final class _StubPicker extends AttachmentPicker {
       height: 2,
     );
   }
+}
+
+final class _CountingAttachmentRepository implements AttachmentRepository {
+  final InMemoryAttachmentRepository _delegate = InMemoryAttachmentRepository();
+  int readCount = 0;
+
+  @override
+  Future<StoredAttachment> store(List<int> bytes, {required String mimeType}) =>
+      _delegate.store(bytes, mimeType: mimeType);
+
+  @override
+  Future<List<int>?> read(String attachmentId) {
+    readCount++;
+    return _delegate.read(attachmentId);
+  }
+
+  @override
+  Future<void> retainOnly(Set<String> attachmentIds) =>
+      _delegate.retainOnly(attachmentIds);
+
+  @override
+  Future<int> storedBytes() => _delegate.storedBytes();
 }
