@@ -145,7 +145,10 @@ final class _ModelPickerContent extends ConsumerWidget {
 
   String _statusLine(ModelCatalogEntry entry, ModelState? models) {
     final engine = entry.engine.name.toUpperCase();
-    final base = '$engine · ${entry.quantization}';
+    // Only artifacts whose image path has been validated say so, so the
+    // picker is where a user can tell which model reads pictures (#18).
+    final vision = entry.supportsImages ? ' · Images' : '';
+    final base = '$engine · ${entry.quantization}$vision';
     final status = models?.statusOf(entry.key);
     if (status == null) return base;
     return switch (status.phase) {

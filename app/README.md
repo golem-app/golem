@@ -68,6 +68,17 @@ preflight, and delete. Downloads install under
 backups (iOS/macOS `NSURLIsExcludedFromBackupKey`, Android
 `dataExtractionRules`).
 
+Image input follows proven capability, never a model name: only artifacts whose
+vision path has been validated accept a picture, and the attach sheet disables
+its rows with copy naming the model otherwise. Today that is Gemma 4 E2B on
+llama.cpp/GGUF, which loads a pinned `mmproj` projector beside its weights
+(selection evidence: `../docs/evals/2026-08-09-gemma4-mmproj-selection.md`;
+design: `../docs/decisions/0004-image-input.md`). Attached images are copied
+into an app-owned store under application support, referenced by opaque id so
+no transcript or export can leak a source path, and collected as soon as no
+conversation mentions them. Unlike model weights they are kept in platform
+backups — a model is re-fetchable, a photo is not.
+
 Per-model **generation settings** (temperature, top-p, top-k, max tokens,
 context length) live in Settings ▸ Response style's Advanced sampling
 section, persist sparsely to `flutter-prefs-v1.json` (only user-set
@@ -167,7 +178,8 @@ streaming (blinking caret + live generating pill), stop and failure recovery
 with the ephemeral stopped-tokens caption, message actions (copy, regenerate,
 branch-from-here, share, delete), edit-and-truncate, the sectioned edge-swipe
 conversation drawer with pinning and a storage meter, full-screen cross-chat
-search, the per-chat model picker, the attach sheet (UI only until #18),
+search, the per-chat model picker, image attachment from the photo library,
+camera, or a file — gated on what the selected model can actually read —
 confirmation toasts, the redesigned minimal Settings (root rows plus Models,
 Response style, System prompt, Appearance, Privacy & data, and Storage
 sub-screens, with an Advanced mode switch gating the sampling controls, the
@@ -196,7 +208,8 @@ identifiers are `launch-splash`, `chat-composer`, `send-button`, `stop-button`,
 `message-copy-<id>`, `message-regenerate-<id>`, `message-share-<id>`,
 `message-menu-<id>` plus `menu-message-{copy,regenerate,branch,share,delete}`,
 `code-block`/`code-copy`, `attach-sheet` plus
-`attach-{photo-library,take-photo,files}`, `model-picker-sheet`,
+`attach-{photo-library,take-photo,files}`, `composer-attachments` plus
+`composer-attachment-remove-<index>`, `model-picker-sheet`,
 `model-picker-<catalogKey>`, `model-picker-manage`, `golem-toast`,
 `open-drawer`, `drawer-search-button`, `new-chat-drawer`,
 `conversation-<id>`, `conversation-menu-<id>` plus
