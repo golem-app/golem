@@ -249,6 +249,54 @@ final class ModelCatalogEntriesProvider
 String _$modelCatalogEntriesHash() =>
     r'12eee37f81325029df04be2d9a3f438baf556399';
 
+@ProviderFor(customRepositoryResolver)
+const customRepositoryResolverProvider = CustomRepositoryResolverProvider._();
+
+final class CustomRepositoryResolverProvider
+    extends
+        $FunctionalProvider<
+          CustomRepositoryResolver,
+          CustomRepositoryResolver,
+          CustomRepositoryResolver
+        >
+    with $Provider<CustomRepositoryResolver> {
+  const CustomRepositoryResolverProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'customRepositoryResolverProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$customRepositoryResolverHash();
+
+  @$internal
+  @override
+  $ProviderElement<CustomRepositoryResolver> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  CustomRepositoryResolver create(Ref ref) {
+    return customRepositoryResolver(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(CustomRepositoryResolver value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<CustomRepositoryResolver>(value),
+    );
+  }
+}
+
+String _$customRepositoryResolverHash() =>
+    r'b2ada27fe20df8df9c83e4e35e85df85b35c9bb7';
+
 @ProviderFor(settingsRepository)
 const settingsRepositoryProvider = SettingsRepositoryProvider._();
 
@@ -476,24 +524,20 @@ final class DiskFreeSpaceProbeProvider
 String _$diskFreeSpaceProbeHash() =>
     r'95441f7541254e1512e632401b909a1180691934';
 
-/// The resolved inference backend for this process. Deliberately a fake
-/// default value rather than a throwing seam — a documented exception to
-/// the repository-provider discipline: this is a value signal that dozens
-/// of widgets read for honest "simulated" labeling, and host tests (which
-/// run as the dev flavor) must see the fake without every container
-/// overriding it. main() always overrides it with the resolved config;
-/// a regression test pins the fake default.
+/// The resolved inference backend for this process. A fake default rather than
+/// a throwing seam — a documented exception to the repository-provider
+/// discipline: dozens of widgets read it for honest "simulated" labeling, and
+/// host tests (the dev flavor) must see the fake without every container
+/// overriding it. main() always overrides it with the resolved config.
 
 @ProviderFor(inferenceBackend)
 const inferenceBackendProvider = InferenceBackendProvider._();
 
-/// The resolved inference backend for this process. Deliberately a fake
-/// default value rather than a throwing seam — a documented exception to
-/// the repository-provider discipline: this is a value signal that dozens
-/// of widgets read for honest "simulated" labeling, and host tests (which
-/// run as the dev flavor) must see the fake without every container
-/// overriding it. main() always overrides it with the resolved config;
-/// a regression test pins the fake default.
+/// The resolved inference backend for this process. A fake default rather than
+/// a throwing seam — a documented exception to the repository-provider
+/// discipline: dozens of widgets read it for honest "simulated" labeling, and
+/// host tests (the dev flavor) must see the fake without every container
+/// overriding it. main() always overrides it with the resolved config.
 
 final class InferenceBackendProvider
     extends
@@ -503,13 +547,11 @@ final class InferenceBackendProvider
           InferenceBackendConfig
         >
     with $Provider<InferenceBackendConfig> {
-  /// The resolved inference backend for this process. Deliberately a fake
-  /// default value rather than a throwing seam — a documented exception to
-  /// the repository-provider discipline: this is a value signal that dozens
-  /// of widgets read for honest "simulated" labeling, and host tests (which
-  /// run as the dev flavor) must see the fake without every container
-  /// overriding it. main() always overrides it with the resolved config;
-  /// a regression test pins the fake default.
+  /// The resolved inference backend for this process. A fake default rather than
+  /// a throwing seam — a documented exception to the repository-provider
+  /// discipline: dozens of widgets read it for honest "simulated" labeling, and
+  /// host tests (the dev flavor) must see the fake without every container
+  /// overriding it. main() always overrides it with the resolved config.
   const InferenceBackendProvider._()
     : super(
         from: null,
@@ -546,38 +588,29 @@ final class InferenceBackendProvider
 
 String _$inferenceBackendHash() => r'679d3dfd7f9bdcc675a964fdfe9368052cc0b632';
 
-/// The catalog key of the model currently resident in the engine, straight
-/// from the residency owner (#42). Null while the engine is empty — label
-/// helpers fall back to the configured artifact then, so a lazy first load
-/// does not blank the chrome. Under a simulated backend this is always
-/// null without touching the repository seam: fake labels follow the
-/// per-chat choice, and label-only widget containers must not need an
-/// inference repository just to render chrome (the same discipline
-/// exception [inferenceBackend] documents).
+/// The catalog key of the model resident in the engine, straight from the
+/// residency owner (#42). Null while the engine is empty — label helpers fall
+/// back to the configured artifact, so a lazy first load does not blank the
+/// chrome. Always null under a simulated backend, without touching the
+/// repository seam: label-only containers must not need one.
 
 @ProviderFor(residentModelKey)
 const residentModelKeyProvider = ResidentModelKeyProvider._();
 
-/// The catalog key of the model currently resident in the engine, straight
-/// from the residency owner (#42). Null while the engine is empty — label
-/// helpers fall back to the configured artifact then, so a lazy first load
-/// does not blank the chrome. Under a simulated backend this is always
-/// null without touching the repository seam: fake labels follow the
-/// per-chat choice, and label-only widget containers must not need an
-/// inference repository just to render chrome (the same discipline
-/// exception [inferenceBackend] documents).
+/// The catalog key of the model resident in the engine, straight from the
+/// residency owner (#42). Null while the engine is empty — label helpers fall
+/// back to the configured artifact, so a lazy first load does not blank the
+/// chrome. Always null under a simulated backend, without touching the
+/// repository seam: label-only containers must not need one.
 
 final class ResidentModelKeyProvider
     extends $FunctionalProvider<String?, String?, String?>
     with $Provider<String?> {
-  /// The catalog key of the model currently resident in the engine, straight
-  /// from the residency owner (#42). Null while the engine is empty — label
-  /// helpers fall back to the configured artifact then, so a lazy first load
-  /// does not blank the chrome. Under a simulated backend this is always
-  /// null without touching the repository seam: fake labels follow the
-  /// per-chat choice, and label-only widget containers must not need an
-  /// inference repository just to render chrome (the same discipline
-  /// exception [inferenceBackend] documents).
+  /// The catalog key of the model resident in the engine, straight from the
+  /// residency owner (#42). Null while the engine is empty — label helpers fall
+  /// back to the configured artifact, so a lazy first load does not blank the
+  /// chrome. Always null under a simulated backend, without touching the
+  /// repository seam: label-only containers must not need one.
   const ResidentModelKeyProvider._()
     : super(
         from: null,
@@ -702,50 +735,26 @@ final class DocumentsPathProvider
 
 String _$documentsPathHash() => r'22f7639f5b12516f043a3f4971f84d9142ebf642';
 
-/// Storage accounting for the drawer meter and the Storage screen: model
-/// bytes from artifact state, chat bytes from the history store, cache
-/// bytes from the cache probe. [StorageBreakdown.freeBytes] and
-/// [StorageBreakdown.totalBytes] are null whenever the platform cannot
-/// report them (or the seams are unwired) — surfaces hide those figures
-/// instead of inventing them. Watching the chat controller keeps the chat
-/// bucket honest after sends and deletes.
-/// A cheap signature of the chat store that changes only when
-/// conversations or messages are added or removed. ChatController
-/// reassigns state on every streaming delta; anything as heavy as disk
-/// probing must key on this instead of the raw chat state, or it re-runs
-/// per token for the always-mounted drawer meter.
+/// A cheap signature that changes only when conversations or messages are added
+/// or removed. ChatController reassigns state on every streaming delta, so
+/// anything as heavy as disk probing must key on this rather than the raw chat
+/// state, or it re-runs per token for the always-mounted drawer meter.
 
 @ProviderFor(chatStorageSignature)
 const chatStorageSignatureProvider = ChatStorageSignatureProvider._();
 
-/// Storage accounting for the drawer meter and the Storage screen: model
-/// bytes from artifact state, chat bytes from the history store, cache
-/// bytes from the cache probe. [StorageBreakdown.freeBytes] and
-/// [StorageBreakdown.totalBytes] are null whenever the platform cannot
-/// report them (or the seams are unwired) — surfaces hide those figures
-/// instead of inventing them. Watching the chat controller keeps the chat
-/// bucket honest after sends and deletes.
-/// A cheap signature of the chat store that changes only when
-/// conversations or messages are added or removed. ChatController
-/// reassigns state on every streaming delta; anything as heavy as disk
-/// probing must key on this instead of the raw chat state, or it re-runs
-/// per token for the always-mounted drawer meter.
+/// A cheap signature that changes only when conversations or messages are added
+/// or removed. ChatController reassigns state on every streaming delta, so
+/// anything as heavy as disk probing must key on this rather than the raw chat
+/// state, or it re-runs per token for the always-mounted drawer meter.
 
 final class ChatStorageSignatureProvider
     extends $FunctionalProvider<(int, int), (int, int), (int, int)>
     with $Provider<(int, int)> {
-  /// Storage accounting for the drawer meter and the Storage screen: model
-  /// bytes from artifact state, chat bytes from the history store, cache
-  /// bytes from the cache probe. [StorageBreakdown.freeBytes] and
-  /// [StorageBreakdown.totalBytes] are null whenever the platform cannot
-  /// report them (or the seams are unwired) — surfaces hide those figures
-  /// instead of inventing them. Watching the chat controller keeps the chat
-  /// bucket honest after sends and deletes.
-  /// A cheap signature of the chat store that changes only when
-  /// conversations or messages are added or removed. ChatController
-  /// reassigns state on every streaming delta; anything as heavy as disk
-  /// probing must key on this instead of the raw chat state, or it re-runs
-  /// per token for the always-mounted drawer meter.
+  /// A cheap signature that changes only when conversations or messages are added
+  /// or removed. ChatController reassigns state on every streaming delta, so
+  /// anything as heavy as disk probing must key on this rather than the raw chat
+  /// state, or it re-runs per token for the always-mounted drawer meter.
   const ChatStorageSignatureProvider._()
     : super(
         from: null,
@@ -782,8 +791,16 @@ final class ChatStorageSignatureProvider
 String _$chatStorageSignatureHash() =>
     r'df201c6875f3c90d6cd294e37597891dfd4b41a3';
 
+/// Storage accounting for the drawer meter and the Storage screen. Free and
+/// total bytes are null whenever the platform cannot report them (or the seams
+/// are unwired) — surfaces hide those figures instead of inventing them.
+
 @ProviderFor(storageBreakdown)
 const storageBreakdownProvider = StorageBreakdownProvider._();
+
+/// Storage accounting for the drawer meter and the Storage screen. Free and
+/// total bytes are null whenever the platform cannot report them (or the seams
+/// are unwired) — surfaces hide those figures instead of inventing them.
 
 final class StorageBreakdownProvider
     extends
@@ -793,6 +810,9 @@ final class StorageBreakdownProvider
           FutureOr<StorageBreakdown>
         >
     with $FutureModifier<StorageBreakdown>, $FutureProvider<StorageBreakdown> {
+  /// Storage accounting for the drawer meter and the Storage screen. Free and
+  /// total bytes are null whenever the platform cannot report them (or the seams
+  /// are unwired) — surfaces hide those figures instead of inventing them.
   const StorageBreakdownProvider._()
     : super(
         from: null,
@@ -821,16 +841,14 @@ final class StorageBreakdownProvider
 
 String _$storageBreakdownHash() => r'7b13bb7429ac20321976a2578dcfac7c1713acfd';
 
-/// The catalog the UI renders: pinned entries plus the user's custom
-/// repositories (Advanced mode), derived — never stored — so the pinned
-/// manifest stays the single source of model knowledge.
+/// Pinned entries plus the user's custom repositories, derived — never stored —
+/// so the pinned manifest stays the single source of model knowledge.
 
 @ProviderFor(effectiveModelCatalog)
 const effectiveModelCatalogProvider = EffectiveModelCatalogProvider._();
 
-/// The catalog the UI renders: pinned entries plus the user's custom
-/// repositories (Advanced mode), derived — never stored — so the pinned
-/// manifest stays the single source of model knowledge.
+/// Pinned entries plus the user's custom repositories, derived — never stored —
+/// so the pinned manifest stays the single source of model knowledge.
 
 final class EffectiveModelCatalogProvider
     extends
@@ -840,9 +858,8 @@ final class EffectiveModelCatalogProvider
           List<ModelCatalogEntry>
         >
     with $Provider<List<ModelCatalogEntry>> {
-  /// The catalog the UI renders: pinned entries plus the user's custom
-  /// repositories (Advanced mode), derived — never stored — so the pinned
-  /// manifest stays the single source of model knowledge.
+  /// Pinned entries plus the user's custom repositories, derived — never stored —
+  /// so the pinned manifest stays the single source of model knowledge.
   const EffectiveModelCatalogProvider._()
     : super(
         from: null,
@@ -880,23 +897,17 @@ final class EffectiveModelCatalogProvider
 String _$effectiveModelCatalogHash() =>
     r'e5ef1df3119d320d101a756b92fbef2cf4d28857';
 
-/// The published cross-chat search query. The raw field text stays in
-/// the search screen (widget-local, debounced 350 ms); only the
-/// normalized query lands here, so results derive reactively without
-/// rebuilding on every keystroke.
+/// The raw field text stays widget-local in the search screen (debounced
+/// 350 ms); only the normalized query lands here, so results derive reactively.
 
 @ProviderFor(SearchQuery)
 const searchQueryProvider = SearchQueryProvider._();
 
-/// The published cross-chat search query. The raw field text stays in
-/// the search screen (widget-local, debounced 350 ms); only the
-/// normalized query lands here, so results derive reactively without
-/// rebuilding on every keystroke.
+/// The raw field text stays widget-local in the search screen (debounced
+/// 350 ms); only the normalized query lands here, so results derive reactively.
 final class SearchQueryProvider extends $NotifierProvider<SearchQuery, String> {
-  /// The published cross-chat search query. The raw field text stays in
-  /// the search screen (widget-local, debounced 350 ms); only the
-  /// normalized query lands here, so results derive reactively without
-  /// rebuilding on every keystroke.
+  /// The raw field text stays widget-local in the search screen (debounced
+  /// 350 ms); only the normalized query lands here, so results derive reactively.
   const SearchQueryProvider._()
     : super(
         from: null,
@@ -926,10 +937,8 @@ final class SearchQueryProvider extends $NotifierProvider<SearchQuery, String> {
 
 String _$searchQueryHash() => r'4dbfed33213193c0360e544ccb7b76d58c781f42';
 
-/// The published cross-chat search query. The raw field text stays in
-/// the search screen (widget-local, debounced 350 ms); only the
-/// normalized query lands here, so results derive reactively without
-/// rebuilding on every keystroke.
+/// The raw field text stays widget-local in the search screen (debounced
+/// 350 ms); only the normalized query lands here, so results derive reactively.
 
 abstract class _$SearchQuery extends $Notifier<String> {
   String build();
@@ -950,14 +959,8 @@ abstract class _$SearchQuery extends $Notifier<String> {
   }
 }
 
-/// Search results over every conversation, derived from the published
-/// query and the chat state — one source of truth, no copies.
-
 @ProviderFor(chatSearchResults)
 const chatSearchResultsProvider = ChatSearchResultsProvider._();
-
-/// Search results over every conversation, derived from the published
-/// query and the chat state — one source of truth, no copies.
 
 final class ChatSearchResultsProvider
     extends
@@ -967,8 +970,6 @@ final class ChatSearchResultsProvider
           List<ChatSearchResult>
         >
     with $Provider<List<ChatSearchResult>> {
-  /// Search results over every conversation, derived from the published
-  /// query and the chat state — one source of truth, no copies.
   const ChatSearchResultsProvider._()
     : super(
         from: null,
@@ -1005,21 +1006,15 @@ final class ChatSearchResultsProvider
 
 String _$chatSearchResultsHash() => r'4924c9bcb9501cbe48cf7c370df3e24254a943db';
 
-/// Persisted per-model generation settings. Reads resolve against the
-/// broker profile's recommended defaults at the consumer, never here —
-/// only user-set values are stored.
+/// Only user-set values are stored; profile defaults resolve at the consumer.
 
 @ProviderFor(SettingsController)
 const settingsControllerProvider = SettingsControllerProvider._();
 
-/// Persisted per-model generation settings. Reads resolve against the
-/// broker profile's recommended defaults at the consumer, never here —
-/// only user-set values are stored.
+/// Only user-set values are stored; profile defaults resolve at the consumer.
 final class SettingsControllerProvider
     extends $AsyncNotifierProvider<SettingsController, GenerationSettings> {
-  /// Persisted per-model generation settings. Reads resolve against the
-  /// broker profile's recommended defaults at the consumer, never here —
-  /// only user-set values are stored.
+  /// Only user-set values are stored; profile defaults resolve at the consumer.
   const SettingsControllerProvider._()
     : super(
         from: null,
@@ -1042,9 +1037,7 @@ final class SettingsControllerProvider
 String _$settingsControllerHash() =>
     r'7040b13d308b8e347c0b0c2872bd4ada1c6a5d5d';
 
-/// Persisted per-model generation settings. Reads resolve against the
-/// broker profile's recommended defaults at the consumer, never here —
-/// only user-set values are stored.
+/// Only user-set values are stored; profile defaults resolve at the consumer.
 
 abstract class _$SettingsController extends $AsyncNotifier<GenerationSettings> {
   FutureOr<GenerationSettings> build();
@@ -1066,24 +1059,18 @@ abstract class _$SettingsController extends $AsyncNotifier<GenerationSettings> {
   }
 }
 
-/// Persisted app-wide preferences: appearance, transcript behavior,
-/// privacy, Advanced mode, response styles, custom repositories. Every
-/// command follows the settings idiom — drop taps that land in the
-/// cold-start load window, publish optimistically, then save.
+/// Persisted app-wide preferences. Every command follows the settings idiom —
+/// drop taps that land in the cold-start load window, publish, then save.
 
 @ProviderFor(PreferencesController)
 const preferencesControllerProvider = PreferencesControllerProvider._();
 
-/// Persisted app-wide preferences: appearance, transcript behavior,
-/// privacy, Advanced mode, response styles, custom repositories. Every
-/// command follows the settings idiom — drop taps that land in the
-/// cold-start load window, publish optimistically, then save.
+/// Persisted app-wide preferences. Every command follows the settings idiom —
+/// drop taps that land in the cold-start load window, publish, then save.
 final class PreferencesControllerProvider
     extends $AsyncNotifierProvider<PreferencesController, AppPreferences> {
-  /// Persisted app-wide preferences: appearance, transcript behavior,
-  /// privacy, Advanced mode, response styles, custom repositories. Every
-  /// command follows the settings idiom — drop taps that land in the
-  /// cold-start load window, publish optimistically, then save.
+  /// Persisted app-wide preferences. Every command follows the settings idiom —
+  /// drop taps that land in the cold-start load window, publish, then save.
   const PreferencesControllerProvider._()
     : super(
         from: null,
@@ -1106,10 +1093,8 @@ final class PreferencesControllerProvider
 String _$preferencesControllerHash() =>
     r'3262f94c328a1845db90bcea44e3b348eb7363d7';
 
-/// Persisted app-wide preferences: appearance, transcript behavior,
-/// privacy, Advanced mode, response styles, custom repositories. Every
-/// command follows the settings idiom — drop taps that land in the
-/// cold-start load window, publish optimistically, then save.
+/// Persisted app-wide preferences. Every command follows the settings idiom —
+/// drop taps that land in the cold-start load window, publish, then save.
 
 abstract class _$PreferencesController extends $AsyncNotifier<AppPreferences> {
   FutureOr<AppPreferences> build();
@@ -1154,7 +1139,7 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'8285c8a7633aab02c760cf34025bfd48935d8d04';
+String _$chatControllerHash() => r'4bd2ad1ab428fda12b3589d7e2b453ebdef66ea3';
 
 abstract class _$ChatController extends $AsyncNotifier<ChatState> {
   FutureOr<ChatState> build();

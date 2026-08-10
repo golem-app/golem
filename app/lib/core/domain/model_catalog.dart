@@ -17,6 +17,21 @@ const unresolvedProfileKey = 'unresolved';
 /// [projector]; an MLX artifact is a directory of [snapshot] files.
 enum ModelFileRole { weights, projector, snapshot }
 
+/// The catalog key a hand-added repository takes.
+///
+/// Hashed on top of a slug so two repositories differing only in punctuation
+/// (`org/foo_bar`, `org/foo-bar`) cannot collapse onto one install directory and
+/// replace each other's card and download state. Hand-rolled FNV-1a rather than
+/// `hashCode`, which is not stable across runs or platforms.
+String customCatalogKeyFor(String repository) {
+  final slug = repository.toLowerCase().replaceAll(RegExp('[^a-z0-9]+'), '-');
+  var hash = 0x811c9dc5;
+  for (final unit in repository.codeUnits) {
+    hash = ((hash ^ unit) * 0x01000193) & 0xFFFFFFFF;
+  }
+  return 'custom-$slug-${hash.toRadixString(16).padLeft(8, '0')}';
+}
+
 final class ModelArtifactFile {
   const ModelArtifactFile({
     required this.path,

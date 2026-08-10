@@ -11,6 +11,7 @@ import '../../core/domain/inference_backend.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
+import '../../core/services/repository_resolver.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/labeled_row.dart';
@@ -30,15 +31,20 @@ class ModelsScreen extends ConsumerStatefulWidget {
 }
 
 class _ModelsScreenState extends ConsumerState<ModelsScreen> {
-  // Ephemeral screen state stays widget-local: the tab, the custom
-  // repository draft, and its engine chip.
+  // Ephemeral screen state stays widget-local: the tab, the custom repository
+  // draft, its engine chip, and what resolving it found. The resolution lives
+  // here rather than in the card because the list disposes off-screen children
+  // — scrolling away and back would otherwise silently discard it.
   _CatalogTab _tab = _CatalogTab.all;
   final _repositoryController = TextEditingController();
+  final _revisionController = TextEditingController();
   ModelEngine _customEngine = ModelEngine.mlx;
+  _AddState _addState = const _Unresolved();
 
   @override
   void dispose() {
     _repositoryController.dispose();
+    _revisionController.dispose();
     super.dispose();
   }
 
@@ -69,6 +75,15 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
     // enabled button there would fail on every tap.
     final pinnedKeys = {
       for (final entry in ref.watch(modelCatalogEntriesProvider)) entry.key,
+    };
+    // A hand-added repository can be fetched once it has resolved: its file
+    // list is then real. An unresolved one still cannot, because its files are
+    // synthesized and nothing would be on the other end of the request.
+    final resolvedKeys = {
+      for (final spec
+          in ref.watch(preferencesControllerProvider).value?.customModels ??
+              const <CustomModelSpec>[])
+        if (spec.resolved != null) spec.key,
     };
     final advanced =
         ref.watch(preferencesControllerProvider).value?.advancedMode ?? false;
@@ -140,7 +155,10 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
             active: entry.key == model.activeArtifactKey,
             otherDownloadActive:
                 downloadingKey != null && downloadingKey != entry.key,
-            downloadable: model.simulated || pinnedKeys.contains(entry.key),
+            downloadable:
+                model.simulated ||
+                pinnedKeys.contains(entry.key) ||
+                resolvedKeys.contains(entry.key),
           ),
           const SizedBox(height: 12),
         ],
@@ -154,8 +172,15 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
           const SizedBox(height: 8),
           _CustomRepositoryCard(
             controller: _repositoryController,
+            revisionController: _revisionController,
+            state: _addState,
+            onState: (state) => setState(() => _addState = state),
             engine: _customEngine,
-            onEngine: (engine) => setState(() => _customEngine = engine),
+            onEngine: (engine) => setState(() {
+              _customEngine = engine;
+              // A resolution belongs to one engine's file selection.
+              _addState = const _Unresolved();
+            }),
             simulatedDownloads: model.simulated,
           ),
         ],
@@ -239,21 +264,122 @@ class _RuntimeCard extends ConsumerWidget {
   }
 }
 
+/// What the Add flow has learned about the repository currently in the field.
+sealed class _AddState {
+  const _AddState();
+}
+
+final class _Unresolved extends _AddState {
+  const _Unresolved();
+}
+
+final class _Resolving extends _AddState {
+  const _Resolving();
+}
+
+final class _Resolved extends _AddState {
+  const _Resolved(this.outcome);
+
+  final RepositoryResolved outcome;
+}
+
+final class _WeightChoice extends _AddState {
+  const _WeightChoice(this.candidates);
+
+  final List<ResolvedWeightCandidate> candidates;
+}
+
+final class _Refused extends _AddState {
+  const _Refused(this.message);
+
+  final String message;
+}
+
 class _CustomRepositoryCard extends ConsumerWidget {
   const _CustomRepositoryCard({
     required this.controller,
+    required this.revisionController,
+    required this.state,
+    required this.onState,
     required this.engine,
     required this.onEngine,
     required this.simulatedDownloads,
   });
 
   final TextEditingController controller;
+  final TextEditingController revisionController;
+
+  /// Owned by the screen, so scrolling this card off-list cannot discard it.
+  final _AddState state;
+  final ValueChanged<_AddState> onState;
+
   final ModelEngine engine;
   final ValueChanged<ModelEngine> onEngine;
 
-  /// Only the fake management backend simulates arbitrary repositories;
-  /// the real downloader stays pinned-catalog-only until #20.
+  /// Both backends resolve, so only the copy differs — a simulated size is
+  /// never presented as something that was measured.
   final bool simulatedDownloads;
+
+  String get _ref => revisionController.text.trim().isEmpty
+      ? 'main'
+      : revisionController.text.trim();
+
+  /// Any edit makes an existing resolution stale, and showing a commit and file
+  /// list for a repository the user has since retyped is worse than nothing.
+  void _invalidate() {
+    if (state is! _Unresolved) onState(const _Unresolved());
+  }
+
+  Future<void> _resolve(WidgetRef ref, {String? weightsFile}) async {
+    final repository = controller.text.trim();
+    if (repository.isEmpty) return;
+    // Every seam is read before the first await.
+    final resolver = ref.read(customRepositoryResolverProvider);
+    final existingKeys = <String>{
+      for (final entry in ref.read(modelCatalogEntriesProvider)) entry.key,
+      ...?ref
+          .read(preferencesControllerProvider)
+          .value
+          ?.customModels
+          .map((spec) => spec.key),
+    };
+    onState(const _Resolving());
+    final outcome = await resolver.resolve(
+      repository: repository,
+      engine: engine,
+      ref: _ref,
+      weightsFile: weightsFile,
+      existingKeys: existingKeys,
+    );
+    onState(switch (outcome) {
+      RepositoryResolved() => _Resolved(outcome),
+      RepositoryNeedsWeightChoice(:final candidates) => _WeightChoice(
+        candidates,
+      ),
+      RepositoryRejected(:final message) => _Refused(message),
+    });
+  }
+
+  Future<void> _add(
+    BuildContext context,
+    WidgetRef ref,
+    RepositoryResolved outcome,
+  ) async {
+    final preferences = ref.read(preferencesControllerProvider.notifier);
+    await preferences.addCustomModel(
+      CustomModelSpec(
+        repository: controller.text.trim(),
+        engine: engine,
+        revision: _ref,
+        profile: outcome.profile,
+        resolved: outcome.resolved,
+      ),
+    );
+    controller.clear();
+    revisionController.clear();
+    onState(const _Unresolved());
+    if (context.mounted) showGolemToast(context, 'Model added');
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -283,53 +409,39 @@ class _CustomRepositoryCard extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 14),
-              CupertinoTextField(
+              _field(
+                context,
                 key: const Key('custom-repo-field'),
                 controller: controller,
                 placeholder: engine == ModelEngine.mlx
                     ? 'mlx-community/model-name'
                     : 'org/model-name-GGUF',
-                autocorrect: false,
-                enableSuggestions: false,
-                style: GolemText.code,
-                placeholderStyle: GolemText.code.copyWith(color: muted),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 13,
-                ),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: CupertinoDynamicColor.resolve(
-                      GolemTheme.borderStrong,
-                      context,
-                    ),
-                  ),
-                  borderRadius: BorderRadius.circular(GolemRadius.field),
-                ),
+                muted: muted,
               ),
-              const SizedBox(height: 12),
-              const LabeledRow(label: 'Revision', value: 'main'),
+              const SizedBox(height: 10),
+              _field(
+                context,
+                key: const Key('custom-repo-revision'),
+                controller: revisionController,
+                placeholder: 'main — or a branch, tag, or commit',
+                muted: muted,
+              ),
               const SizedBox(height: 16),
-              ValueListenableBuilder<TextEditingValue>(
-                valueListenable: controller,
-                builder: (context, value, _) => GolemButton.filled(
-                  key: const Key('custom-repo-add'),
-                  label: 'Add model',
-                  onPressed: !simulatedDownloads || value.text.trim().isEmpty
-                      ? null
-                      : () => _add(context, ref, value.text.trim()),
-                ),
-              ),
+              ..._outcome(context, ref, muted),
               const SizedBox(height: 12),
-              Text(
-                simulatedDownloads
-                    ? 'Nothing is validated ahead of time. If the repository '
-                          'isn\'t a supported MLX or GGUF build, loading it '
-                          'will simply fail.'
-                    : 'Custom repositories on a real engine arrive in a '
-                          'future update.',
-                style: GolemText.footnote.copyWith(color: muted),
-              ),
+              Text(switch (state) {
+                _Resolved(:final outcome) when outcome.profile == null =>
+                  'This will download and can be deleted, but Golem cannot '
+                      'prompt it: its chat template is not one this version '
+                      'recognizes.',
+                _ when simulatedDownloads =>
+                  'This build simulates downloads, so the revision and size '
+                      'below are synthesized rather than read from Hugging '
+                      'Face.',
+                _ =>
+                  'Only public repositories are supported. Nothing downloads '
+                      'until you have seen what resolving found.',
+              }, style: GolemText.footnote.copyWith(color: muted)),
             ],
           ),
         ),
@@ -337,16 +449,163 @@ class _CustomRepositoryCard extends ConsumerWidget {
     );
   }
 
-  Future<void> _add(
+  Widget _field(
+    BuildContext context, {
+    required Key key,
+    required TextEditingController controller,
+    required String placeholder,
+    required Color muted,
+  }) => CupertinoTextField(
+    key: key,
+    controller: controller,
+    placeholder: placeholder,
+    autocorrect: false,
+    enableSuggestions: false,
+    onChanged: (_) => _invalidate(),
+    style: GolemText.code,
+    placeholderStyle: GolemText.code.copyWith(color: muted),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+    decoration: BoxDecoration(
+      border: Border.all(
+        color: CupertinoDynamicColor.resolve(GolemTheme.borderStrong, context),
+      ),
+      borderRadius: BorderRadius.circular(GolemRadius.field),
+    ),
+  );
+
+  List<Widget> _outcome(
     BuildContext context,
     WidgetRef ref,
-    String repository,
-  ) async {
-    final spec = CustomModelSpec(repository: repository, engine: engine);
-    await ref.read(preferencesControllerProvider.notifier).addCustomModel(spec);
-    controller.clear();
-    if (context.mounted) showGolemToast(context, 'Model added');
-  }
+    Color muted,
+  ) => switch (state) {
+    _Unresolved() => [_resolveButton(ref)],
+    _Resolving() => [
+      Row(
+        children: [
+          const CupertinoActivityIndicator(radius: 8),
+          const SizedBox(width: 10),
+          Text(
+            'Reading the repository…',
+            style: GolemText.footnote.copyWith(color: muted),
+          ),
+        ],
+      ),
+    ],
+    _Refused(:final message) => [
+      Text(
+        key: const Key('custom-repo-error'),
+        message,
+        style: GolemText.footnote.copyWith(
+          color: CupertinoDynamicColor.resolve(GolemTheme.destructive, context),
+        ),
+      ),
+      const SizedBox(height: 14),
+      _resolveButton(ref, label: 'Try again'),
+    ],
+    _WeightChoice(:final candidates) => [
+      Text(
+        'This repository holds several weight files. Choose the one to '
+        'install:',
+        style: GolemText.footnote.copyWith(color: muted),
+      ),
+      const SizedBox(height: 10),
+      for (final candidate in candidates)
+        CupertinoButton(
+          key: Key('custom-repo-candidate-${candidate.path}'),
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          minimumSize: const Size(44, 44),
+          onPressed: () => _resolve(ref, weightsFile: candidate.path),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  candidate.path,
+                  style: GolemText.code,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                _gigabytes(candidate.bytes),
+                style: GolemText.footnote.copyWith(color: muted),
+              ),
+            ],
+          ),
+        ),
+    ],
+    _Resolved(:final outcome) => [
+      Column(
+        key: const Key('custom-repo-detail'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          LabeledRow(
+            label: 'Revision',
+            // The commit, not the ref that was typed: this is what installs.
+            value: outcome.resolved.commitSha.substring(0, 12),
+          ),
+          const SizedBox(height: 8),
+          LabeledRow(
+            label: 'Quantization',
+            value: outcome.resolved.quantization,
+          ),
+          const SizedBox(height: 8),
+          LabeledRow(
+            label: 'Size',
+            value: _gigabytes(outcome.resolved.totalBytes),
+          ),
+          const SizedBox(height: 8),
+          LabeledRow(
+            label: 'Prompt profile',
+            value: outcome.profile?.key ?? 'Not recognized',
+          ),
+          const SizedBox(height: 12),
+          for (final file in outcome.resolved.files.take(5))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      file.path,
+                      style: GolemText.code.copyWith(color: muted),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    _gigabytes(file.bytes),
+                    style: GolemText.footnote.copyWith(color: muted),
+                  ),
+                ],
+              ),
+            ),
+          if (outcome.resolved.files.length > 5)
+            Text(
+              '+ ${outcome.resolved.files.length - 5} more files',
+              style: GolemText.footnote.copyWith(color: muted),
+            ),
+        ],
+      ),
+      const SizedBox(height: 16),
+      Builder(
+        builder: (context) => GolemButton.filled(
+          key: const Key('custom-repo-add'),
+          label: 'Add model',
+          onPressed: () => _add(context, ref, outcome),
+        ),
+      ),
+    ],
+  };
+
+  Widget _resolveButton(WidgetRef ref, {String label = 'Resolve'}) =>
+      ValueListenableBuilder<TextEditingValue>(
+        valueListenable: controller,
+        builder: (context, value, _) => GolemButton.filled(
+          key: const Key('custom-repo-resolve'),
+          label: label,
+          onPressed: value.text.trim().isEmpty ? null : () => _resolve(ref),
+        ),
+      );
 }
 
 class _EngineChip extends StatelessWidget {
@@ -610,8 +869,8 @@ class _ModelCard extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(top: 10),
             child: Text(
-              'Hand-added repositories can\'t download on this engine yet — '
-              'that arrives in a future update.',
+              'This repository has not been resolved against Hugging Face, so '
+              'its files are unknown. Add it again to resolve it.',
               style: GolemText.footnote.copyWith(
                 color: CupertinoDynamicColor.resolve(
                   GolemTheme.mutedInk,

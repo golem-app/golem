@@ -41,20 +41,7 @@ final class CustomModelSpec {
   /// Null is a first-class state, not a half-filled one.
   final ResolvedRepository? resolved;
 
-  /// Stable catalog key. The hash suffix keeps names that differ only in
-  /// punctuation (org/foo_bar vs org/foo-bar) from colliding on one slug.
-  String get key {
-    final slug = repository.toLowerCase().replaceAll(RegExp('[^a-z0-9]+'), '-');
-    return 'custom-$slug-${_fnv32(repository).toRadixString(16).padLeft(8, '0')}';
-  }
-
-  static int _fnv32(String value) {
-    var hash = 0x811c9dc5;
-    for (final unit in value.codeUnits) {
-      hash = ((hash ^ unit) * 0x01000193) & 0xFFFFFFFF;
-    }
-    return hash;
-  }
+  String get key => customCatalogKeyFor(repository);
 
   String get displayName =>
       repository.contains('/') ? repository.split('/').last : repository;

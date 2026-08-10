@@ -209,6 +209,13 @@ final Map<String, ModelProfile> modelProfiles = Map.unmodifiable({
   'qwen35': const Qwen35Profile(),
 });
 
+/// The built-ins' specs, for the custom-repository resolver (#52), which lives
+/// in core and cannot import this library. Derived rather than restated so a
+/// fingerprint match yields the very spec the broker renders with.
+final Map<String, ModelProfileSpec> brokerProfileSpecs = Map.unmodifiable({
+  for (final entry in modelProfiles.entries) entry.key: entry.value.spec,
+});
+
 /// The built-ins plus any specs a resolved custom model brought with it.
 /// Deliberately a value passed to the resolver, not a mutable global (handbook
 /// v4.2A §2.1 prohibits app-authored mutable statics).

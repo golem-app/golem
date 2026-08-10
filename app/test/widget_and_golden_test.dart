@@ -392,7 +392,7 @@ void main() {
     await revealIn(
       tester,
       const Key('models-list'),
-      const Key('custom-repo-add'),
+      const Key('custom-repo-resolve'),
     );
     await expectLater(
       find.byType(ModelsScreen),

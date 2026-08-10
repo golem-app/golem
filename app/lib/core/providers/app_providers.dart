@@ -12,6 +12,7 @@ import '../domain/models.dart';
 import '../domain/response_style_mapping.dart';
 import '../repositories/contracts.dart';
 import '../services/cache_probe.dart';
+import '../services/custom_repository_resolver.dart';
 import '../services/device_storage.dart';
 import '../services/image_intake.dart';
 import '../startup/startup_sequence.dart';
@@ -41,6 +42,12 @@ BenchmarkRepository benchmarkRepository(Ref ref) =>
 @Riverpod(keepAlive: true)
 List<ModelCatalogEntry> modelCatalogEntries(Ref ref) =>
     throw UnimplementedError('Override modelCatalogEntriesProvider at startup');
+
+@Riverpod(keepAlive: true)
+CustomRepositoryResolver customRepositoryResolver(Ref ref) =>
+    throw UnimplementedError(
+      'Override customRepositoryResolverProvider at startup',
+    );
 
 @Riverpod(keepAlive: true)
 SettingsRepository settingsRepository(Ref ref) =>

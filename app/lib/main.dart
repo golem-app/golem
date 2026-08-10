@@ -8,7 +8,9 @@ import 'package:path_provider/path_provider.dart';
 import 'app/app.dart';
 import 'broker/configured_inference_repository.dart';
 import 'broker/model_catalog.dart';
+import 'broker/model_profile.dart';
 import 'core/app_identity.dart';
+import 'core/domain/inference_backend.dart';
 import 'core/providers/app_providers.dart';
 import 'core/repositories/contracts.dart';
 import 'core/repositories/fake_benchmark_repository.dart';
@@ -20,7 +22,10 @@ import 'core/repositories/file_settings_repository.dart';
 import 'core/repositories/real_model_management_repository.dart';
 import 'core/services/artifact_downloader.dart';
 import 'core/services/cache_probe.dart';
+import 'core/services/custom_repository_resolver.dart';
 import 'core/services/device_storage.dart';
+import 'core/services/hugging_face_api.dart';
+import 'core/services/repository_resolver.dart';
 import 'features/chat/widgets/attach_sheet.dart';
 
 Future<void> main() => launch();
@@ -59,10 +64,22 @@ Future<void> launch({
   );
   final preferences = await preferencesRepository.load();
   final pinnedKeys = {for (final entry in modelCatalog) entry.key};
+  final customEntries = [
+    for (final spec in preferences.customModels)
+      if (!pinnedKeys.contains(spec.key)) spec,
+  ];
   final mergedCatalog = [
     ...modelCatalog,
-    for (final spec in preferences.customModels)
-      if (!pinnedKeys.contains(spec.key)) spec.toCatalogEntry(),
+    for (final spec in customEntries) spec.toCatalogEntry(),
+  ];
+  // The real downloader only takes repositories that resolved: an unresolved
+  // entry's file list is synthesized, so offering to fetch it would put a
+  // request on the wire for a file nobody has seen. Those stay out of its
+  // catalog and their card keeps saying it cannot download here.
+  final realCatalog = [
+    ...modelCatalog,
+    for (final spec in customEntries)
+      if (spec.resolved != null) spec.toCatalogEntry(),
   ];
   // Created before the scope so the inference repository can read an image
   // part's bytes without going through a provider.
@@ -75,7 +92,7 @@ Future<void> launch({
       : RealModelManagementRepository(
           stateFile: stateFile,
           documentsDirectory: documents.path,
-          catalog: modelCatalog,
+          catalog: realCatalog,
           downloader: BackgroundArtifactDownloader(),
           diskSpace: const DeviceStorageChannel(),
           backupExclusion: const DeviceStorageChannel(),
@@ -114,6 +131,17 @@ Future<void> launch({
           ),
         ),
         modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
+        customRepositoryResolverProvider.overrideWithValue(
+          // The fake identity never reaches the network, so its resolution is
+          // synthesized; the real one carries the broker's profiles because
+          // core cannot import them itself.
+          backendConfig.kind == InferenceBackendKind.fake
+              ? const DeterministicRepositoryResolver()
+              : HuggingFaceRepositoryResolver(
+                  api: HttpClientHuggingFaceApi(),
+                  profiles: brokerProfileSpecs,
+                ),
+        ),
         modelManagementRepositoryProvider.overrideWithValue(modelManagement),
         deviceCapacityProbeProvider.overrideWithValue(
           const DeviceStorageChannel(),

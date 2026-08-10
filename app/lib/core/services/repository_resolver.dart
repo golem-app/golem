@@ -11,6 +11,7 @@ import 'dart:typed_data';
 import '../domain/model_catalog.dart';
 import '../domain/model_profile_spec.dart';
 import '../domain/resolved_repository.dart';
+import 'custom_repository_resolver.dart';
 import 'chat_template_fingerprint.dart';
 import 'gguf_header.dart';
 import 'hugging_face_api.dart';
@@ -167,7 +168,7 @@ final class _Sibling {
   final String? sha256;
 }
 
-final class HuggingFaceRepositoryResolver {
+final class HuggingFaceRepositoryResolver implements CustomRepositoryResolver {
   HuggingFaceRepositoryResolver({
     required this.api,
     required this.profiles,
@@ -184,6 +185,7 @@ final class HuggingFaceRepositoryResolver {
   /// [existingKeys] are the keys already present, so a colliding repository is
   /// refused before anything is written. [weightsFile] picks one of several
   /// GGUF payloads; without it, ambiguity comes back as a needs-choice outcome.
+  @override
   Future<RepositoryResolution> resolve({
     required String repository,
     required ModelEngine engine,
@@ -582,17 +584,6 @@ final class HuggingFaceRepositoryResolver {
     }
     return files;
   }
-}
-
-/// Hashed on top of a slug so two names differing only in punctuation
-/// (`org/foo_bar` and `org/foo-bar`) cannot collapse onto one directory.
-String customCatalogKeyFor(String repository) {
-  final slug = repository.toLowerCase().replaceAll(RegExp('[^a-z0-9]+'), '-');
-  var hash = 0x811c9dc5;
-  for (final unit in repository.codeUnits) {
-    hash = ((hash ^ unit) * 0x01000193) & 0xFFFFFFFF;
-  }
-  return 'custom-$slug-${hash.toRadixString(16).padLeft(8, '0')}';
 }
 
 bool _validIdentifier(String repository) {
