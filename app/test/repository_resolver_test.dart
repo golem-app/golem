@@ -708,9 +708,11 @@ void main() {
         repository: _repo,
         engine: ModelEngine.gguf,
       );
+      // Refused for what it is: a listing disagreeing with itself, not an
+      // unsafe path — the copy the user sees must name the actual problem.
       expect(
         (outcome as RepositoryRejected).reason,
-        RepositoryRejection.unsafePath,
+        RepositoryRejection.inconsistentMetadata,
       );
     });
 
@@ -739,13 +741,16 @@ void main() {
     });
 
     test('a non-string LFS hash is refused rather than thrown past', () async {
+      // A real size, so the refusal below can only come from the hash check —
+      // a zero size would trip the unrelated zero-byte guard first, and a
+      // silently null hash would install a multi-gigabyte file unverified.
       api.responses[_revisionUrl(_repo)] = revisionInfo(
         sha: _sha,
         siblings: [
           {
             'rfilename': _weights,
-            'size': 0,
-            'lfs': {'oid': 42},
+            'size': 4000000000,
+            'lfs': {'oid': 42, 'size': 4000000000},
           },
         ],
       );
@@ -753,7 +758,10 @@ void main() {
         repository: _repo,
         engine: ModelEngine.gguf,
       );
-      expect(outcome, isA<RepositoryRejected>());
+      expect(
+        (outcome as RepositoryRejected).reason,
+        RepositoryRejection.malformedMetadata,
+      );
     });
 
     test('a missing or non-commit sha is refused', () async {
