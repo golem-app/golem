@@ -61,7 +61,7 @@ const _mlxAssetId = 'package:inferno/inferno_mlx.dart';
 
 /// The C ABI revision this package speaks. A mismatch fails before any native
 /// object is created rather than crashing inside one.
-const infernoAbiVersion = 3;
+const infernoAbiVersion = 4;
 
 @Native<Uint32 Function()>(
   symbol: 'inferno_abi_version',
@@ -593,6 +593,7 @@ final class NativeInfernoBackend implements InfernoBackend {
           'topP': request.sampling.topP,
           'topK': request.sampling.topK,
           'contextLength': request.sampling.contextLength,
+          'presencePenalty': request.sampling.presencePenalty,
           'seed': request.sampling.seed,
           'stopSequences': request.sampling.stopSequences,
           'stopTokenIds': request.sampling.stopTokenIds,

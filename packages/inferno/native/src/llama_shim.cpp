@@ -582,6 +582,12 @@ int32_t inferno_engine_generate(inferno_engine *engine,
         (!request.contains("contextLength") || request["contextLength"].is_null())
             ? 0
             : request["contextLength"].get<int64_t>();
+    // Absent-or-null when unset: 0 keeps the penalties sampler out of the
+    // chain entirely.
+    const float presence_penalty =
+        (!request.contains("presencePenalty") || request["presencePenalty"].is_null())
+            ? 0.0F
+            : request["presencePenalty"].get<float>();
     const uint32_t seed = request["seed"].is_null()
                               ? LLAMA_DEFAULT_SEED
                               : request.value("seed", LLAMA_DEFAULT_SEED);
@@ -590,7 +596,7 @@ int32_t inferno_engine_generate(inferno_engine *engine,
     const std::unordered_set<llama_token> stop_ids(stop_ids_vector.begin(),
                                                    stop_ids_vector.end());
     if (prompt.empty() || max_tokens <= 0 || temperature < 0 || top_p <= 0 || top_p > 1 ||
-        top_k < 0 || context_length < 0) {
+        top_k < 0 || context_length < 0 || presence_penalty < 0) {
       emit_error(callback,
                  operation_id,
                  "generation_failed",
@@ -760,6 +766,13 @@ int32_t inferno_engine_generate(inferno_engine *engine,
     }
 
     llama_sampler *sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
+    if (presence_penalty > 0) {
+      // Whole-context window (-1): the penalty exists to break think loops
+      // that run the full budget, so a short window would miss them. Repeat
+      // and frequency stay at their disabled values.
+      llama_sampler_chain_add(
+          sampler, llama_sampler_init_penalties(-1, 1.0F, 0.0F, presence_penalty));
+    }
     if (top_k > 0) {
       llama_sampler_chain_add(sampler, llama_sampler_init_top_k(top_k));
     }

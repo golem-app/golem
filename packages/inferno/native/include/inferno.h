@@ -27,7 +27,7 @@ extern "C" {
 /// "swaFull": bool} — mirroring how generate crosses the boundary. Engines
 /// ignore fields that do not apply to them. Error codes remain JSON
 /// strings inside INFERNO_EVENT_ERROR payloads.
-#define INFERNO_ABI_VERSION 3
+#define INFERNO_ABI_VERSION 4
 
 typedef struct inferno_engine inferno_engine;
 
