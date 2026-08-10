@@ -31,15 +31,20 @@ class ModelsScreen extends ConsumerStatefulWidget {
 }
 
 class _ModelsScreenState extends ConsumerState<ModelsScreen> {
-  // Ephemeral screen state stays widget-local: the tab, the custom
-  // repository draft, and its engine chip.
+  // Ephemeral screen state stays widget-local: the tab, the custom repository
+  // draft, its engine chip, and what resolving it found. The resolution lives
+  // here rather than in the card because the list disposes off-screen children
+  // — scrolling away and back would otherwise silently discard it.
   _CatalogTab _tab = _CatalogTab.all;
   final _repositoryController = TextEditingController();
+  final _revisionController = TextEditingController();
   ModelEngine _customEngine = ModelEngine.mlx;
+  _AddState _addState = const _Unresolved();
 
   @override
   void dispose() {
     _repositoryController.dispose();
+    _revisionController.dispose();
     super.dispose();
   }
 
@@ -70,6 +75,15 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
     // enabled button there would fail on every tap.
     final pinnedKeys = {
       for (final entry in ref.watch(modelCatalogEntriesProvider)) entry.key,
+    };
+    // A hand-added repository can be fetched once it has resolved: its file
+    // list is then real. An unresolved one still cannot, because its files are
+    // synthesized and nothing would be on the other end of the request.
+    final resolvedKeys = {
+      for (final spec
+          in ref.watch(preferencesControllerProvider).value?.customModels ??
+              const <CustomModelSpec>[])
+        if (spec.resolved != null) spec.key,
     };
     final advanced =
         ref.watch(preferencesControllerProvider).value?.advancedMode ?? false;
@@ -141,7 +155,10 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
             active: entry.key == model.activeArtifactKey,
             otherDownloadActive:
                 downloadingKey != null && downloadingKey != entry.key,
-            downloadable: model.simulated || pinnedKeys.contains(entry.key),
+            downloadable:
+                model.simulated ||
+                pinnedKeys.contains(entry.key) ||
+                resolvedKeys.contains(entry.key),
           ),
           const SizedBox(height: 12),
         ],
@@ -155,8 +172,15 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
           const SizedBox(height: 8),
           _CustomRepositoryCard(
             controller: _repositoryController,
+            revisionController: _revisionController,
+            state: _addState,
+            onState: (state) => setState(() => _addState = state),
             engine: _customEngine,
-            onEngine: (engine) => setState(() => _customEngine = engine),
+            onEngine: (engine) => setState(() {
+              _customEngine = engine;
+              // A resolution belongs to one engine's file selection.
+              _addState = const _Unresolved();
+            }),
             simulatedDownloads: model.simulated,
           ),
         ],
@@ -271,15 +295,24 @@ final class _Refused extends _AddState {
   final String message;
 }
 
-class _CustomRepositoryCard extends ConsumerStatefulWidget {
+class _CustomRepositoryCard extends ConsumerWidget {
   const _CustomRepositoryCard({
     required this.controller,
+    required this.revisionController,
+    required this.state,
+    required this.onState,
     required this.engine,
     required this.onEngine,
     required this.simulatedDownloads,
   });
 
   final TextEditingController controller;
+  final TextEditingController revisionController;
+
+  /// Owned by the screen, so scrolling this card off-list cannot discard it.
+  final _AddState state;
+  final ValueChanged<_AddState> onState;
+
   final ModelEngine engine;
   final ValueChanged<ModelEngine> onEngine;
 
@@ -287,52 +320,20 @@ class _CustomRepositoryCard extends ConsumerStatefulWidget {
   /// never presented as something that was measured.
   final bool simulatedDownloads;
 
-  @override
-  ConsumerState<_CustomRepositoryCard> createState() =>
-      _CustomRepositoryCardState();
-}
-
-class _CustomRepositoryCardState extends ConsumerState<_CustomRepositoryCard> {
-  final TextEditingController _revision = TextEditingController();
-  _AddState _state = const _Unresolved();
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_invalidate);
-    _revision.addListener(_invalidate);
-  }
-
-  @override
-  void didUpdateWidget(_CustomRepositoryCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // A resolution belongs to one engine's file selection.
-    if (oldWidget.engine != widget.engine) _state = const _Unresolved();
-  }
-
-  @override
-  void dispose() {
-    widget.controller.removeListener(_invalidate);
-    _revision.dispose();
-    super.dispose();
-  }
+  String get _ref => revisionController.text.trim().isEmpty
+      ? 'main'
+      : revisionController.text.trim();
 
   /// Any edit makes an existing resolution stale, and showing a commit and file
-  /// list for a repository the user has since retyped is worse than showing
-  /// nothing.
+  /// list for a repository the user has since retyped is worse than nothing.
   void _invalidate() {
-    if (_state is _Unresolved) return;
-    setState(() => _state = const _Unresolved());
+    if (state is! _Unresolved) onState(const _Unresolved());
   }
 
-  String get _ref =>
-      _revision.text.trim().isEmpty ? 'main' : _revision.text.trim();
-
-  Future<void> _resolve({String? weightsFile}) async {
-    final repository = widget.controller.text.trim();
+  Future<void> _resolve(WidgetRef ref, {String? weightsFile}) async {
+    final repository = controller.text.trim();
     if (repository.isEmpty) return;
-    // Every seam is read before the first await; the notifier's Ref must not be
-    // touched across one.
+    // Every seam is read before the first await.
     final resolver = ref.read(customRepositoryResolverProvider);
     final existingKeys = <String>{
       for (final entry in ref.read(modelCatalogEntriesProvider)) entry.key,
@@ -342,46 +343,46 @@ class _CustomRepositoryCardState extends ConsumerState<_CustomRepositoryCard> {
           ?.customModels
           .map((spec) => spec.key),
     };
-    setState(() => _state = const _Resolving());
+    onState(const _Resolving());
     final outcome = await resolver.resolve(
       repository: repository,
-      engine: widget.engine,
+      engine: engine,
       ref: _ref,
       weightsFile: weightsFile,
       existingKeys: existingKeys,
     );
-    if (!mounted) return;
-    setState(
-      () => _state = switch (outcome) {
-        RepositoryResolved() => _Resolved(outcome),
-        RepositoryNeedsWeightChoice(:final candidates) => _WeightChoice(
-          candidates,
-        ),
-        RepositoryRejected(:final message) => _Refused(message),
-      },
-    );
+    onState(switch (outcome) {
+      RepositoryResolved() => _Resolved(outcome),
+      RepositoryNeedsWeightChoice(:final candidates) => _WeightChoice(
+        candidates,
+      ),
+      RepositoryRejected(:final message) => _Refused(message),
+    });
   }
 
-  Future<void> _add(RepositoryResolved outcome) async {
+  Future<void> _add(
+    BuildContext context,
+    WidgetRef ref,
+    RepositoryResolved outcome,
+  ) async {
     final preferences = ref.read(preferencesControllerProvider.notifier);
     await preferences.addCustomModel(
       CustomModelSpec(
-        repository: widget.controller.text.trim(),
-        engine: widget.engine,
+        repository: controller.text.trim(),
+        engine: engine,
         revision: _ref,
         profile: outcome.profile,
         resolved: outcome.resolved,
       ),
     );
-    if (!mounted) return;
-    widget.controller.clear();
-    _revision.clear();
-    setState(() => _state = const _Unresolved());
-    showGolemToast(context, 'Model added');
+    controller.clear();
+    revisionController.clear();
+    onState(const _Unresolved());
+    if (context.mounted) showGolemToast(context, 'Model added');
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
     return SettingsCard(
       children: [
@@ -395,15 +396,15 @@ class _CustomRepositoryCardState extends ConsumerState<_CustomRepositoryCard> {
                   _EngineChip(
                     key: const Key('custom-repo-engine-mlx'),
                     label: 'MLX',
-                    selected: widget.engine == ModelEngine.mlx,
-                    onTap: () => widget.onEngine(ModelEngine.mlx),
+                    selected: engine == ModelEngine.mlx,
+                    onTap: () => onEngine(ModelEngine.mlx),
                   ),
                   const SizedBox(width: 8),
                   _EngineChip(
                     key: const Key('custom-repo-engine-gguf'),
                     label: 'GGUF',
-                    selected: widget.engine == ModelEngine.gguf,
-                    onTap: () => widget.onEngine(ModelEngine.gguf),
+                    selected: engine == ModelEngine.gguf,
+                    onTap: () => onEngine(ModelEngine.gguf),
                   ),
                 ],
               ),
@@ -411,8 +412,8 @@ class _CustomRepositoryCardState extends ConsumerState<_CustomRepositoryCard> {
               _field(
                 context,
                 key: const Key('custom-repo-field'),
-                controller: widget.controller,
-                placeholder: widget.engine == ModelEngine.mlx
+                controller: controller,
+                placeholder: engine == ModelEngine.mlx
                     ? 'mlx-community/model-name'
                     : 'org/model-name-GGUF',
                 muted: muted,
@@ -421,19 +422,19 @@ class _CustomRepositoryCardState extends ConsumerState<_CustomRepositoryCard> {
               _field(
                 context,
                 key: const Key('custom-repo-revision'),
-                controller: _revision,
+                controller: revisionController,
                 placeholder: 'main — or a branch, tag, or commit',
                 muted: muted,
               ),
               const SizedBox(height: 16),
-              ..._outcome(context, muted),
+              ..._outcome(context, ref, muted),
               const SizedBox(height: 12),
-              Text(switch (_state) {
+              Text(switch (state) {
                 _Resolved(:final outcome) when outcome.profile == null =>
                   'This will download and can be deleted, but Golem cannot '
                       'prompt it: its chat template is not one this version '
                       'recognizes.',
-                _ when widget.simulatedDownloads =>
+                _ when simulatedDownloads =>
                   'This build simulates downloads, so the revision and size '
                       'below are synthesized rather than read from Hugging '
                       'Face.',
@@ -460,6 +461,7 @@ class _CustomRepositoryCardState extends ConsumerState<_CustomRepositoryCard> {
     placeholder: placeholder,
     autocorrect: false,
     enableSuggestions: false,
+    onChanged: (_) => _invalidate(),
     style: GolemText.code,
     placeholderStyle: GolemText.code.copyWith(color: muted),
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
@@ -471,8 +473,12 @@ class _CustomRepositoryCardState extends ConsumerState<_CustomRepositoryCard> {
     ),
   );
 
-  List<Widget> _outcome(BuildContext context, Color muted) => switch (_state) {
-    _Unresolved() => [_resolveButton()],
+  List<Widget> _outcome(
+    BuildContext context,
+    WidgetRef ref,
+    Color muted,
+  ) => switch (state) {
+    _Unresolved() => [_resolveButton(ref)],
     _Resolving() => [
       Row(
         children: [
@@ -494,7 +500,7 @@ class _CustomRepositoryCardState extends ConsumerState<_CustomRepositoryCard> {
         ),
       ),
       const SizedBox(height: 14),
-      _resolveButton(label: 'Try again'),
+      _resolveButton(ref, label: 'Try again'),
     ],
     _WeightChoice(:final candidates) => [
       Text(
@@ -508,7 +514,7 @@ class _CustomRepositoryCardState extends ConsumerState<_CustomRepositoryCard> {
           key: Key('custom-repo-candidate-${candidate.path}'),
           padding: const EdgeInsets.symmetric(vertical: 6),
           minimumSize: const Size(44, 44),
-          onPressed: () => _resolve(weightsFile: candidate.path),
+          onPressed: () => _resolve(ref, weightsFile: candidate.path),
           child: Row(
             children: [
               Expanded(
@@ -581,21 +587,23 @@ class _CustomRepositoryCardState extends ConsumerState<_CustomRepositoryCard> {
         ],
       ),
       const SizedBox(height: 16),
-      GolemButton.filled(
-        key: const Key('custom-repo-add'),
-        label: 'Add model',
-        onPressed: () => _add(outcome),
+      Builder(
+        builder: (context) => GolemButton.filled(
+          key: const Key('custom-repo-add'),
+          label: 'Add model',
+          onPressed: () => _add(context, ref, outcome),
+        ),
       ),
     ],
   };
 
-  Widget _resolveButton({String label = 'Resolve'}) =>
+  Widget _resolveButton(WidgetRef ref, {String label = 'Resolve'}) =>
       ValueListenableBuilder<TextEditingValue>(
-        valueListenable: widget.controller,
+        valueListenable: controller,
         builder: (context, value, _) => GolemButton.filled(
           key: const Key('custom-repo-resolve'),
           label: label,
-          onPressed: value.text.trim().isEmpty ? null : _resolve,
+          onPressed: value.text.trim().isEmpty ? null : () => _resolve(ref),
         ),
       );
 }
@@ -861,8 +869,8 @@ class _ModelCard extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(top: 10),
             child: Text(
-              'Hand-added repositories can\'t download on this engine yet — '
-              'that arrives in a future update.',
+              'This repository has not been resolved against Hugging Face, so '
+              'its files are unknown. Add it again to resolve it.',
               style: GolemText.footnote.copyWith(
                 color: CupertinoDynamicColor.resolve(
                   GolemTheme.mutedInk,

@@ -390,10 +390,9 @@ void main() {
       isNull,
       reason: 'the real repository would throw on the unknown key',
     );
-    expect(
-      find.textContaining('can\'t download on this engine yet'),
-      findsOneWidget,
-    );
+    // Unresolved is now the reason it cannot be fetched, not the engine: its
+    // file list is synthesized, so there is nothing to request.
+    expect(find.textContaining('has not been resolved'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('custom-repo-resolve')),
@@ -664,5 +663,51 @@ void main() {
     // A proven profile is what lets this entry be activated at all.
     expect(spec.toCatalogEntry().profileKey, 'qwen35');
     await tester.pump(const Duration(milliseconds: 1600));
+  }, variant: iosChrome);
+
+  testWidgets('a resolution survives scrolling the card out of view', (
+    tester,
+  ) async {
+    // Found on device: the models list disposes off-screen children, so a
+    // resolution held inside the card vanished when the user scrolled up to
+    // look at something and came back, silently sending them round again.
+    await pumpCard(
+      tester,
+      _ScriptedResolver([
+        RepositoryResolved(
+          resolved: _resolution(),
+          profile: qwen35ProfileSpec,
+          templateFingerprint: 'ef' * 32,
+        ),
+      ]),
+    );
+    await tester.tap(find.byKey(const Key('custom-repo-resolve')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('custom-repo-detail')), findsOneWidget);
+
+    final scrollable = find
+        .descendant(
+          of: find.byKey(const Key('models-list')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('models-tab-all')),
+      -240,
+      scrollable: scrollable,
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('custom-repo-detail')), findsNothing);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('custom-repo-add')),
+      240,
+      scrollable: scrollable,
+    );
+    await tester.pumpAndSettle();
+    // Still resolved, and still the same resolution.
+    expect(find.byKey(const Key('custom-repo-detail')), findsOneWidget);
+    expect(find.text('qwen35'), findsOneWidget);
+    expect(find.text('ffffffffffff'), findsOneWidget);
   }, variant: iosChrome);
 }
