@@ -525,6 +525,81 @@ void main() {
     expect(image, findsOneWidget);
     expect(attachments.readCount, 1);
   });
+
+  testWidgets('materializing a chat under the tray keeps the picture', (
+    tester,
+  ) async {
+    // A fresh session has no conversation, so picking a model creates one
+    // and activeId flips null → id. That is this chat coming into existence,
+    // not a switch away from it: the attachment must survive.
+    await pumpWithRepositories(
+      tester,
+      child: ChatScreen(picker: _StubPicker()),
+    );
+    await tester.tap(find.byKey(const Key('composer-attach')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('attach-photo-library')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('composer-attachments')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('composer-model-chip')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('model-picker-gemma4-gguf')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('composer-attachments')), findsOneWidget);
+  });
+
+  testWidgets('an unresolved entry mid-download shows its progress', (
+    tester,
+  ) async {
+    // Resolution and template recognition are independent: an entry whose
+    // template matched no profile still downloads. Mid-download its row must
+    // say so — masking progress behind the profile notice reads as a stall.
+    final source = modelCatalog.firstWhere(
+      (entry) => entry.key == 'qwen35-2b-mlx',
+    );
+    final unresolved = ModelCatalogEntry(
+      key: source.key,
+      displayName: source.displayName,
+      engine: source.engine,
+      quantization: source.quantization,
+      repository: source.repository,
+      revision: source.revision,
+      files: source.files,
+      profileKey: unresolvedProfileKey,
+    );
+    await pumpWithRepositories(
+      tester,
+      catalog: [
+        for (final entry in modelCatalog)
+          if (entry.key == source.key) unresolved else entry,
+      ],
+      history: markdownHistory(),
+      backend: const InferenceBackendConfig(
+        kind: InferenceBackendKind.mlx,
+        profileKey: 'gemma4',
+        artifactKey: 'gemma4-mlx',
+        modelPath: '/models/gemma',
+        modelPathFromCatalog: true,
+      ),
+      model: ModelState(
+        artifacts: {
+          'gemma4-mlx': const ArtifactStatus(phase: ArtifactPhase.installed),
+          source.key: ArtifactStatus(
+            phase: ArtifactPhase.downloading,
+            downloadedBytes: source.totalBytes ~/ 2,
+          ),
+        },
+      ),
+      child: const ChatScreen(),
+    );
+    await tester.tap(find.byKey(const Key('composer-model-chip')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Downloading'), findsOneWidget);
+    expect(find.textContaining('Chat template not recognized'), findsNothing);
+  });
 }
 
 ChatHistorySnapshot _picturesChat() => ChatHistorySnapshot(

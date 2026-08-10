@@ -44,11 +44,15 @@ class _ComposerState extends ConsumerState<Composer> {
 
   /// A picked image belongs to the chat it was picked in. The Composer element
   /// is reused across a drawer switch, so without this the tray would follow
-  /// the user into the next conversation and send there.
+  /// the user into the next conversation and send there. A fresh chat
+  /// materializing under the tray (null → id) is this conversation coming
+  /// into existence, not a switch away from it.
   @override
   void didUpdateWidget(Composer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.activeId != oldWidget.activeId && _pending.isNotEmpty) {
+    if (oldWidget.activeId != null &&
+        widget.activeId != oldWidget.activeId &&
+        _pending.isNotEmpty) {
       setState(_pending.clear);
     }
   }

@@ -150,13 +150,13 @@ final class _ModelPickerContent extends ConsumerWidget {
     final base = '$engine · ${entry.quantization}$vision';
     final status = models?.statusOf(entry.key);
     if (status == null) return base;
-    // Installed but untappable otherwise reads as a bug: say which of the two
-    // reasons it is.
-    if (entry.profileKey == unresolvedProfileKey) {
-      return '$base · Chat template not recognized';
-    }
     return switch (status.phase) {
-      ArtifactPhase.installed => '$base · Installed',
+      // Installed but untappable otherwise reads as a bug: say which of the
+      // two reasons it is. Mid-download, progress and failure matter more.
+      ArtifactPhase.installed =>
+        entry.profileKey == unresolvedProfileKey
+            ? '$base · Chat template not recognized'
+            : '$base · Installed',
       ArtifactPhase.downloading =>
         '$base · Downloading · '
             '${(status.downloadedBytes / entry.totalBytes * 100).clamp(0, 100).round()}%',
