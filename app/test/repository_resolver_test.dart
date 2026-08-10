@@ -714,6 +714,48 @@ void main() {
       );
     });
 
+    test('a weight file published with no size is refused', () async {
+      // Zero bytes cannot be probed: no read window clamps into an empty file.
+      // Both shapes reach it — an explicit zero, and a listing with no size at
+      // all — and neither may leave the resolver by throwing.
+      for (final entry in [
+        {'rfilename': _weights, 'size': 0},
+        {'rfilename': _weights},
+      ]) {
+        api.responses[_revisionUrl(_repo)] = revisionInfo(
+          sha: _sha,
+          siblings: [entry],
+        );
+        final outcome = await resolver().resolve(
+          repository: _repo,
+          engine: ModelEngine.gguf,
+        );
+        expect(
+          (outcome as RepositoryRejected).reason,
+          RepositoryRejection.malformedMetadata,
+          reason: 'listing $entry',
+        );
+      }
+    });
+
+    test('a non-string LFS hash is refused rather than thrown past', () async {
+      api.responses[_revisionUrl(_repo)] = revisionInfo(
+        sha: _sha,
+        siblings: [
+          {
+            'rfilename': _weights,
+            'size': 0,
+            'lfs': {'oid': 42},
+          },
+        ],
+      );
+      final outcome = await resolver().resolve(
+        repository: _repo,
+        engine: ModelEngine.gguf,
+      );
+      expect(outcome, isA<RepositoryRejected>());
+    });
+
     test('a missing or non-commit sha is refused', () async {
       for (final sha in [null, 'main', 'abc', '${'0' * 39}g']) {
         api.responses[_revisionUrl(_repo)] = {

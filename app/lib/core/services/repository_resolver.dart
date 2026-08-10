@@ -286,6 +286,15 @@ final class HuggingFaceRepositoryResolver implements CustomRepositoryResolver {
       ]);
     }
 
+    // A listing that published no size leaves bytes at 0, which no window can
+    // be clamped into. Refuse it here rather than in arithmetic downstream.
+    if (chosen.bytes <= 0) {
+      return const RepositoryRejected(
+        RepositoryRejection.malformedMetadata,
+        cause: 'weight file published with no size',
+      );
+    }
+
     final probe = await _probeGgufHeader(repository, sha, chosen);
     if (probe is RepositoryRejected) return probe;
     final metadata = (probe as GgufComplete).metadata;
@@ -574,11 +583,15 @@ final class HuggingFaceRepositoryResolver implements CustomRepositoryResolver {
       final lfsSize = lfs is Map ? lfs['size'] : null;
       // Two sources for one fact: a disagreement means nothing can be pinned.
       if (declared is int && lfsSize is int && declared != lfsSize) return null;
+      final sha256 = lfs is Map ? lfs['sha256'] : null;
+      final oid = lfs is Map ? lfs['oid'] : null;
       files.add(
         _Sibling(
           path,
           declared is int ? declared : (lfsSize is int ? lfsSize : 0),
-          lfs is Map ? lfs['sha256'] as String? ?? lfs['oid'] as String? : null,
+          // Tested rather than cast: a non-string hash is a listing this
+          // resolver refuses, not an exception thrown past its contract.
+          sha256 is String ? sha256 : (oid is String ? oid : null),
         ),
       );
     }
@@ -615,7 +628,7 @@ bool _safeRelativePath(String path) {
 
 bool _looksLikeProjector(String path) {
   final name = path.split('/').last.toLowerCase();
-  return name.contains('mmproj') || name.startsWith('mmproj');
+  return name.contains('mmproj');
 }
 
 /// `Qwen3.5-2B-Q4_0.gguf` → `Q4_0`. A display label only; llama.cpp reads the
