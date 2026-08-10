@@ -68,7 +68,9 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   riverpod_generator: 4.0.4
-  build_runner: ^2.15.1
+  # Exact, like the generator pair it drives: the generated output must be
+  # reproducible from the lockfile alone (#74).
+  build_runner: 2.15.1
   flutter_native_splash: ^2.4.8
   flutter_launcher_icons: ^0.14.4
   image: ^4.9.1

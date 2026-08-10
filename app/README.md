@@ -171,14 +171,12 @@ repo root.
   cancel work at lifecycle boundaries, and reject stale completions with epochs.
   Focus, text, scroll, disclosure, and drawer animation remain widget-local state.
 
-The Riverpod family is pinned exactly — `flutter_riverpod` 3.3.2,
-`riverpod_annotation` 4.0.3, `riverpod_generator` 4.0.4 — because each release
-exact-pins the next, so the three move as one set or not at all. That set is
-the ceiling under Flutter 3.44.8, whose `flutter_test` pins `test_api`
-exactly and caps `analyzer` below 13. Exact transitive versions are committed
-in the workspace lockfile at `../pubspec.lock`; the blockers holding every
-package back from its latest release are recorded in
-`../docs/notes/dependencies.md`.
+The Riverpod runtime, annotation, and generator are pinned exactly, and move
+only as one set, because each release exact-pins the next. The set sits at the
+ceiling the pinned SDK allows. Exact versions live in the workspace lockfile
+at `../pubspec.lock`; the constraint chain that sets the ceiling, and the
+blocker holding every other package back from its latest release, are recorded
+once in `../docs/notes/dependencies.md`.
 
 ## Screens and identifiers
 

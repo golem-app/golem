@@ -4,8 +4,11 @@ After #74 every direct and transitive package in the workspace sits at the
 newest version that resolves against the pinned Flutter 3.44.8 / Dart 3.12.2
 toolchain — `flutter pub outdated` reports `Current == Upgradable ==
 Resolvable` for every row. What remains is the gap to `Latest`, and each of
-those gaps has a cause recorded here. Re-derive before acting; the chains move
-when the SDK does.
+those gaps has a cause recorded here.
+
+The version columns below are a snapshot, not a source of truth — `pubspec.lock`
+is. Nothing checks them, so re-derive from the lockfile and from pub.dev before
+acting on any row; the chains move when the SDK does.
 
 ## The two chains
 
@@ -41,7 +44,8 @@ Held back by this, all at their ceiling:
 | `flutter_riverpod` / `riverpod` | 3.3.2 | 3.4.2 | pinned by annotation 4.0.3 |
 | `build_runner` | 2.15.1 | 2.16.0 | `analyzer >= 13.3.0` |
 | `build` | 4.0.7 | 4.0.10 | `analyzer >= 13.3.0` |
-| `dart_style` | 3.1.3 | 3.1.12 | `analyzer ^13.0.0` |
+| `dart_style` | 3.1.8 | 3.1.12 | 3.1.9+ needs `analyzer ^13.0.0` |
+| `mockito` | 5.6.4 | 5.8.1 | 5.8.1 needs `analyzer >= 13.3.0` |
 | `analyzer`, `_fe_analyzer_shared` | 12.1.0 / 99.0.0 | 14.1.0 / 105.0.0 | the cap itself |
 
 The Riverpod family is exact-pinned (no caret) because each release
@@ -64,10 +68,11 @@ Clears with: an SDK bump (#38).
 ## Transitive consequences, not separate problems
 
 `record_use` (0.6.0 → 1.1.0), `package_config` (2.2.0 → 3.0.0),
-`vector_math`, `matcher`, and `mockito` are all pulled in by the SDK or by
-the chains above and cannot be selected independently. `mockito` in
-particular is unreachable from any source file here; it arrives through the
-codegen stack.
+`vector_math`, and `matcher` are pulled in by the SDK or by the chains above
+and cannot be selected independently. `mockito` is listed in the analyzer
+table rather than here: it is unreachable from any source file — it arrives
+through `riverpod_generator` — but its gap has the same analyzer cause as the
+rest of that table, so it clears with #38 too.
 
 ## Removed in #74
 
