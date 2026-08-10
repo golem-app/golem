@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/chrome/golem_alert.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_toast.dart';
+import '../../core/domain/model_activation.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
@@ -212,6 +213,17 @@ class _DownloadedModels extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
+    // The same resolution chat and Settings use, so one model is called active
+    // in exactly one place at a time (#20).
+    final activeKey = effectiveModelKey(
+      backend: ref.watch(inferenceBackendProvider),
+      catalog: catalog,
+      modelKey: ref.watch(
+        chatControllerProvider.select((state) => state.value?.active?.modelKey),
+      ),
+      residentModelKey: ref.watch(residentModelKeyProvider),
+      loadableKeys: ref.watch(loadableModelKeysProvider),
+    );
     // Anything holding bytes shows up — installed or partial — so what the
     // meter counts and what can be freed always agree.
     final rows = catalog
@@ -245,7 +257,7 @@ class _DownloadedModels extends ConsumerWidget {
                         [
                           entry.engine == ModelEngine.mlx ? 'MLX' : 'GGUF',
                           entry.quantization,
-                          if (entry.key == model.activeArtifactKey) 'active',
+                          if (entry.key == activeKey) 'active',
                           if (model.statusOf(entry.key).phase !=
                               ArtifactPhase.installed)
                             'partial',

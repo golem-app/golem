@@ -646,11 +646,13 @@ void main() {
     expect(find.textContaining('deterministic simulation'), findsWidgets);
     expect(find.text('Load Runtime'), findsOneWidget);
     expect(find.textContaining('Simulated Runtime'), findsNothing);
-    // The runtime rows: an honest bare state and no simulated qualifier
-    // on the empty active-model row.
+    // The runtime rows: the artifact this build would load, an honest bare
+    // state beside it, and no simulated qualifier anywhere on them. Naming the
+    // model while it is unloaded is the point — "active" is which model, and
+    // "state" is whether the engine holds it (#20).
     expect(find.text('Unloaded'), findsOneWidget);
-    expect(find.text('None'), findsOneWidget);
-    expect(find.textContaining('None · simulated'), findsNothing);
+    expect(find.text('Gemma 4 E2B QAT'), findsWidgets);
+    expect(find.textContaining('· simulated'), findsNothing);
 
     await pumpWithRepositories(
       tester,

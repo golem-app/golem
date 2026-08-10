@@ -67,7 +67,9 @@ void main() {
     expect(state.active!.modelKey, 'gemma4-gguf');
   });
 
-  testWidgets('a real backend keeps other model rows disabled', (tester) async {
+  testWidgets('a real backend offers every installed same-engine model', (
+    tester,
+  ) async {
     await pumpWithRepositories(
       tester,
       history: markdownHistory(),
@@ -78,34 +80,81 @@ void main() {
         modelPath: '/models/gemma',
         modelPathFromCatalog: true,
       ),
+      model: const ModelState(
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+          'qwen35-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+        },
+      ),
       child: const ChatScreen(),
     );
     await tester.tap(find.byKey(const Key('composer-model-chip')));
     await tester.pumpAndSettle();
-    // Only the running artifact stays tappable until #20; the footnote
-    // explains the constraint honestly.
+    // Installed alternatives are now selectable — the point of #20.
+    for (final key in ['gemma4-mlx', 'qwen35-mlx']) {
+      expect(
+        tester
+            .widget<CupertinoButton>(find.byKey(Key('model-picker-$key')))
+            .onPressed,
+        isNotNull,
+        reason: key,
+      );
+    }
+    // A model that is not downloaded cannot be chosen: the chip would name
+    // weights the next send would fail to load.
+    expect(
+      tester
+          .widget<CupertinoButton>(
+            find.byKey(const Key('model-picker-qwen35-2b-mlx')),
+          )
+          .onPressed,
+      isNull,
+    );
+    // Artifacts this build's engine can never load stay hidden outright
+    // (#63): no dead multi-gigabyte options.
+    expect(find.byKey(const Key('model-picker-qwen35-gguf')), findsNothing);
+    expect(find.byKey(const Key('model-picker-gemma4-gguf')), findsNothing);
+    expect(find.textContaining('loads with your next message'), findsOneWidget);
+  });
+
+  testWidgets('a sideload refuses every row and names its own file', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      history: markdownHistory(),
+      backend: const InferenceBackendConfig(
+        kind: InferenceBackendKind.mlx,
+        profileKey: 'gemma4',
+        // The policy still derives a key; the sideload must not inherit it.
+        artifactKey: 'gemma4-mlx',
+        modelPath: '/operator/my-own-build',
+      ),
+      model: const ModelState(
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+        },
+      ),
+      child: const ChatScreen(),
+    );
+    await tester.tap(find.byKey(const Key('composer-model-chip')));
+    await tester.pumpAndSettle();
     expect(
       tester
           .widget<CupertinoButton>(
             find.byKey(const Key('model-picker-gemma4-mlx')),
           )
           .onPressed,
-      isNotNull,
-    );
-    // Same-engine alternatives render but stay disabled…
-    expect(
-      tester
-          .widget<CupertinoButton>(
-            find.byKey(const Key('model-picker-qwen35-mlx')),
-          )
-          .onPressed,
       isNull,
+      reason:
+          'switching away from a sideload is a one-way door: there is no key '
+          'to switch back to',
     );
-    // …while artifacts this build's engine can never load are hidden
-    // outright (#63): no dead multi-gigabyte options.
-    expect(find.byKey(const Key('model-picker-qwen35-gguf')), findsNothing);
-    expect(find.byKey(const Key('model-picker-gemma4-gguf')), findsNothing);
-    expect(find.textContaining('Golem is running Gemma 4 E2B'), findsOneWidget);
+    expect(
+      find.textContaining('my-own-build'),
+      findsWidgets,
+      reason: 'the sheet names the file the build pins, not a pinned artifact',
+    );
   });
 
   testWidgets('starter chips prefill and focus the composer', (tester) async {

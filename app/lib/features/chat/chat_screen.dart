@@ -161,9 +161,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         title: chat.active?.title ?? 'New chat',
                         subtitle: chatModelSubtitle(
                           backend: ref.watch(inferenceBackendProvider),
-                          catalog: ref.watch(modelCatalogEntriesProvider),
+                          catalog: ref.watch(effectiveModelCatalogProvider),
                           modelKey: chat.active?.modelKey,
                           residentModelKey: ref.watch(residentModelKeyProvider),
+                          loadableKeys: ref.watch(loadableModelKeysProvider),
                         ),
                         // Contained glass follows the iOS 26 toolbar style;
                         // bare nav-bar glyphs read too small next to it.

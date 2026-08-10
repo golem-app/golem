@@ -81,7 +81,7 @@ class _DownloadActiveModelButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final entry = ref
-        .watch(modelCatalogEntriesProvider)
+        .watch(effectiveModelCatalogProvider)
         .where((item) => item.key == artifactKey)
         .firstOrNull;
     final installed =

@@ -8,6 +8,7 @@ import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_toast.dart';
 import '../../core/domain/app_preferences.dart';
 import '../../core/domain/inference_backend.dart';
+import '../../core/domain/model_activation.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
@@ -70,9 +71,6 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
 
   Widget _body(BuildContext context, ModelState model) {
     final catalog = ref.watch(effectiveModelCatalogProvider);
-    // Only the fake backend can download hand-added repositories; the
-    // real downloader knows the pinned catalog alone until #20, and an
-    // enabled button there would fail on every tap.
     final pinnedKeys = {
       for (final entry in ref.watch(modelCatalogEntriesProvider)) entry.key,
     };
@@ -99,12 +97,23 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
     // be dead disk (#63). Installed leftovers stay visible (and
     // deletable) here and in Storage; the fake keeps the whole catalog.
     final backend = ref.watch(inferenceBackendProvider);
+    // Which artifact is live must read the same everywhere: chat, here, and
+    // Storage all resolve it through the one helper (#20).
+    final activeKey = effectiveModelKey(
+      backend: backend,
+      catalog: catalog,
+      modelKey: ref.watch(
+        chatControllerProvider.select((state) => state.value?.active?.modelKey),
+      ),
+      residentModelKey: ref.watch(residentModelKeyProvider),
+      loadableKeys: ref.watch(loadableModelKeysProvider),
+    );
     final loadable = catalog
         .where(
           (entry) =>
               simulatedInference ||
               model.statusOf(entry.key).phase == ArtifactPhase.installed ||
-              _engineLoadable(backend.kind, entry.engine),
+              backend.kind.loads(entry.engine),
         )
         .toList();
     final visible = _tab == _CatalogTab.all
@@ -152,7 +161,7 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
             entry: entry,
             status: model.statusOf(entry.key),
             simulated: model.simulated,
-            active: entry.key == model.activeArtifactKey,
+            active: entry.key == activeKey,
             otherDownloadActive:
                 downloadingKey != null && downloadingKey != entry.key,
             downloadable:
@@ -165,7 +174,11 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
         const SizedBox(height: 12),
         const SectionHeader('Runtime'),
         const SizedBox(height: 8),
-        _RuntimeCard(model: model, simulatedInference: simulatedInference),
+        _RuntimeCard(
+          model: model,
+          simulatedInference: simulatedInference,
+          activeKey: activeKey,
+        ),
         if (advanced) ...[
           const SizedBox(height: 24),
           const SectionHeader('Custom repository'),
@@ -195,29 +208,23 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
       ],
     );
   }
-
-  /// Whether this build's composed engine can load artifacts of [engine].
-  /// The fake never reaches here; explicit `mlx` builds mirror the rule
-  /// for GGUF entries.
-  static bool _engineLoadable(InferenceBackendKind kind, ModelEngine engine) =>
-      switch (kind) {
-        InferenceBackendKind.fake => true,
-        InferenceBackendKind.llama => engine == ModelEngine.gguf,
-        InferenceBackendKind.mlx => engine == ModelEngine.mlx,
-      };
 }
 
 class _RuntimeCard extends ConsumerWidget {
-  const _RuntimeCard({required this.model, required this.simulatedInference});
+  const _RuntimeCard({
+    required this.model,
+    required this.simulatedInference,
+    required this.activeKey,
+  });
   final ModelState model;
   final bool simulatedInference;
+  final String? activeKey;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final catalog = ref.watch(effectiveModelCatalogProvider);
-    final active = catalog
-        .where((entry) => entry.key == model.activeArtifactKey)
-        .firstOrNull;
+    final backend = ref.watch(inferenceBackendProvider);
+    final active = catalog.where((entry) => entry.key == activeKey).firstOrNull;
     return SettingsCard(
       children: [
         Padding(
@@ -228,7 +235,10 @@ class _RuntimeCard extends ConsumerWidget {
                 label: 'Active model',
                 value:
                     active?.displayName ??
-                    (simulatedInference
+                    // A sideload has no entry to name, so name its file.
+                    (backend.sideloaded
+                        ? sideloadedModelLabel(backend.modelPath!)
+                        : simulatedInference
                         ? 'None · simulated inference'
                         : 'None'),
               ),
