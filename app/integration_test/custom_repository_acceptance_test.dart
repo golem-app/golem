@@ -14,6 +14,8 @@ import 'package:golem_flutter/core/services/repository_resolver.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'support/acceptance_hud.dart';
+
 /// End-to-end acceptance for a **non-pinned** public repository (#52):
 ///
 ///   flutter test integration_test/custom_repository_acceptance_test.dart \
@@ -57,6 +59,7 @@ void main() {
         : 'Set --dart-define=GOLEM_CUSTOM_ACCEPTANCE=true to run the '
               'non-pinned repository acceptance.',
     () async {
+      AcceptanceHud.step('Resolving $_repository');
       final api = HttpClientHuggingFaceApi();
       addTearDown(api.close);
       final outcome =
@@ -101,6 +104,7 @@ void main() {
       expect(entry.revision, resolved.resolved.commitSha);
       expect(entry.profileKey, 'qwen35');
 
+      AcceptanceHud.step('Registering the resolved entry');
       final documents = await getApplicationDocumentsDirectory();
       final temp = await Directory.systemTemp.createTemp('golem-custom-state-');
       addTearDown(() => temp.delete(recursive: true));
@@ -118,6 +122,10 @@ void main() {
       final added = await repository.addModel(entry);
       expect(added.statusOf(entry.key).phase, ArtifactPhase.notDownloaded);
 
+      AcceptanceHud.step(
+        'Downloading ${entry.files.length} file(s), '
+        '${(entry.totalBytes / 1e9).toStringAsFixed(2)} GB',
+      );
       final states = await repository
           .download(entry.key)
           .timeout(const Duration(minutes: 20))
@@ -153,6 +161,7 @@ void main() {
         expect(receiptBody, contains(file.path), reason: file.path);
       }
 
+      AcceptanceHud.step('Checking skip-if-valid and the receipt');
       // Skip-if-valid: a second pass re-downloads nothing.
       final again = await repository.download(entry.key).toList();
       expect(again.last.statusOf(entry.key).phase, ArtifactPhase.installed);
@@ -171,6 +180,7 @@ void main() {
         ArtifactPhase.installed,
       );
 
+      AcceptanceHud.step('Resolving a runtime configuration');
       // It resolves to a runtime configuration, which is what activation needs.
       final runtime = resolveModelRuntimeConfig(
         entry.key,
@@ -193,15 +203,18 @@ void main() {
       );
 
       if (_keep) {
+        AcceptanceHud.finish('Done — install kept for generation');
         stdout.writeln('GOLEM_ACCEPTANCE kept install for generation');
         return;
       }
+      AcceptanceHud.step('Deleting the install');
       final deleted = await repository.delete(entry.key);
       expect(deleted.statusOf(entry.key).phase, ArtifactPhase.notDownloaded);
       expect(
         await Directory('${documents.path}/${entry.installDirectory}').exists(),
         isFalse,
       );
+      AcceptanceHud.finish('Done — nothing left on this device');
     },
     timeout: const Timeout(Duration(minutes: 25)),
   );
