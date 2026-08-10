@@ -444,6 +444,20 @@ the flag the app and its documents survive, so provisioning is once per device
 and every later run installs from bytes already present. Desktop targets are
 unaffected either way — a macOS "uninstall" is a no-op.
 
+**`flutter install` wipes the container too, and has no such flag.** It
+uninstalls the old version before installing, so it destroys provisioned
+models even when the install then fails — the app comes back empty. Use it on
+a provisioned phone only if you intend to re-provision. To replace the binary
+and keep `Documents/`, build and install without uninstalling:
+
+```sh
+flutter build ios --release --flavor qa            # or: build apk --flavor qa
+xcrun devicectl device install app --device <UUID> \
+  build/ios/iphoneos/Runner.app                    # Android: adb install -r
+```
+
+`devicectl device install app` and `adb install -r` both upgrade in place.
+
 Provisioning is therefore a separate, deliberate step, and the offline path is
 the default: an unprovisioned artifact fails fast and names the directory to
 fill rather than quietly spending five gigabytes. Sideload the pinned files
