@@ -13,6 +13,27 @@ abstract interface class ChatHistoryRepository {
   Future<int> storedBytes();
 }
 
+/// Which side of a store operation failed, deciding the recovery affordance:
+/// a [read] failure invalidates what a screen shows, a [write] failure means
+/// the presented state was rolled back and the change can simply be retried.
+enum PersistenceFailureKind { read, write }
+
+/// An unexpected I/O failure at a persistence boundary — permissions, a full
+/// disk, a vanished directory. Deliberately distinct from corrupt-data
+/// recovery, which quarantines the file and falls back to defaults without
+/// throwing. [message] is user-presentable copy, like [InferenceException];
+/// [cause] keeps the `dart:io` error for logs only.
+class PersistenceException implements Exception {
+  const PersistenceException(this.kind, this.message, {this.cause});
+
+  final PersistenceFailureKind kind;
+  final String message;
+  final Object? cause;
+
+  @override
+  String toString() => message;
+}
+
 /// Semantic classification, stable across fake and real backends so the
 /// recovery banner picks actions without parsing copy (§19.1). Recovery
 /// categories, not engine codes: [contextExhausted] is the one Retry can't fix.
@@ -118,6 +139,9 @@ abstract interface class PreferencesRepository {
 
 /// Keys address entries of the injected catalog; operational failures (network,
 /// disk, verification) surface as failed-phase snapshots, never thrown errors.
+/// [load] is the one exception: a store the process cannot read at all throws
+/// [PersistenceException] instead of presenting invented state, while a
+/// corrupt store still quarantines and falls back to defaults.
 abstract interface class ModelManagementRepository {
   Future<ModelState> load();
 

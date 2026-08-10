@@ -9,6 +9,7 @@ import '../domain/models.dart';
 import '../services/artifact_downloader.dart';
 import '../services/device_storage.dart';
 import 'contracts.dart';
+import 'persistence_io.dart';
 
 /// Real Hugging Face downloads: pinned repository + revision URLs, per-file
 /// SHA-256 verification, skip-if-valid, disk-space preflight. Artifacts install
@@ -56,12 +57,13 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   Future<ModelState> _persist(ModelState value) async {
     _state = value;
     // Serialized atomic writes: a kill mid-write must not truncate the file.
-    final write = _writes.then((_) async {
-      await stateFile.parent.create(recursive: true);
-      final temporary = File('${stateFile.path}.tmp');
-      await temporary.writeAsString(jsonEncode(value.toJson()), flush: true);
-      await temporary.rename(stateFile.path);
-    });
+    final write = _writes.then(
+      (_) => writeStore(
+        stateFile,
+        jsonEncode(value.toJson()),
+        what: 'model state',
+      ),
+    );
     _writes = write.catchError((_) {});
     await write;
     return value;
@@ -78,16 +80,16 @@ final class RealModelManagementRepository implements ModelManagementRepository {
 
   @override
   Future<ModelState> load() async {
-    if (await stateFile.exists()) {
+    final raw = await readStore(stateFile, what: 'model state');
+    if (raw != null) {
       var loaded = const ModelState();
       try {
         loaded = ModelState.fromJson(
-          Map<String, Object?>.from(
-            jsonDecode(await stateFile.readAsString()) as Map,
-          ),
+          Map<String, Object?>.from(jsonDecode(raw) as Map),
         );
       } catch (_) {
-        await stateFile.rename('${stateFile.path}.corrupt');
+        // Only pure decode/parse can throw here — corruption by definition.
+        await quarantineStore(stateFile, what: 'model state');
       }
       _state = loaded.stamp(
         activeArtifactKey: activeArtifactKey,

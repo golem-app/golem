@@ -6,6 +6,7 @@ import 'dart:math';
 import '../domain/model_catalog.dart';
 import '../domain/models.dart';
 import 'contracts.dart';
+import 'persistence_io.dart';
 
 final class FakeModelManagementRepository implements ModelManagementRepository {
   FakeModelManagementRepository(
@@ -39,12 +40,9 @@ final class FakeModelManagementRepository implements ModelManagementRepository {
     _state = value;
     // Serialized atomic writes, mirroring FileChatHistoryRepository: a kill
     // mid-write must never leave a truncated file behind.
-    final write = _writes.then((_) async {
-      await file.parent.create(recursive: true);
-      final temporary = File('${file.path}.tmp');
-      await temporary.writeAsString(jsonEncode(value.toJson()), flush: true);
-      await temporary.rename(file.path);
-    });
+    final write = _writes.then(
+      (_) => writeStore(file, jsonEncode(value.toJson()), what: 'model state'),
+    );
     _writes = write.catchError((_) {});
     await write;
     return value;
@@ -61,18 +59,17 @@ final class FakeModelManagementRepository implements ModelManagementRepository {
 
   @override
   Future<ModelState> load() async {
-    if (await file.exists()) {
+    final raw = await readStore(file, what: 'model state');
+    if (raw != null) {
       var loaded = const ModelState();
       try {
         loaded = ModelState.fromJson(
-          Map<String, Object?>.from(
-            jsonDecode(await file.readAsString()) as Map,
-          ),
+          Map<String, Object?>.from(jsonDecode(raw) as Map),
         );
       } catch (_) {
-        // Preserve an unreadable or unknown-schema file and fall back to the
-        // default simulated state rather than failing startup.
-        await file.rename('${file.path}.corrupt');
+        // Only pure decode/parse can throw here — corruption by definition:
+        // preserve the file and fall back to the default simulated state.
+        await quarantineStore(file, what: 'model state');
       }
       _state = loaded.stamp(
         activeArtifactKey: activeArtifactKey,
