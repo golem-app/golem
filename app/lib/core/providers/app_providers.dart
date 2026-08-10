@@ -7,6 +7,7 @@ import '../domain/app_state.dart';
 import '../domain/chat_search.dart';
 import '../domain/generation_settings.dart';
 import '../domain/inference_backend.dart';
+import '../domain/model_activation.dart' as domain;
 import '../domain/model_catalog.dart';
 import '../domain/models.dart';
 import '../domain/response_style_mapping.dart';
@@ -216,6 +217,16 @@ List<ModelCatalogEntry> effectiveModelCatalog(Ref ref) {
       if (!pinnedKeys.contains(spec.key)) spec.toCatalogEntry(),
   ];
 }
+
+/// The models a per-chat selection may name: installed, and of the engine this
+/// build composed. Derived here so chat, Settings, and Storage cannot disagree
+/// about which model is live (#20).
+@Riverpod(keepAlive: true)
+Set<String> loadableModelKeys(Ref ref) => domain.loadableModelKeys(
+  backend: ref.watch(inferenceBackendProvider),
+  catalog: ref.watch(effectiveModelCatalogProvider),
+  models: ref.watch(modelControllerProvider).value,
+);
 
 /// The raw field text stays widget-local in the search screen (debounced
 /// 350 ms); only the normalized query lands here, so results derive reactively.
@@ -522,16 +533,55 @@ class ChatController extends _$ChatController {
     await _persist(next);
   }
 
+  /// Refuses a model this build could not load, which is what lets every label
+  /// name the choice immediately: a stored selection is always honorable on the
+  /// next send (#20).
   Future<void> setConversationModel(String id, String? modelKey) async {
-    if (_value.generation != GenerationPhase.idle) return;
-    final next = _value.copyWith(
-      conversations: [
-        for (final item in _value.conversations)
-          if (item.id == id) item.withModel(modelKey) else item,
-      ],
-    );
+    // A failed turn may be switched away from: picking another model is the
+    // natural recovery from a missing one, and blocking it dead-ends the
+    // banner. Only work in flight is protected.
+    if (_value.generation == GenerationPhase.preparing ||
+        _value.generation == GenerationPhase.streaming) {
+      return;
+    }
+    if (modelKey != null && !_selectable(modelKey)) return;
+    final next = _value
+        .copyWith(
+          conversations: [
+            for (final item in _value.conversations)
+              if (item.id == id) item.withModel(modelKey) else item,
+          ],
+          // Whatever the last model failed at is no longer this chat's problem.
+          generation: GenerationPhase.idle,
+        )
+        .copyWith(clearFailure: true);
     state = AsyncData(next);
     await _persist(next);
+  }
+
+  /// The fake simulates any switch; a real engine takes only an installed
+  /// artifact of the engine it composed, and a sideload takes none at all —
+  /// there is no key to switch back to.
+  bool _selectable(String modelKey) {
+    final backend = ref.read(inferenceBackendProvider);
+    if (backend.simulatedInference) return true;
+    if (backend.sideloaded) return false;
+    try {
+      return ref.read(loadableModelKeysProvider).contains(modelKey);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Empty when the catalog seam is unwired. A container without one must not
+  /// turn a send into a crash — the same degrade-independently rule the
+  /// settings layers follow, and prepare() stays the loud path.
+  List<ModelCatalogEntry> _catalog() {
+    try {
+      return ref.read(effectiveModelCatalogProvider);
+    } catch (_) {
+      return const [];
+    }
   }
 
   Future<void> deleteMessage(String messageId) async {
@@ -666,15 +716,19 @@ class ChatController extends _$ChatController {
       return;
     }
     final epoch = ++_generationEpoch;
-    // Real backend with the active artifact not installed: fail fast into the
-    // banner's download CTA — prepare() would only give a cryptic missing-file
-    // error after a hang-like pause. Catalog-derived paths only: an
-    // operator-supplied GOLEM_MODEL_PATH must reach prepare() untouched.
+    // Real backend with the model this send needs not installed: fail fast into
+    // the banner's download CTA — prepare() would only give a cryptic
+    // missing-file error after a hang-like pause. The conversation's own choice
+    // decides which artifact that is (#20). An operator-supplied
+    // GOLEM_MODEL_PATH must reach prepare() untouched, and a key this build no
+    // longer carries is prepare()'s own typed failure to describe.
     final backend = ref.read(inferenceBackendProvider);
-    if (!backend.simulatedInference &&
-        backend.artifactKey != null &&
-        backend.modelPathFromCatalog) {
-      final installed = await _activeModelInstalled();
+    final target = active.modelKey ?? backend.artifactKey;
+    final entry = target == null
+        ? null
+        : _catalog().where((item) => item.key == target).firstOrNull;
+    if (!backend.simulatedInference && !backend.sideloaded && entry != null) {
+      final installed = await _modelInstalled(entry.key);
       if (!ref.mounted || epoch != _generationEpoch) return;
       if (installed == false) {
         state = AsyncData(
@@ -683,9 +737,9 @@ class ChatController extends _$ChatController {
             failure: ChatFailure(
               kind: ChatFailureKind.missingModel,
               message:
-                  'The local model is not downloaded on this device yet. '
-                  'Download it to start chatting.',
-              artifactKey: backend.artifactKey,
+                  '${entry.displayName} is not downloaded on this device yet. '
+                  'Download it to use it in this chat.',
+              artifactKey: entry.key,
             ),
           ),
         );
@@ -807,10 +861,10 @@ class ChatController extends _$ChatController {
 
   /// Null when model state is unavailable — generation then proceeds and
   /// prepare() stays the loud failure path, rather than inventing a verdict.
-  Future<bool?> _activeModelInstalled() async {
+  Future<bool?> _modelInstalled(String artifactKey) async {
     try {
       final models = await ref.read(modelControllerProvider.future);
-      return models.activeModelInstalled;
+      return models.statusOf(artifactKey).phase == ArtifactPhase.installed;
     } catch (_) {
       return null;
     }
@@ -820,7 +874,7 @@ class ChatController extends _$ChatController {
   /// layered on top, knob by knob. Settings that fail to surface must never
   /// block chat, so each layer degrades independently to nothing.
   Future<SamplingOverrides?> _samplingOverrides() async {
-    final profileKey = ref.read(inferenceBackendProvider).profileKey;
+    final profileKey = _activeProfileKey();
     var manual = const SamplingOverrides();
     try {
       final settings = await ref.read(settingsControllerProvider.future);
@@ -833,6 +887,17 @@ class ChatController extends _$ChatController {
     } catch (_) {}
     final merged = layerOverrides(manual: manual, style: style);
     return merged.isEmpty ? null : merged;
+  }
+
+  /// The profile of the model this chat runs, so hand-set sampling and the
+  /// response style follow a switch instead of staying on the build's boot
+  /// profile — switching Gemma to Qwen otherwise applies Gemma's numbers (#20).
+  String _activeProfileKey() {
+    final modelKey = _value.active?.modelKey;
+    final entry = modelKey == null
+        ? null
+        : _catalog().where((item) => item.key == modelKey).firstOrNull;
+    return entry?.profileKey ?? ref.read(inferenceBackendProvider).profileKey;
   }
 
   /// Null for the model's default; unavailable preferences degrade to null.
@@ -1003,7 +1068,12 @@ class ModelController extends _$ModelController {
     try {
       // Never delete weights the engine may still have mapped: releasing
       // the runtime comes first, and an unload failure aborts the delete.
-      if (artifactKey == state.value?.activeArtifactKey) {
+      // Residency decides, since a switch can make any installed artifact the
+      // one that is mapped (#20).
+      final resident =
+          ref.read(inferenceRepositoryProvider).residentModelKey.value ??
+          state.value?.activeArtifactKey;
+      if (artifactKey == resident) {
         await ref.read(inferenceRepositoryProvider).unload();
         if (!ref.mounted) return;
       }
@@ -1024,9 +1094,11 @@ class ModelController extends _$ModelController {
   Future<void> reflectEngineLoaded() async {
     if (_busy) return;
     final current = state.value;
+    final target = _engineTargetKey();
     if (current == null ||
         current.runtime == RuntimePhase.loaded ||
-        !current.activeModelInstalled) {
+        target == null ||
+        current.statusOf(target).phase != ArtifactPhase.installed) {
       return;
     }
     _busy = true;
@@ -1099,18 +1171,25 @@ class ModelController extends _$ModelController {
         state = AsyncData(
           current.copyWith(runtime: RuntimePhase.loading, clearFailure: true),
         );
-        if (!current.activeModelInstalled) {
+        // A sideload's path is the operator's own and has no catalog phase to
+        // gate on; everything else must be installed before the engine is
+        // touched, and which artifact that is follows the active chat (#20).
+        final backend = ref.read(inferenceBackendProvider);
+        final target = _engineTargetKey();
+        if (!backend.sideloaded &&
+            (target == null ||
+                current.statusOf(target).phase != ArtifactPhase.installed)) {
           // Refuse with a persisted failed phase; the engine is never touched.
           final value = await repository.recordRuntime(
             RuntimePhase.failed,
-            failure: _installFirstFailure(current),
+            failure: _installFirstFailure(target),
           );
           if (!ref.mounted) return;
           state = AsyncData(value);
           return;
         }
         try {
-          await ref.read(inferenceRepositoryProvider).prepare();
+          await ref.read(inferenceRepositoryProvider).prepare(modelKey: target);
         } catch (error) {
           if (!ref.mounted) return;
           state = AsyncData(
@@ -1159,10 +1238,20 @@ class ModelController extends _$ModelController {
     }
   }
 
-  /// The load-refusal copy for a not-installed active model. Owned here since
-  /// #42: the management repository no longer knows why a load was refused.
-  String _installFirstFailure(ModelState current) {
-    if (current.activeArtifactKey == null) {
+  /// The model the engine would load now: the active chat's choice when it has
+  /// one, else the boot artifact. Null for a sideload, whose path no catalog key
+  /// describes, and for a build with no inference backend at all.
+  String? _engineTargetKey() {
+    final backend = ref.read(inferenceBackendProvider);
+    if (backend.sideloaded) return null;
+    final active = ref.read(chatControllerProvider).value?.active;
+    return active?.modelKey ?? state.value?.activeArtifactKey;
+  }
+
+  /// The load-refusal copy for a not-installed target. Owned here since #42:
+  /// the management repository no longer knows why a load was refused.
+  String _installFirstFailure(String? target) {
+    if (target == null) {
       return 'Inference is a build-time opt-in; no backend is configured.';
     }
     return ref.read(inferenceBackendProvider).simulatedInference

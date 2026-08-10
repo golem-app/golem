@@ -238,7 +238,8 @@ final class ChatConversation {
   final bool pinned;
 
   /// Catalog key of the model chosen for this chat; null means the build's
-  /// default. Acted on only where supported (the fake today, real with #20).
+  /// default. Only ever set to a model the build could load, which is what lets
+  /// labels name it before the engine has swapped to it.
   final String? modelKey;
 
   ChatConversation copyWith({
@@ -541,10 +542,6 @@ final class ModelState {
 
   ArtifactStatus statusOf(String key) =>
       artifacts[key] ?? const ArtifactStatus();
-
-  bool get activeModelInstalled =>
-      activeArtifactKey != null &&
-      statusOf(activeArtifactKey!).phase == ArtifactPhase.installed;
 
   ModelState copyWith({
     Map<String, ArtifactStatus>? artifacts,
