@@ -3,6 +3,9 @@
 /// from the pinned Inferno manifest, the single source of model knowledge.
 library;
 
+import 'dart:collection';
+
+import 'equality.dart';
 import 'model_profile_spec.dart' show ModelInputModality;
 
 export 'model_profile_spec.dart' show ModelInputModality;
@@ -54,6 +57,20 @@ final class ModelArtifactFile {
   /// Set when this file lives in another repository — common for projectors.
   final String? repository;
   final String? revision;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ModelArtifactFile &&
+      other.path == path &&
+      other.bytes == bytes &&
+      other.sha256 == sha256 &&
+      other.role == role &&
+      other.repository == repository &&
+      other.revision == revision;
+
+  @override
+  int get hashCode =>
+      Object.hash(path, bytes, sha256, role, repository, revision);
 }
 
 final class ModelCatalogEntry {
@@ -64,9 +81,9 @@ final class ModelCatalogEntry {
     required this.quantization,
     required this.repository,
     required this.revision,
-    required this.files,
+    required this._files,
     required this.profileKey,
-    this.inputModalities = const {ModelInputModality.text},
+    this._inputModalities = const {ModelInputModality.text},
   });
 
   /// Stable identifier, also the on-disk directory name under `models/`. Pinned
@@ -79,19 +96,25 @@ final class ModelCatalogEntry {
   final String quantization;
   final String repository;
   final String revision;
-  final List<ModelArtifactFile> files;
+  final List<ModelArtifactFile> _files;
 
   /// The broker profile to render and sample with. Explicit, never inferred: a
   /// slug, file name or engine is no proof of a chat template (#43).
   final String profileKey;
 
+  final Set<ModelInputModality> _inputModalities;
+
+  List<ModelArtifactFile> get files => UnmodifiableListView(_files);
+
   /// What this artifact on this engine is *proven* to accept: a profile can be
   /// image-capable on one engine and text-only on another (#18).
-  final Set<ModelInputModality> inputModalities;
+  Set<ModelInputModality> get inputModalities =>
+      UnmodifiableSetView(_inputModalities);
 
-  bool get supportsImages => inputModalities.contains(ModelInputModality.image);
+  bool get supportsImages =>
+      _inputModalities.contains(ModelInputModality.image);
 
-  int get totalBytes => files.fold(0, (sum, file) => sum + file.bytes);
+  int get totalBytes => _files.fold(0, (sum, file) => sum + file.bytes);
 
   Uri get repositoryUrl =>
       Uri.https('huggingface.co', '/$repository/tree/$revision');
@@ -106,4 +129,30 @@ final class ModelCatalogEntry {
 
   /// Relative to app documents, per the `documents:` model-path convention.
   String get installDirectory => 'models/$key';
+
+  @override
+  bool operator ==(Object other) =>
+      other is ModelCatalogEntry &&
+      other.key == key &&
+      other.displayName == displayName &&
+      other.engine == engine &&
+      other.quantization == quantization &&
+      other.repository == repository &&
+      other.revision == revision &&
+      other.profileKey == profileKey &&
+      listEquals(other._files, _files) &&
+      setEquals(other._inputModalities, _inputModalities);
+
+  @override
+  int get hashCode => Object.hash(
+    key,
+    displayName,
+    engine,
+    quantization,
+    repository,
+    revision,
+    profileKey,
+    listHash(_files),
+    setHash(_inputModalities),
+  );
 }
