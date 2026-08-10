@@ -89,6 +89,24 @@ void main() {
       isNotEmpty,
     );
 
+    // Switch this chat's model through the sheet, then send again on it: the
+    // daily-use flow #20 exists to prove, driven the way a user drives it.
+    await tester.tap(find.byKey(const Key('composer-model-chip')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('model-picker-sheet')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('model-picker-qwen35-gguf')));
+    await tester.pumpAndSettle();
+    expect(
+      container.read(chatControllerProvider).requireValue.active!.modelKey,
+      'qwen35-gguf',
+    );
+    // Every surface follows the choice at once, not on the next send.
+    expect(find.text('Qwen 3.5 4B · simulated'), findsAtLeastNWidgets(1));
+    await container
+        .read(chatControllerProvider.notifier)
+        .send('A turn on the switched model');
+    await tester.pump();
+
     final chatCommands = container.read(chatControllerProvider.notifier);
     await chatCommands.regenerate();
     var active = container.read(chatControllerProvider).requireValue.active!;
