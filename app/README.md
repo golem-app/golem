@@ -171,9 +171,14 @@ repo root.
   cancel work at lifecycle boundaries, and reject stale completions with epochs.
   Focus, text, scroll, disclosure, and drawer animation remain widget-local state.
 
-Riverpod 3.0.3 is pinned because it is the newest stable runtime/generator set that
-resolves with Flutter 3.44.8's pinned analyzer/test packages. Exact transitive
-versions are committed in the workspace lockfile at `../pubspec.lock`.
+The Riverpod family is pinned exactly — `flutter_riverpod` 3.3.2,
+`riverpod_annotation` 4.0.3, `riverpod_generator` 4.0.4 — because each release
+exact-pins the next, so the three move as one set or not at all. That set is
+the ceiling under Flutter 3.44.8, whose `flutter_test` pins `test_api`
+exactly and caps `analyzer` below 13. Exact transitive versions are committed
+in the workspace lockfile at `../pubspec.lock`; the blockers holding every
+package back from its latest release are recorded in
+`../docs/notes/dependencies.md`.
 
 ## Screens and identifiers
 
