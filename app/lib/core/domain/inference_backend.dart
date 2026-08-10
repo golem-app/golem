@@ -1,6 +1,19 @@
+import 'model_catalog.dart';
+
 /// Which inference backend this process runs. `fake` is the deterministic
 /// simulation; `llama`/`mlx` are the real local engines.
 enum InferenceBackendKind { fake, llama, mlx }
+
+extension InferenceBackendKindEngines on InferenceBackendKind {
+  /// Whether this process could load [engine] at all. The engine is a
+  /// build-time composition, so an artifact of the other kind is dead disk
+  /// rather than a runtime choice.
+  bool loads(ModelEngine engine) => switch (this) {
+    InferenceBackendKind.fake => true,
+    InferenceBackendKind.llama => engine == ModelEngine.gguf,
+    InferenceBackendKind.mlx => engine == ModelEngine.mlx,
+  };
+}
 
 /// The resolved inference configuration for this process: one immutable
 /// value derived at startup from dart-defines, flavor policy, and the
@@ -46,4 +59,10 @@ final class InferenceBackendConfig {
   final bool modelPathFromCatalog;
 
   bool get simulatedInference => kind == InferenceBackendKind.fake;
+
+  /// A real engine pointed at an operator's own file. It has no catalog entry,
+  /// so nothing may claim its capabilities, name it after a pinned artifact, or
+  /// gate it behind a download.
+  bool get sideloaded =>
+      !simulatedInference && !modelPathFromCatalog && modelPath != null;
 }
