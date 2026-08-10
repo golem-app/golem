@@ -220,7 +220,30 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
       // record a long-paused multi-gigabyte download is recovered through.
       autoCleanDatabase: false,
     );
+    await _pruneFinishedRecords();
     await _sweepOrphanedPartials();
+  }
+
+  /// Drops tracking records for transfers that have ended.
+  ///
+  /// Automatic cleanup is off (it would drop the record a long-paused download
+  /// is recovered through), so without this one record accumulates per
+  /// generation per file forever — and `start()` stats every one of them on the
+  /// path that blocks the first frame, so launch would slow in proportion to
+  /// the app's entire download history. Terminal records carry nothing the app
+  /// reads: resume data lives in its own store, and whether the platform holds
+  /// a transfer is answered by liveness alone.
+  Future<void> _pruneFinishedRecords() async {
+    for (final record in await _guard(
+      () => _downloader.database.allRecords(group: _group),
+      const <TaskRecord>[],
+    )) {
+      if (!record.status.isFinalState) continue;
+      await _guard(
+        () => _downloader.database.deleteRecordWithId(record.taskId),
+        null,
+      );
+    }
   }
 
   static void _recordTerminal(TaskUpdate update) {
