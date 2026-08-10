@@ -9,6 +9,7 @@ import '../../core/domain/model_catalog.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
+import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
 import 'widgets/settings_rows.dart';
 
@@ -17,9 +18,15 @@ class StorageScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final breakdown = ref.watch(storageBreakdownProvider).value;
-    final model = ref.watch(modelControllerProvider).value;
+    final breakdownValue = ref.watch(storageBreakdownProvider);
+    final modelValue = ref.watch(modelControllerProvider);
     final catalog = ref.watch(effectiveModelCatalogProvider);
+    // This screen is *about* the stored data, so a failed read gets a
+    // full error pane with a retry — never the eternal spinner that used
+    // to render for loading and failure alike.
+    final failed = breakdownValue.hasError || modelValue.hasError;
+    final breakdown = breakdownValue.value;
+    final model = modelValue.value;
     return CupertinoPageScaffold(
       navigationBar: GolemNavBar(
         title: 'Storage',
@@ -27,7 +34,23 @@ class StorageScreen extends ConsumerWidget {
       ),
       child: SafeArea(
         bottom: false,
-        child: breakdown == null || model == null
+        child: failed
+            ? RetryPane(
+                key: const Key('storage-error'),
+                message: "Couldn't read storage.",
+                onRetry: () {
+                  // Only the provider that actually failed: invalidating a
+                  // healthy ModelController would kill an in-flight download
+                  // (the epoch/mounted guards abandon its stream).
+                  if (breakdownValue.hasError) {
+                    ref.invalidate(storageBreakdownProvider);
+                  }
+                  if (modelValue.hasError) {
+                    ref.invalidate(modelControllerProvider);
+                  }
+                },
+              )
+            : breakdown == null || model == null
             ? const Center(child: CupertinoActivityIndicator())
             : ListView(
                 key: const Key('storage-list'),

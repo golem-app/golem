@@ -1,4 +1,4 @@
-import 'models.dart';
+import '../../../core/domain/models.dart';
 
 /// The most recent decode speed evidenced for [modelKey] in the chat
 /// history, or null when no generation has measured it.

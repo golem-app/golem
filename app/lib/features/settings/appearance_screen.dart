@@ -5,7 +5,9 @@ import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/domain/app_preferences.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
+import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
+import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
 
 /// Appearance: theme, text size, and the transcript toggles.
@@ -14,9 +16,27 @@ class AppearanceScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final preferences =
-        ref.watch(preferencesControllerProvider).value ??
-        const AppPreferences();
+    final preferencesValue = ref.watch(preferencesControllerProvider);
+    // The app root deliberately degrades a failed preferences read to
+    // defaults; this screen is where that failure surfaces with a retry —
+    // editing over invented defaults would overwrite the store blind.
+    if (preferencesValue.hasError) {
+      return CupertinoPageScaffold(
+        navigationBar: GolemNavBar(
+          title: 'Appearance',
+          previousPageTitle: 'Settings',
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: RetryPane(
+            key: const Key('preferences-load-error'),
+            message: "Couldn't load preferences.",
+            onRetry: () => ref.invalidate(preferencesControllerProvider),
+          ),
+        ),
+      );
+    }
+    final preferences = preferencesValue.value ?? const AppPreferences();
     final notifier = ref.read(preferencesControllerProvider.notifier);
     return CupertinoPageScaffold(
       navigationBar: GolemNavBar(
@@ -32,7 +52,8 @@ class AppearanceScreen extends ConsumerWidget {
             const SizedBox(height: 8),
             GolemSegmented<ThemeSetting>(
               groupValue: preferences.theme,
-              onChanged: notifier.setTheme,
+              onChanged: (value) =>
+                  announceFailedSave(context, notifier.setTheme(value)),
               segments: const {
                 ThemeSetting.system: Text(
                   'System',
@@ -56,7 +77,8 @@ class AppearanceScreen extends ConsumerWidget {
             const SizedBox(height: 8),
             _TextSizeCard(
               scale: preferences.textScale,
-              onCommit: notifier.setTextScale,
+              onCommit: (value) =>
+                  announceFailedSave(context, notifier.setTextScale(value)),
             ),
             const SizedBox(height: 24),
             const SectionHeader('In the transcript'),
@@ -67,19 +89,28 @@ class AppearanceScreen extends ConsumerWidget {
                   toggleKey: const Key('toggle-metrics'),
                   label: 'Show inference metrics',
                   value: preferences.showMetrics,
-                  onChanged: notifier.setShowMetrics,
+                  onChanged: (value) => announceFailedSave(
+                    context,
+                    notifier.setShowMetrics(value),
+                  ),
                 ),
                 SettingsToggleRow(
                   toggleKey: const Key('toggle-reasoning'),
                   label: 'Always expand reasoning',
                   value: preferences.expandReasoning,
-                  onChanged: notifier.setExpandReasoning,
+                  onChanged: (value) => announceFailedSave(
+                    context,
+                    notifier.setExpandReasoning(value),
+                  ),
                 ),
                 SettingsToggleRow(
                   toggleKey: const Key('toggle-haptics'),
                   label: 'Haptics on send',
                   value: preferences.hapticsOnSend,
-                  onChanged: notifier.setHapticsOnSend,
+                  onChanged: (value) => announceFailedSave(
+                    context,
+                    notifier.setHapticsOnSend(value),
+                  ),
                 ),
               ],
             ),

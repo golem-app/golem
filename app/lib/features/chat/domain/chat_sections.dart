@@ -1,4 +1,4 @@
-import 'models.dart';
+import '../../../core/domain/models.dart';
 
 /// Drawer presentation grouping: pinned first, then calendar buckets.
 ///

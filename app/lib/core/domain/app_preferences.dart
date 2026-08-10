@@ -1,5 +1,11 @@
+/// Stays in core (#69): named by the PreferencesRepository contract and
+/// read by the app root, chat, settings, and the model catalog merge.
+library;
+
+import 'dart:collection';
 import 'dart:convert';
 
+import 'equality.dart';
 import 'model_catalog.dart';
 import 'model_profile_spec.dart';
 import 'resolved_repository.dart';
@@ -127,6 +133,19 @@ final class CustomModelSpec {
       resolved: resolved,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is CustomModelSpec &&
+      other.repository == repository &&
+      other.engine == engine &&
+      other.revision == revision &&
+      other.profile == profile &&
+      other.resolved == resolved;
+
+  @override
+  int get hashCode =>
+      Object.hash(repository, engine, revision, profile, resolved);
 }
 
 /// App-wide user preferences. Sparse on disk — only non-default values are
@@ -142,8 +161,8 @@ final class AppPreferences {
     this.saveHistory = true,
     this.advancedMode = false,
     this.systemPrompt,
-    this.responseStyles = const {},
-    this.customModels = const [],
+    this._responseStyles = const {},
+    this._customModels = const [],
   });
 
   final ThemeSetting theme;
@@ -157,12 +176,18 @@ final class AppPreferences {
   /// Null means the model's default behavior.
   final String? systemPrompt;
 
-  final Map<String, ResponseStyle> responseStyles;
+  final Map<String, ResponseStyle> _responseStyles;
 
-  final List<CustomModelSpec> customModels;
+  final List<CustomModelSpec> _customModels;
+
+  /// Unmodifiable: state consumers go through [withStyle]/[withCustomModel].
+  Map<String, ResponseStyle> get responseStyles =>
+      UnmodifiableMapView(_responseStyles);
+
+  List<CustomModelSpec> get customModels => UnmodifiableListView(_customModels);
 
   ResponseStyle styleFor(String profileKey) =>
-      responseStyles[profileKey] ?? ResponseStyle.balanced;
+      _responseStyles[profileKey] ?? ResponseStyle.balanced;
 
   AppPreferences copyWith({
     ThemeSetting? theme,
@@ -189,7 +214,7 @@ final class AppPreferences {
   );
 
   AppPreferences withStyle(String profileKey, ResponseStyle style) {
-    final next = Map<String, ResponseStyle>.from(responseStyles);
+    final next = Map<String, ResponseStyle>.from(_responseStyles);
     if (style == ResponseStyle.balanced) {
       next.remove(profileKey);
     } else {
@@ -200,7 +225,7 @@ final class AppPreferences {
 
   AppPreferences withCustomModel(CustomModelSpec spec) => copyWith(
     customModels: [
-      for (final item in customModels)
+      for (final item in _customModels)
         if (item.key != spec.key) item,
       spec,
     ],
@@ -220,15 +245,43 @@ final class AppPreferences {
     if (!saveHistory) 'saveHistory': saveHistory,
     if (advancedMode) 'advancedMode': advancedMode,
     if (systemPrompt != null) 'systemPrompt': systemPrompt,
-    if (responseStyles.isNotEmpty)
+    if (_responseStyles.isNotEmpty)
       'responseStyles': {
-        for (final entry in responseStyles.entries)
+        for (final entry in _responseStyles.entries)
           if (entry.value != ResponseStyle.balanced)
             entry.key: entry.value.name,
       },
-    if (customModels.isNotEmpty)
-      'customModels': [for (final spec in customModels) spec.toJson()],
+    if (_customModels.isNotEmpty)
+      'customModels': [for (final spec in _customModels) spec.toJson()],
   };
+
+  @override
+  bool operator ==(Object other) =>
+      other is AppPreferences &&
+      other.theme == theme &&
+      other.textScale == textScale &&
+      other.showMetrics == showMetrics &&
+      other.expandReasoning == expandReasoning &&
+      other.hapticsOnSend == hapticsOnSend &&
+      other.saveHistory == saveHistory &&
+      other.advancedMode == advancedMode &&
+      other.systemPrompt == systemPrompt &&
+      mapEquals(other._responseStyles, _responseStyles) &&
+      listEquals(other._customModels, _customModels);
+
+  @override
+  int get hashCode => Object.hash(
+    theme,
+    textScale,
+    showMetrics,
+    expandReasoning,
+    hapticsOnSend,
+    saveHistory,
+    advancedMode,
+    systemPrompt,
+    mapHash(_responseStyles),
+    listHash(_customModels),
+  );
 
   factory AppPreferences.fromJson(Map<String, Object?> json) {
     final version = json['schemaVersion'];

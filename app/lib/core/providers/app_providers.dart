@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../application/storage_breakdown_service.dart';
 import '../domain/app_preferences.dart';
 import '../domain/app_state.dart';
-import '../domain/chat_search.dart';
 import '../domain/generation_settings.dart';
 import '../domain/inference_backend.dart';
 import '../domain/model_activation.dart' as domain;
@@ -17,59 +17,70 @@ import '../services/custom_repository_resolver.dart';
 import '../services/device_storage.dart';
 import '../services/image_intake.dart';
 import '../startup/startup_sequence.dart';
+import 'retry.dart';
+
+// The breakdown types moved with their service; consumers keep importing
+// them from here beside the provider that produces them.
+export '../application/storage_breakdown_service.dart'
+    show StorageBreakdown, StorageBreakdownTotals;
 
 part 'app_providers.g.dart';
 
-@Riverpod(keepAlive: true)
+// Lifetime policy (#69): the repository/probe seams below are keepAlive
+// because they are composition-injected process-lifetime dependencies —
+// overridden once in main.dart, never recomputed; disposing one could only
+// re-throw its seam. Providers with a narrower owner say so individually.
+
+@Riverpod(keepAlive: true, retry: noRetry)
 ChatHistoryRepository chatHistoryRepository(Ref ref) =>
     throw UnimplementedError(
       'Override chatHistoryRepositoryProvider at startup',
     );
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 InferenceRepository inferenceRepository(Ref ref) =>
     throw UnimplementedError('Override inferenceRepositoryProvider at startup');
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 ModelManagementRepository modelManagementRepository(Ref ref) =>
     throw UnimplementedError(
       'Override modelManagementRepositoryProvider at startup',
     );
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 BenchmarkRepository benchmarkRepository(Ref ref) =>
     throw UnimplementedError('Override benchmarkRepositoryProvider at startup');
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 List<ModelCatalogEntry> modelCatalogEntries(Ref ref) =>
     throw UnimplementedError('Override modelCatalogEntriesProvider at startup');
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 CustomRepositoryResolver customRepositoryResolver(Ref ref) =>
     throw UnimplementedError(
       'Override customRepositoryResolverProvider at startup',
     );
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 SettingsRepository settingsRepository(Ref ref) =>
     throw UnimplementedError('Override settingsRepositoryProvider at startup');
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 PreferencesRepository preferencesRepository(Ref ref) =>
     throw UnimplementedError(
       'Override preferencesRepositoryProvider at startup',
     );
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 AttachmentRepository attachmentRepository(Ref ref) => throw UnimplementedError(
   'Override attachmentRepositoryProvider at startup',
 );
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 CacheProbe cacheProbe(Ref ref) =>
     throw UnimplementedError('Override cacheProbeProvider at startup');
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 DiskSpaceProbe diskFreeSpaceProbe(Ref ref) =>
     throw UnimplementedError('Override diskFreeSpaceProbeProvider at startup');
 
@@ -78,7 +89,8 @@ DiskSpaceProbe diskFreeSpaceProbe(Ref ref) =>
 /// discipline: dozens of widgets read it for honest "simulated" labeling, and
 /// host tests (the dev flavor) must see the fake without every container
 /// overriding it. main() always overrides it with the resolved config.
-@Riverpod(keepAlive: true)
+/// KeepAlive: process-constant boot configuration.
+@Riverpod(keepAlive: true, retry: noRetry)
 InferenceBackendConfig inferenceBackend(Ref ref) =>
     const InferenceBackendConfig.fake();
 
@@ -87,7 +99,9 @@ InferenceBackendConfig inferenceBackend(Ref ref) =>
 /// back to the configured artifact, so a lazy first load does not blank the
 /// chrome. Always null under a simulated backend, without touching the
 /// repository seam: label-only containers must not need one.
-@Riverpod(keepAlive: true)
+/// KeepAlive: holds the live ValueListenable subscription onto #42's
+/// residency owner; autoDispose would churn that listener per route.
+@Riverpod(keepAlive: true, retry: noRetry)
 String? residentModelKey(Ref ref) {
   if (ref.watch(inferenceBackendProvider).simulatedInference) return null;
   final listenable = ref.watch(inferenceRepositoryProvider).residentModelKey;
@@ -97,32 +111,25 @@ String? residentModelKey(Ref ref) {
   return listenable.value;
 }
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 DiskCapacityProbe deviceCapacityProbe(Ref ref) =>
     throw UnimplementedError('Override deviceCapacityProbeProvider at startup');
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 String documentsPath(Ref ref) =>
     throw UnimplementedError('Override documentsPathProvider at startup');
-
-typedef StorageBreakdown = ({
-  int modelsBytes,
-  int chatsBytes,
-  int attachmentsBytes,
-  int cacheBytes,
-  int? freeBytes,
-  int? totalBytes,
-});
-
-extension StorageBreakdownTotals on StorageBreakdown {
-  int get usedBytes => modelsBytes + chatsBytes + attachmentsBytes + cacheBytes;
-}
 
 /// A cheap signature that changes only when conversations or messages are added
 /// or removed. ChatController reassigns state on every streaming delta, so
 /// anything as heavy as disk probing must key on this rather than the raw chat
 /// state, or it re-runs per token for the always-mounted drawer meter.
-@Riverpod(keepAlive: true)
+/// KeepAlive, deliberately (#69): would classify as an autoDispose derived
+/// value, but on the pinned flutter_riverpod (3.3.2) a widget-watched
+/// derivation over an async controller still trips Flutter's element-update
+/// invariant when a provider scope is swapped mid-test — the class of bug
+/// fixed upstream in 3.4.0 ("markNeedsBuild ... inside Widget lifecycle").
+/// Revisit when the pin crosses 3.4.0.
+@Riverpod(keepAlive: true, retry: noRetry)
 (int, int) chatStorageSignature(Ref ref) {
   final conversations =
       ref.watch(chatControllerProvider).value?.conversations ??
@@ -136,8 +143,16 @@ extension StorageBreakdownTotals on StorageBreakdown {
 
 /// Storage accounting for the drawer meter and the Storage screen. Free and
 /// total bytes are null whenever the platform cannot report them (or the seams
-/// are unwired) — surfaces hide those figures instead of inventing them.
-@Riverpod(keepAlive: true)
+/// are unwired) — surfaces hide those figures instead of inventing them. The
+/// provider owns seam tolerance; the service owns the computation and its
+/// required-vs-optional failure policy.
+/// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it
+/// continuously anyway, and the 3.3.2 scope-swap hazard (see
+/// chatStorageSignature) rules autoDispose out. Staleness is owned by
+/// invalidation — the storage signature upstream and `ref.invalidate` after
+/// a cache clear — never by a `KeepAliveLink` TTL (§4.4, a silent no-op on
+/// keepAlive providers). Revisit when the pin crosses 3.4.0.
+@Riverpod(keepAlive: true, retry: noRetry)
 Future<StorageBreakdown> storageBreakdown(Ref ref) async {
   // Every dependency registers before the first await: a watch first taken
   // mid-computation would race its own invalidation.
@@ -164,47 +179,23 @@ Future<StorageBreakdown> storageBreakdown(Ref ref) async {
     path = ref.watch(documentsPathProvider);
   } catch (_) {}
   final models = await ref.watch(modelControllerProvider.future);
-  final modelsBytes = models.artifacts.values.fold(
-    0,
-    (sum, status) => sum + status.downloadedBytes,
-  );
-  var chatsBytes = 0;
-  try {
-    chatsBytes = await history.storedBytes();
-  } catch (_) {}
-  var attachmentsBytes = 0;
-  try {
-    attachmentsBytes = await attachments?.storedBytes() ?? 0;
-  } catch (_) {}
-  var cacheBytes = 0;
-  try {
-    cacheBytes = await cache?.sizeBytes() ?? 0;
-  } catch (_) {}
-  int? freeBytes;
-  try {
-    freeBytes = path == null ? null : await free?.freeBytes(path);
-  } catch (_) {
-    freeBytes = null;
-  }
-  int? totalBytes;
-  try {
-    totalBytes = path == null ? null : await capacity?.totalBytes(path);
-  } catch (_) {
-    totalBytes = null;
-  }
-  return (
-    modelsBytes: modelsBytes,
-    chatsBytes: chatsBytes,
-    attachmentsBytes: attachmentsBytes,
-    cacheBytes: cacheBytes,
-    freeBytes: freeBytes,
-    totalBytes: totalBytes,
-  );
+  return StorageBreakdownService(
+    history: history,
+    attachments: attachments,
+    cache: cache,
+    free: free,
+    capacity: capacity,
+    documentsPath: path,
+  ).compute(models: models);
 }
 
 /// Pinned entries plus the user's custom repositories, derived — never stored —
 /// so the pinned manifest stays the single source of model knowledge.
-@Riverpod(keepAlive: true)
+/// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
+/// (composer, drawer, recovery banner), so disposal would never fire in
+/// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature)
+/// rules autoDispose out. Revisit when the pin crosses 3.4.0.
+@Riverpod(keepAlive: true, retry: noRetry)
 List<ModelCatalogEntry> effectiveModelCatalog(Ref ref) {
   final pinned = ref.watch(modelCatalogEntriesProvider);
   final custom =
@@ -221,140 +212,197 @@ List<ModelCatalogEntry> effectiveModelCatalog(Ref ref) {
 /// The models a per-chat selection may name: installed, and of the engine this
 /// build composed. Derived here so chat, Settings, and Storage cannot disagree
 /// about which model is live (#20).
-@Riverpod(keepAlive: true)
+/// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
+/// continuously watched, and the 3.3.2 scope-swap hazard. Revisit when the
+/// pin crosses 3.4.0.
+@Riverpod(keepAlive: true, retry: noRetry)
 Set<String> loadableModelKeys(Ref ref) => domain.loadableModelKeys(
   backend: ref.watch(inferenceBackendProvider),
   catalog: ref.watch(effectiveModelCatalogProvider),
   models: ref.watch(modelControllerProvider).value,
 );
 
-/// The raw field text stays widget-local in the search screen (debounced
-/// 350 ms); only the normalized query lands here, so results derive reactively.
-@Riverpod(keepAlive: true)
-class SearchQuery extends _$SearchQuery {
-  @override
-  String build() => '';
-
-  void publish(String raw) => state = raw.trim();
-}
-
-@Riverpod(keepAlive: true)
-List<ChatSearchResult> chatSearchResults(Ref ref) {
-  final query = ref.watch(searchQueryProvider);
-  final conversations = ref.watch(chatControllerProvider).value?.conversations;
-  return searchConversations(conversations ?? const [], query);
-}
-
 /// Only user-set values are stored; profile defaults resolve at the consumer.
-@Riverpod(keepAlive: true)
+/// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
+/// owner over write-through persistence.
+@Riverpod(keepAlive: true, retry: noRetry)
 class SettingsController extends _$SettingsController {
+  /// The last state known to be on disk — what a failed commit snaps back
+  /// to. Rolling back to the merely-previous state would restore another
+  /// commit's unpersisted optimistic value when failures overlap.
+  late GenerationSettings _persisted;
+
   @override
-  Future<GenerationSettings> build() =>
-      ref.read(settingsRepositoryProvider).load();
+  Future<GenerationSettings> build() async {
+    final loaded = await ref.read(settingsRepositoryProvider).load();
+    _persisted = loaded;
+    return loaded;
+  }
 
   GenerationSettings get _value => state.requireValue;
 
-  Future<void> updateModel(
+  /// False means the write failed and the presented state snapped back to
+  /// the last persisted value — the caller owns telling the user. Commands
+  /// never throw, so fire-and-forget call sites stay safe.
+  Future<bool> updateModel(
     String profileKey,
     SamplingOverrides overrides,
   ) async {
     // A tap can land in the cold-start load window; dropping it beats throwing
     // on requireValue while the store is still reading.
-    if (!state.hasValue) return;
+    if (!state.hasValue) return false;
     final next = _value.withModel(profileKey, overrides);
     state = AsyncData(next);
-    await ref.read(settingsRepositoryProvider).save(next);
+    try {
+      await ref.read(settingsRepositoryProvider).save(next);
+      _persisted = next;
+      return true;
+    } on Exception {
+      // Roll back only while this commit is still the presented one; a newer
+      // commit owns the presentation (and its own outcome) otherwise.
+      if (ref.mounted && identical(state.value, next)) {
+        state = AsyncData(_persisted);
+      }
+      return false;
+    }
   }
 
-  Future<void> resetModel(String profileKey) =>
+  Future<bool> resetModel(String profileKey) =>
       updateModel(profileKey, const SamplingOverrides());
 }
 
 /// Persisted app-wide preferences. Every command follows the settings idiom —
-/// drop taps that land in the cold-start load window, publish, then save.
-@Riverpod(keepAlive: true)
+/// drop taps that land in the cold-start load window, publish, then save —
+/// and returns false after rolling back a failed write, never throwing.
+/// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
+/// root on every frame.
+@Riverpod(keepAlive: true, retry: noRetry)
 class PreferencesController extends _$PreferencesController {
+  /// The last state known to be on disk — what a failed commit snaps back
+  /// to. Rolling back to the merely-previous state would restore another
+  /// commit's unpersisted optimistic value when failures overlap.
+  late AppPreferences _persisted;
+
   @override
-  Future<AppPreferences> build() =>
-      ref.read(preferencesRepositoryProvider).load();
+  Future<AppPreferences> build() async {
+    final loaded = await ref.read(preferencesRepositoryProvider).load();
+    _persisted = loaded;
+    return loaded;
+  }
 
   AppPreferences get _value => state.requireValue;
 
-  Future<void> _commit(AppPreferences next) async {
+  /// Publishes the transformed preferences, persists them, and reports the
+  /// outcome; a failed write snaps presentation back to the last persisted
+  /// value. The cold-start guard lives here so every command shares it —
+  /// a tap in the load window is dropped rather than thrown on requireValue.
+  Future<bool> _commit(AppPreferences Function(AppPreferences) change) async {
+    if (!state.hasValue) return false;
+    final next = change(_value);
     state = AsyncData(next);
-    await ref.read(preferencesRepositoryProvider).save(next);
+    try {
+      await ref.read(preferencesRepositoryProvider).save(next);
+      _persisted = next;
+      return true;
+    } on Exception {
+      // Roll back only while this commit is still the presented one; a newer
+      // commit owns the presentation (and its own outcome) otherwise.
+      if (ref.mounted && identical(state.value, next)) {
+        state = AsyncData(_persisted);
+      }
+      return false;
+    }
   }
 
-  Future<void> setTheme(ThemeSetting theme) async {
-    if (!state.hasValue) return;
-    await _commit(_value.copyWith(theme: theme));
-  }
+  Future<bool> setTheme(ThemeSetting theme) =>
+      _commit((value) => value.copyWith(theme: theme));
 
-  Future<void> setTextScale(double scale) async {
-    if (!state.hasValue) return;
-    await _commit(_value.copyWith(textScale: scale));
-  }
+  Future<bool> setTextScale(double scale) =>
+      _commit((value) => value.copyWith(textScale: scale));
 
-  Future<void> setShowMetrics(bool value) async {
-    if (!state.hasValue) return;
-    await _commit(_value.copyWith(showMetrics: value));
-  }
+  Future<bool> setShowMetrics(bool value) =>
+      _commit((current) => current.copyWith(showMetrics: value));
 
-  Future<void> setExpandReasoning(bool value) async {
-    if (!state.hasValue) return;
-    await _commit(_value.copyWith(expandReasoning: value));
-  }
+  Future<bool> setExpandReasoning(bool value) =>
+      _commit((current) => current.copyWith(expandReasoning: value));
 
-  Future<void> setHapticsOnSend(bool value) async {
-    if (!state.hasValue) return;
-    await _commit(_value.copyWith(hapticsOnSend: value));
-  }
+  Future<bool> setHapticsOnSend(bool value) =>
+      _commit((current) => current.copyWith(hapticsOnSend: value));
 
-  Future<void> setAdvancedMode(bool value) async {
-    if (!state.hasValue) return;
-    await _commit(_value.copyWith(advancedMode: value));
-  }
+  Future<bool> setAdvancedMode(bool value) =>
+      _commit((current) => current.copyWith(advancedMode: value));
 
   /// Null or blank clears the prompt back to the model default.
-  Future<void> setSystemPrompt(String? prompt) async {
-    if (!state.hasValue) return;
+  Future<bool> setSystemPrompt(String? prompt) {
     final trimmed = prompt?.trim();
-    await _commit(
-      _value.copyWith(
+    return _commit(
+      (value) => value.copyWith(
         systemPrompt: () => trimmed == null || trimmed.isEmpty ? null : trimmed,
       ),
     );
   }
 
-  Future<void> setResponseStyle(String profileKey, ResponseStyle style) async {
-    if (!state.hasValue) return;
-    await _commit(_value.withStyle(profileKey, style));
-  }
+  Future<bool> setResponseStyle(String profileKey, ResponseStyle style) =>
+      _commit((value) => value.withStyle(profileKey, style));
 
   /// Turning history off empties the on-disk store immediately: the design copy
   /// promises chats disappear. Past consent — the alert lives in the widget.
-  Future<void> setSaveHistory(bool save) async {
-    if (!state.hasValue) return;
-    await _commit(_value.copyWith(saveHistory: save));
+  /// The wipe runs before the commit, so a failed wipe can never present as
+  /// "history off" while chats still sit on disk; a wipe that lands under a
+  /// commit that then fails is undone, so disk always matches the toggle.
+  Future<bool> setSaveHistory(bool save) async {
+    if (!state.hasValue) return false;
     if (save) {
-      await ref.read(chatControllerProvider.notifier).persistCurrent();
-    } else {
+      final committed = await _commit(
+        (value) => value.copyWith(saveHistory: true),
+      );
+      if (!committed) return false;
+      // Re-persisting the session is best-effort: the preference is saved, and
+      // the next chat mutation persists the same conversations again.
+      try {
+        await ref.read(chatControllerProvider.notifier).persistCurrent();
+      } on Exception {
+        // The toggle itself succeeded; history lands on the next mutation.
+      }
+      return true;
+    }
+    try {
       await ref
           .read(chatHistoryRepositoryProvider)
           .save(const ChatHistorySnapshot(conversations: []));
+    } on Exception {
+      return false;
     }
+    final committed = await _commit(
+      (value) => value.copyWith(saveHistory: false),
+    );
+    if (committed) return true;
+    // The wipe landed but the preference did not: the toggle stays on, so
+    // put the chats back on disk to match what the UI now claims.
+    try {
+      await ref.read(chatControllerProvider.notifier).persistCurrent();
+    } on Exception {
+      // Disk and toggle disagree until the next chat mutation re-persists.
+    }
+    return false;
   }
 
-  Future<void> addCustomModel(CustomModelSpec spec) async {
-    if (!state.hasValue) return;
-    await _commit(_value.withCustomModel(spec));
+  /// The preference commit owns success: a failed model-card registration
+  /// surfaces on the card itself (its failed-phase channel) while the stored
+  /// spec is retained, so the next launch re-merges it into the catalog.
+  Future<bool> addCustomModel(CustomModelSpec spec) async {
+    final committed = await _commit((value) => value.withCustomModel(spec));
+    if (!committed) return false;
     await ref
         .read(modelControllerProvider.notifier)
         .registerCustomModel(spec.toCatalogEntry());
+    return true;
   }
 }
 
-@Riverpod(keepAlive: true)
+/// KeepAlive: the chat session aggregate — in-flight generation and unsaved
+/// turns must survive every route transition.
+@Riverpod(keepAlive: true, retry: noRetry)
 class ChatController extends _$ChatController {
   int _generationEpoch = 0;
 
@@ -437,17 +485,24 @@ class ChatController extends _$ChatController {
   }
 
   /// The confirmation alert lives at the widget layer; this is past consent.
-  Future<void> deleteAllChats() async {
+  /// The disk wipe runs first and gates the in-memory clear: a failed wipe
+  /// returns false with the chats still shown, because "deleted" must never
+  /// be presented while the store still holds them.
+  Future<bool> deleteAllChats() async {
     stop();
-    final next = ChatState(conversations: const []);
-    state = AsyncData(next);
     // Both seams read before the first await, as in _persist.
     final history = ref.read(chatHistoryRepositoryProvider);
     final attachments = _attachments;
-    // Directly, not via _persist: the wipe must reach disk even when the
-    // save-history gate is closed.
-    await history.save(const ChatHistorySnapshot(conversations: []));
+    try {
+      // Directly, not via _persist: the wipe must reach disk even when the
+      // save-history gate is closed.
+      await history.save(const ChatHistorySnapshot(conversations: []));
+    } on Exception {
+      return false;
+    }
+    if (ref.mounted) state = AsyncData(ChatState(conversations: const []));
     await _retainReferenced(attachments, const []);
+    return true;
   }
 
   /// The user's own export, so unlike a shared transcript it keeps reasoning.
@@ -1000,7 +1055,10 @@ class ChatController extends _$ChatController {
   );
 }
 
-@Riverpod(keepAlive: true)
+/// KeepAlive: a command controller whose downloads, busy guard, and epochs
+/// must survive leaving the Models screen (§3.4 — an autoDispose command
+/// provider dies mid-flight).
+@Riverpod(keepAlive: true, retry: noRetry)
 class ModelController extends _$ModelController {
   int _operationEpoch = 0;
   // One mutating model operation at a time. Pause and cancel stay exempt:
@@ -1256,7 +1314,9 @@ class ModelController extends _$ModelController {
   }
 }
 
-@Riverpod(keepAlive: true)
+/// KeepAlive: the startup outcome is process-lifetime; #66 owns any
+/// startup redesign.
+@Riverpod(keepAlive: true, retry: noRetry)
 class StartupController extends _$StartupController {
   static const missingModel = bool.fromEnvironment('GOLEM_MISSING_MODEL');
   static const injectedFailure = bool.fromEnvironment('GOLEM_SPLASH_FAILURE');
@@ -1291,40 +1351,5 @@ class StartupController extends _$StartupController {
     final result = await const StartupSequence().run(StartupScenario.ready);
     if (!ref.mounted) return;
     state = AsyncData(result);
-  }
-}
-
-@Riverpod(keepAlive: true)
-class BenchmarkController extends _$BenchmarkController {
-  int _epoch = 0;
-
-  @override
-  BenchmarkState build() => const BenchmarkState();
-
-  // A result belongs to the exact case/phase it was produced for.
-  void selectCase(String caseId) =>
-      state = state.copyWith(caseId: caseId, clearResult: true);
-  void selectPhase(BenchmarkPhase phase) =>
-      state = state.copyWith(phase: phase, clearResult: true);
-
-  Future<void> run() async {
-    final epoch = ++_epoch;
-    state = state.copyWith(isRunning: true, clearResult: true);
-    final result = await ref
-        .read(benchmarkRepositoryProvider)
-        .run(state.caseId, state.phase);
-    if (epoch != _epoch) return;
-    state = state.copyWith(isRunning: false, result: result);
-  }
-
-  void stop() {
-    _epoch++;
-    state = state.copyWith(isRunning: false);
-  }
-
-  Future<String?> export() async {
-    final result = state.result;
-    if (result == null) return null;
-    return ref.read(benchmarkRepositoryProvider).export(result);
   }
 }

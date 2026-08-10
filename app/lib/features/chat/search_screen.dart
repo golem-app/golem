@@ -4,7 +4,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/domain/chat_search.dart';
+import 'application/search_providers.dart';
+import 'domain/chat_search.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 
@@ -22,8 +23,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _controller = TextEditingController();
   Timer? _debounce;
 
-  // Captured at init because ref is unusable in dispose; the keepAlive
-  // notifier outlives this screen.
+  // Captured at init because ref is unusable in dispose. The notifier is
+  // autoDispose and lives exactly as long as this screen watches it; every
+  // publish below runs while mounted, and disposal itself now provides the
+  // fresh-visit reset the manual clears used to guarantee alone.
   late final SearchQuery _query;
 
   @override

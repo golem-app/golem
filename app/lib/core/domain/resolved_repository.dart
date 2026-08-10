@@ -4,12 +4,15 @@
 /// state: it still lists, still deletes, and refuses activation.
 library;
 
+import 'dart:collection';
+
+import 'equality.dart';
 import 'model_catalog.dart';
 
 final class ResolvedRepository {
   const ResolvedRepository({
     required this.commitSha,
-    required this.files,
+    required this._files,
     required this.quantization,
     this.architecture,
     this.displayName,
@@ -19,8 +22,10 @@ final class ResolvedRepository {
   /// addresses this, so a moving branch cannot change an installed model.
   final String commitSha;
 
+  final List<ModelArtifactFile> _files;
+
   /// Exactly the files to fetch — never a whole repository by guesswork.
-  final List<ModelArtifactFile> files;
+  List<ModelArtifactFile> get files => UnmodifiableListView(_files);
 
   /// Display label such as `Q4_0` or `4-bit`; never a capability claim.
   final String quantization;
@@ -32,11 +37,29 @@ final class ResolvedRepository {
 
   final String? displayName;
 
-  int get totalBytes => files.fold(0, (sum, file) => sum + file.bytes);
+  int get totalBytes => _files.fold(0, (sum, file) => sum + file.bytes);
 
   /// Whether the Hub published an authoritative hash for every file. False is
   /// normal — small metadata files are not stored in LFS and carry none.
-  bool get fullyHashed => files.every((file) => file.sha256 != null);
+  bool get fullyHashed => _files.every((file) => file.sha256 != null);
+
+  @override
+  bool operator ==(Object other) =>
+      other is ResolvedRepository &&
+      other.commitSha == commitSha &&
+      other.quantization == quantization &&
+      other.architecture == architecture &&
+      other.displayName == displayName &&
+      listEquals(other._files, _files);
+
+  @override
+  int get hashCode => Object.hash(
+    commitSha,
+    quantization,
+    architecture,
+    displayName,
+    listHash(_files),
+  );
 
   Map<String, Object?> toJson() => {
     'commitSha': commitSha,
@@ -44,7 +67,7 @@ final class ResolvedRepository {
     if (architecture != null) 'architecture': architecture,
     if (displayName != null) 'displayName': displayName,
     'files': [
-      for (final file in files)
+      for (final file in _files)
         {
           'path': file.path,
           'bytes': file.bytes,

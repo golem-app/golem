@@ -93,6 +93,8 @@ ProviderContainer buildContainer({
   PreferencesRepository? preferences,
   AttachmentRepository? attachments,
   CustomRepositoryResolver? resolver,
+  ChatHistoryRepository? chatHistory,
+  ModelManagementRepository? models,
 }) {
   final directory = Directory.systemTemp.createTempSync('golem-widget-test-');
   return ProviderContainer(
@@ -109,9 +111,10 @@ ProviderContainer buildContainer({
         preferences ?? InMemoryPreferencesRepository(),
       ),
       chatHistoryRepositoryProvider.overrideWithValue(
-        InMemoryChatHistoryRepository(
-          history ?? const ChatHistorySnapshot(conversations: []),
-        ),
+        chatHistory ??
+            InMemoryChatHistoryRepository(
+              history ?? const ChatHistorySnapshot(conversations: []),
+            ),
       ),
       inferenceRepositoryProvider.overrideWithValue(
         FakeInferenceRepository(eventDelay: Duration.zero),
@@ -123,7 +126,9 @@ ProviderContainer buildContainer({
       customRepositoryResolverProvider.overrideWithValue(
         resolver ?? const DeterministicRepositoryResolver(),
       ),
-      modelManagementRepositoryProvider.overrideWithValue(StaticModels(model)),
+      modelManagementRepositoryProvider.overrideWithValue(
+        models ?? StaticModels(model),
+      ),
       benchmarkRepositoryProvider.overrideWithValue(
         FakeBenchmarkRepository(
           directory,
@@ -143,9 +148,12 @@ Future<void> pumpWithRepositories(
   ModelState model = const ModelState(),
   List<ModelCatalogEntry>? catalog,
   InferenceBackendConfig? backend,
+  SettingsRepository? settings,
   PreferencesRepository? preferences,
   AttachmentRepository? attachments,
   CustomRepositoryResolver? resolver,
+  ChatHistoryRepository? chatHistory,
+  ModelManagementRepository? models,
 }) async {
   setViewport(tester);
   final container = buildContainer(
@@ -153,9 +161,12 @@ Future<void> pumpWithRepositories(
     model: model,
     catalog: catalog,
     backend: backend,
+    settings: settings,
     preferences: preferences,
     attachments: attachments,
     resolver: resolver,
+    chatHistory: chatHistory,
+    models: models,
   );
   addTearDown(container.dispose);
   await tester.pumpWidget(

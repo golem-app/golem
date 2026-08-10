@@ -11,6 +11,7 @@ import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
 import '../chat/model_label.dart';
+import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
 
 /// The minimal settings root: model and app rows, the Advanced mode
@@ -25,6 +26,8 @@ class SettingsScreen extends ConsumerWidget {
     final preferences =
         ref.watch(preferencesControllerProvider).value ??
         const AppPreferences();
+    // Deliberate .value degrade: the root row shows no size while loading
+    // or failed — the Storage screen owns the full error surface.
     final storage = ref.watch(storageBreakdownProvider).value;
     final style = preferences.styleFor(backend.profileKey);
     return CupertinoPageScaffold(
@@ -128,12 +131,15 @@ class SettingsScreen extends ConsumerWidget {
                                           GolemTheme.accent,
                                           context,
                                         ),
-                                    onChanged: (value) => ref
-                                        .read(
-                                          preferencesControllerProvider
-                                              .notifier,
-                                        )
-                                        .setAdvancedMode(value),
+                                    onChanged: (value) => announceFailedSave(
+                                      context,
+                                      ref
+                                          .read(
+                                            preferencesControllerProvider
+                                                .notifier,
+                                          )
+                                          .setAdvancedMode(value),
+                                    ),
                                   ),
                                 ),
                               ),

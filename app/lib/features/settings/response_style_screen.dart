@@ -13,8 +13,10 @@ import '../../core/domain/generation_settings.dart';
 import '../../core/domain/response_style_mapping.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
+import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
 import '../chat/model_label.dart';
+import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
 
 /// Response style: the three presets, and — in Advanced mode — the raw
@@ -60,9 +62,12 @@ class ResponseStyleScreen extends ConsumerWidget {
               _StyleCard(
                 style: style,
                 selected: style == selected,
-                onTap: () => ref
-                    .read(preferencesControllerProvider.notifier)
-                    .setResponseStyle(profileKey, style),
+                onTap: () => announceFailedSave(
+                  context,
+                  ref
+                      .read(preferencesControllerProvider.notifier)
+                      .setResponseStyle(profileKey, style),
+                ),
               ),
               const SizedBox(height: 10),
             ],
@@ -227,9 +232,18 @@ class GenerationCard extends ConsumerWidget {
     final defaults = profile.sampling(reasoningEnabled: false);
     final thinking = profile.sampling(reasoningEnabled: true);
     final thinkingPinned = thinking.pinned;
+    final settings = ref.watch(settingsControllerProvider);
+    if (settings.hasError) {
+      // Editing over invented defaults would overwrite whatever the store
+      // holds on the next successful write; surface the failed read instead.
+      return RetryPane(
+        key: const Key('settings-load-error'),
+        message: "Couldn't load settings.",
+        onRetry: () => ref.invalidate(settingsControllerProvider),
+      );
+    }
     final overrides =
-        ref.watch(settingsControllerProvider).value?.overridesFor(profileKey) ??
-        const SamplingOverrides();
+        settings.value?.overridesFor(profileKey) ?? const SamplingOverrides();
     // The card must state what generation will actually run: the response
     // style's values layered under the hand-set overrides, exactly as
     // ChatController computes them. Captions name each value's source.
@@ -258,9 +272,12 @@ class GenerationCard extends ConsumerWidget {
     final effectiveBudget =
         overrides.maxTokens ?? max(defaults.maxTokens, thinking.maxTokens);
 
-    Future<void> update(SamplingOverrides next) => ref
-        .read(settingsControllerProvider.notifier)
-        .updateModel(profileKey, next);
+    Future<void> update(SamplingOverrides next) => announceFailedSave(
+      context,
+      ref
+          .read(settingsControllerProvider.notifier)
+          .updateModel(profileKey, next),
+    );
 
     return GolemCard(
       child: Column(
@@ -273,9 +290,12 @@ class GenerationCard extends ConsumerWidget {
                 key: Key('gen-reset-$profileKey'),
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 minimumSize: const Size(44, 30),
-                onPressed: () => ref
-                    .read(settingsControllerProvider.notifier)
-                    .resetModel(profileKey),
+                onPressed: () => announceFailedSave(
+                  context,
+                  ref
+                      .read(settingsControllerProvider.notifier)
+                      .resetModel(profileKey),
+                ),
                 child: const Text('Reset', style: TextStyle(fontSize: 14)),
               ),
             ),

@@ -1,3 +1,7 @@
+/// Stays in core (#69): chat, Settings, and Storage all resolve the live
+/// model through these helpers, so none of the three can own them.
+library;
+
 import 'inference_backend.dart';
 import 'model_catalog.dart';
 import 'models.dart';

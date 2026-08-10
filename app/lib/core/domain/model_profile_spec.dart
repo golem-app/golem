@@ -8,6 +8,8 @@
 /// rejected rather than guessed at (handbook v4.2A §5.1).
 library;
 
+import 'equality.dart';
+
 /// Each maps to one broker implementation; the spec supplies its markers.
 enum ChatTemplateStrategy {
   /// One leading BOS, `<|turn>role\n…<turn|>\n`, optional system turn.
@@ -113,6 +115,28 @@ final class ProfileSampling {
       pinned: json['pinned'] as bool? ?? false,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is ProfileSampling &&
+      other.maxTokens == maxTokens &&
+      other.temperature == temperature &&
+      other.topP == topP &&
+      other.topK == topK &&
+      other.contextLength == contextLength &&
+      other.presencePenalty == presencePenalty &&
+      other.pinned == pinned;
+
+  @override
+  int get hashCode => Object.hash(
+    maxTokens,
+    temperature,
+    topP,
+    topK,
+    contextLength,
+    presencePenalty,
+    pinned,
+  );
 }
 
 /// The markers and role names one [ChatTemplateStrategy] needs. Fields a
@@ -280,6 +304,46 @@ final class ChatTemplateSpec {
         break;
     }
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is ChatTemplateSpec &&
+      other.strategy == strategy &&
+      other.bos == bos &&
+      other.turnOpen == turnOpen &&
+      other.turnClose == turnClose &&
+      other.systemRole == systemRole &&
+      other.userRole == userRole &&
+      other.assistantRole == assistantRole &&
+      other.thoughtControl == thoughtControl &&
+      other.channelStart == channelStart &&
+      other.channelEnd == channelEnd &&
+      other.thinkStart == thinkStart &&
+      other.thinkEnd == thinkEnd &&
+      other.reasoningPrimer == reasoningPrimer &&
+      other.directPrimer == directPrimer &&
+      other.mediaMarker == mediaMarker &&
+      other.historyStrip == historyStrip;
+
+  @override
+  int get hashCode => Object.hash(
+    strategy,
+    bos,
+    turnOpen,
+    turnClose,
+    systemRole,
+    userRole,
+    assistantRole,
+    thoughtControl,
+    channelStart,
+    channelEnd,
+    thinkStart,
+    thinkEnd,
+    reasoningPrimer,
+    directPrimer,
+    mediaMarker,
+    historyStrip,
+  );
 }
 
 final class ModelProfileSpec {
@@ -425,6 +489,32 @@ final class ModelProfileSpec {
           : _requirePositiveInt(json['imageTokenCost'], 'imageTokenCost'),
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is ModelProfileSpec &&
+      other.key == key &&
+      other.template == template &&
+      other.parser == parser &&
+      other.reasoningSampling == reasoningSampling &&
+      other.directSampling == directSampling &&
+      other.imageTokenCost == imageTokenCost &&
+      listEquals(other.stopSequences, stopSequences) &&
+      listEquals(other.stopTokenIds, stopTokenIds) &&
+      setEquals(other.inputModalities, inputModalities);
+
+  @override
+  int get hashCode => Object.hash(
+    key,
+    template,
+    parser,
+    reasoningSampling,
+    directSampling,
+    imageTokenCost,
+    listHash(stopSequences),
+    listHash(stopTokenIds),
+    setHash(inputModalities),
+  );
 
   static void _validateParser(
     ReasoningParserMode parser,

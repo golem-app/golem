@@ -24,7 +24,7 @@ final class ChatHistoryRepositoryProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'chatHistoryRepositoryProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -55,7 +55,7 @@ final class ChatHistoryRepositoryProvider
 }
 
 String _$chatHistoryRepositoryHash() =>
-    r'272ebcd1745a580ce2a622e5b227e91c4435f30e';
+    r'e05f4fc18a899e8797b4477e6a833b9b0819cdcf';
 
 @ProviderFor(inferenceRepository)
 final inferenceRepositoryProvider = InferenceRepositoryProvider._();
@@ -72,7 +72,7 @@ final class InferenceRepositoryProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'inferenceRepositoryProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -103,7 +103,7 @@ final class InferenceRepositoryProvider
 }
 
 String _$inferenceRepositoryHash() =>
-    r'82143828d32f1c068c8a1562f08085502e619275';
+    r'6c861649e47783f6fa0462b977ecbc44d477e9a2';
 
 @ProviderFor(modelManagementRepository)
 final modelManagementRepositoryProvider = ModelManagementRepositoryProvider._();
@@ -120,7 +120,7 @@ final class ModelManagementRepositoryProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'modelManagementRepositoryProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -151,7 +151,7 @@ final class ModelManagementRepositoryProvider
 }
 
 String _$modelManagementRepositoryHash() =>
-    r'883bf3845440e47f63576a82f18f225f31be3622';
+    r'3613b43a27a617fd059610ab8bf52cf8e1935b69';
 
 @ProviderFor(benchmarkRepository)
 final benchmarkRepositoryProvider = BenchmarkRepositoryProvider._();
@@ -168,7 +168,7 @@ final class BenchmarkRepositoryProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'benchmarkRepositoryProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -199,7 +199,7 @@ final class BenchmarkRepositoryProvider
 }
 
 String _$benchmarkRepositoryHash() =>
-    r'c71d916e23996f845670a9ad8da54540b73dcdb7';
+    r'0fab8c8808a2d269976912c1526b25dec4ee7af3';
 
 @ProviderFor(modelCatalogEntries)
 final modelCatalogEntriesProvider = ModelCatalogEntriesProvider._();
@@ -216,7 +216,7 @@ final class ModelCatalogEntriesProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'modelCatalogEntriesProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -247,7 +247,7 @@ final class ModelCatalogEntriesProvider
 }
 
 String _$modelCatalogEntriesHash() =>
-    r'12eee37f81325029df04be2d9a3f438baf556399';
+    r'20a6040238d621e1f74177f051d52cd23432281b';
 
 @ProviderFor(customRepositoryResolver)
 final customRepositoryResolverProvider = CustomRepositoryResolverProvider._();
@@ -264,7 +264,7 @@ final class CustomRepositoryResolverProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'customRepositoryResolverProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -295,7 +295,7 @@ final class CustomRepositoryResolverProvider
 }
 
 String _$customRepositoryResolverHash() =>
-    r'b2ada27fe20df8df9c83e4e35e85df85b35c9bb7';
+    r'a250f77e52b63df63d7ee26e8ad66e511957aa96';
 
 @ProviderFor(settingsRepository)
 final settingsRepositoryProvider = SettingsRepositoryProvider._();
@@ -312,7 +312,7 @@ final class SettingsRepositoryProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'settingsRepositoryProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -343,7 +343,7 @@ final class SettingsRepositoryProvider
 }
 
 String _$settingsRepositoryHash() =>
-    r'7f08be7173b537a7eccd726a624b784cc87b3fa3';
+    r'43697d2b39824fa73d1ee4289c6efd83fd57e1f4';
 
 @ProviderFor(preferencesRepository)
 final preferencesRepositoryProvider = PreferencesRepositoryProvider._();
@@ -360,7 +360,7 @@ final class PreferencesRepositoryProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'preferencesRepositoryProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -391,7 +391,7 @@ final class PreferencesRepositoryProvider
 }
 
 String _$preferencesRepositoryHash() =>
-    r'84f12c67b0492c83d2e641eac794500552c759e5';
+    r'd272370ad36e3fb91b553a2b3786234a2dfe8afd';
 
 @ProviderFor(attachmentRepository)
 final attachmentRepositoryProvider = AttachmentRepositoryProvider._();
@@ -408,7 +408,7 @@ final class AttachmentRepositoryProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'attachmentRepositoryProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -439,7 +439,7 @@ final class AttachmentRepositoryProvider
 }
 
 String _$attachmentRepositoryHash() =>
-    r'e36781dc865631b0997a4aa474a8c95b401c5d5b';
+    r'55dc90dfc35bb906a88a8b1b29b54b81dab4671a';
 
 @ProviderFor(cacheProbe)
 final cacheProbeProvider = CacheProbeProvider._();
@@ -451,7 +451,7 @@ final class CacheProbeProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'cacheProbeProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -480,7 +480,7 @@ final class CacheProbeProvider
   }
 }
 
-String _$cacheProbeHash() => r'900fcb1840982afab2b91e05f9883543a2d767a4';
+String _$cacheProbeHash() => r'37f95d013183a6ec649e264751218aebe8543de4';
 
 @ProviderFor(diskFreeSpaceProbe)
 final diskFreeSpaceProbeProvider = DiskFreeSpaceProbeProvider._();
@@ -492,7 +492,7 @@ final class DiskFreeSpaceProbeProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'diskFreeSpaceProbeProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -522,13 +522,14 @@ final class DiskFreeSpaceProbeProvider
 }
 
 String _$diskFreeSpaceProbeHash() =>
-    r'95441f7541254e1512e632401b909a1180691934';
+    r'3b7a8d9208a6ae4e4be69c4b6394744e41816afa';
 
 /// The resolved inference backend for this process. A fake default rather than
 /// a throwing seam — a documented exception to the repository-provider
 /// discipline: dozens of widgets read it for honest "simulated" labeling, and
 /// host tests (the dev flavor) must see the fake without every container
 /// overriding it. main() always overrides it with the resolved config.
+/// KeepAlive: process-constant boot configuration.
 
 @ProviderFor(inferenceBackend)
 final inferenceBackendProvider = InferenceBackendProvider._();
@@ -538,6 +539,7 @@ final inferenceBackendProvider = InferenceBackendProvider._();
 /// discipline: dozens of widgets read it for honest "simulated" labeling, and
 /// host tests (the dev flavor) must see the fake without every container
 /// overriding it. main() always overrides it with the resolved config.
+/// KeepAlive: process-constant boot configuration.
 
 final class InferenceBackendProvider
     extends
@@ -552,11 +554,12 @@ final class InferenceBackendProvider
   /// discipline: dozens of widgets read it for honest "simulated" labeling, and
   /// host tests (the dev flavor) must see the fake without every container
   /// overriding it. main() always overrides it with the resolved config.
+  /// KeepAlive: process-constant boot configuration.
   InferenceBackendProvider._()
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'inferenceBackendProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -586,13 +589,15 @@ final class InferenceBackendProvider
   }
 }
 
-String _$inferenceBackendHash() => r'679d3dfd7f9bdcc675a964fdfe9368052cc0b632';
+String _$inferenceBackendHash() => r'514f250994225e1c5e3830610653488e7a69988b';
 
 /// The catalog key of the model resident in the engine, straight from the
 /// residency owner (#42). Null while the engine is empty — label helpers fall
 /// back to the configured artifact, so a lazy first load does not blank the
 /// chrome. Always null under a simulated backend, without touching the
 /// repository seam: label-only containers must not need one.
+/// KeepAlive: holds the live ValueListenable subscription onto #42's
+/// residency owner; autoDispose would churn that listener per route.
 
 @ProviderFor(residentModelKey)
 final residentModelKeyProvider = ResidentModelKeyProvider._();
@@ -602,6 +607,8 @@ final residentModelKeyProvider = ResidentModelKeyProvider._();
 /// back to the configured artifact, so a lazy first load does not blank the
 /// chrome. Always null under a simulated backend, without touching the
 /// repository seam: label-only containers must not need one.
+/// KeepAlive: holds the live ValueListenable subscription onto #42's
+/// residency owner; autoDispose would churn that listener per route.
 
 final class ResidentModelKeyProvider
     extends $FunctionalProvider<String?, String?, String?>
@@ -611,11 +618,13 @@ final class ResidentModelKeyProvider
   /// back to the configured artifact, so a lazy first load does not blank the
   /// chrome. Always null under a simulated backend, without touching the
   /// repository seam: label-only containers must not need one.
+  /// KeepAlive: holds the live ValueListenable subscription onto #42's
+  /// residency owner; autoDispose would churn that listener per route.
   ResidentModelKeyProvider._()
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'residentModelKeyProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -644,7 +653,7 @@ final class ResidentModelKeyProvider
   }
 }
 
-String _$residentModelKeyHash() => r'06d40b724654be95583dd2adef25a96f7354b1f3';
+String _$residentModelKeyHash() => r'a0072e8c58064797a9c045af4114c54a7db92439';
 
 @ProviderFor(deviceCapacityProbe)
 final deviceCapacityProbeProvider = DeviceCapacityProbeProvider._();
@@ -661,7 +670,7 @@ final class DeviceCapacityProbeProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'deviceCapacityProbeProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -692,7 +701,7 @@ final class DeviceCapacityProbeProvider
 }
 
 String _$deviceCapacityProbeHash() =>
-    r'bffceb765c5bf126c7449e4761b2c951e7495b9c';
+    r'd9f7649721fba1b27bda3931ab92f068359c19f6';
 
 @ProviderFor(documentsPath)
 final documentsPathProvider = DocumentsPathProvider._();
@@ -704,7 +713,7 @@ final class DocumentsPathProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'documentsPathProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -733,12 +742,18 @@ final class DocumentsPathProvider
   }
 }
 
-String _$documentsPathHash() => r'22f7639f5b12516f043a3f4971f84d9142ebf642';
+String _$documentsPathHash() => r'2642290dce766869e9b00ab9bc831b6a60672caf';
 
 /// A cheap signature that changes only when conversations or messages are added
 /// or removed. ChatController reassigns state on every streaming delta, so
 /// anything as heavy as disk probing must key on this rather than the raw chat
 /// state, or it re-runs per token for the always-mounted drawer meter.
+/// KeepAlive, deliberately (#69): would classify as an autoDispose derived
+/// value, but on the pinned flutter_riverpod (3.3.2) a widget-watched
+/// derivation over an async controller still trips Flutter's element-update
+/// invariant when a provider scope is swapped mid-test — the class of bug
+/// fixed upstream in 3.4.0 ("markNeedsBuild ... inside Widget lifecycle").
+/// Revisit when the pin crosses 3.4.0.
 
 @ProviderFor(chatStorageSignature)
 final chatStorageSignatureProvider = ChatStorageSignatureProvider._();
@@ -747,6 +762,12 @@ final chatStorageSignatureProvider = ChatStorageSignatureProvider._();
 /// or removed. ChatController reassigns state on every streaming delta, so
 /// anything as heavy as disk probing must key on this rather than the raw chat
 /// state, or it re-runs per token for the always-mounted drawer meter.
+/// KeepAlive, deliberately (#69): would classify as an autoDispose derived
+/// value, but on the pinned flutter_riverpod (3.3.2) a widget-watched
+/// derivation over an async controller still trips Flutter's element-update
+/// invariant when a provider scope is swapped mid-test — the class of bug
+/// fixed upstream in 3.4.0 ("markNeedsBuild ... inside Widget lifecycle").
+/// Revisit when the pin crosses 3.4.0.
 
 final class ChatStorageSignatureProvider
     extends $FunctionalProvider<(int, int), (int, int), (int, int)>
@@ -755,11 +776,17 @@ final class ChatStorageSignatureProvider
   /// or removed. ChatController reassigns state on every streaming delta, so
   /// anything as heavy as disk probing must key on this rather than the raw chat
   /// state, or it re-runs per token for the always-mounted drawer meter.
+  /// KeepAlive, deliberately (#69): would classify as an autoDispose derived
+  /// value, but on the pinned flutter_riverpod (3.3.2) a widget-watched
+  /// derivation over an async controller still trips Flutter's element-update
+  /// invariant when a provider scope is swapped mid-test — the class of bug
+  /// fixed upstream in 3.4.0 ("markNeedsBuild ... inside Widget lifecycle").
+  /// Revisit when the pin crosses 3.4.0.
   ChatStorageSignatureProvider._()
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'chatStorageSignatureProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -789,18 +816,34 @@ final class ChatStorageSignatureProvider
 }
 
 String _$chatStorageSignatureHash() =>
-    r'df201c6875f3c90d6cd294e37597891dfd4b41a3';
+    r'ebfde4072049845a37f487bcef5a939d1755019a';
 
 /// Storage accounting for the drawer meter and the Storage screen. Free and
 /// total bytes are null whenever the platform cannot report them (or the seams
-/// are unwired) — surfaces hide those figures instead of inventing them.
+/// are unwired) — surfaces hide those figures instead of inventing them. The
+/// provider owns seam tolerance; the service owns the computation and its
+/// required-vs-optional failure policy.
+/// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it
+/// continuously anyway, and the 3.3.2 scope-swap hazard (see
+/// chatStorageSignature) rules autoDispose out. Staleness is owned by
+/// invalidation — the storage signature upstream and `ref.invalidate` after
+/// a cache clear — never by a `KeepAliveLink` TTL (§4.4, a silent no-op on
+/// keepAlive providers). Revisit when the pin crosses 3.4.0.
 
 @ProviderFor(storageBreakdown)
 final storageBreakdownProvider = StorageBreakdownProvider._();
 
 /// Storage accounting for the drawer meter and the Storage screen. Free and
 /// total bytes are null whenever the platform cannot report them (or the seams
-/// are unwired) — surfaces hide those figures instead of inventing them.
+/// are unwired) — surfaces hide those figures instead of inventing them. The
+/// provider owns seam tolerance; the service owns the computation and its
+/// required-vs-optional failure policy.
+/// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it
+/// continuously anyway, and the 3.3.2 scope-swap hazard (see
+/// chatStorageSignature) rules autoDispose out. Staleness is owned by
+/// invalidation — the storage signature upstream and `ref.invalidate` after
+/// a cache clear — never by a `KeepAliveLink` TTL (§4.4, a silent no-op on
+/// keepAlive providers). Revisit when the pin crosses 3.4.0.
 
 final class StorageBreakdownProvider
     extends
@@ -812,12 +855,20 @@ final class StorageBreakdownProvider
     with $FutureModifier<StorageBreakdown>, $FutureProvider<StorageBreakdown> {
   /// Storage accounting for the drawer meter and the Storage screen. Free and
   /// total bytes are null whenever the platform cannot report them (or the seams
-  /// are unwired) — surfaces hide those figures instead of inventing them.
+  /// are unwired) — surfaces hide those figures instead of inventing them. The
+  /// provider owns seam tolerance; the service owns the computation and its
+  /// required-vs-optional failure policy.
+  /// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it
+  /// continuously anyway, and the 3.3.2 scope-swap hazard (see
+  /// chatStorageSignature) rules autoDispose out. Staleness is owned by
+  /// invalidation — the storage signature upstream and `ref.invalidate` after
+  /// a cache clear — never by a `KeepAliveLink` TTL (§4.4, a silent no-op on
+  /// keepAlive providers). Revisit when the pin crosses 3.4.0.
   StorageBreakdownProvider._()
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'storageBreakdownProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -839,16 +890,24 @@ final class StorageBreakdownProvider
   }
 }
 
-String _$storageBreakdownHash() => r'7b13bb7429ac20321976a2578dcfac7c1713acfd';
+String _$storageBreakdownHash() => r'4ba7c85265ff7001eabf61e7b6339e0080f2a0ba';
 
 /// Pinned entries plus the user's custom repositories, derived — never stored —
 /// so the pinned manifest stays the single source of model knowledge.
+/// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
+/// (composer, drawer, recovery banner), so disposal would never fire in
+/// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature)
+/// rules autoDispose out. Revisit when the pin crosses 3.4.0.
 
 @ProviderFor(effectiveModelCatalog)
 final effectiveModelCatalogProvider = EffectiveModelCatalogProvider._();
 
 /// Pinned entries plus the user's custom repositories, derived — never stored —
 /// so the pinned manifest stays the single source of model knowledge.
+/// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
+/// (composer, drawer, recovery banner), so disposal would never fire in
+/// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature)
+/// rules autoDispose out. Revisit when the pin crosses 3.4.0.
 
 final class EffectiveModelCatalogProvider
     extends
@@ -860,11 +919,15 @@ final class EffectiveModelCatalogProvider
     with $Provider<List<ModelCatalogEntry>> {
   /// Pinned entries plus the user's custom repositories, derived — never stored —
   /// so the pinned manifest stays the single source of model knowledge.
+  /// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
+  /// (composer, drawer, recovery banner), so disposal would never fire in
+  /// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature)
+  /// rules autoDispose out. Revisit when the pin crosses 3.4.0.
   EffectiveModelCatalogProvider._()
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'effectiveModelCatalogProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -895,11 +958,14 @@ final class EffectiveModelCatalogProvider
 }
 
 String _$effectiveModelCatalogHash() =>
-    r'e5ef1df3119d320d101a756b92fbef2cf4d28857';
+    r'd30df0161aff1d214c0d08f6e8533f60197f5df3';
 
 /// The models a per-chat selection may name: installed, and of the engine this
 /// build composed. Derived here so chat, Settings, and Storage cannot disagree
 /// about which model is live (#20).
+/// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
+/// continuously watched, and the 3.3.2 scope-swap hazard. Revisit when the
+/// pin crosses 3.4.0.
 
 @ProviderFor(loadableModelKeys)
 final loadableModelKeysProvider = LoadableModelKeysProvider._();
@@ -907,6 +973,9 @@ final loadableModelKeysProvider = LoadableModelKeysProvider._();
 /// The models a per-chat selection may name: installed, and of the engine this
 /// build composed. Derived here so chat, Settings, and Storage cannot disagree
 /// about which model is live (#20).
+/// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
+/// continuously watched, and the 3.3.2 scope-swap hazard. Revisit when the
+/// pin crosses 3.4.0.
 
 final class LoadableModelKeysProvider
     extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
@@ -914,11 +983,14 @@ final class LoadableModelKeysProvider
   /// The models a per-chat selection may name: installed, and of the engine this
   /// build composed. Derived here so chat, Settings, and Storage cannot disagree
   /// about which model is live (#20).
+  /// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
+  /// continuously watched, and the 3.3.2 scope-swap hazard. Revisit when the
+  /// pin crosses 3.4.0.
   LoadableModelKeysProvider._()
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'loadableModelKeysProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -947,130 +1019,28 @@ final class LoadableModelKeysProvider
   }
 }
 
-String _$loadableModelKeysHash() => r'e1fc1aba3225db2d81c08133f3da197d03c492ef';
-
-/// The raw field text stays widget-local in the search screen (debounced
-/// 350 ms); only the normalized query lands here, so results derive reactively.
-
-@ProviderFor(SearchQuery)
-final searchQueryProvider = SearchQueryProvider._();
-
-/// The raw field text stays widget-local in the search screen (debounced
-/// 350 ms); only the normalized query lands here, so results derive reactively.
-final class SearchQueryProvider extends $NotifierProvider<SearchQuery, String> {
-  /// The raw field text stays widget-local in the search screen (debounced
-  /// 350 ms); only the normalized query lands here, so results derive reactively.
-  SearchQueryProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'searchQueryProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$searchQueryHash();
-
-  @$internal
-  @override
-  SearchQuery create() => SearchQuery();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(String value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<String>(value),
-    );
-  }
-}
-
-String _$searchQueryHash() => r'4dbfed33213193c0360e544ccb7b76d58c781f42';
-
-/// The raw field text stays widget-local in the search screen (debounced
-/// 350 ms); only the normalized query lands here, so results derive reactively.
-
-abstract class _$SearchQuery extends $Notifier<String> {
-  String build();
-  @$mustCallSuper
-  @override
-  WhenComplete runBuild() {
-    final ref = this.ref as $Ref<String, String>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<String, String>,
-              String,
-              Object?,
-              Object?
-            >;
-    return element.handleCreate(ref, build);
-  }
-}
-
-@ProviderFor(chatSearchResults)
-final chatSearchResultsProvider = ChatSearchResultsProvider._();
-
-final class ChatSearchResultsProvider
-    extends
-        $FunctionalProvider<
-          List<ChatSearchResult>,
-          List<ChatSearchResult>,
-          List<ChatSearchResult>
-        >
-    with $Provider<List<ChatSearchResult>> {
-  ChatSearchResultsProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'chatSearchResultsProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$chatSearchResultsHash();
-
-  @$internal
-  @override
-  $ProviderElement<List<ChatSearchResult>> $createElement(
-    $ProviderPointer pointer,
-  ) => $ProviderElement(pointer);
-
-  @override
-  List<ChatSearchResult> create(Ref ref) {
-    return chatSearchResults(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<ChatSearchResult> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<List<ChatSearchResult>>(value),
-    );
-  }
-}
-
-String _$chatSearchResultsHash() => r'4924c9bcb9501cbe48cf7c370df3e24254a943db';
+String _$loadableModelKeysHash() => r'12e16f3f980da93856da1aa47fec36b9d9201e01';
 
 /// Only user-set values are stored; profile defaults resolve at the consumer.
+/// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
+/// owner over write-through persistence.
 
 @ProviderFor(SettingsController)
 final settingsControllerProvider = SettingsControllerProvider._();
 
 /// Only user-set values are stored; profile defaults resolve at the consumer.
+/// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
+/// owner over write-through persistence.
 final class SettingsControllerProvider
     extends $AsyncNotifierProvider<SettingsController, GenerationSettings> {
   /// Only user-set values are stored; profile defaults resolve at the consumer.
+  /// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
+  /// owner over write-through persistence.
   SettingsControllerProvider._()
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'settingsControllerProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -1086,9 +1056,11 @@ final class SettingsControllerProvider
 }
 
 String _$settingsControllerHash() =>
-    r'7040b13d308b8e347c0b0c2872bd4ada1c6a5d5d';
+    r'1c2af52933a97a9d1a8713fd6bb2b42bca0ed384';
 
 /// Only user-set values are stored; profile defaults resolve at the consumer.
+/// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
+/// owner over write-through persistence.
 
 abstract class _$SettingsController extends $AsyncNotifier<GenerationSettings> {
   FutureOr<GenerationSettings> build();
@@ -1110,22 +1082,31 @@ abstract class _$SettingsController extends $AsyncNotifier<GenerationSettings> {
 }
 
 /// Persisted app-wide preferences. Every command follows the settings idiom —
-/// drop taps that land in the cold-start load window, publish, then save.
+/// drop taps that land in the cold-start load window, publish, then save —
+/// and returns false after rolling back a failed write, never throwing.
+/// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
+/// root on every frame.
 
 @ProviderFor(PreferencesController)
 final preferencesControllerProvider = PreferencesControllerProvider._();
 
 /// Persisted app-wide preferences. Every command follows the settings idiom —
-/// drop taps that land in the cold-start load window, publish, then save.
+/// drop taps that land in the cold-start load window, publish, then save —
+/// and returns false after rolling back a failed write, never throwing.
+/// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
+/// root on every frame.
 final class PreferencesControllerProvider
     extends $AsyncNotifierProvider<PreferencesController, AppPreferences> {
   /// Persisted app-wide preferences. Every command follows the settings idiom —
-  /// drop taps that land in the cold-start load window, publish, then save.
+  /// drop taps that land in the cold-start load window, publish, then save —
+  /// and returns false after rolling back a failed write, never throwing.
+  /// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
+  /// root on every frame.
   PreferencesControllerProvider._()
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'preferencesControllerProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -1141,10 +1122,13 @@ final class PreferencesControllerProvider
 }
 
 String _$preferencesControllerHash() =>
-    r'3262f94c328a1845db90bcea44e3b348eb7363d7';
+    r'aeeb637738d76126ac2b6f0085a3c475c5e7f26d';
 
 /// Persisted app-wide preferences. Every command follows the settings idiom —
-/// drop taps that land in the cold-start load window, publish, then save.
+/// drop taps that land in the cold-start load window, publish, then save —
+/// and returns false after rolling back a failed write, never throwing.
+/// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
+/// root on every frame.
 
 abstract class _$PreferencesController extends $AsyncNotifier<AppPreferences> {
   FutureOr<AppPreferences> build();
@@ -1164,16 +1148,23 @@ abstract class _$PreferencesController extends $AsyncNotifier<AppPreferences> {
   }
 }
 
+/// KeepAlive: the chat session aggregate — in-flight generation and unsaved
+/// turns must survive every route transition.
+
 @ProviderFor(ChatController)
 final chatControllerProvider = ChatControllerProvider._();
 
+/// KeepAlive: the chat session aggregate — in-flight generation and unsaved
+/// turns must survive every route transition.
 final class ChatControllerProvider
     extends $AsyncNotifierProvider<ChatController, ChatState> {
+  /// KeepAlive: the chat session aggregate — in-flight generation and unsaved
+  /// turns must survive every route transition.
   ChatControllerProvider._()
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'chatControllerProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -1188,7 +1179,10 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'b5bdd8d9a3178e268018ecdf940f5370f835f52e';
+String _$chatControllerHash() => r'2d5ea9018dcaa97c7a6c581929855441cc46c7ec';
+
+/// KeepAlive: the chat session aggregate — in-flight generation and unsaved
+/// turns must survive every route transition.
 
 abstract class _$ChatController extends $AsyncNotifier<ChatState> {
   FutureOr<ChatState> build();
@@ -1208,16 +1202,26 @@ abstract class _$ChatController extends $AsyncNotifier<ChatState> {
   }
 }
 
+/// KeepAlive: a command controller whose downloads, busy guard, and epochs
+/// must survive leaving the Models screen (§3.4 — an autoDispose command
+/// provider dies mid-flight).
+
 @ProviderFor(ModelController)
 final modelControllerProvider = ModelControllerProvider._();
 
+/// KeepAlive: a command controller whose downloads, busy guard, and epochs
+/// must survive leaving the Models screen (§3.4 — an autoDispose command
+/// provider dies mid-flight).
 final class ModelControllerProvider
     extends $AsyncNotifierProvider<ModelController, ModelState> {
+  /// KeepAlive: a command controller whose downloads, busy guard, and epochs
+  /// must survive leaving the Models screen (§3.4 — an autoDispose command
+  /// provider dies mid-flight).
   ModelControllerProvider._()
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'modelControllerProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -1232,7 +1236,11 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'84cc0509e764484ae3c77b429f41122b36a8e4ca';
+String _$modelControllerHash() => r'13feb0274a7de49f9b86157a27e042d1f66af0f8';
+
+/// KeepAlive: a command controller whose downloads, busy guard, and epochs
+/// must survive leaving the Models screen (§3.4 — an autoDispose command
+/// provider dies mid-flight).
 
 abstract class _$ModelController extends $AsyncNotifier<ModelState> {
   FutureOr<ModelState> build();
@@ -1252,16 +1260,23 @@ abstract class _$ModelController extends $AsyncNotifier<ModelState> {
   }
 }
 
+/// KeepAlive: the startup outcome is process-lifetime; #66 owns any
+/// startup redesign.
+
 @ProviderFor(StartupController)
 final startupControllerProvider = StartupControllerProvider._();
 
+/// KeepAlive: the startup outcome is process-lifetime; #66 owns any
+/// startup redesign.
 final class StartupControllerProvider
     extends $AsyncNotifierProvider<StartupController, StartupState> {
+  /// KeepAlive: the startup outcome is process-lifetime; #66 owns any
+  /// startup redesign.
   StartupControllerProvider._()
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'startupControllerProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -1276,7 +1291,10 @@ final class StartupControllerProvider
   StartupController create() => StartupController();
 }
 
-String _$startupControllerHash() => r'937f4451c25348e2e4bdc562a9e8125d13f78af1';
+String _$startupControllerHash() => r'd4a2a4151c2a95fb1f9bd58bfee3cdd02463a04d';
+
+/// KeepAlive: the startup outcome is process-lifetime; #66 owns any
+/// startup redesign.
 
 abstract class _$StartupController extends $AsyncNotifier<StartupState> {
   FutureOr<StartupState> build();
@@ -1289,59 +1307,6 @@ abstract class _$StartupController extends $AsyncNotifier<StartupState> {
             as $ClassProviderElement<
               AnyNotifier<AsyncValue<StartupState>, StartupState>,
               AsyncValue<StartupState>,
-              Object?,
-              Object?
-            >;
-    return element.handleCreate(ref, build);
-  }
-}
-
-@ProviderFor(BenchmarkController)
-final benchmarkControllerProvider = BenchmarkControllerProvider._();
-
-final class BenchmarkControllerProvider
-    extends $NotifierProvider<BenchmarkController, BenchmarkState> {
-  BenchmarkControllerProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'benchmarkControllerProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$benchmarkControllerHash();
-
-  @$internal
-  @override
-  BenchmarkController create() => BenchmarkController();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(BenchmarkState value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<BenchmarkState>(value),
-    );
-  }
-}
-
-String _$benchmarkControllerHash() =>
-    r'd5ac45951cd24b9be36e3f97bf4f3f09c4ebdbd8';
-
-abstract class _$BenchmarkController extends $Notifier<BenchmarkState> {
-  BenchmarkState build();
-  @$mustCallSuper
-  @override
-  WhenComplete runBuild() {
-    final ref = this.ref as $Ref<BenchmarkState, BenchmarkState>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<BenchmarkState, BenchmarkState>,
-              BenchmarkState,
               Object?,
               Object?
             >;

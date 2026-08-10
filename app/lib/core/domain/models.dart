@@ -1,4 +1,11 @@
+/// Stays in core (#69): chat, settings, and storage all consume these
+/// entities, and the repository contracts name them.
+library;
+
+import 'dart:collection';
 import 'dart:convert';
+
+import 'equality.dart';
 
 enum MessageRole { user, assistant }
 
@@ -126,7 +133,7 @@ final class ChatMessage {
   const ChatMessage({
     required this.id,
     required this.role,
-    required this.parts,
+    required this._parts,
     required this.createdAt,
     this.reasoning,
     this.metrics,
@@ -153,18 +160,21 @@ final class ChatMessage {
 
   final String id;
   final MessageRole role;
-  final List<MessagePart> parts;
+  final List<MessagePart> _parts;
   final String? reasoning;
   final InferenceMetrics? metrics;
   final DateTime createdAt;
   final bool isStreaming;
 
+  /// Unmodifiable — streaming accumulates through [withText]/[copyWith].
+  List<MessagePart> get parts => UnmodifiableListView(_parts);
+
   /// Every text part joined; only rendering and the prompt boundary see parts.
-  String get text => parts.whereType<TextPart>().map((p) => p.text).join();
+  String get text => _parts.whereType<TextPart>().map((p) => p.text).join();
 
-  Iterable<ImagePart> get images => parts.whereType<ImagePart>();
+  Iterable<ImagePart> get images => _parts.whereType<ImagePart>();
 
-  bool get hasImages => parts.any((part) => part is ImagePart);
+  bool get hasImages => _parts.any((part) => part is ImagePart);
 
   ChatMessage copyWith({
     List<MessagePart>? parts,
@@ -174,7 +184,7 @@ final class ChatMessage {
   }) => ChatMessage(
     id: id,
     role: role,
-    parts: parts ?? this.parts,
+    parts: parts ?? _parts,
     reasoning: reasoning ?? this.reasoning,
     metrics: metrics ?? this.metrics,
     createdAt: createdAt,
@@ -184,12 +194,12 @@ final class ChatMessage {
   /// Replaces the text, keeping images ahead of it as a vision prompt expects.
   /// This is how a streaming assistant draft accumulates.
   ChatMessage withText(String text) =>
-      copyWith(parts: [...parts.whereType<ImagePart>(), TextPart(text)]);
+      copyWith(parts: [..._parts.whereType<ImagePart>(), TextPart(text)]);
 
   Map<String, Object?> toJson() => {
     'id': id,
     'role': role.name,
-    'parts': parts.map((part) => part.toJson()).toList(),
+    'parts': _parts.map((part) => part.toJson()).toList(),
     'reasoning': reasoning,
     'metrics': metrics?.toJson(),
     'createdAt': createdAt.toIso8601String(),
@@ -223,7 +233,7 @@ final class ChatConversation {
   const ChatConversation({
     required this.id,
     required this.title,
-    required this.messages,
+    required this._messages,
     required this.updatedAt,
     this.reasoningEnabled = false,
     this.pinned = false,
@@ -232,10 +242,13 @@ final class ChatConversation {
 
   final String id;
   final String title;
-  final List<ChatMessage> messages;
+  final List<ChatMessage> _messages;
   final DateTime updatedAt;
   final bool reasoningEnabled;
   final bool pinned;
+
+  /// Unmodifiable — turns are appended through the controller's copy helpers.
+  List<ChatMessage> get messages => UnmodifiableListView(_messages);
 
   /// Catalog key of the model chosen for this chat; null means the build's
   /// default. Only ever set to a model the build could load, which is what lets
@@ -251,7 +264,7 @@ final class ChatConversation {
   }) => ChatConversation(
     id: id,
     title: title ?? this.title,
-    messages: messages ?? this.messages,
+    messages: messages ?? _messages,
     updatedAt: updatedAt ?? this.updatedAt,
     reasoningEnabled: reasoningEnabled ?? this.reasoningEnabled,
     pinned: pinned ?? this.pinned,
@@ -264,7 +277,7 @@ final class ChatConversation {
   ChatConversation withModel(String? key) => ChatConversation(
     id: id,
     title: title,
-    messages: messages,
+    messages: _messages,
     updatedAt: updatedAt,
     reasoningEnabled: reasoningEnabled,
     pinned: pinned,
@@ -276,12 +289,12 @@ final class ChatConversation {
     required String id,
     required DateTime now,
   }) {
-    final index = messages.indexWhere((message) => message.id == messageId);
+    final index = _messages.indexWhere((message) => message.id == messageId);
     if (index < 0) return null;
     return ChatConversation(
       id: id,
       title: title,
-      messages: messages.take(index + 1).toList(growable: false),
+      messages: _messages.take(index + 1).toList(growable: false),
       updatedAt: now,
       reasoningEnabled: reasoningEnabled,
       modelKey: modelKey,
@@ -297,7 +310,7 @@ final class ChatConversation {
   /// Shareable transcript; reasoning stays private, like [promptContext].
   String transcriptMarkdown() {
     final buffer = StringBuffer('## $title\n');
-    for (final message in messages.where((message) => !message.isStreaming)) {
+    for (final message in _messages.where((message) => !message.isStreaming)) {
       final speaker = message.role == MessageRole.user ? 'You' : 'Golem';
       buffer.write('\n**$speaker:** ${message.text}\n');
     }
@@ -305,7 +318,7 @@ final class ChatConversation {
   }
 
   /// Prompt context intentionally excludes private reasoning.
-  List<PromptMessage> get promptContext => messages
+  List<PromptMessage> get promptContext => _messages
       .where((message) => !message.isStreaming)
       .map(
         (message) =>
@@ -315,14 +328,14 @@ final class ChatConversation {
 
   /// The store keeps exactly the union of these across all conversations.
   Iterable<String> get attachmentIds =>
-      messages.expand((message) => message.images).map((i) => i.attachmentId);
+      _messages.expand((message) => message.images).map((i) => i.attachmentId);
 
   // pinned/modelKey stay additive under schemaVersion 1: absent keys
   // default below, so pre-#47 histories load unchanged.
   Map<String, Object?> toJson() => {
     'id': id,
     'title': title,
-    'messages': messages
+    'messages': _messages
         .where((message) => !message.isStreaming)
         .map((m) => m.toJson())
         .toList(),
@@ -350,22 +363,26 @@ final class ChatConversation {
 }
 
 final class ChatHistorySnapshot {
-  const ChatHistorySnapshot({required this.conversations, this.activeId});
-  final List<ChatConversation> conversations;
+  const ChatHistorySnapshot({required this._conversations, this.activeId});
+  final List<ChatConversation> _conversations;
   final String? activeId;
+
+  /// Unmodifiable — snapshots are rebuilt, never edited in place.
+  List<ChatConversation> get conversations =>
+      UnmodifiableListView(_conversations);
 
   /// v2 replaced each message's flat `text` with ordered `parts` (#18); a v1
   /// file loads unchanged and is rewritten as v2 on the next save.
   static const schemaVersion = 2;
 
   Set<String> get referencedAttachmentIds => {
-    for (final conversation in conversations) ...conversation.attachmentIds,
+    for (final conversation in _conversations) ...conversation.attachmentIds,
   };
 
   Map<String, Object?> toJson() => {
     'schemaVersion': schemaVersion,
     'activeConversationId': activeId,
-    'conversations': conversations.map((item) => item.toJson()).toList(),
+    'conversations': _conversations.map((item) => item.toJson()).toList(),
   };
 
   factory ChatHistorySnapshot.fromJson(Map<String, Object?> json) {
@@ -431,6 +448,28 @@ final class InferenceMetrics {
     timeToFirstTokenSeconds: (json['timeToFirstTokenSeconds'] as num?)
         ?.toDouble(),
     peakPhysicalFootprintBytes: json['peakPhysicalFootprintBytes'] as int?,
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      other is InferenceMetrics &&
+      other.promptTokensPerSecond == promptTokensPerSecond &&
+      other.decodeTokensPerSecond == decodeTokensPerSecond &&
+      other.tokenCount == tokenCount &&
+      other.elapsedSeconds == elapsedSeconds &&
+      other.promptTokenCount == promptTokenCount &&
+      other.timeToFirstTokenSeconds == timeToFirstTokenSeconds &&
+      other.peakPhysicalFootprintBytes == peakPhysicalFootprintBytes;
+
+  @override
+  int get hashCode => Object.hash(
+    promptTokensPerSecond,
+    decodeTokensPerSecond,
+    tokenCount,
+    elapsedSeconds,
+    promptTokenCount,
+    timeToFirstTokenSeconds,
+    peakPhysicalFootprintBytes,
   );
 }
 
@@ -518,20 +557,33 @@ final class ArtifactStatus {
     downloadedBytes: json['downloadedBytes'] as int? ?? 0,
     failure: json['failure'] as String?,
   );
+
+  @override
+  bool operator ==(Object other) =>
+      other is ArtifactStatus &&
+      other.phase == phase &&
+      other.downloadedBytes == downloadedBytes &&
+      other.failure == failure;
+
+  @override
+  int get hashCode => Object.hash(phase, downloadedBytes, failure);
 }
 
 final class ModelState {
   const ModelState({
-    this.artifacts = const {},
+    this._artifacts = const {},
     this.runtime = RuntimePhase.unloaded,
     this.failure,
     this.activeArtifactKey,
     this.simulated = false,
   });
 
-  final Map<String, ArtifactStatus> artifacts;
+  final Map<String, ArtifactStatus> _artifacts;
   final RuntimePhase runtime;
   final String? failure;
+
+  /// Unmodifiable — transitions go through [withArtifact]/[copyWith].
+  Map<String, ArtifactStatus> get artifacts => UnmodifiableMapView(_artifacts);
 
   /// Stamped by the repository from its configuration; never persisted.
   final String? activeArtifactKey;
@@ -541,7 +593,7 @@ final class ModelState {
   final bool simulated;
 
   ArtifactStatus statusOf(String key) =>
-      artifacts[key] ?? const ArtifactStatus();
+      _artifacts[key] ?? const ArtifactStatus();
 
   ModelState copyWith({
     Map<String, ArtifactStatus>? artifacts,
@@ -549,7 +601,7 @@ final class ModelState {
     String? failure,
     bool clearFailure = false,
   }) => ModelState(
-    artifacts: artifacts ?? this.artifacts,
+    artifacts: artifacts ?? _artifacts,
     runtime: runtime ?? this.runtime,
     failure: clearFailure ? null : failure ?? this.failure,
     activeArtifactKey: activeArtifactKey,
@@ -557,12 +609,12 @@ final class ModelState {
   );
 
   ModelState withArtifact(String key, ArtifactStatus status) =>
-      copyWith(artifacts: {...artifacts, key: status});
+      copyWith(artifacts: {..._artifacts, key: status});
 
   /// [copyWith] then carries these stamps through every later transition.
   ModelState stamp({String? activeArtifactKey, required bool simulated}) =>
       ModelState(
-        artifacts: artifacts,
+        artifacts: _artifacts,
         runtime: runtime,
         failure: failure,
         activeArtifactKey: activeArtifactKey,
@@ -575,8 +627,28 @@ final class ModelState {
     'schemaVersion': 2,
     'runtime': runtime.name,
     'failure': failure,
-    'artifacts': artifacts.map((key, status) => MapEntry(key, status.toJson())),
+    'artifacts': _artifacts.map(
+      (key, status) => MapEntry(key, status.toJson()),
+    ),
   };
+
+  @override
+  bool operator ==(Object other) =>
+      other is ModelState &&
+      other.runtime == runtime &&
+      other.failure == failure &&
+      other.activeArtifactKey == activeArtifactKey &&
+      other.simulated == simulated &&
+      mapEquals(other._artifacts, _artifacts);
+
+  @override
+  int get hashCode => Object.hash(
+    runtime,
+    failure,
+    activeArtifactKey,
+    simulated,
+    mapHash(_artifacts),
+  );
 
   factory ModelState.fromJson(Map<String, Object?> json) {
     if (json['schemaVersion'] != 2) {

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:golem_flutter/core/domain/chat_sections.dart';
+import 'package:golem_flutter/features/chat/domain/chat_sections.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 
 ChatConversation _chat(String id, DateTime updatedAt, {bool pinned = false}) =>

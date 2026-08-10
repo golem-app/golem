@@ -8,6 +8,7 @@ import '../../core/chrome/golem_toast.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
+import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
 
 /// Privacy & data: the no-network statement, chat-history retention, and
@@ -79,7 +80,10 @@ class PrivacyScreen extends ConsumerWidget {
                   footnote:
                       'Off means every chat disappears when you close it.',
                   onChanged: (value) => value
-                      ? notifier.setSaveHistory(true)
+                      ? announceFailedSave(
+                          context,
+                          notifier.setSaveHistory(true),
+                        )
                       : _confirmHistoryOff(context, notifier),
                 ),
               ],
@@ -132,7 +136,11 @@ class PrivacyScreen extends ConsumerWidget {
           isDestructive: true,
           onPressed: () {
             Navigator.pop(context);
-            notifier.setSaveHistory(false);
+            announceFailedSave(
+              context,
+              notifier.setSaveHistory(false),
+              message: "Couldn't delete the saved chats. Try again.",
+            );
           },
         ),
       ],
@@ -173,8 +181,14 @@ class PrivacyScreen extends ConsumerWidget {
           isDestructive: true,
           onPressed: () async {
             Navigator.pop(context);
-            await ref.read(chatControllerProvider.notifier).deleteAllChats();
-            if (context.mounted) showGolemToast(context, 'Chats deleted');
+            final deleted = await ref
+                .read(chatControllerProvider.notifier)
+                .deleteAllChats();
+            if (!context.mounted) return;
+            showGolemToast(
+              context,
+              deleted ? 'Chats deleted' : "Couldn't delete chats. Try again.",
+            );
           },
         ),
       ],

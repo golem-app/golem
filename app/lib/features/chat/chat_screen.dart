@@ -7,6 +7,7 @@ import '../../core/domain/app_state.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
+import '../../core/widgets/retry_pane.dart';
 import 'model_label.dart';
 import 'widgets/attach_sheet.dart';
 import 'widgets/chat_canvas.dart';
@@ -125,8 +126,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       loading: () => const CupertinoPageScaffold(
         child: Center(child: CupertinoActivityIndicator()),
       ),
+      // Fixed copy plus a retry: raw exception text never reaches a surface
+      // (§8.1), and the load failure must not brick the root screen for the
+      // process lifetime — nothing else ever rebuilds this keepAlive provider.
       error: (error, stack) => CupertinoPageScaffold(
-        child: Center(child: Text('Could not load chat history: $error')),
+        child: RetryPane(
+          key: const Key('chat-load-error'),
+          message: "Couldn't load chat history.",
+          onRetry: () => ref.invalidate(chatControllerProvider),
+        ),
       ),
       data: (value) => _buildShell(context, value),
     );

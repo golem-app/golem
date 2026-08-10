@@ -10,14 +10,16 @@ import '../../core/domain/app_preferences.dart';
 import '../../core/domain/inference_backend.dart';
 import '../../core/domain/model_activation.dart';
 import '../../core/domain/model_catalog.dart';
-import '../../core/domain/model_speed.dart';
+import 'domain/model_speed.dart';
 import '../../core/domain/models.dart';
 import '../../core/services/repository_resolver.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/labeled_row.dart';
 import '../../core/widgets/progress_track.dart';
+import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
+import 'application/custom_repository_workflow.dart';
 import 'widgets/settings_rows.dart';
 
 enum _CatalogTab { all, installed }
@@ -61,8 +63,11 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
         bottom: false,
         child: model.when(
           loading: () => const Center(child: CupertinoActivityIndicator()),
-          error: (error, stack) =>
-              Center(child: Text('Could not load model state: $error')),
+          error: (error, stack) => RetryPane(
+            key: const Key('models-load-error'),
+            message: "Couldn't load model state.",
+            onRetry: () => ref.invalidate(modelControllerProvider),
+          ),
           data: (value) => _body(context, value),
         ),
       ),
@@ -358,37 +363,24 @@ class _CustomRepositoryCard extends ConsumerWidget {
   Future<void> _resolve(WidgetRef ref, {String? weightsFile}) async {
     final repository = controller.text.trim();
     if (repository.isEmpty) return;
-    // Every seam is read before the first await.
-    final resolver = ref.read(customRepositoryResolverProvider);
-    final existingKeys = <String>{
-      for (final entry in ref.read(modelCatalogEntriesProvider)) entry.key,
-      // Only entries with a recognized profile collide. Both an unresolved
-      // spec and a resolved one whose template matched no known profile are
-      // told by their card to add the repository again, so counting either
-      // would refuse the only repair the card offers.
-      ...?ref
-          .read(preferencesControllerProvider)
-          .value
-          ?.customModels
-          .where((spec) => spec.profile != null)
-          .map((spec) => spec.key),
-    };
+    // Every seam is read before the first await; the workflow owns the
+    // collision derivation and the resolver's failure contract.
+    final workflow = CustomRepositoryWorkflow(
+      resolver: ref.read(customRepositoryResolverProvider),
+    );
+    final pinned = ref.read(modelCatalogEntriesProvider);
+    final custom =
+        ref.read(preferencesControllerProvider).value?.customModels ??
+        const <CustomModelSpec>[];
     onState(const _Resolving());
-    final RepositoryResolution outcome;
-    try {
-      outcome = await resolver.resolve(
-        repository: repository,
-        engine: engine,
-        ref: _ref,
-        weightsFile: weightsFile,
-        existingKeys: existingKeys,
-      );
-    } catch (_) {
-      // A resolver that escapes its own failure contract must not strand the
-      // card on a spinner with no message and no way back.
-      onState(_Refused(RepositoryRejection.malformedMetadata.message));
-      return;
-    }
+    final outcome = await workflow.resolve(
+      repository: repository,
+      engine: engine,
+      ref: _ref,
+      weightsFile: weightsFile,
+      pinned: pinned,
+      custom: custom,
+    );
     onState(switch (outcome) {
       RepositoryResolved() => _Resolved(outcome),
       RepositoryNeedsWeightChoice(:final candidates) => _WeightChoice(
@@ -404,7 +396,7 @@ class _CustomRepositoryCard extends ConsumerWidget {
     RepositoryResolved outcome,
   ) async {
     final preferences = ref.read(preferencesControllerProvider.notifier);
-    await preferences.addCustomModel(
+    final added = await preferences.addCustomModel(
       CustomModelSpec(
         repository: controller.text.trim(),
         engine: engine,
@@ -413,6 +405,14 @@ class _CustomRepositoryCard extends ConsumerWidget {
         resolved: outcome.resolved,
       ),
     );
+    if (!added) {
+      // The preference write failed and rolled back; the resolution card is
+      // still on screen, so Add remains the retry affordance.
+      if (context.mounted) {
+        showGolemToast(context, "Couldn't save the model. Try again.");
+      }
+      return;
+    }
     // The controllers and the draft state belong to the screen, which may be
     // gone: only it can decide whether resetting them is still meaningful.
     onAdded();

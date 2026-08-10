@@ -1,3 +1,7 @@
+/// Stays in core (#69): consumed by both the settings UI and the chat
+/// send path (ChatController layers styles under manual overrides).
+library;
+
 import 'app_preferences.dart';
 import 'generation_settings.dart';
 
