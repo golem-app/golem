@@ -748,11 +748,12 @@ String _$documentsPathHash() => r'2642290dce766869e9b00ab9bc831b6a60672caf';
 /// or removed. ChatController reassigns state on every streaming delta, so
 /// anything as heavy as disk probing must key on this rather than the raw chat
 /// state, or it re-runs per token for the always-mounted drawer meter.
-/// KeepAlive, deliberately (#69): classified as a derived value that could
-/// autoDispose, but on the pinned riverpod 3.0.3 a widget-watched derivation
-/// over an async controller trips Flutter's element-update invariant when a
-/// provider scope is swapped mid-test ("markNeedsBuild ... inside Widget
-/// lifecycle", fixed upstream in 3.4.0). Revisit with the pin.
+/// KeepAlive, deliberately (#69): would classify as an autoDispose derived
+/// value, but on the pinned flutter_riverpod (3.3.2) a widget-watched
+/// derivation over an async controller still trips Flutter's element-update
+/// invariant when a provider scope is swapped mid-test — the class of bug
+/// fixed upstream in 3.4.0 ("markNeedsBuild ... inside Widget lifecycle").
+/// Revisit when the pin crosses 3.4.0.
 
 @ProviderFor(chatStorageSignature)
 final chatStorageSignatureProvider = ChatStorageSignatureProvider._();
@@ -761,11 +762,12 @@ final chatStorageSignatureProvider = ChatStorageSignatureProvider._();
 /// or removed. ChatController reassigns state on every streaming delta, so
 /// anything as heavy as disk probing must key on this rather than the raw chat
 /// state, or it re-runs per token for the always-mounted drawer meter.
-/// KeepAlive, deliberately (#69): classified as a derived value that could
-/// autoDispose, but on the pinned riverpod 3.0.3 a widget-watched derivation
-/// over an async controller trips Flutter's element-update invariant when a
-/// provider scope is swapped mid-test ("markNeedsBuild ... inside Widget
-/// lifecycle", fixed upstream in 3.4.0). Revisit with the pin.
+/// KeepAlive, deliberately (#69): would classify as an autoDispose derived
+/// value, but on the pinned flutter_riverpod (3.3.2) a widget-watched
+/// derivation over an async controller still trips Flutter's element-update
+/// invariant when a provider scope is swapped mid-test — the class of bug
+/// fixed upstream in 3.4.0 ("markNeedsBuild ... inside Widget lifecycle").
+/// Revisit when the pin crosses 3.4.0.
 
 final class ChatStorageSignatureProvider
     extends $FunctionalProvider<(int, int), (int, int), (int, int)>
@@ -774,11 +776,12 @@ final class ChatStorageSignatureProvider
   /// or removed. ChatController reassigns state on every streaming delta, so
   /// anything as heavy as disk probing must key on this rather than the raw chat
   /// state, or it re-runs per token for the always-mounted drawer meter.
-  /// KeepAlive, deliberately (#69): classified as a derived value that could
-  /// autoDispose, but on the pinned riverpod 3.0.3 a widget-watched derivation
-  /// over an async controller trips Flutter's element-update invariant when a
-  /// provider scope is swapped mid-test ("markNeedsBuild ... inside Widget
-  /// lifecycle", fixed upstream in 3.4.0). Revisit with the pin.
+  /// KeepAlive, deliberately (#69): would classify as an autoDispose derived
+  /// value, but on the pinned flutter_riverpod (3.3.2) a widget-watched
+  /// derivation over an async controller still trips Flutter's element-update
+  /// invariant when a provider scope is swapped mid-test — the class of bug
+  /// fixed upstream in 3.4.0 ("markNeedsBuild ... inside Widget lifecycle").
+  /// Revisit when the pin crosses 3.4.0.
   ChatStorageSignatureProvider._()
     : super(
         from: null,
@@ -820,12 +823,12 @@ String _$chatStorageSignatureHash() =>
 /// are unwired) — surfaces hide those figures instead of inventing them. The
 /// provider owns seam tolerance; the service owns the computation and its
 /// required-vs-optional failure policy.
-/// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it,
-/// so disposal would never fire in practice, and the pinned riverpod 3.0.3
-/// scope-swap hazard (see chatStorageSignature) rules autoDispose out for
-/// widget-watched derivations. Staleness is owned by invalidation — the
-/// storage signature upstream and `ref.invalidate` after a cache clear —
-/// never by a `KeepAliveLink` TTL (§4.4). Revisit with the pin.
+/// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it
+/// continuously anyway, and the 3.3.2 scope-swap hazard (see
+/// chatStorageSignature) rules autoDispose out. Staleness is owned by
+/// invalidation — the storage signature upstream and `ref.invalidate` after
+/// a cache clear — never by a `KeepAliveLink` TTL (§4.4, a silent no-op on
+/// keepAlive providers). Revisit when the pin crosses 3.4.0.
 
 @ProviderFor(storageBreakdown)
 final storageBreakdownProvider = StorageBreakdownProvider._();
@@ -835,12 +838,12 @@ final storageBreakdownProvider = StorageBreakdownProvider._();
 /// are unwired) — surfaces hide those figures instead of inventing them. The
 /// provider owns seam tolerance; the service owns the computation and its
 /// required-vs-optional failure policy.
-/// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it,
-/// so disposal would never fire in practice, and the pinned riverpod 3.0.3
-/// scope-swap hazard (see chatStorageSignature) rules autoDispose out for
-/// widget-watched derivations. Staleness is owned by invalidation — the
-/// storage signature upstream and `ref.invalidate` after a cache clear —
-/// never by a `KeepAliveLink` TTL (§4.4). Revisit with the pin.
+/// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it
+/// continuously anyway, and the 3.3.2 scope-swap hazard (see
+/// chatStorageSignature) rules autoDispose out. Staleness is owned by
+/// invalidation — the storage signature upstream and `ref.invalidate` after
+/// a cache clear — never by a `KeepAliveLink` TTL (§4.4, a silent no-op on
+/// keepAlive providers). Revisit when the pin crosses 3.4.0.
 
 final class StorageBreakdownProvider
     extends
@@ -855,12 +858,12 @@ final class StorageBreakdownProvider
   /// are unwired) — surfaces hide those figures instead of inventing them. The
   /// provider owns seam tolerance; the service owns the computation and its
   /// required-vs-optional failure policy.
-  /// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it,
-  /// so disposal would never fire in practice, and the pinned riverpod 3.0.3
-  /// scope-swap hazard (see chatStorageSignature) rules autoDispose out for
-  /// widget-watched derivations. Staleness is owned by invalidation — the
-  /// storage signature upstream and `ref.invalidate` after a cache clear —
-  /// never by a `KeepAliveLink` TTL (§4.4). Revisit with the pin.
+  /// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it
+  /// continuously anyway, and the 3.3.2 scope-swap hazard (see
+  /// chatStorageSignature) rules autoDispose out. Staleness is owned by
+  /// invalidation — the storage signature upstream and `ref.invalidate` after
+  /// a cache clear — never by a `KeepAliveLink` TTL (§4.4, a silent no-op on
+  /// keepAlive providers). Revisit when the pin crosses 3.4.0.
   StorageBreakdownProvider._()
     : super(
         from: null,
@@ -893,9 +896,8 @@ String _$storageBreakdownHash() => r'4ba7c85265ff7001eabf61e7b6339e0080f2a0ba';
 /// so the pinned manifest stays the single source of model knowledge.
 /// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
 /// (composer, drawer, recovery banner), so disposal would never fire in
-/// practice — and the pinned riverpod 3.0.3 scope-swap hazard (see
-/// chatStorageSignature) rules autoDispose out for widget-watched
-/// derivations. Revisit with the pin.
+/// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature)
+/// rules autoDispose out. Revisit when the pin crosses 3.4.0.
 
 @ProviderFor(effectiveModelCatalog)
 final effectiveModelCatalogProvider = EffectiveModelCatalogProvider._();
@@ -904,9 +906,8 @@ final effectiveModelCatalogProvider = EffectiveModelCatalogProvider._();
 /// so the pinned manifest stays the single source of model knowledge.
 /// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
 /// (composer, drawer, recovery banner), so disposal would never fire in
-/// practice — and the pinned riverpod 3.0.3 scope-swap hazard (see
-/// chatStorageSignature) rules autoDispose out for widget-watched
-/// derivations. Revisit with the pin.
+/// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature)
+/// rules autoDispose out. Revisit when the pin crosses 3.4.0.
 
 final class EffectiveModelCatalogProvider
     extends
@@ -920,9 +921,8 @@ final class EffectiveModelCatalogProvider
   /// so the pinned manifest stays the single source of model knowledge.
   /// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
   /// (composer, drawer, recovery banner), so disposal would never fire in
-  /// practice — and the pinned riverpod 3.0.3 scope-swap hazard (see
-  /// chatStorageSignature) rules autoDispose out for widget-watched
-  /// derivations. Revisit with the pin.
+  /// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature)
+  /// rules autoDispose out. Revisit when the pin crosses 3.4.0.
   EffectiveModelCatalogProvider._()
     : super(
         from: null,
@@ -964,8 +964,8 @@ String _$effectiveModelCatalogHash() =>
 /// build composed. Derived here so chat, Settings, and Storage cannot disagree
 /// about which model is live (#20).
 /// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
-/// continuously watched, and the 3.0.3 scope-swap hazard. Revisit with the
-/// pin.
+/// continuously watched, and the 3.3.2 scope-swap hazard. Revisit when the
+/// pin crosses 3.4.0.
 
 @ProviderFor(loadableModelKeys)
 final loadableModelKeysProvider = LoadableModelKeysProvider._();
@@ -974,8 +974,8 @@ final loadableModelKeysProvider = LoadableModelKeysProvider._();
 /// build composed. Derived here so chat, Settings, and Storage cannot disagree
 /// about which model is live (#20).
 /// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
-/// continuously watched, and the 3.0.3 scope-swap hazard. Revisit with the
-/// pin.
+/// continuously watched, and the 3.3.2 scope-swap hazard. Revisit when the
+/// pin crosses 3.4.0.
 
 final class LoadableModelKeysProvider
     extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
@@ -984,8 +984,8 @@ final class LoadableModelKeysProvider
   /// build composed. Derived here so chat, Settings, and Storage cannot disagree
   /// about which model is live (#20).
   /// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
-  /// continuously watched, and the 3.0.3 scope-swap hazard. Revisit with the
-  /// pin.
+  /// continuously watched, and the 3.3.2 scope-swap hazard. Revisit when the
+  /// pin crosses 3.4.0.
   LoadableModelKeysProvider._()
     : super(
         from: null,

@@ -83,4 +83,15 @@ void main() {
       expect(chatHistory.storedBytesCalls, greaterThan(baseline));
     },
   );
+
+  test('derived catalog providers serve unlistened reads', () async {
+    final container = buildContainer();
+    addTearDown(container.dispose);
+    // ChatController deliberately reads these without watching; a bare read
+    // must answer regardless of the providers' lifetime classification.
+    expect(container.read(effectiveModelCatalogProvider), isNotEmpty);
+    expect(container.read(loadableModelKeysProvider), isA<Set<String>>());
+    await container.pump();
+    expect(container.read(effectiveModelCatalogProvider), isNotEmpty);
+  });
 }
