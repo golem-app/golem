@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/runtime.dart';
+import 'package:golem_flutter/core/repositories/contracts.dart';
 
 import 'package:golem_flutter/features/eval/data/eval_matrix.dart';
 
@@ -75,7 +76,9 @@ void main() {
         installedDefine: 'custom-something',
         documentsDirectory: '/docs',
       ),
-      throwsStateError,
+      // Activation refusals are typed so the chat surface can render
+      // actionable copy rather than a generic engine error (#43).
+      throwsA(isA<InferenceException>()),
     );
   });
 }

@@ -1,12 +1,34 @@
 // ReasoningStreamDelta is the broker-wide stream currency; it lives with the
 // first parser that produced it.
+import '../core/domain/model_profile_spec.dart';
 import 'gemma4_chat_template.dart' show ReasoningStreamDelta;
+import 'history_strip.dart' as history;
+
+/// The built-in Qwen 3.5 template description.
+const qwen35TemplateSpec = ChatTemplateSpec(
+  strategy: ChatTemplateStrategy.chatMl,
+  turnOpen: Qwen35ChatTemplate.imStart,
+  turnClose: Qwen35ChatTemplate.imEnd,
+  systemRole: 'system',
+  userRole: 'user',
+  assistantRole: 'assistant',
+  thinkStart: Qwen35ChatTemplate.thinkStart,
+  thinkEnd: Qwen35ChatTemplate.thinkEnd,
+  reasoningPrimer: '${Qwen35ChatTemplate.thinkStart}\n',
+  directPrimer:
+      '${Qwen35ChatTemplate.thinkStart}\n\n${Qwen35ChatTemplate.thinkEnd}\n\n',
+  historyStrip: HistoryStripMode.thinkBlocks,
+);
 
 /// The pinned Qwen 3.5 `chat_template.jinja` subset used by v0 text chat:
 /// ChatML turns with no BOS anywhere, an optional leading system turn, and a
 /// generation primer that opens a `<think>` block when reasoning is enabled
 /// or closes an empty one when it is not — so streamed output begins inside
 /// the think block and `</think>` is the channel boundary.
+///
+/// Every entry point takes a [ChatTemplateSpec] so a supported custom
+/// repository can reuse this proven algorithm with its own markers and role
+/// names (#43); the default is the built-in Qwen spec.
 final class Qwen35ChatTemplate {
   static const imStart = '<|im_start|>';
   static const imEnd = '<|im_end|>';
@@ -18,11 +40,12 @@ final class Qwen35ChatTemplate {
   static String render(
     List<Map<String, String>> messages, {
     required bool reasoningEnabled,
+    ChatTemplateSpec spec = qwen35TemplateSpec,
   }) {
     if (messages.isEmpty) {
       throw ArgumentError('messages must not be empty.');
     }
-    final buffer = StringBuffer();
+    final buffer = StringBuffer(spec.bos ?? '');
     for (var i = 0; i < messages.length; i++) {
       final message = messages[i];
       switch (message['role']) {
@@ -30,42 +53,50 @@ final class Qwen35ChatTemplate {
           if (i != 0) {
             throw ArgumentError('A system message must come first.');
           }
-          buffer.write('${imStart}system\n${_content(message)}$imEnd\n');
+          buffer.write(
+            '${spec.turnOpen}${spec.systemRole}\n'
+            '${_content(message, spec)}${spec.turnClose}\n',
+          );
         case 'user':
-          buffer.write('${imStart}user\n${_content(message)}$imEnd\n');
+          buffer.write(
+            '${spec.turnOpen}${spec.userRole}\n'
+            '${_content(message, spec)}${spec.turnClose}\n',
+          );
         case 'assistant':
           // Upstream strips reasoning from every assistant turn at or before
           // the latest user query; chat history always precedes it, so
           // history turns carry the visible answer only.
           buffer.write(
-            '${imStart}assistant\n'
-            '${sanitize(stripThinkBlocks(message['content'] ?? '')).trim()}'
-            '$imEnd\n',
+            '${spec.turnOpen}${spec.assistantRole}\n'
+            '${sanitize(history.stripHistoryReasoning(message['content'] ?? '', spec), spec).trim()}'
+            '${spec.turnClose}\n',
           );
         default:
           throw ArgumentError('Unsupported role: ${message['role']}');
       }
     }
-    buffer.write('${imStart}assistant\n');
-    buffer.write(
-      reasoningEnabled ? '$thinkStart\n' : '$thinkStart\n\n$thinkEnd\n\n',
-    );
+    buffer.write('${spec.turnOpen}${spec.assistantRole}\n');
+    final primer = reasoningEnabled ? spec.reasoningPrimer : spec.directPrimer;
+    if (primer != null) buffer.write(primer);
     return buffer.toString();
   }
 
-  static String _content(Map<String, String> message) =>
-      sanitize(message['content'] ?? '').trim();
+  static String _content(Map<String, String> message, ChatTemplateSpec spec) =>
+      sanitize(message['content'] ?? '', spec).trim();
 
   /// Removes every control marker, to a fixpoint so removals cannot splice
   /// two fragments into a live marker.
-  static String sanitize(String text) {
+  static String sanitize(
+    String text, [
+    ChatTemplateSpec spec = qwen35TemplateSpec,
+  ]) {
+    final markers = spec.controlMarkers;
     var current = text;
     while (true) {
-      final next = current
-          .replaceAll(imStart, '')
-          .replaceAll(imEnd, '')
-          .replaceAll(thinkStart, '')
-          .replaceAll(thinkEnd, '');
+      var next = current;
+      for (final marker in markers) {
+        next = next.replaceAll(marker, '');
+      }
       if (next == current) return current;
       current = next;
     }
@@ -73,13 +104,10 @@ final class Qwen35ChatTemplate {
 
   /// Removes complete `<think>…</think>` spans; stray unmatched markers are
   /// left for [sanitize].
-  static String stripThinkBlocks(String text) => text.replaceAll(
-    RegExp(
-      '${RegExp.escape(thinkStart)}.*?${RegExp.escape(thinkEnd)}',
-      dotAll: true,
-    ),
-    '',
-  );
+  static String stripThinkBlocks(
+    String text, [
+    ChatTemplateSpec spec = qwen35TemplateSpec,
+  ]) => history.stripThinkBlocks(text, spec);
 }
 
 /// Splits a streamed Qwen generation into reasoning and answer channels.
@@ -92,13 +120,16 @@ final class Qwen35ChatTemplate {
 /// mirroring the Gemma parser's contract. Markers split across engine
 /// callbacks are held back until they resolve.
 final class Qwen35StreamParser {
-  Qwen35StreamParser({required bool reasoningEnabled})
-    : _inReasoning = reasoningEnabled;
+  Qwen35StreamParser({
+    required bool reasoningEnabled,
+    this.openMarker = Qwen35ChatTemplate.thinkStart,
+    this.closeMarker = Qwen35ChatTemplate.thinkEnd,
+  }) : _inReasoning = reasoningEnabled;
 
-  static const _markers = [
-    Qwen35ChatTemplate.thinkStart,
-    Qwen35ChatTemplate.thinkEnd,
-  ];
+  /// The reasoning-block delimiters this instance parses. Defaulted to the
+  /// pinned Qwen markers; a supported custom profile supplies its own.
+  final String openMarker;
+  final String closeMarker;
 
   bool _inReasoning;
   bool _sawAnswer = false;
@@ -126,30 +157,24 @@ final class Qwen35StreamParser {
     var remaining = _pending;
     while (true) {
       if (_inReasoning) {
-        final end = remaining.indexOf(Qwen35ChatTemplate.thinkEnd);
+        final end = remaining.indexOf(closeMarker);
         if (end < 0) break;
         reasoning.write(remaining.substring(0, end));
-        remaining = remaining.substring(
-          end + Qwen35ChatTemplate.thinkEnd.length,
-        );
+        remaining = remaining.substring(end + closeMarker.length);
         _inReasoning = false;
         // The template emits '\n\n' between the think close and the answer.
         _trimAnswerLead = true;
       } else {
-        final start = remaining.indexOf(Qwen35ChatTemplate.thinkStart);
-        final end = remaining.indexOf(Qwen35ChatTemplate.thinkEnd);
+        final start = remaining.indexOf(openMarker);
+        final end = remaining.indexOf(closeMarker);
         if (start < 0 && end < 0) break;
         if (end >= 0 && (start < 0 || end < start)) {
           // A stray close without an open: drop the marker, stay visible.
           emitAnswer(remaining.substring(0, end));
-          remaining = remaining.substring(
-            end + Qwen35ChatTemplate.thinkEnd.length,
-          );
+          remaining = remaining.substring(end + closeMarker.length);
         } else {
           emitAnswer(remaining.substring(0, start));
-          remaining = remaining.substring(
-            start + Qwen35ChatTemplate.thinkStart.length,
-          );
+          remaining = remaining.substring(start + openMarker.length);
           _inReasoning = true;
           if (_sawAnswer) {
             resetAnswer = true;
@@ -192,9 +217,9 @@ final class Qwen35StreamParser {
 
   /// The length of the longest suffix of [text] that could still grow into
   /// one of the markers; that tail is held back until the next callback.
-  static int _possibleMarkerPrefixLength(String text) {
+  int _possibleMarkerPrefixLength(String text) {
     var longest = 0;
-    for (final marker in _markers) {
+    for (final marker in [openMarker, closeMarker]) {
       final max = marker.length - 1;
       for (var length = max.clamp(0, text.length); length > longest; length--) {
         if (text.endsWith(marker.substring(0, length))) {

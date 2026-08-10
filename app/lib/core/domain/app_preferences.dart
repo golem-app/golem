@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'model_catalog.dart';
+import 'model_profile_spec.dart';
 
 /// The user's theme choice; [system] follows the platform brightness.
 enum ThemeSetting { system, light, dark }
@@ -19,17 +20,24 @@ enum ResponseStyle { precise, balanced, creative }
 
 /// A hand-added Hugging Face repository (Advanced mode). Pure data: the
 /// catalog entry it becomes is derived, and real download wiring for
-/// arbitrary repositories stays with #20.
+/// arbitrary repositories stays with #52.
 final class CustomModelSpec {
   const CustomModelSpec({
     required this.repository,
     required this.engine,
     this.revision = 'main',
+    this.profile,
   });
 
   final String repository;
   final ModelEngine engine;
   final String revision;
+
+  /// The broker profile this repository was proven to match, or null while it
+  /// is unresolved. Only a spec that exactly matched a supported template is
+  /// ever stored here; an unresolved entry lists and deletes normally but
+  /// refuses activation (#43).
+  final ModelProfileSpec? profile;
 
   /// Stable catalog key derived from the repository name. The hash
   /// suffix keeps repositories whose names differ only in punctuation
@@ -72,6 +80,7 @@ final class CustomModelSpec {
       repository: repository,
       revision: revision,
       files: [ModelArtifactFile(path: 'weights.bin', bytes: bytes, sha256: '')],
+      profileKey: profile?.key ?? unresolvedProfileKey,
     );
   }
 
@@ -79,14 +88,31 @@ final class CustomModelSpec {
     'repository': repository,
     'engine': engine.name,
     if (revision != 'main') 'revision': revision,
+    if (profile != null) 'profile': profile!.toJson(),
   };
 
-  factory CustomModelSpec.fromJson(Map<String, Object?> json) =>
-      CustomModelSpec(
-        repository: json['repository'] as String,
-        engine: ModelEngine.values.byName(json['engine'] as String),
-        revision: json['revision'] as String? ?? 'main',
-      );
+  /// A stored profile that no longer parses is dropped rather than failing
+  /// the whole preferences file: the repository stays listed and deletable,
+  /// and activation refuses it with actionable copy.
+  factory CustomModelSpec.fromJson(Map<String, Object?> json) {
+    final rawProfile = json['profile'];
+    ModelProfileSpec? profile;
+    if (rawProfile is Map) {
+      try {
+        profile = ModelProfileSpec.fromJson(
+          Map<String, Object?>.from(rawProfile),
+        );
+      } on FormatException {
+        profile = null;
+      }
+    }
+    return CustomModelSpec(
+      repository: json['repository'] as String,
+      engine: ModelEngine.values.byName(json['engine'] as String),
+      revision: json['revision'] as String? ?? 'main',
+      profile: profile,
+    );
+  }
 }
 
 /// App-wide user preferences: appearance, transcript behavior, privacy,
@@ -172,8 +198,13 @@ final class AppPreferences {
     ],
   );
 
+  /// v2 added the optional resolved broker profile on each custom repository
+  /// (#43). Everything else is unchanged, so a v1 file loads as-is and is
+  /// rewritten as v2 on the next save.
+  static const schemaVersion = 2;
+
   Map<String, Object?> toJson() => {
-    'schemaVersion': 1,
+    'schemaVersion': schemaVersion,
     if (theme != ThemeSetting.system) 'theme': theme.name,
     if (textScale != 1.0) 'textScale': textScale,
     if (!showMetrics) 'showMetrics': showMetrics,
@@ -193,7 +224,10 @@ final class AppPreferences {
   };
 
   factory AppPreferences.fromJson(Map<String, Object?> json) {
-    if (json['schemaVersion'] != 1) {
+    final version = json['schemaVersion'];
+    // v1 is read directly: the only v2 addition is an optional key inside
+    // each custom repository, so no field has to be rewritten to migrate.
+    if (version != 1 && version != schemaVersion) {
       throw const FormatException('Unsupported app preferences schema');
     }
     final rawStyles = json['responseStyles'];

@@ -21,6 +21,7 @@ ModelCatalogEntry _entry() => ModelCatalogEntry(
   quantization: '4-bit',
   repository: 'example/test-mlx',
   revision: '0123456789abcdef',
+  profileKey: 'gemma4',
   files: [
     ModelArtifactFile(
       path: _fileOne,

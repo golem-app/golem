@@ -19,6 +19,7 @@ const _catalog = [
     quantization: 'Q4_0',
     repository: 'example/test-gguf',
     revision: 'fedcba9876543210',
+    profileKey: 'gemma4',
     files: [
       ModelArtifactFile(path: 'model.gguf', bytes: 2600000000, sha256: 'bb'),
     ],

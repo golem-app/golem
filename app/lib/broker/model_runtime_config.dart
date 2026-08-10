@@ -1,4 +1,6 @@
 import '../core/domain/model_catalog.dart';
+import '../core/repositories/contracts.dart'
+    show InferenceException, InferenceFailureKind;
 import 'model_catalog.dart';
 import 'model_profile.dart';
 import 'runtime.dart';
@@ -32,50 +34,65 @@ BrokerEngine brokerEngineFor(ModelEngine engine) => switch (engine) {
   ModelEngine.mlx => BrokerEngine.mlx,
 };
 
-/// Resolves a pinned catalog key to everything a load needs. Throws a
-/// [StateError] with actionable text for keys that cannot be activated:
-/// `custom-*` entries encode no broker profile (their downloads and
-/// activation arrive with the custom-repository work), and unknown keys
-/// are a caller bug.
-ModelRuntimeConfig resolveModelRuntimeConfig(String catalogKey) {
-  final entry = modelCatalog
-      .where((item) => item.key == catalogKey)
-      .firstOrNull;
+/// Resolves a catalog key to everything a load needs.
+///
+/// The profile comes from the entry's declared [ModelCatalogEntry.profileKey]
+/// and a [ProfileRegistry] lookup — never from slicing the key. That is what
+/// lets a resolved custom repository carrying a supported profile spec
+/// activate through exactly the same path as a pinned model (#43).
+///
+/// Every refusal is an [InferenceException] rather than a raw error, so the
+/// chat surface can map it to actionable copy the way it already maps engine
+/// failures (handbook v4.2A §5.2, §8.1). All of them happen *before* any
+/// multi-gigabyte load is attempted.
+ModelRuntimeConfig resolveModelRuntimeConfig(
+  String catalogKey, {
+  List<ModelCatalogEntry>? catalog,
+  ProfileRegistry? profiles,
+}) {
+  final entries = catalog ?? modelCatalog;
+  final registry = profiles ?? ProfileRegistry.builtIn;
+  final entry = entries.where((item) => item.key == catalogKey).firstOrNull;
   if (entry == null) {
-    throw StateError(
-      catalogKey.startsWith('custom-')
-          ? 'Custom repository models cannot be activated yet: "$catalogKey" '
-                'carries no broker profile.'
-          : 'Unknown catalog key "$catalogKey".',
+    // InferenceException.message is user-presentable copy (handbook v4.2A
+    // §5.3), and this is reachable in normal use — a conversation persists its
+    // modelKey, and a later build may no longer carry that entry. The internal
+    // key stays on `cause` for diagnostics instead of in the banner.
+    throw InferenceException(
+      InferenceFailureKind.engine,
+      "This chat's model is not available in this version of Golem. "
+      'Choose another model to continue.',
+      cause: StateError('Unknown catalog key "$catalogKey".'),
     );
   }
-  final profileKey = _profileKeyFor(catalogKey, entry.engine);
-  final profile = modelProfiles[profileKey];
+
+  final profile = registry[entry.profileKey];
   if (profile == null) {
-    throw StateError(
-      'Catalog key "$catalogKey" implies broker profile "$profileKey", '
-      'which is not registered.',
+    throw InferenceException(
+      InferenceFailureKind.engine,
+      entry.profileKey == unresolvedProfileKey
+          ? 'This model has not been checked against a supported chat '
+                'template yet, so it cannot be loaded. Add it again to '
+                'resolve it.'
+          : 'This model declares the chat template "${entry.profileKey}", '
+                'which this build does not support. Remove it and add a '
+                'supported model.',
     );
   }
+
+  final modelPath = modelPathForEntry(entry);
+  if (modelPath == null) {
+    throw InferenceException(
+      InferenceFailureKind.engine,
+      'This model does not name exactly one weights file, so it cannot be '
+      'loaded. Remove it and add a supported model.',
+    );
+  }
+
   return ModelRuntimeConfig(
     catalogKey: catalogKey,
     engine: brokerEngineFor(entry.engine),
-    modelPath: primaryModelPathFor(catalogKey),
+    modelPath: modelPath,
     profile: profile,
   );
-}
-
-/// Pinned keys follow `<profile>-<engine>`; the engine suffix is stripped
-/// against the entry's actual engine rather than guessed from the string.
-String _profileKeyFor(String catalogKey, ModelEngine engine) {
-  final suffix = switch (engine) {
-    ModelEngine.gguf => '-gguf',
-    ModelEngine.mlx => '-mlx',
-  };
-  if (!catalogKey.endsWith(suffix)) {
-    throw StateError(
-      'Catalog key "$catalogKey" does not follow the <profile>$suffix shape.',
-    );
-  }
-  return catalogKey.substring(0, catalogKey.length - suffix.length);
 }

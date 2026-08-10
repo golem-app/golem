@@ -46,6 +46,7 @@ void main() {
         quantization: source.quantization,
         repository: source.repository,
         revision: source.revision,
+        profileKey: source.profileKey,
         files: smallFiles,
       );
 

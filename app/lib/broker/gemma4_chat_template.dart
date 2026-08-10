@@ -1,7 +1,32 @@
+import '../core/domain/model_profile_spec.dart';
+import 'history_strip.dart' as history;
+
+/// The built-in Gemma 4 template description. The literal markers below stay
+/// as named constants because tests, the parity fixture, and
+/// `docs/architecture/inferno.md` all cite them by name.
+const gemma4TemplateSpec = ChatTemplateSpec(
+  strategy: ChatTemplateStrategy.gemmaTurns,
+  bos: Gemma4ChatTemplate.bos,
+  turnOpen: Gemma4ChatTemplate.turnStart,
+  turnClose: Gemma4ChatTemplate.turnEnd,
+  systemRole: 'system',
+  userRole: 'user',
+  assistantRole: 'model',
+  thoughtControl: Gemma4ChatTemplate.thoughtControl,
+  channelStart: ReasoningStreamParser.channelStart,
+  channelEnd: ReasoningStreamParser.channelEnd,
+  historyStrip: HistoryStripMode.reasoningChannels,
+);
+
 /// Gemma 4 text-chat rendering derived from the pinned model template.
 ///
 /// The broker emits BOS exactly once. Both engines must tokenize this with
 /// add-BOS disabled; see `docs/architecture/inferno.md`.
+///
+/// Every entry point takes a [ChatTemplateSpec] so a supported custom
+/// repository can reuse this proven algorithm with its own markers and role
+/// names (#43). The default is the built-in Gemma spec, so existing callers
+/// and the recorded fixtures render byte for byte as before.
 abstract final class Gemma4ChatTemplate {
   static const bos = '<bos>';
   static const turnStart = '<|turn>';
@@ -13,77 +38,72 @@ abstract final class Gemma4ChatTemplate {
   static String render(
     List<Map<String, String>> messages, {
     required bool reasoningEnabled,
+    ChatTemplateSpec spec = gemma4TemplateSpec,
   }) {
     if (messages.isEmpty) {
       throw ArgumentError.value(messages, 'messages', 'must not be empty');
     }
-    final output = StringBuffer(bos);
+    final output = StringBuffer(spec.bos ?? '');
     var start = 0;
     final firstRole = messages.first['role'];
     final hasSystem = firstRole == 'system' || firstRole == 'developer';
     if (reasoningEnabled || hasSystem) {
-      output.write(
-        '$turnStart'
-        'system\n',
-      );
-      if (reasoningEnabled) output.write('$thoughtControl\n');
+      output.write('${spec.turnOpen}${spec.systemRole}\n');
+      if (reasoningEnabled && spec.thoughtControl != null) {
+        output.write('${spec.thoughtControl}\n');
+      }
       if (hasSystem) {
-        output.write(sanitize(_content(messages.first)));
+        output.write(sanitize(_content(messages.first), spec));
         start = 1;
       }
-      output.write('$turnEnd\n');
+      output.write('${spec.turnClose}\n');
     }
 
     for (final message in messages.skip(start)) {
-      final role = switch (message['role']) {
-        'user' => 'user',
-        'assistant' => 'model',
+      final isAssistant = switch (message['role']) {
+        'user' => false,
+        'assistant' => true,
         final unsupported => throw ArgumentError.value(
           unsupported,
           'role',
           'must be user or assistant after the optional leading system turn',
         ),
       };
-      // Model turns lose their reasoning channels before sanitizing, so the
-      // markers are still present to delimit what gets removed.
+      // Model turns lose their reasoning before sanitizing, so the markers are
+      // still present to delimit what gets removed.
       output
-        ..write('$turnStart$role\n')
+        ..write(
+          '${spec.turnOpen}${isAssistant ? spec.assistantRole : spec.userRole}\n',
+        )
         ..write(
           sanitize(
-            role == 'model'
-                ? stripReasoningChannels(_content(message))
+            isAssistant
+                ? history.stripHistoryReasoning(_content(message), spec)
                 : _content(message),
+            spec,
           ),
         )
-        ..write('$turnEnd\n');
+        ..write('${spec.turnClose}\n');
     }
-    output.write(
-      '$turnStart'
-      'model\n',
-    );
+    output.write('${spec.turnOpen}${spec.assistantRole}\n');
     return output.toString();
   }
-
-  static const _controlMarkers = [
-    bos,
-    turnStart,
-    turnEnd,
-    thoughtControl,
-    ReasoningStreamParser.channelStart,
-    ReasoningStreamParser.channelEnd,
-  ];
 
   /// Pasted content must not be able to close the current turn or open a new
   /// one, so every control marker is stripped before rendering. Stripping
   /// runs to a fixpoint: removing an inner marker can splice its neighbours
   /// into a live one (`<|turn<turn|>>` → `<|turn>`), so one pass is not
   /// enough.
-  static String sanitize(String text) {
+  static String sanitize(
+    String text, [
+    ChatTemplateSpec spec = gemma4TemplateSpec,
+  ]) {
+    final markers = spec.controlMarkers;
     var cleaned = text;
     String previous;
     do {
       previous = cleaned;
-      for (final marker in _controlMarkers) {
+      for (final marker in markers) {
         cleaned = cleaned.replaceAll(marker, '');
       }
     } while (cleaned != previous);
@@ -93,27 +113,10 @@ abstract final class Gemma4ChatTemplate {
   static String _content(Map<String, String> message) =>
       (message['content'] ?? '').trim();
 
-  static String stripReasoningChannels(String text) {
-    var remaining = text;
-    final visible = StringBuffer();
-    while (remaining.isNotEmpty) {
-      final start = remaining.indexOf(ReasoningStreamParser.channelStart);
-      if (start < 0) {
-        visible.write(remaining);
-        break;
-      }
-      visible.write(remaining.substring(0, start));
-      final end = remaining.indexOf(
-        ReasoningStreamParser.channelEnd,
-        start + ReasoningStreamParser.channelStart.length,
-      );
-      if (end < 0) break;
-      remaining = remaining.substring(
-        end + ReasoningStreamParser.channelEnd.length,
-      );
-    }
-    return visible.toString().trim();
-  }
+  static String stripReasoningChannels(
+    String text, [
+    ChatTemplateSpec spec = gemma4TemplateSpec,
+  ]) => history.stripReasoningChannels(text, spec);
 }
 
 final class ReasoningStreamDelta {
@@ -132,8 +135,18 @@ enum _Channel { visible, reasoning, label }
 
 /// Parses markers even when a native engine splits them across callbacks.
 final class ReasoningStreamParser {
+  ReasoningStreamParser({
+    this.openMarker = channelStart,
+    this.closeMarker = channelEnd,
+  });
+
   static const channelStart = '<|channel>';
   static const channelEnd = '<channel|>';
+
+  /// The channel delimiters this instance parses. Defaulted to the pinned
+  /// Gemma markers; a supported custom profile supplies its own.
+  final String openMarker;
+  final String closeMarker;
 
   _Channel _channel = _Channel.visible;
   String _pending = '';
@@ -175,8 +188,8 @@ final class ReasoningStreamParser {
         continue;
       }
 
-      final start = _pending.indexOf(channelStart);
-      final end = _pending.indexOf(channelEnd);
+      final start = _pending.indexOf(openMarker);
+      final end = _pending.indexOf(closeMarker);
       final markerIndex = switch ((start, end)) {
         (-1, -1) => -1,
         (final value, -1) => value,
@@ -201,7 +214,7 @@ final class ReasoningStreamParser {
         answer: answer,
       );
       final opensLabel = start == markerIndex;
-      final marker = opensLabel ? channelStart : channelEnd;
+      final marker = opensLabel ? openMarker : closeMarker;
       _pending = _pending.substring(markerIndex + marker.length);
       _channel = opensLabel ? _Channel.label : _Channel.visible;
     }
@@ -213,12 +226,13 @@ final class ReasoningStreamParser {
   }
 
   int _possibleMarkerPrefixLength() {
-    final maximum = _pending.length < channelStart.length
-        ? _pending.length
-        : channelStart.length - 1;
+    final longest = openMarker.length > closeMarker.length
+        ? openMarker.length
+        : closeMarker.length;
+    final maximum = _pending.length < longest ? _pending.length : longest - 1;
     for (var length = maximum; length > 0; length--) {
       final suffix = _pending.substring(_pending.length - length);
-      if (channelStart.startsWith(suffix) || channelEnd.startsWith(suffix)) {
+      if (openMarker.startsWith(suffix) || closeMarker.startsWith(suffix)) {
         return length;
       }
     }
