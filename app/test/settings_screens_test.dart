@@ -734,6 +734,30 @@ void main() {
     expect(find.textContaining('already been added'), findsNothing);
   }, variant: iosChrome);
 
+  testWidgets('a resolved entry with no recognized template can be added '
+      'again', (tester) async {
+    // Resolution can succeed while the chat template matches no profile;
+    // such an entry never activates, and its card says to add it again. The
+    // duplicate guard must not count it, or the advised repair dead-ends.
+    await pumpCard(
+      tester,
+      const DeterministicRepositoryResolver(),
+      customModels: [
+        CustomModelSpec(
+          repository: 'org/tiny-GGUF',
+          engine: ModelEngine.gguf,
+          resolved: _resolution(),
+        ),
+      ],
+    );
+    await tester.tap(find.byKey(const Key('custom-repo-resolve')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('custom-repo-detail')), findsOneWidget);
+    expect(find.byKey(const Key('custom-repo-error')), findsNothing);
+    expect(find.textContaining('already been added'), findsNothing);
+  }, variant: iosChrome);
+
   testWidgets('an outcome landing after dispose touches nothing', (
     tester,
   ) async {

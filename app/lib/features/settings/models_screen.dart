@@ -362,14 +362,15 @@ class _CustomRepositoryCard extends ConsumerWidget {
     final resolver = ref.read(customRepositoryResolverProvider);
     final existingKeys = <String>{
       for (final entry in ref.read(modelCatalogEntriesProvider)) entry.key,
-      // Only resolved entries collide. An unresolved one is what the user is
-      // being told to add again, so counting it would refuse the only repair
-      // the card offers.
+      // Only entries with a recognized profile collide. Both an unresolved
+      // spec and a resolved one whose template matched no known profile are
+      // told by their card to add the repository again, so counting either
+      // would refuse the only repair the card offers.
       ...?ref
           .read(preferencesControllerProvider)
           .value
           ?.customModels
-          .where((spec) => spec.resolved != null)
+          .where((spec) => spec.profile != null)
           .map((spec) => spec.key),
     };
     onState(const _Resolving());
