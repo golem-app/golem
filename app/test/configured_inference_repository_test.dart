@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/configured_inference_repository.dart';
 import 'package:golem_flutter/broker/inferno_inference_repository.dart';
+import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/broker/runtime.dart';
+import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 
@@ -38,6 +40,8 @@ InferenceRepository _select({
   int samplingSeed = 0,
   String? initialCatalogKey,
   String? initialProjectorPath,
+  bool sideloaded = false,
+  List<ModelCatalogEntry> Function()? activationCatalog,
   _StubRuntime? runtime,
 }) => selectInferenceRepository(
   backend: backend,
@@ -45,6 +49,8 @@ InferenceRepository _select({
   modelProfile: modelProfile,
   initialCatalogKey: initialCatalogKey,
   initialProjectorPath: initialProjectorPath,
+  sideloaded: sideloaded,
+  activationCatalog: activationCatalog,
   samplingSeed: samplingSeed,
   fakeStreamDelay: Duration.zero,
   documentsDirectory: '/documents',
@@ -93,6 +99,71 @@ void main() {
     expect(
       runtime.loadedProjectorPath,
       '/documents/models/gemma4-gguf/projector.gguf',
+    );
+  });
+
+  test('a sideloaded configuration claims no catalog key', () async {
+    final runtime = _StubRuntime();
+    final repository =
+        _select(
+              backend: 'llama',
+              modelPath: '/operator/my-own-build.gguf',
+              // The policy derives one anyway; a sideload must not adopt it.
+              initialCatalogKey: 'gemma4-gguf',
+              sideloaded: true,
+              runtime: runtime,
+            )
+            as InfernoInferenceRepository;
+
+    await repository.prepare();
+
+    expect(
+      repository.residentModelKey.value,
+      isNull,
+      reason:
+          'reporting a pinned key here is what made the chat header name the '
+          'wrong model',
+    );
+    expect(runtime.loadedModelPath, '/operator/my-own-build.gguf');
+  });
+
+  test('activation resolves against the catalog it is given', () async {
+    // The #52 gap: a resolved custom repository downloads and verifies, then
+    // could not be loaded because activation only ever saw the pinned list.
+    final custom = ModelCatalogEntry(
+      key: 'custom-example-repo',
+      displayName: 'Example Repo',
+      engine: ModelEngine.gguf,
+      quantization: 'Q4_K_M',
+      repository: 'example/repo',
+      revision: 'a' * 40,
+      profileKey: 'qwen35',
+      files: const [
+        ModelArtifactFile(
+          path: 'model.gguf',
+          bytes: 12,
+          sha256: null,
+          role: ModelFileRole.weights,
+        ),
+      ],
+    );
+    final runtime = _StubRuntime();
+    final repository =
+        _select(
+              backend: 'llama',
+              modelPath: 'documents:models/gemma4-gguf/model.gguf',
+              initialCatalogKey: 'gemma4-gguf',
+              activationCatalog: () => [...modelCatalog, custom],
+              runtime: runtime,
+            )
+            as InfernoInferenceRepository;
+
+    await repository.prepare(modelKey: custom.key);
+
+    expect(repository.residentModelKey.value, custom.key);
+    expect(
+      runtime.loadedModelPath,
+      '/documents/${custom.installDirectory}/model.gguf',
     );
   });
 
