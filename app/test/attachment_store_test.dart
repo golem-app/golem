@@ -186,6 +186,31 @@ void main() {
       expect(await attachments.read(dropped.id), isNull);
     });
 
+    test('editing a message keeps its pictures', () async {
+      final attachments = InMemoryAttachmentRepository();
+      final stored = await attachments.store(const [1], mimeType: 'image/png');
+      final container = containerWith(
+        attachments,
+        history: historyWith([stored.id]),
+      );
+      addTearDown(container.dispose);
+      await container.read(chatControllerProvider.future);
+
+      await container
+          .read(chatControllerProvider.notifier)
+          .editAndTruncate('u1', 'What is that?');
+
+      final edited = container
+          .read(chatControllerProvider)
+          .value!
+          .active!
+          .messages
+          .first;
+      expect(edited.text, 'What is that?');
+      expect(edited.images, hasLength(1));
+      expect(await attachments.read(stored.id), isNotNull);
+    });
+
     test(
       'startup collects bytes no restored conversation references',
       () async {

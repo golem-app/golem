@@ -545,16 +545,15 @@ class ChatController extends _$ChatController {
       return;
     }
     if (modelKey != null && !_selectable(modelKey)) return;
-    final next = _value
-        .copyWith(
-          conversations: [
-            for (final item in _value.conversations)
-              if (item.id == id) item.withModel(modelKey) else item,
-          ],
-          // Whatever the last model failed at is no longer this chat's problem.
-          generation: GenerationPhase.idle,
-        )
-        .copyWith(clearFailure: true);
+    final next = _value.copyWith(
+      conversations: [
+        for (final item in _value.conversations)
+          if (item.id == id) item.withModel(modelKey) else item,
+      ],
+      // Whatever the last model failed at is no longer this chat's problem.
+      generation: GenerationPhase.idle,
+      clearFailure: true,
+    );
     state = AsyncData(next);
     await _persist(next);
   }
@@ -691,12 +690,9 @@ class ChatController extends _$ChatController {
     }
     final index = active.messages.indexWhere((item) => item.id == messageId);
     if (index < 0 || active.messages[index].role != MessageRole.user) return;
-    final edited = ChatMessage.text(
-      id: active.messages[index].id,
-      role: MessageRole.user,
-      text: text,
-      createdAt: active.messages[index].createdAt,
-    );
+    // withText, not a fresh text message: a re-run of an image turn is still an
+    // image turn, and dropping the part would unlink its bytes on the next save.
+    final edited = active.messages[index].withText(text);
     final next = _replaceActive(
       active.copyWith(
         messages: [...active.messages.take(index), edited],
