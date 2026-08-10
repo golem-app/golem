@@ -1374,8 +1374,10 @@ class ModelController extends _$ModelController {
   }
 }
 
-/// KeepAlive: the startup outcome is process-lifetime; #66 owns any
-/// startup redesign.
+/// KeepAlive: the startup outcome is process-lifetime. This is the scripted
+/// splash theatre (minimum hold, progress ticks, injected demo scenarios);
+/// real launch failures and their retry live before this scope exists, in
+/// the bootstrap gate (docs/decisions/0006-launch-bootstrap.md).
 @Riverpod(keepAlive: true, retry: noRetry)
 class StartupController extends _$StartupController {
   static const missingModel = bool.fromEnvironment('GOLEM_MISSING_MODEL');

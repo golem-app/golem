@@ -19,6 +19,16 @@ void main() {
 
   testWidgets('complete fake-only Golem journey', (tester) async {
     await app.launch(picker: const _JourneyPicker());
+    // launch() returns before the composition finishes, and the bootstrap
+    // splash schedules no frames while it runs — pumpAndSettle alone could
+    // settle on the splash. Poll the gate away on a real deadline instead.
+    final gateDeadline = DateTime.now().add(const Duration(seconds: 30));
+    while (find.byKey(const Key('launch-splash')).evaluate().isNotEmpty) {
+      if (DateTime.now().isAfter(gateDeadline)) {
+        fail('The startup gate never completed.');
+      }
+      await tester.pump(const Duration(milliseconds: 100));
+    }
     await tester.pumpAndSettle(const Duration(seconds: 2));
     if (find.byKey(const Key('empty-chat')).evaluate().isEmpty) {
       await tester.tap(find.byKey(const Key('new-chat-header')));

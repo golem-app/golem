@@ -209,17 +209,23 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
     // outright when its stream has no listener, so this subscription is what
     // makes the database and the replay map trustworthy.
     _permanent ??= _updates.listen(_recordTerminal);
-    await _downloader.start(
-      doTrackTasks: true,
-      markDownloadedComplete: true,
-      // The app decides what restarts. rescheduleKilledTasks re-enqueues
-      // killed tasks on its own, producing a writer the repository never
-      // sequenced and no hash gate governs.
-      doRescheduleKilledTasks: false,
-      // Its defaults drop records older than ten days, which is exactly the
-      // record a long-paused multi-gigabyte download is recovered through.
-      autoCleanDatabase: false,
-    );
+    // Bounded so a hung start throws instead of parking a forever-pending
+    // future in _ready — a caller that stopped waiting must find a cleared
+    // slot, or "the next call retries the start" would be a lie.
+    await _downloader
+        .start(
+          doTrackTasks: true,
+          markDownloadedComplete: true,
+          // The app decides what restarts. rescheduleKilledTasks re-enqueues
+          // killed tasks on its own, producing a writer the repository never
+          // sequenced and no hash gate governs.
+          doRescheduleKilledTasks: false,
+          // Its defaults drop records older than ten days, which is exactly
+          // the record a long-paused multi-gigabyte download is recovered
+          // through.
+          autoCleanDatabase: false,
+        )
+        .timeout(platformCallTimeout);
     await _pruneFinishedRecords();
     await _sweepOrphanedPartials();
   }
