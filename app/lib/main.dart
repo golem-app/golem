@@ -87,8 +87,11 @@ Future<void> launch({
     Directory('${support.path}/attachments'),
   );
 
-  final ModelManagementRepository modelManagement = useFakeModels
-      ? FakeModelManagementRepository(stateFile, catalog: mergedCatalog)
+  // The real repository's catalog grows in place as repositories are added, so
+  // holding the concrete instance is what lets the engine resolve an entry that
+  // did not exist at launch (#20).
+  final realModels = useFakeModels
+      ? null
       : RealModelManagementRepository(
           stateFile: stateFile,
           documentsDirectory: documents.path,
@@ -96,8 +99,15 @@ Future<void> launch({
           downloader: BackgroundArtifactDownloader(),
           diskSpace: const DeviceStorageChannel(),
           backupExclusion: const DeviceStorageChannel(),
-          activeArtifactKey: backendConfig.artifactKey,
+          // A sideload has no catalog entry, so no pinned artifact may be
+          // called active on its behalf.
+          activeArtifactKey: backendConfig.sideloaded
+              ? null
+              : backendConfig.artifactKey,
         );
+  final ModelManagementRepository modelManagement =
+      realModels ??
+      FakeModelManagementRepository(stateFile, catalog: mergedCatalog);
   runApp(
     ProviderScope(
       overrides: [
@@ -128,6 +138,11 @@ Future<void> launch({
             fakeStreamDelay: Duration(milliseconds: streamDelayMilliseconds),
             documentsDirectory: documents.path,
             readAttachment: attachments.read,
+            // The download layer's own list, live: a repository added in
+            // Advanced mode becomes activatable without a relaunch.
+            activationCatalog: realModels == null
+                ? null
+                : () => realModels.catalog,
           ),
         ),
         modelCatalogEntriesProvider.overrideWithValue(modelCatalog),

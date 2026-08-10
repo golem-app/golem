@@ -1,5 +1,6 @@
 import '../core/app_identity.dart';
 import '../core/domain/inference_backend.dart';
+import '../core/domain/model_catalog.dart';
 import '../core/repositories/contracts.dart';
 import '../core/repositories/fake_inference_repository.dart';
 import '../core/services/device_storage.dart';
@@ -32,6 +33,7 @@ InferenceRepository createConfiguredInferenceRepository({
   required Duration fakeStreamDelay,
   required String documentsDirectory,
   Future<List<int>?> Function(String attachmentId)? readAttachment,
+  List<ModelCatalogEntry> Function()? activationCatalog,
 }) {
   // Only a catalog-derived path inherits the projector and its capability
   // proof; a sideload stays text-only until its own pairing is validated.
@@ -44,8 +46,10 @@ InferenceRepository createConfiguredInferenceRepository({
     modelPath: config.modelPath ?? '',
     modelProfile: config.profileKey,
     initialCatalogKey: config.artifactKey,
+    sideloaded: config.sideloaded,
     initialProjectorPath: initialRuntime?.projectorPath,
     initialSupportsImages: initialRuntime?.supportsImages ?? false,
+    activationCatalog: activationCatalog,
     // A fixed seed pins sampling for determinism probes (0 = engine default).
     samplingSeed: const int.fromEnvironment('GOLEM_SAMPLING_SEED'),
     fakeStreamDelay: fakeStreamDelay,
@@ -74,6 +78,15 @@ InferenceRepository selectInferenceRepository({
   String? initialCatalogKey,
   String? initialProjectorPath,
   bool initialSupportsImages = false,
+
+  /// A real engine on an operator's own path. No catalog key is inferred for
+  /// it, so residency reports nothing rather than naming a pinned artifact the
+  /// engine does not hold.
+  bool sideloaded = false,
+
+  /// The entries activation may resolve, read on every switch so a repository
+  /// added after launch is reachable. Null keeps the pinned catalog.
+  List<ModelCatalogEntry> Function()? activationCatalog,
   required Duration fakeStreamDelay,
   required String documentsDirectory,
   required BrokerRuntime Function() createRuntime,
@@ -111,11 +124,18 @@ InferenceRepository selectInferenceRepository({
     engine: engine,
     modelPath: resolvedModelPath,
     profile: profile,
-    initialCatalogKey:
-        initialCatalogKey ??
-        activeArtifactKeyFor(backend: backend, modelProfile: modelProfile),
+    initialCatalogKey: sideloaded
+        ? null
+        : initialCatalogKey ??
+              activeArtifactKeyFor(
+                backend: backend,
+                modelProfile: modelProfile,
+              ),
     initialProjectorPath: initialProjectorPath,
     initialSupportsImages: initialSupportsImages,
+    resolveConfig: activationCatalog == null
+        ? resolveModelRuntimeConfig
+        : (key) => resolveModelRuntimeConfig(key, catalog: activationCatalog()),
     documentsDirectory: documentsDirectory,
     availableMemoryBytes: const DeviceStorageChannel().availableMemoryBytes,
     loadOptions: loadOptions,

@@ -44,14 +44,14 @@ void main() {
       activeArtifactKey: 'gemma4-mlx',
       simulated: true,
     );
-    expect(stamped.activeModelInstalled, isFalse);
+    expect(stamped.statusOf('gemma4-mlx').phase, ArtifactPhase.paused);
     final installed = stamped.withArtifact(
       'gemma4-mlx',
       const ArtifactStatus(phase: ArtifactPhase.installed),
     );
     // copyWith and withArtifact carry the stamps through transitions.
     expect(installed.simulated, isTrue);
-    expect(installed.activeModelInstalled, isTrue);
+    expect(installed.activeArtifactKey, 'gemma4-mlx');
   });
 
   test('v1 model state files are rejected as an unknown schema', () {

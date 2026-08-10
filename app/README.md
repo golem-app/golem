@@ -114,7 +114,9 @@ profile, and artifact resolve together and cannot disagree.
 engine or explicit-profile mismatch. `GOLEM_MODEL_PATH` remains the separate
 operator-sideload contract and must be paired manually with
 `GOLEM_MODEL_PROFILE` (`gemma4` or `qwen35`); because a sideload has no catalog
-proof, it stays text-only. Artifact and path overrides are mutually exclusive.
+proof, it stays text-only, claims no catalog key, and is labeled by its own file
+name rather than the pinned artifact its profile implies. Artifact and path
+overrides are mutually exclusive.
 No other app code may import Inferno;
 `../tool/check_inferno_imports.dart` and `test/inferno_import_boundary_test.dart`
 enforce that. Benchmark exports contain both:
@@ -188,19 +190,29 @@ added), runtime controls, Benchmark,
 JSON export, and the native share sheet. Privacy & data can stop saving chat
 history (confirming, then emptying the on-disk store), export every chat as
 JSON, and delete all chats; Storage breaks usage into models, chats, and
-cache with per-model delete and a cache clear. Custom repositories download
-for real nowhere yet: the fake simulates them and the real backend keeps Add
-disabled until #20.
+cache with per-model delete and a cache clear. A resolved custom repository
+downloads, verifies, and activates through the same paths as a pinned one; the
+fake simulates the whole flow, and an unresolved entry still refuses to download
+because its file list is synthesized.
 
 Assistant messages render a scoped markdown subset (paragraphs, emphasis,
 inline code, one-level lists, fenced code with a fixed dark card in both
 themes) through `features/chat/widgets/markdown/`; parsing is memoized per
 message so only the streaming bubble re-parses. Free text selection is
 deliberately absent — copy actions cover it on both chromes. Toasts are the
-chrome layer's `showGolemToast` (iOS pill / Android bar, no actions). The
-per-chat model selection persists on the conversation (`modelKey`); the fake
-simulates the switch fully, while real engines keep their configured model
-until #20 and the picker's footnote says so.
+chrome layer's `showGolemToast` (iOS pill / Android bar, no actions).
+
+The per-chat model selection persists on the conversation (`modelKey`) and a
+real engine honors it: the next send unloads and loads the chosen artifact
+through the residency owner. Because the **engine** is a build-time composition
+(`auto` composes llama.cpp/GGUF), the picker offers only artifacts that engine
+can load *and* that are installed — so every label may name the choice
+immediately without promising weights the next send would refuse. A model that
+is not downloaded stays disabled and points at Settings ▸ Models; under an
+operator `GOLEM_MODEL_PATH` the sheet refuses entirely and names the file the
+build pins, because a sideload has no catalog key to switch back to. Sampling,
+response style, and capability all follow the chosen model's profile, not the
+build's boot profile.
 
 Stable keys/semantics preserve the native automation vocabulary. The most useful
 identifiers are `launch-splash`, `chat-composer`, `send-button`, `stop-button`,

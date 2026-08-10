@@ -24,6 +24,46 @@ import 'support/in_memory_settings_repository.dart';
 Future<String> _fixtureAsset(String key) async =>
     '[{"role": "user", "content": "${'x' * 400}"}]';
 
+/// One catalog behind both the fake downloader and `modelCatalogEntriesProvider`
+/// in these containers: chat resolves the model a send needs through the
+/// catalog, so a repository stocking keys the catalog does not carry would test
+/// a world that cannot exist.
+const _testCatalog = [
+  ModelCatalogEntry(
+    key: 'test-mlx',
+    displayName: 'Test MLX',
+    engine: ModelEngine.mlx,
+    quantization: '4-bit',
+    repository: 'example/test-mlx',
+    revision: '0123456789abcdef',
+    profileKey: 'gemma4',
+    files: [
+      ModelArtifactFile(path: 'model.safetensors', bytes: 12, sha256: 'a'),
+    ],
+  ),
+];
+
+FakeModelManagementRepository fakeModels(Directory directory) =>
+    FakeModelManagementRepository(
+      File('${directory.path}/model.json'),
+      catalog: _testCatalog,
+      activeArtifactKey: 'test-mlx',
+      stepDelay: Duration.zero,
+    );
+
+Future<void> installActiveModel(ProviderContainer container) async {
+  await container.read(modelControllerProvider.future);
+  await container.read(modelControllerProvider.notifier).download('test-mlx');
+  expect(
+    container
+        .read(modelControllerProvider)
+        .requireValue
+        .statusOf('test-mlx')
+        .phase,
+    ArtifactPhase.installed,
+  );
+}
+
 final class _RecordingInferenceRepository implements InferenceRepository {
   _RecordingInferenceRepository({
     this.failPrepare = false,
@@ -251,6 +291,105 @@ void main() {
     await container.read(chatControllerProvider.notifier).send('Hello');
     expect(inference.lastOverrides?.maxTokens, 64);
     expect(inference.lastOverrides?.temperature, 1.4);
+  });
+
+  test(
+    'switching a chat\'s model switches which profile\'s sampling applies',
+    () async {
+      // The defect this pins: sampling used to follow the build's boot profile,
+      // so a chat switched from Gemma to Qwen silently kept Gemma's numbers.
+      final inference = _RecordingInferenceRepository();
+      final container = ProviderContainer(
+        overrides: [
+          chatHistoryRepositoryProvider.overrideWithValue(
+            InMemoryChatHistoryRepository(),
+          ),
+          inferenceRepositoryProvider.overrideWithValue(inference),
+          inferenceBackendProvider.overrideWithValue(
+            const InferenceBackendConfig(
+              kind: InferenceBackendKind.fake,
+              profileKey: 'gemma4',
+            ),
+          ),
+          modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
+          settingsRepositoryProvider.overrideWithValue(
+            InMemorySettingsRepository(
+              const GenerationSettings()
+                  .withModel('gemma4', const SamplingOverrides(maxTokens: 111))
+                  .withModel('qwen35', const SamplingOverrides(maxTokens: 222)),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(chatControllerProvider.future);
+      final controller = container.read(chatControllerProvider.notifier);
+      await controller.send('Hello');
+      expect(inference.lastOverrides?.maxTokens, 111);
+
+      // gemma4-gguf → qwen35-gguf: a profile change, not merely a model change.
+      final id = container.read(chatControllerProvider).requireValue.active!.id;
+      await controller.setConversationModel(id, 'qwen35-gguf');
+      await controller.send('Again');
+      expect(inference.lastOverrides?.maxTokens, 222);
+      expect(inference.lastModelKey, 'qwen35-gguf');
+    },
+  );
+
+  test('a real backend refuses a model it could not load', () async {
+    final directory = Directory.systemTemp.createTempSync('golem-select-test-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final container = ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(
+          _RecordingInferenceRepository(),
+        ),
+        inferenceBackendProvider.overrideWithValue(
+          const InferenceBackendConfig(
+            kind: InferenceBackendKind.mlx,
+            profileKey: 'gemma4',
+            artifactKey: 'test-mlx',
+            modelPath: 'documents:models/test-mlx',
+            modelPathFromCatalog: true,
+          ),
+        ),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(chatControllerProvider.future);
+    final controller = container.read(chatControllerProvider.notifier);
+    await controller.send('Hello');
+    final id = container.read(chatControllerProvider).requireValue.active!.id;
+    // The send failed into the missing-model banner, which is the state a user
+    // recovers from by picking a model.
+    expect(
+      container.read(chatControllerProvider).requireValue.failure?.kind,
+      ChatFailureKind.missingModel,
+    );
+
+    // Not installed yet: the choice is refused, so no label can name it. This
+    // is the invariant every "follow the selection" label depends on.
+    await controller.setConversationModel(id, 'test-mlx');
+    expect(
+      container.read(chatControllerProvider).requireValue.active!.modelKey,
+      isNull,
+    );
+
+    await installActiveModel(container);
+    await controller.setConversationModel(id, 'test-mlx');
+    final state = container.read(chatControllerProvider).requireValue;
+    expect(state.active!.modelKey, 'test-mlx');
+    // Switching clears the stale failure, so the banner does not outlive the
+    // model it was about.
+    expect(state.failure, isNull);
+    expect(state.generation, GenerationPhase.idle);
   });
 
   test(
@@ -625,44 +764,6 @@ void main() {
     expect(state.failure?.kind, ChatFailureKind.outOfMemory);
   });
 
-  FakeModelManagementRepository fakeModels(Directory directory) =>
-      FakeModelManagementRepository(
-        File('${directory.path}/model.json'),
-        catalog: const [
-          ModelCatalogEntry(
-            key: 'test-mlx',
-            displayName: 'Test MLX',
-            engine: ModelEngine.mlx,
-            quantization: '4-bit',
-            repository: 'example/test-mlx',
-            revision: '0123456789abcdef',
-            profileKey: 'gemma4',
-            files: [
-              ModelArtifactFile(
-                path: 'model.safetensors',
-                bytes: 12,
-                sha256: 'a',
-              ),
-            ],
-          ),
-        ],
-        activeArtifactKey: 'test-mlx',
-        stepDelay: Duration.zero,
-      );
-
-  Future<void> installActiveModel(ProviderContainer container) async {
-    await container.read(modelControllerProvider.future);
-    await container.read(modelControllerProvider.notifier).download('test-mlx');
-    expect(
-      container
-          .read(modelControllerProvider)
-          .requireValue
-          .statusOf('test-mlx')
-          .phase,
-      ArtifactPhase.installed,
-    );
-  }
-
   test('a real backend without its model fails fast into the CTA', () async {
     final directory = Directory.systemTemp.createTempSync('golem-cta-test-');
     addTearDown(() => directory.deleteSync(recursive: true));
@@ -685,6 +786,7 @@ void main() {
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
         ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
       ],
     );
     addTearDown(container.dispose);
@@ -712,6 +814,7 @@ void main() {
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
         ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
       ],
     );
     addTearDown(container.dispose);
@@ -748,6 +851,7 @@ void main() {
           modelManagementRepositoryProvider.overrideWithValue(
             fakeModels(directory),
           ),
+          modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
         ],
       );
       addTearDown(container.dispose);
@@ -791,6 +895,7 @@ void main() {
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
         ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
       ],
     );
     addTearDown(container.dispose);
@@ -829,6 +934,7 @@ void main() {
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
         ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
       ],
     );
     addTearDown(fakeContainer.dispose);
@@ -855,6 +961,7 @@ void main() {
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
         ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
       ],
     );
     addTearDown(realContainer.dispose);
@@ -879,6 +986,7 @@ void main() {
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
         ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
       ],
     );
     addTearDown(container.dispose);
@@ -904,6 +1012,7 @@ void main() {
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
         ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
       ],
     );
     addTearDown(container.dispose);
@@ -944,6 +1053,7 @@ void main() {
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
         ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
       ],
     );
     addTearDown(container.dispose);
@@ -978,6 +1088,7 @@ void main() {
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
         ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
       ],
     );
     addTearDown(container.dispose);
@@ -1023,6 +1134,7 @@ void main() {
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
         ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
       ],
     );
     addTearDown(container.dispose);
@@ -1048,6 +1160,7 @@ void main() {
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
         ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
       ],
     );
     addTearDown(container.dispose);
@@ -1070,6 +1183,7 @@ void main() {
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
         ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
       ],
     );
     addTearDown(container.dispose);
@@ -1103,6 +1217,7 @@ void main() {
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
         ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
       ],
     );
     addTearDown(container.dispose);

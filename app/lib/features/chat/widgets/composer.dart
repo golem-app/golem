@@ -148,19 +148,22 @@ class _ComposerState extends ConsumerState<Composer> {
   Widget build(BuildContext context) {
     final generating = generation != GenerationPhase.idle;
     final backend = ref.watch(inferenceBackendProvider);
-    final catalog = ref.watch(modelCatalogEntriesProvider);
+    final catalog = ref.watch(effectiveModelCatalogProvider);
     final resident = ref.watch(residentModelKeyProvider);
+    final loadable = ref.watch(loadableModelKeysProvider);
     final modelLabel = chatModelLabel(
       backend: backend,
       catalog: catalog,
       modelKey: modelKey,
       residentModelKey: resident,
+      loadableKeys: loadable,
     );
     final supportsImages = chatModelSupportsImages(
       backend: backend,
       catalog: catalog,
       modelKey: modelKey,
       residentModelKey: resident,
+      loadableKeys: loadable,
     );
     return Padding(
       padding: EdgeInsets.fromLTRB(

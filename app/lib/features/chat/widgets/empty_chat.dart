@@ -45,11 +45,12 @@ class EmptyChat extends ConsumerWidget {
     final backend = ref.watch(inferenceBackendProvider);
     final label = chatModelLabel(
       backend: backend,
-      catalog: ref.watch(modelCatalogEntriesProvider),
+      catalog: ref.watch(effectiveModelCatalogProvider),
       modelKey: ref.watch(
         chatControllerProvider.select((state) => state.value?.active?.modelKey),
       ),
       residentModelKey: ref.watch(residentModelKeyProvider),
+      loadableKeys: ref.watch(loadableModelKeysProvider),
     );
     return Center(
       child: SingleChildScrollView(

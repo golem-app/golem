@@ -897,6 +897,58 @@ final class EffectiveModelCatalogProvider
 String _$effectiveModelCatalogHash() =>
     r'e5ef1df3119d320d101a756b92fbef2cf4d28857';
 
+/// The models a per-chat selection may name: installed, and of the engine this
+/// build composed. Derived here so chat, Settings, and Storage cannot disagree
+/// about which model is live (#20).
+
+@ProviderFor(loadableModelKeys)
+const loadableModelKeysProvider = LoadableModelKeysProvider._();
+
+/// The models a per-chat selection may name: installed, and of the engine this
+/// build composed. Derived here so chat, Settings, and Storage cannot disagree
+/// about which model is live (#20).
+
+final class LoadableModelKeysProvider
+    extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
+    with $Provider<Set<String>> {
+  /// The models a per-chat selection may name: installed, and of the engine this
+  /// build composed. Derived here so chat, Settings, and Storage cannot disagree
+  /// about which model is live (#20).
+  const LoadableModelKeysProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'loadableModelKeysProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$loadableModelKeysHash();
+
+  @$internal
+  @override
+  $ProviderElement<Set<String>> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Set<String> create(Ref ref) {
+    return loadableModelKeys(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Set<String> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Set<String>>(value),
+    );
+  }
+}
+
+String _$loadableModelKeysHash() => r'e1fc1aba3225db2d81c08133f3da197d03c492ef';
+
 /// The raw field text stays widget-local in the search screen (debounced
 /// 350 ms); only the normalized query lands here, so results derive reactively.
 

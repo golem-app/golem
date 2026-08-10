@@ -4,16 +4,15 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/chrome/golem_sheet.dart';
 import '../../../core/domain/inference_backend.dart';
+import '../../../core/domain/model_activation.dart';
 import '../../../core/domain/model_catalog.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
-import '../model_label.dart';
 
-/// The per-chat model sheet. Selection persists on the conversation; the fake
-/// simulates the switch fully, while a real engine keeps running its
-/// configured model until #20 — the footnote says so rather than let the sheet
-/// imply a hot swap.
+/// The per-chat model sheet. Selection persists on the conversation and is
+/// offered only for a model this build could actually load, so the chip may
+/// name the choice at once without promising weights that will not run (#20).
 Future<void> showModelPickerSheet(
   BuildContext context, {
   required String conversationId,
@@ -29,9 +28,10 @@ final class _ModelPickerContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final catalog = ref.watch(modelCatalogEntriesProvider);
+    final catalog = ref.watch(effectiveModelCatalogProvider);
     final backend = ref.watch(inferenceBackendProvider);
     final models = ref.watch(modelControllerProvider).value;
+    final loadable = ref.watch(loadableModelKeysProvider);
     final modelKey = ref.watch(
       chatControllerProvider.select(
         (state) => state.value?.conversations
@@ -45,21 +45,14 @@ final class _ModelPickerContent extends ConsumerWidget {
       catalog: catalog,
       modelKey: modelKey,
       residentModelKey: ref.watch(residentModelKeyProvider),
+      loadableKeys: loadable,
     );
     // Real builds hide artifacts their composed engine can never load
     // (#63) — the fake keeps the full catalog for its simulated switch.
     final visible = backend.simulatedInference
         ? catalog
-        : catalog
-              .where(
-                (entry) => switch (backend.kind) {
-                  InferenceBackendKind.fake => true,
-                  InferenceBackendKind.llama =>
-                    entry.engine == ModelEngine.gguf,
-                  InferenceBackendKind.mlx => entry.engine == ModelEngine.mlx,
-                },
-              )
-              .toList();
+        : catalog.where((entry) => backend.kind.loads(entry.engine)).toList();
+    final hidden = catalog.length - visible.length;
     return SafeArea(
       top: false,
       child: Padding(
@@ -84,9 +77,14 @@ final class _ModelPickerContent extends ConsumerWidget {
                 entry: entry,
                 selected: entry.key == selected,
                 status: _statusLine(entry, models),
-                // Until #20 only the running artifact's row stays tappable on
-                // a real engine; the footnote below explains why.
-                onTap: backend.simulatedInference || entry.key == selected
+                // A model that is not installed cannot be chosen — the chip
+                // would name weights the next send would fail to load. Manage
+                // models below is the route to fetch one.
+                // A sideload cannot be switched away from and back: it has no
+                // catalog key to return to, so the door only opens one way.
+                onTap:
+                    backend.simulatedInference ||
+                        (!backend.sideloaded && loadable.contains(entry.key))
                     ? () async {
                         final controller = ref.read(
                           chatControllerProvider.notifier,
@@ -105,9 +103,12 @@ final class _ModelPickerContent extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.only(top: GolemSpace.s1),
                 child: Text(
-                  'Golem is running '
-                  '${chatModelLabel(backend: backend, catalog: catalog, modelKey: null, residentModelKey: ref.watch(residentModelKeyProvider))}. '
-                  'Per-chat model switching arrives in a future update.',
+                  backend.sideloaded
+                      ? 'This build runs '
+                            '${sideloadedModelLabel(backend.modelPath!)} from a '
+                            'path it pins, so this chat cannot switch models.'
+                      : 'A different model loads with your next message.'
+                            '${hidden > 0 ? ' Models for the other engine are not listed.' : ''}',
                   style: GolemText.caption.copyWith(
                     color: CupertinoDynamicColor.resolve(
                       GolemTheme.mutedInk,

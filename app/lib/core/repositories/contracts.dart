@@ -60,11 +60,11 @@ abstract interface class InferenceRepository {
   /// so honesty labels follow this rather than the boot-resolved configuration.
   ValueListenable<String?> get residentModelKey;
 
-  /// [overrides] are the user's sparse per-model settings, merged onto the
-  /// profile's recommended defaults by a real backend and ignored by the fake.
-  /// [modelKey] is activated when it is not already resident (chat-side
-  /// switching UX stays with #20). [systemPrompt] renders as the leading system
-  /// turn; the fake acknowledges it so the round-trip is provable model-free.
+  /// [overrides] are the user's sparse per-model settings for the profile of
+  /// [modelKey]'s model, merged onto that profile's recommended defaults by a
+  /// real backend and ignored by the fake. [modelKey] is activated when it is
+  /// not already resident. [systemPrompt] renders as the leading system turn;
+  /// the fake acknowledges it so the round-trip is provable model-free.
   Stream<InferenceEvent> generate({
     required List<PromptMessage> context,
     required bool reasoningEnabled,
