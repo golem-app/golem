@@ -427,19 +427,60 @@ an image turn, and history read back off disk:
 
 ```sh
 flutter test integration_test/device_acceptance_test.dart -d <device> \
-  --flavor qa --dart-define=GOLEM_INFERENCE_BACKEND=auto \
+  --flavor qa --no-uninstall --dart-define=GOLEM_INFERENCE_BACKEND=auto \
   --dart-define=GOLEM_DEVICE_ACCEPTANCE=true \
   --dart-define=GOLEM_ACCEPT_PRIMARY=gemma4-gguf \
   --dart-define=GOLEM_ACCEPT_SECONDARY=qwen35-2b-gguf \
   --dart-define=GOLEM_ACCEPT_IMAGE=true
 ```
 
-Two operational facts to plan around. A device test bundle install preserves the
-app's data, but **teardown uninstalls the app** — anything provisioned by hand is
-gone afterwards, so budget one provisioning pass per run. And a release build's
-`debugPrint` is os_log-privacy-redacted in an `ios syslog` capture, so read
-`GOLEM_CELL` and `INFERNO_METRICS` from the test harness console instead. Results
-live in `../docs/real-model-matrix.md`.
+**`--no-uninstall` is not optional on a phone.** `flutter test` uninstalls the
+app on teardown by default and takes the container's models with it, which is
+what used to make every run pay a full multi-gigabyte provisioning pass. With
+the flag the app and its documents survive, so provisioning is once per device
+and every later run installs from bytes already present. Desktop targets are
+unaffected either way — a macOS "uninstall" is a no-op.
+
+Provisioning is therefore a separate, deliberate step, and the offline path is
+the default: an unprovisioned artifact fails fast and names the directory to
+fill rather than quietly spending five gigabytes. Sideload the pinned files
+(`../packages/inferno/lib/src/model_manifest.dart` is the authority on names and
+byte counts; `dart run tool/fetch_model.dart gguf` in `../packages/inferno`
+fetches them to the Mac) into `models/<catalog-key>/` under the app's documents
+directory. One bootstrap run creates those directories for you:
+
+```sh
+# Android — flutter test builds debug, so the QA package is run-as-able
+adb -s <serial> push <file> /data/local/tmp/
+adb -s <serial> shell run-as app.golem.qa \
+  cp /data/local/tmp/<file> app_flutter/models/<catalog-key>/
+
+# iOS — one file per invocation; devicectl will not copy a directory
+xcrun devicectl device copy to --device <UUID> --user mobile \
+  --domain-type appDataContainer --domain-identifier app.golem.qa \
+  --source <file> --destination Documents/models/<catalog-key>/<name>
+```
+
+The next run hashes them in place against the pinned SHA-256s, writes the
+receipt, and installs with no network at all; the run after that finds the
+receipt and does neither. To fetch from Hugging Face for real instead — the
+path the matrix's downloaded cells claim — add
+`--dart-define=GOLEM_ACCEPT_DOWNLOAD=true`.
+
+Every gated instrument paints its progress on the device it occupies
+(`integration_test/support/acceptance_hud.dart`): current step, live bytes
+against the artifact total, and an elapsed clock, so a working run and a hung
+one no longer look the same. It is test-only and never linked into `lib/`, which
+`test/inferno_import_boundary_test.dart` enforces. Read it off the screen rather
+than attaching an observer — a WebDriverAgent session (Mobile MCP against a real
+iPhone) turns on iOS accessibility, and the semantics handle that opens fails
+the run at teardown with "A SemanticsHandle was active at the end of the test"
+after every assertion has already passed.
+
+One more operational fact: a release build's `debugPrint` is
+os_log-privacy-redacted in an `ios syslog` capture, so read `GOLEM_CELL` and
+`INFERNO_METRICS` from the test harness console instead. Results live in
+`../docs/real-model-matrix.md`.
 
 ## Model evaluation harness (macOS)
 

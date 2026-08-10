@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/services/image_intake.dart';
@@ -11,11 +14,13 @@ import 'package:integration_test/integration_test.dart';
 
 import 'package:golem_flutter/main.dart' as app;
 
+import 'support/acceptance_hud.dart';
+
 /// The real-model chat acceptance for one device/engine cell (#20).
 ///
 /// ```sh
 /// flutter test integration_test/device_acceptance_test.dart -d <device> \
-///   --flavor qa --dart-define=GOLEM_INFERENCE_BACKEND=auto \
+///   --flavor qa --no-uninstall --dart-define=GOLEM_INFERENCE_BACKEND=auto \
 ///   --dart-define=GOLEM_DEVICE_ACCEPTANCE=true \
 ///   --dart-define=GOLEM_ACCEPT_PRIMARY=gemma4-gguf \
 ///   --dart-define=GOLEM_ACCEPT_SECONDARY=qwen35-2b-gguf \
@@ -32,14 +37,21 @@ import 'package:golem_flutter/main.dart' as app;
 /// because a release build's `debugPrint` is privacy-redacted in an iOS syslog
 /// capture.
 ///
-/// A device test bundle install preserves the app's data but teardown removes
-/// the app, so anything provisioned by hand must be re-provisioned per run.
+/// **`--no-uninstall` is not optional on a phone** (#83). Without it the
+/// harness uninstalls the app on teardown and takes the container's models with
+/// it, so every run pays full provisioning and hands the next one nothing. With
+/// it, provisioning is once per device and the offline path — bytes already in
+/// the container, verified against the pinned hashes with no network — is what
+/// every later run takes. That offline path is the default: fetching from the
+/// Hub is the explicit opt-in `--dart-define=GOLEM_ACCEPT_DOWNLOAD=true`, so an
+/// unprovisioned device says so instead of quietly spending five gigabytes.
 ///
 /// CI never sets the defines, so this self-skips and touches no weights.
 const _enabled = bool.fromEnvironment('GOLEM_DEVICE_ACCEPTANCE');
 const _primary = String.fromEnvironment('GOLEM_ACCEPT_PRIMARY');
 const _secondary = String.fromEnvironment('GOLEM_ACCEPT_SECONDARY');
 const _image = bool.fromEnvironment('GOLEM_ACCEPT_IMAGE');
+const _allowDownload = bool.fromEnvironment('GOLEM_ACCEPT_DOWNLOAD');
 
 /// A 320×320 solid red PNG. Large enough for a vision encoder to see, and its
 /// one correct answer is knowable without shipping a photograph.
@@ -96,22 +108,72 @@ void main() {
         'the launch splash to dismiss',
         () => find.byKey(const Key('launch-splash')).evaluate().isEmpty,
       );
+      await AcceptanceHud.attach(tester);
+      host(
+        'GOLEM_CELL lifecycle download=${_allowDownload ? 'allowed' : 'offline'} '
+        '— run with --no-uninstall or teardown deletes these models',
+      );
       final providers = ProviderScope.containerOf(
         tester.element(find.byType(ChatScreen)),
       );
       final models = providers.read(modelControllerProvider.notifier);
       final chat = providers.read(chatControllerProvider.notifier);
+      final documents = providers.read(documentsPathProvider);
+      final catalog = providers.read(modelCatalogEntriesProvider);
+
+      // Every file of the entry already on disk at its pinned length. Not a
+      // verdict — the download path still hashes them — but enough to know
+      // whether this install needs the network at all.
+      Future<bool> bytesArePresent(ModelCatalogEntry entry) async {
+        for (final spec in entry.files) {
+          final file = File(
+            '$documents/${entry.installDirectory}/${spec.path}',
+          );
+          if (!await file.exists() || await file.length() != spec.bytes) {
+            return false;
+          }
+        }
+        return true;
+      }
 
       Future<void> install(String key) async {
+        final entry = catalog.firstWhere((entry) => entry.key == key);
         final before = providers
             .read(modelControllerProvider)
             .requireValue
             .statusOf(key);
-        host(
-          'GOLEM_CELL install $key from=${before.phase.name} '
-          'bytes=${before.downloadedBytes}',
+        // An install already receipted in the container is the whole point of
+        // provisioning once: no network, no rehash, straight to the turns.
+        if (before.phase == ArtifactPhase.installed) {
+          AcceptanceHud.step('$key already installed');
+          host(
+            'GOLEM_CELL install $key from=installed '
+            'bytes=${before.downloadedBytes}',
+          );
+          return;
+        }
+
+        final present = await bytesArePresent(entry);
+        if (!present && !_allowDownload) {
+          AcceptanceHud.finish('$key is not provisioned on this device');
+          fail(
+            '$key is not provisioned on this device. Copy its '
+            '${entry.files.length} pinned file(s) into '
+            '$documents/${entry.installDirectory}/ and run again, or pass '
+            '--dart-define=GOLEM_ACCEPT_DOWNLOAD=true to fetch them from the '
+            'Hub for real. Either way pass --no-uninstall, or teardown '
+            'deletes them again.',
+          );
+        }
+
+        final source = present ? 'present-offline' : 'hub';
+        AcceptanceHud.step(
+          present ? 'Verifying $key offline' : 'Downloading $key',
         );
-        if (before.phase == ArtifactPhase.installed) return;
+        host(
+          'GOLEM_CELL install $key from=$source '
+          'bytes=${before.downloadedBytes} total=${entry.totalBytes}',
+        );
         models.download(key);
         await pumpUntil(tester, '$key to install', () {
           final status = providers
@@ -121,9 +183,16 @@ void main() {
           if (status.phase == ArtifactPhase.failed) {
             fail('$key failed to install: ${status.failure}');
           }
+          // Straight off the download layer's own status stream, so the screen
+          // can never claim more than the repository has banked.
+          AcceptanceHud.progress(
+            received: status.downloadedBytes,
+            total: entry.totalBytes,
+            detail: status.phase.name,
+          );
           return status.phase == ArtifactPhase.installed;
         }, timeout: const Duration(minutes: 40));
-        host('GOLEM_CELL installed $key');
+        host('GOLEM_CELL installed $key from=$source');
       }
 
       // Driven through the composer, not the controller: an attachment lives in
@@ -138,11 +207,16 @@ void main() {
         await tester.enterText(find.byKey(const Key('chat-composer')), prompt);
         await tester.pump();
         await tester.tap(find.byKey(const Key('send-button')));
-        await pumpUntil(
-          tester,
-          'a turn to complete',
-          () => metrics.length >= expected,
-        );
+        await pumpUntil(tester, 'a turn to complete', () {
+          AcceptanceHud.progress(
+            detail: providers
+                .read(chatControllerProvider)
+                .requireValue
+                .generation
+                .name,
+          );
+          return metrics.length >= expected;
+        });
         await pumpUntil(
           tester,
           'the composer to go idle',
@@ -159,6 +233,15 @@ void main() {
             .text;
       }
 
+      // Every destination this cell can need, before the first one is missed:
+      // one bootstrap run then prepares the whole sideload in a single pass
+      // rather than one directory per failed attempt.
+      for (final key in [_primary, if (_secondary.isNotEmpty) _secondary]) {
+        await Directory(
+          '$documents/${catalog.firstWhere((e) => e.key == key).installDirectory}',
+        ).create(recursive: true);
+      }
+
       await install(_primary);
       await chat.newChat();
       await chat.setConversationModel(
@@ -171,6 +254,7 @@ void main() {
         reason: 'the cell under test must be the model the chat actually runs',
       );
 
+      AcceptanceHud.step('Text turn on $_primary');
       final first = await turn(
         'Name the capital of France. Answer with one word.',
       );
@@ -189,6 +273,7 @@ void main() {
           _secondary,
           reason: 'an installed same-engine artifact must be selectable',
         );
+        AcceptanceHud.step('Switch turn on $_secondary');
         final switched = await turn(
           'Name the capital of Japan. Answer with one word.',
         );
@@ -207,13 +292,27 @@ void main() {
       if (_image) {
         // Back to the image-capable artifact, then attach through the real
         // sheet and composer tray rather than a synthetic message part.
+        AcceptanceHud.step('Image turn on $_primary');
         await chat.setConversationModel(
           providers.read(chatControllerProvider).requireValue.active!.id,
           _primary,
         );
-        await tester.pumpAndSettle();
+        // Waits, not pumpAndSettle: the HUD's liveness pulse never stops
+        // scheduling frames, so settling is not a state this screen reaches.
+        await pumpUntil(
+          tester,
+          'the attach button to be tappable',
+          () => find.byKey(const Key('composer-attach')).evaluate().isNotEmpty,
+        );
         await tester.tap(find.byKey(const Key('composer-attach')));
-        await tester.pumpAndSettle();
+        await pumpUntil(
+          tester,
+          'the attach sheet to open',
+          () => find
+              .byKey(const Key('attach-photo-library'))
+              .evaluate()
+              .isNotEmpty,
+        );
         await tester.tap(find.byKey(const Key('attach-photo-library')));
         await pumpUntil(
           tester,
@@ -230,6 +329,7 @@ void main() {
         host('GOLEM_CELL image primary=$_primary answer="${described.trim()}"');
       }
 
+      AcceptanceHud.step('Reading the chat back off disk');
       // History is on disk, not merely in memory: the turns must survive the
       // next launch, which is what a restart would read.
       final stored = await providers.read(chatHistoryRepositoryProvider).load();
@@ -246,6 +346,7 @@ void main() {
         'modelKey=${persisted.modelKey}',
       );
       host('GOLEM_CELL metrics\n${metrics.join('\n')}');
+      AcceptanceHud.finish('Done — cell passed, models kept on this device');
     },
     timeout: const Timeout(Duration(minutes: 90)),
     skip: !_enabled || _primary.isEmpty,

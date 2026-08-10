@@ -9,6 +9,8 @@ import 'package:path_provider/path_provider.dart';
 
 import 'package:golem_flutter/main.dart' as app;
 
+import 'support/acceptance_hud.dart';
+
 /// The repeatable soak regimen for a real backend (#63): twelve sequential
 /// turns under a deliberately tiny context budget, crossing the windowing
 /// boundary several times, asserting the conversation never bricks (no
@@ -17,13 +19,14 @@ import 'package:golem_flutter/main.dart' as app;
 ///
 /// ```sh
 /// flutter test integration_test/real_soak_test.dart -d <device> \
-///   --flavor qa --dart-define=GOLEM_INFERENCE_BACKEND=auto
+///   --flavor qa --no-uninstall --dart-define=GOLEM_INFERENCE_BACKEND=auto
 /// ```
 ///
-/// A deliberate measurement instrument like the probe: fresh container,
-/// installed model, never CI. The tiny budget is seeded through the real
-/// settings store before the app boots, so every turn exercises exactly
-/// the windowing and sampling enforcement that ships.
+/// A deliberate measurement instrument like the probe: installed model,
+/// never CI. The tiny budget is seeded through the real settings store
+/// before the app boots, so every turn exercises exactly the windowing
+/// and sampling enforcement that ships. `--no-uninstall` keeps the model
+/// this soak needs from being deleted on teardown (#83).
 const _backend = String.fromEnvironment(
   'GOLEM_INFERENCE_BACKEND',
   defaultValue: 'fake',
@@ -59,8 +62,23 @@ void main() {
       // Seed the tiny budget through the real settings store before the
       // app boots: the soak must measure the shipped merge path, not a
       // parallel configuration channel.
+      //
+      // Put it back afterwards. The soak used to get a fresh container from
+      // the harness uninstalling the app; now that a device keeps its
+      // container across runs (#83), a 1024-token budget left behind is a
+      // booby trap for the next instrument — an image turn under it overflows
+      // the window and raises the recovery banner.
       final support = await getApplicationSupportDirectory();
-      await File('${support.path}/flutter-prefs-v1.json').writeAsString(
+      final settings = File('${support.path}/flutter-prefs-v1.json');
+      final restored = await settings.exists()
+          ? await settings.readAsString()
+          : null;
+      addTearDown(
+        () => restored == null
+            ? settings.delete()
+            : settings.writeAsString(restored),
+      );
+      await settings.writeAsString(
         jsonEncode({
           'schemaVersion': 1,
           'models': {
@@ -96,8 +114,10 @@ void main() {
         'the launch splash to dismiss',
         () => find.byKey(const Key('launch-splash')).evaluate().isEmpty,
       );
+      await AcceptanceHud.attach(tester);
 
       for (var turn = 1; turn <= _turns; turn++) {
+        AcceptanceHud.step('Turn $turn of $_turns');
         final expected = metricsLines.length + 1;
         await tester.tap(find.byKey(const Key('chat-composer')));
         await tester.enterText(
@@ -128,6 +148,7 @@ void main() {
         );
       }
 
+      AcceptanceHud.step('Checking the footprint plateaued');
       expect(metricsLines, hasLength(_turns));
 
       // Footprint must plateau: after the model and caches are warm
@@ -152,6 +173,11 @@ void main() {
                 'baseline $warm',
           );
         }
+        AcceptanceHud.finish(
+          'Done — $_turns turns, warm footprint ${formatBytes(warm)}',
+        );
+      } else {
+        AcceptanceHud.finish('Done — $_turns turns, no footprint reported');
       }
     },
     timeout: const Timeout(Duration(minutes: 30)),
