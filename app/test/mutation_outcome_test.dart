@@ -55,6 +55,39 @@ void main() {
       expect(repository.settings.overridesFor('gemma4').temperature, 0.9);
     });
 
+    test(
+      'overlapping failures roll back to the last persisted value',
+      () async {
+        final repository = InMemorySettingsRepository();
+        final container = buildContainer(settings: repository);
+        addTearDown(container.dispose);
+        final controller = container.read(settingsControllerProvider.notifier);
+        await container.read(settingsControllerProvider.future);
+        final persisted = container
+            .read(settingsControllerProvider)
+            .requireValue;
+
+        repository.failingSaves = 2;
+        // Both commits fail; the second one's "previous" is the first one's
+        // unpersisted optimistic value, which must NOT survive the rollback.
+        final first = controller.updateModel(
+          'gemma4',
+          const SamplingOverrides(temperature: 0.2),
+        );
+        final second = controller.updateModel(
+          'gemma4',
+          const SamplingOverrides(temperature: 1.1),
+        );
+        expect(await first, isFalse);
+        expect(await second, isFalse);
+        expect(
+          container.read(settingsControllerProvider).requireValue,
+          persisted,
+        );
+        expect(repository.settings, persisted);
+      },
+    );
+
     test('a stale failure cannot clobber a newer successful commit', () async {
       final repository = InMemorySettingsRepository();
       final container = buildContainer(settings: repository);
@@ -128,6 +161,31 @@ void main() {
         isTrue,
       );
       expect(preferences.preferences.saveHistory, isTrue);
+      expect(chatHistory.snapshot.conversations, isNotEmpty);
+    });
+
+    test('a wipe that lands under a failed commit is undone', () async {
+      final chatHistory = InMemoryChatHistoryRepository(seedHistory());
+      final preferences = InMemoryPreferencesRepository();
+      final container = buildContainer(
+        preferences: preferences,
+        chatHistory: chatHistory,
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(preferencesControllerProvider.notifier);
+      await container.read(preferencesControllerProvider.future);
+      await container.read(chatControllerProvider.future);
+
+      preferences.failingSaves = 1;
+      final saved = await controller.setSaveHistory(false);
+
+      expect(saved, isFalse);
+      // The toggle stayed on, so the successful wipe was rolled back too:
+      // disk must match what the UI claims it kept.
+      expect(
+        container.read(preferencesControllerProvider).requireValue.saveHistory,
+        isTrue,
+      );
       expect(chatHistory.snapshot.conversations, isNotEmpty);
     });
 
