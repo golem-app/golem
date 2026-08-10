@@ -187,7 +187,17 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
             controller: _repositoryController,
             revisionController: _revisionController,
             state: _addState,
-            onState: (state) => setState(() => _addState = state),
+            // Resolving a repository takes seconds of network, and Back is one
+            // tap: both callbacks can land after this screen is gone.
+            onState: (state) {
+              if (mounted) setState(() => _addState = state);
+            },
+            onAdded: () {
+              if (!mounted) return;
+              _repositoryController.clear();
+              _revisionController.clear();
+              setState(() => _addState = const _Unresolved());
+            },
             engine: _customEngine,
             onEngine: (engine) => setState(() {
               _customEngine = engine;
@@ -311,6 +321,7 @@ class _CustomRepositoryCard extends ConsumerWidget {
     required this.revisionController,
     required this.state,
     required this.onState,
+    required this.onAdded,
     required this.engine,
     required this.onEngine,
     required this.simulatedDownloads,
@@ -322,6 +333,10 @@ class _CustomRepositoryCard extends ConsumerWidget {
   /// Owned by the screen, so scrolling this card off-list cannot discard it.
   final _AddState state;
   final ValueChanged<_AddState> onState;
+
+  /// Clears the draft once a spec is persisted. Owned by the screen for the
+  /// same reason [state] is, and because it touches the two controllers.
+  final VoidCallback onAdded;
 
   final ModelEngine engine;
   final ValueChanged<ModelEngine> onEngine;
@@ -347,20 +362,32 @@ class _CustomRepositoryCard extends ConsumerWidget {
     final resolver = ref.read(customRepositoryResolverProvider);
     final existingKeys = <String>{
       for (final entry in ref.read(modelCatalogEntriesProvider)) entry.key,
+      // Only resolved entries collide. An unresolved one is what the user is
+      // being told to add again, so counting it would refuse the only repair
+      // the card offers.
       ...?ref
           .read(preferencesControllerProvider)
           .value
           ?.customModels
+          .where((spec) => spec.resolved != null)
           .map((spec) => spec.key),
     };
     onState(const _Resolving());
-    final outcome = await resolver.resolve(
-      repository: repository,
-      engine: engine,
-      ref: _ref,
-      weightsFile: weightsFile,
-      existingKeys: existingKeys,
-    );
+    final RepositoryResolution outcome;
+    try {
+      outcome = await resolver.resolve(
+        repository: repository,
+        engine: engine,
+        ref: _ref,
+        weightsFile: weightsFile,
+        existingKeys: existingKeys,
+      );
+    } catch (_) {
+      // A resolver that escapes its own failure contract must not strand the
+      // card on a spinner with no message and no way back.
+      onState(_Refused(RepositoryRejection.malformedMetadata.message));
+      return;
+    }
     onState(switch (outcome) {
       RepositoryResolved() => _Resolved(outcome),
       RepositoryNeedsWeightChoice(:final candidates) => _WeightChoice(
@@ -385,9 +412,9 @@ class _CustomRepositoryCard extends ConsumerWidget {
         resolved: outcome.resolved,
       ),
     );
-    controller.clear();
-    revisionController.clear();
-    onState(const _Unresolved());
+    // The controllers and the draft state belong to the screen, which may be
+    // gone: only it can decide whether resetting them is still meaningful.
+    onAdded();
     if (context.mounted) showGolemToast(context, 'Model added');
   }
 
@@ -494,9 +521,11 @@ class _CustomRepositoryCard extends ConsumerWidget {
         children: [
           const CupertinoActivityIndicator(radius: 8),
           const SizedBox(width: 10),
-          Text(
-            'Reading the repository…',
-            style: GolemText.footnote.copyWith(color: muted),
+          Flexible(
+            child: Text(
+              'Reading the repository…',
+              style: GolemText.footnote.copyWith(color: muted),
+            ),
           ),
         ],
       ),
