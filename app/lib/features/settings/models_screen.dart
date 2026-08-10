@@ -61,8 +61,22 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
         bottom: false,
         child: model.when(
           loading: () => const Center(child: CupertinoActivityIndicator()),
-          error: (error, stack) =>
-              Center(child: Text('Could not load model state: $error')),
+          // Fixed copy: raw exception text never reaches a surface (§8.1).
+          error: (error, stack) => Center(
+            child: Column(
+              key: const Key('models-load-error'),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Couldn't load model state."),
+                const SizedBox(height: 12),
+                GolemButton.filled(
+                  label: 'Try again',
+                  onPressed: () => ref.invalidate(modelControllerProvider),
+                  expand: false,
+                ),
+              ],
+            ),
+          ),
           data: (value) => _body(context, value),
         ),
       ),

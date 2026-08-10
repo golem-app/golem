@@ -11,11 +11,24 @@ final class InMemoryChatHistoryRepository implements ChatHistoryRepository {
   /// the fault-injection hook for rollback tests.
   int failingSaves = 0;
 
+  /// While > 0, each [storedBytes] throws a typed read failure and
+  /// decrements — the storage-breakdown fault hook.
+  int failingStoredBytes = 0;
+
   @override
   Future<ChatHistorySnapshot> load() async => snapshot;
 
   @override
-  Future<int> storedBytes() async => snapshot.encode().length;
+  Future<int> storedBytes() async {
+    if (failingStoredBytes > 0) {
+      failingStoredBytes--;
+      throw const PersistenceException(
+        PersistenceFailureKind.read,
+        'Could not read the stored chat history.',
+      );
+    }
+    return snapshot.encode().length;
+  }
 
   @override
   Future<void> save(ChatHistorySnapshot value) async {

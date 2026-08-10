@@ -111,8 +111,10 @@ class _GolemAppState extends ConsumerState<GolemApp>
 
   @override
   Widget build(BuildContext context) {
-    // While preferences load (one frame at most, under the splash) the
-    // platform default applies.
+    // Deliberate .value degrade: while preferences load (one frame at most,
+    // under the splash) — or when the store failed to read — the platform
+    // defaults apply. The app root must never error-screen over a prefs
+    // read; the Appearance screen is where that failure shows.
     final preferences = ref.watch(preferencesControllerProvider).value;
     final brightness = switch (preferences?.theme ?? ThemeSetting.system) {
       ThemeSetting.system =>

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // knowledge (profiles carry no Inferno import); the Inferno boundary is
 // unchanged — only lib/broker/ touches package:inferno.
 import '../../broker/model_profile.dart';
+import '../../core/chrome/golem_button.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/domain/app_preferences.dart';
 import '../../core/domain/generation_settings.dart';
@@ -231,9 +232,16 @@ class GenerationCard extends ConsumerWidget {
     final defaults = profile.sampling(reasoningEnabled: false);
     final thinking = profile.sampling(reasoningEnabled: true);
     final thinkingPinned = thinking.pinned;
+    final settings = ref.watch(settingsControllerProvider);
+    if (settings.hasError) {
+      // Editing over invented defaults would overwrite whatever the store
+      // holds on the next successful write; surface the failed read instead.
+      return _SettingsLoadError(
+        onRetry: () => ref.invalidate(settingsControllerProvider),
+      );
+    }
     final overrides =
-        ref.watch(settingsControllerProvider).value?.overridesFor(profileKey) ??
-        const SamplingOverrides();
+        settings.value?.overridesFor(profileKey) ?? const SamplingOverrides();
     // The card must state what generation will actually run: the response
     // style's values layered under the hand-set overrides, exactly as
     // ChatController computes them. Captions name each value's source.
@@ -525,6 +533,36 @@ class _StepperRow extends StatelessWidget {
           child: const Icon(CupertinoIcons.plus_circle, size: 22),
         ),
       ],
+    );
+  }
+}
+
+class _SettingsLoadError extends StatelessWidget {
+  const _SettingsLoadError({required this.onRetry});
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
+    return GolemCard(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        child: Column(
+          key: const Key('settings-load-error'),
+          children: [
+            Text(
+              "Couldn't load settings.",
+              style: GolemText.body.copyWith(color: muted),
+            ),
+            const SizedBox(height: 12),
+            GolemButton.filled(
+              label: 'Try again',
+              onPressed: onRetry,
+              expand: false,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

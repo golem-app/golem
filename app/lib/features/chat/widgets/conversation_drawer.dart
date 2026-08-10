@@ -491,6 +491,8 @@ final class _StorageMeter extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Deliberate .value degrade: an inline meter hides while loading or
+    // failed — the Storage screen owns the full error surface.
     final overview = ref.watch(storageBreakdownProvider).value;
     final total = overview?.totalBytes;
     if (overview == null || total == null) return const SizedBox.shrink();

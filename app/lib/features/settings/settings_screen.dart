@@ -26,6 +26,8 @@ class SettingsScreen extends ConsumerWidget {
     final preferences =
         ref.watch(preferencesControllerProvider).value ??
         const AppPreferences();
+    // Deliberate .value degrade: the root row shows no size while loading
+    // or failed — the Storage screen owns the full error surface.
     final storage = ref.watch(storageBreakdownProvider).value;
     final style = preferences.styleFor(backend.profileKey);
     return CupertinoPageScaffold(

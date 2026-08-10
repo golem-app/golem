@@ -7,6 +7,7 @@ import '../../core/chrome/golem_toast.dart';
 import '../../core/domain/model_activation.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/models.dart';
+import '../../core/chrome/golem_button.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
@@ -17,9 +18,15 @@ class StorageScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final breakdown = ref.watch(storageBreakdownProvider).value;
-    final model = ref.watch(modelControllerProvider).value;
+    final breakdownValue = ref.watch(storageBreakdownProvider);
+    final modelValue = ref.watch(modelControllerProvider);
     final catalog = ref.watch(effectiveModelCatalogProvider);
+    // This screen is *about* the stored data, so a failed read gets a
+    // full error pane with a retry — never the eternal spinner that used
+    // to render for loading and failure alike.
+    final failed = breakdownValue.hasError || modelValue.hasError;
+    final breakdown = breakdownValue.value;
+    final model = modelValue.value;
     return CupertinoPageScaffold(
       navigationBar: GolemNavBar(
         title: 'Storage',
@@ -27,7 +34,14 @@ class StorageScreen extends ConsumerWidget {
       ),
       child: SafeArea(
         bottom: false,
-        child: breakdown == null || model == null
+        child: failed
+            ? _StorageError(
+                onRetry: () {
+                  ref.invalidate(storageBreakdownProvider);
+                  ref.invalidate(modelControllerProvider);
+                },
+              )
+            : breakdown == null || model == null
             ? const Center(child: CupertinoActivityIndicator())
             : ListView(
                 key: const Key('storage-list'),
@@ -66,6 +80,40 @@ class StorageScreen extends ConsumerWidget {
     await ref.read(cacheProbeProvider).clear();
     ref.invalidate(storageBreakdownProvider);
     if (context.mounted) showGolemToast(context, 'Cache cleared');
+  }
+}
+
+class _StorageError extends StatelessWidget {
+  const _StorageError({required this.onRetry});
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          key: const Key('storage-error'),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(CupertinoIcons.exclamationmark_triangle, color: muted),
+            const SizedBox(height: 12),
+            Text(
+              "Couldn't read storage.",
+              style: GolemText.body.copyWith(color: muted),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            GolemButton.filled(
+              label: 'Try again',
+              onPressed: onRetry,
+              expand: false,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

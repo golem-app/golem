@@ -169,10 +169,11 @@ Future<StorageBreakdown> storageBreakdown(Ref ref) async {
     0,
     (sum, status) => sum + status.downloadedBytes,
   );
-  var chatsBytes = 0;
-  try {
-    chatsBytes = await history.storedBytes();
-  } catch (_) {}
+  // Required inputs propagate: a failed model load (the await above) or an
+  // unreadable chat store must error this provider — a swallowed failure
+  // here used to render as a plausible "0 MB". Only the optional platform
+  // probes below keep their null/zero degrade; unknown is their contract.
+  final chatsBytes = await history.storedBytes();
   var attachmentsBytes = 0;
   try {
     attachmentsBytes = await attachments?.storedBytes() ?? 0;
