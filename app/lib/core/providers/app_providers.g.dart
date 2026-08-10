@@ -10,7 +10,7 @@ part of 'app_providers.dart';
 // ignore_for_file: type=lint, type=warning
 
 @ProviderFor(chatHistoryRepository)
-const chatHistoryRepositoryProvider = ChatHistoryRepositoryProvider._();
+final chatHistoryRepositoryProvider = ChatHistoryRepositoryProvider._();
 
 final class ChatHistoryRepositoryProvider
     extends
@@ -20,7 +20,7 @@ final class ChatHistoryRepositoryProvider
           ChatHistoryRepository
         >
     with $Provider<ChatHistoryRepository> {
-  const ChatHistoryRepositoryProvider._()
+  ChatHistoryRepositoryProvider._()
     : super(
         from: null,
         argument: null,
@@ -58,7 +58,7 @@ String _$chatHistoryRepositoryHash() =>
     r'272ebcd1745a580ce2a622e5b227e91c4435f30e';
 
 @ProviderFor(inferenceRepository)
-const inferenceRepositoryProvider = InferenceRepositoryProvider._();
+final inferenceRepositoryProvider = InferenceRepositoryProvider._();
 
 final class InferenceRepositoryProvider
     extends
@@ -68,7 +68,7 @@ final class InferenceRepositoryProvider
           InferenceRepository
         >
     with $Provider<InferenceRepository> {
-  const InferenceRepositoryProvider._()
+  InferenceRepositoryProvider._()
     : super(
         from: null,
         argument: null,
@@ -106,7 +106,7 @@ String _$inferenceRepositoryHash() =>
     r'82143828d32f1c068c8a1562f08085502e619275';
 
 @ProviderFor(modelManagementRepository)
-const modelManagementRepositoryProvider = ModelManagementRepositoryProvider._();
+final modelManagementRepositoryProvider = ModelManagementRepositoryProvider._();
 
 final class ModelManagementRepositoryProvider
     extends
@@ -116,7 +116,7 @@ final class ModelManagementRepositoryProvider
           ModelManagementRepository
         >
     with $Provider<ModelManagementRepository> {
-  const ModelManagementRepositoryProvider._()
+  ModelManagementRepositoryProvider._()
     : super(
         from: null,
         argument: null,
@@ -154,7 +154,7 @@ String _$modelManagementRepositoryHash() =>
     r'883bf3845440e47f63576a82f18f225f31be3622';
 
 @ProviderFor(benchmarkRepository)
-const benchmarkRepositoryProvider = BenchmarkRepositoryProvider._();
+final benchmarkRepositoryProvider = BenchmarkRepositoryProvider._();
 
 final class BenchmarkRepositoryProvider
     extends
@@ -164,7 +164,7 @@ final class BenchmarkRepositoryProvider
           BenchmarkRepository
         >
     with $Provider<BenchmarkRepository> {
-  const BenchmarkRepositoryProvider._()
+  BenchmarkRepositoryProvider._()
     : super(
         from: null,
         argument: null,
@@ -202,7 +202,7 @@ String _$benchmarkRepositoryHash() =>
     r'c71d916e23996f845670a9ad8da54540b73dcdb7';
 
 @ProviderFor(modelCatalogEntries)
-const modelCatalogEntriesProvider = ModelCatalogEntriesProvider._();
+final modelCatalogEntriesProvider = ModelCatalogEntriesProvider._();
 
 final class ModelCatalogEntriesProvider
     extends
@@ -212,7 +212,7 @@ final class ModelCatalogEntriesProvider
           List<ModelCatalogEntry>
         >
     with $Provider<List<ModelCatalogEntry>> {
-  const ModelCatalogEntriesProvider._()
+  ModelCatalogEntriesProvider._()
     : super(
         from: null,
         argument: null,
@@ -250,7 +250,7 @@ String _$modelCatalogEntriesHash() =>
     r'12eee37f81325029df04be2d9a3f438baf556399';
 
 @ProviderFor(customRepositoryResolver)
-const customRepositoryResolverProvider = CustomRepositoryResolverProvider._();
+final customRepositoryResolverProvider = CustomRepositoryResolverProvider._();
 
 final class CustomRepositoryResolverProvider
     extends
@@ -260,7 +260,7 @@ final class CustomRepositoryResolverProvider
           CustomRepositoryResolver
         >
     with $Provider<CustomRepositoryResolver> {
-  const CustomRepositoryResolverProvider._()
+  CustomRepositoryResolverProvider._()
     : super(
         from: null,
         argument: null,
@@ -298,7 +298,7 @@ String _$customRepositoryResolverHash() =>
     r'b2ada27fe20df8df9c83e4e35e85df85b35c9bb7';
 
 @ProviderFor(settingsRepository)
-const settingsRepositoryProvider = SettingsRepositoryProvider._();
+final settingsRepositoryProvider = SettingsRepositoryProvider._();
 
 final class SettingsRepositoryProvider
     extends
@@ -308,7 +308,7 @@ final class SettingsRepositoryProvider
           SettingsRepository
         >
     with $Provider<SettingsRepository> {
-  const SettingsRepositoryProvider._()
+  SettingsRepositoryProvider._()
     : super(
         from: null,
         argument: null,
@@ -346,7 +346,7 @@ String _$settingsRepositoryHash() =>
     r'7f08be7173b537a7eccd726a624b784cc87b3fa3';
 
 @ProviderFor(preferencesRepository)
-const preferencesRepositoryProvider = PreferencesRepositoryProvider._();
+final preferencesRepositoryProvider = PreferencesRepositoryProvider._();
 
 final class PreferencesRepositoryProvider
     extends
@@ -356,7 +356,7 @@ final class PreferencesRepositoryProvider
           PreferencesRepository
         >
     with $Provider<PreferencesRepository> {
-  const PreferencesRepositoryProvider._()
+  PreferencesRepositoryProvider._()
     : super(
         from: null,
         argument: null,
@@ -394,7 +394,7 @@ String _$preferencesRepositoryHash() =>
     r'84f12c67b0492c83d2e641eac794500552c759e5';
 
 @ProviderFor(attachmentRepository)
-const attachmentRepositoryProvider = AttachmentRepositoryProvider._();
+final attachmentRepositoryProvider = AttachmentRepositoryProvider._();
 
 final class AttachmentRepositoryProvider
     extends
@@ -404,7 +404,7 @@ final class AttachmentRepositoryProvider
           AttachmentRepository
         >
     with $Provider<AttachmentRepository> {
-  const AttachmentRepositoryProvider._()
+  AttachmentRepositoryProvider._()
     : super(
         from: null,
         argument: null,
@@ -442,12 +442,12 @@ String _$attachmentRepositoryHash() =>
     r'e36781dc865631b0997a4aa474a8c95b401c5d5b';
 
 @ProviderFor(cacheProbe)
-const cacheProbeProvider = CacheProbeProvider._();
+final cacheProbeProvider = CacheProbeProvider._();
 
 final class CacheProbeProvider
     extends $FunctionalProvider<CacheProbe, CacheProbe, CacheProbe>
     with $Provider<CacheProbe> {
-  const CacheProbeProvider._()
+  CacheProbeProvider._()
     : super(
         from: null,
         argument: null,
@@ -483,12 +483,12 @@ final class CacheProbeProvider
 String _$cacheProbeHash() => r'900fcb1840982afab2b91e05f9883543a2d767a4';
 
 @ProviderFor(diskFreeSpaceProbe)
-const diskFreeSpaceProbeProvider = DiskFreeSpaceProbeProvider._();
+final diskFreeSpaceProbeProvider = DiskFreeSpaceProbeProvider._();
 
 final class DiskFreeSpaceProbeProvider
     extends $FunctionalProvider<DiskSpaceProbe, DiskSpaceProbe, DiskSpaceProbe>
     with $Provider<DiskSpaceProbe> {
-  const DiskFreeSpaceProbeProvider._()
+  DiskFreeSpaceProbeProvider._()
     : super(
         from: null,
         argument: null,
@@ -531,7 +531,7 @@ String _$diskFreeSpaceProbeHash() =>
 /// overriding it. main() always overrides it with the resolved config.
 
 @ProviderFor(inferenceBackend)
-const inferenceBackendProvider = InferenceBackendProvider._();
+final inferenceBackendProvider = InferenceBackendProvider._();
 
 /// The resolved inference backend for this process. A fake default rather than
 /// a throwing seam — a documented exception to the repository-provider
@@ -552,7 +552,7 @@ final class InferenceBackendProvider
   /// discipline: dozens of widgets read it for honest "simulated" labeling, and
   /// host tests (the dev flavor) must see the fake without every container
   /// overriding it. main() always overrides it with the resolved config.
-  const InferenceBackendProvider._()
+  InferenceBackendProvider._()
     : super(
         from: null,
         argument: null,
@@ -595,7 +595,7 @@ String _$inferenceBackendHash() => r'679d3dfd7f9bdcc675a964fdfe9368052cc0b632';
 /// repository seam: label-only containers must not need one.
 
 @ProviderFor(residentModelKey)
-const residentModelKeyProvider = ResidentModelKeyProvider._();
+final residentModelKeyProvider = ResidentModelKeyProvider._();
 
 /// The catalog key of the model resident in the engine, straight from the
 /// residency owner (#42). Null while the engine is empty — label helpers fall
@@ -611,7 +611,7 @@ final class ResidentModelKeyProvider
   /// back to the configured artifact, so a lazy first load does not blank the
   /// chrome. Always null under a simulated backend, without touching the
   /// repository seam: label-only containers must not need one.
-  const ResidentModelKeyProvider._()
+  ResidentModelKeyProvider._()
     : super(
         from: null,
         argument: null,
@@ -647,7 +647,7 @@ final class ResidentModelKeyProvider
 String _$residentModelKeyHash() => r'06d40b724654be95583dd2adef25a96f7354b1f3';
 
 @ProviderFor(deviceCapacityProbe)
-const deviceCapacityProbeProvider = DeviceCapacityProbeProvider._();
+final deviceCapacityProbeProvider = DeviceCapacityProbeProvider._();
 
 final class DeviceCapacityProbeProvider
     extends
@@ -657,7 +657,7 @@ final class DeviceCapacityProbeProvider
           DiskCapacityProbe
         >
     with $Provider<DiskCapacityProbe> {
-  const DeviceCapacityProbeProvider._()
+  DeviceCapacityProbeProvider._()
     : super(
         from: null,
         argument: null,
@@ -695,12 +695,12 @@ String _$deviceCapacityProbeHash() =>
     r'bffceb765c5bf126c7449e4761b2c951e7495b9c';
 
 @ProviderFor(documentsPath)
-const documentsPathProvider = DocumentsPathProvider._();
+final documentsPathProvider = DocumentsPathProvider._();
 
 final class DocumentsPathProvider
     extends $FunctionalProvider<String, String, String>
     with $Provider<String> {
-  const DocumentsPathProvider._()
+  DocumentsPathProvider._()
     : super(
         from: null,
         argument: null,
@@ -741,7 +741,7 @@ String _$documentsPathHash() => r'22f7639f5b12516f043a3f4971f84d9142ebf642';
 /// state, or it re-runs per token for the always-mounted drawer meter.
 
 @ProviderFor(chatStorageSignature)
-const chatStorageSignatureProvider = ChatStorageSignatureProvider._();
+final chatStorageSignatureProvider = ChatStorageSignatureProvider._();
 
 /// A cheap signature that changes only when conversations or messages are added
 /// or removed. ChatController reassigns state on every streaming delta, so
@@ -755,7 +755,7 @@ final class ChatStorageSignatureProvider
   /// or removed. ChatController reassigns state on every streaming delta, so
   /// anything as heavy as disk probing must key on this rather than the raw chat
   /// state, or it re-runs per token for the always-mounted drawer meter.
-  const ChatStorageSignatureProvider._()
+  ChatStorageSignatureProvider._()
     : super(
         from: null,
         argument: null,
@@ -796,7 +796,7 @@ String _$chatStorageSignatureHash() =>
 /// are unwired) — surfaces hide those figures instead of inventing them.
 
 @ProviderFor(storageBreakdown)
-const storageBreakdownProvider = StorageBreakdownProvider._();
+final storageBreakdownProvider = StorageBreakdownProvider._();
 
 /// Storage accounting for the drawer meter and the Storage screen. Free and
 /// total bytes are null whenever the platform cannot report them (or the seams
@@ -813,7 +813,7 @@ final class StorageBreakdownProvider
   /// Storage accounting for the drawer meter and the Storage screen. Free and
   /// total bytes are null whenever the platform cannot report them (or the seams
   /// are unwired) — surfaces hide those figures instead of inventing them.
-  const StorageBreakdownProvider._()
+  StorageBreakdownProvider._()
     : super(
         from: null,
         argument: null,
@@ -845,7 +845,7 @@ String _$storageBreakdownHash() => r'7b13bb7429ac20321976a2578dcfac7c1713acfd';
 /// so the pinned manifest stays the single source of model knowledge.
 
 @ProviderFor(effectiveModelCatalog)
-const effectiveModelCatalogProvider = EffectiveModelCatalogProvider._();
+final effectiveModelCatalogProvider = EffectiveModelCatalogProvider._();
 
 /// Pinned entries plus the user's custom repositories, derived — never stored —
 /// so the pinned manifest stays the single source of model knowledge.
@@ -860,7 +860,7 @@ final class EffectiveModelCatalogProvider
     with $Provider<List<ModelCatalogEntry>> {
   /// Pinned entries plus the user's custom repositories, derived — never stored —
   /// so the pinned manifest stays the single source of model knowledge.
-  const EffectiveModelCatalogProvider._()
+  EffectiveModelCatalogProvider._()
     : super(
         from: null,
         argument: null,
@@ -902,7 +902,7 @@ String _$effectiveModelCatalogHash() =>
 /// about which model is live (#20).
 
 @ProviderFor(loadableModelKeys)
-const loadableModelKeysProvider = LoadableModelKeysProvider._();
+final loadableModelKeysProvider = LoadableModelKeysProvider._();
 
 /// The models a per-chat selection may name: installed, and of the engine this
 /// build composed. Derived here so chat, Settings, and Storage cannot disagree
@@ -914,7 +914,7 @@ final class LoadableModelKeysProvider
   /// The models a per-chat selection may name: installed, and of the engine this
   /// build composed. Derived here so chat, Settings, and Storage cannot disagree
   /// about which model is live (#20).
-  const LoadableModelKeysProvider._()
+  LoadableModelKeysProvider._()
     : super(
         from: null,
         argument: null,
@@ -953,14 +953,14 @@ String _$loadableModelKeysHash() => r'e1fc1aba3225db2d81c08133f3da197d03c492ef';
 /// 350 ms); only the normalized query lands here, so results derive reactively.
 
 @ProviderFor(SearchQuery)
-const searchQueryProvider = SearchQueryProvider._();
+final searchQueryProvider = SearchQueryProvider._();
 
 /// The raw field text stays widget-local in the search screen (debounced
 /// 350 ms); only the normalized query lands here, so results derive reactively.
 final class SearchQueryProvider extends $NotifierProvider<SearchQuery, String> {
   /// The raw field text stays widget-local in the search screen (debounced
   /// 350 ms); only the normalized query lands here, so results derive reactively.
-  const SearchQueryProvider._()
+  SearchQueryProvider._()
     : super(
         from: null,
         argument: null,
@@ -996,8 +996,7 @@ abstract class _$SearchQuery extends $Notifier<String> {
   String build();
   @$mustCallSuper
   @override
-  void runBuild() {
-    final created = build();
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<String, String>;
     final element =
         ref.element
@@ -1007,12 +1006,12 @@ abstract class _$SearchQuery extends $Notifier<String> {
               Object?,
               Object?
             >;
-    element.handleValue(ref, created);
+    return element.handleCreate(ref, build);
   }
 }
 
 @ProviderFor(chatSearchResults)
-const chatSearchResultsProvider = ChatSearchResultsProvider._();
+final chatSearchResultsProvider = ChatSearchResultsProvider._();
 
 final class ChatSearchResultsProvider
     extends
@@ -1022,7 +1021,7 @@ final class ChatSearchResultsProvider
           List<ChatSearchResult>
         >
     with $Provider<List<ChatSearchResult>> {
-  const ChatSearchResultsProvider._()
+  ChatSearchResultsProvider._()
     : super(
         from: null,
         argument: null,
@@ -1061,13 +1060,13 @@ String _$chatSearchResultsHash() => r'4924c9bcb9501cbe48cf7c370df3e24254a943db';
 /// Only user-set values are stored; profile defaults resolve at the consumer.
 
 @ProviderFor(SettingsController)
-const settingsControllerProvider = SettingsControllerProvider._();
+final settingsControllerProvider = SettingsControllerProvider._();
 
 /// Only user-set values are stored; profile defaults resolve at the consumer.
 final class SettingsControllerProvider
     extends $AsyncNotifierProvider<SettingsController, GenerationSettings> {
   /// Only user-set values are stored; profile defaults resolve at the consumer.
-  const SettingsControllerProvider._()
+  SettingsControllerProvider._()
     : super(
         from: null,
         argument: null,
@@ -1095,8 +1094,7 @@ abstract class _$SettingsController extends $AsyncNotifier<GenerationSettings> {
   FutureOr<GenerationSettings> build();
   @$mustCallSuper
   @override
-  void runBuild() {
-    final created = build();
+  WhenComplete runBuild() {
     final ref =
         this.ref as $Ref<AsyncValue<GenerationSettings>, GenerationSettings>;
     final element =
@@ -1107,7 +1105,7 @@ abstract class _$SettingsController extends $AsyncNotifier<GenerationSettings> {
               Object?,
               Object?
             >;
-    element.handleValue(ref, created);
+    return element.handleCreate(ref, build);
   }
 }
 
@@ -1115,7 +1113,7 @@ abstract class _$SettingsController extends $AsyncNotifier<GenerationSettings> {
 /// drop taps that land in the cold-start load window, publish, then save.
 
 @ProviderFor(PreferencesController)
-const preferencesControllerProvider = PreferencesControllerProvider._();
+final preferencesControllerProvider = PreferencesControllerProvider._();
 
 /// Persisted app-wide preferences. Every command follows the settings idiom —
 /// drop taps that land in the cold-start load window, publish, then save.
@@ -1123,7 +1121,7 @@ final class PreferencesControllerProvider
     extends $AsyncNotifierProvider<PreferencesController, AppPreferences> {
   /// Persisted app-wide preferences. Every command follows the settings idiom —
   /// drop taps that land in the cold-start load window, publish, then save.
-  const PreferencesControllerProvider._()
+  PreferencesControllerProvider._()
     : super(
         from: null,
         argument: null,
@@ -1152,8 +1150,7 @@ abstract class _$PreferencesController extends $AsyncNotifier<AppPreferences> {
   FutureOr<AppPreferences> build();
   @$mustCallSuper
   @override
-  void runBuild() {
-    final created = build();
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<AsyncValue<AppPreferences>, AppPreferences>;
     final element =
         ref.element
@@ -1163,16 +1160,16 @@ abstract class _$PreferencesController extends $AsyncNotifier<AppPreferences> {
               Object?,
               Object?
             >;
-    element.handleValue(ref, created);
+    return element.handleCreate(ref, build);
   }
 }
 
 @ProviderFor(ChatController)
-const chatControllerProvider = ChatControllerProvider._();
+final chatControllerProvider = ChatControllerProvider._();
 
 final class ChatControllerProvider
     extends $AsyncNotifierProvider<ChatController, ChatState> {
-  const ChatControllerProvider._()
+  ChatControllerProvider._()
     : super(
         from: null,
         argument: null,
@@ -1191,14 +1188,13 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'4bd2ad1ab428fda12b3589d7e2b453ebdef66ea3';
+String _$chatControllerHash() => r'b5bdd8d9a3178e268018ecdf940f5370f835f52e';
 
 abstract class _$ChatController extends $AsyncNotifier<ChatState> {
   FutureOr<ChatState> build();
   @$mustCallSuper
   @override
-  void runBuild() {
-    final created = build();
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<AsyncValue<ChatState>, ChatState>;
     final element =
         ref.element
@@ -1208,16 +1204,16 @@ abstract class _$ChatController extends $AsyncNotifier<ChatState> {
               Object?,
               Object?
             >;
-    element.handleValue(ref, created);
+    return element.handleCreate(ref, build);
   }
 }
 
 @ProviderFor(ModelController)
-const modelControllerProvider = ModelControllerProvider._();
+final modelControllerProvider = ModelControllerProvider._();
 
 final class ModelControllerProvider
     extends $AsyncNotifierProvider<ModelController, ModelState> {
-  const ModelControllerProvider._()
+  ModelControllerProvider._()
     : super(
         from: null,
         argument: null,
@@ -1236,14 +1232,13 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'7be44391a7836ef8069af35ba397942af9d7fb7e';
+String _$modelControllerHash() => r'84cc0509e764484ae3c77b429f41122b36a8e4ca';
 
 abstract class _$ModelController extends $AsyncNotifier<ModelState> {
   FutureOr<ModelState> build();
   @$mustCallSuper
   @override
-  void runBuild() {
-    final created = build();
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<AsyncValue<ModelState>, ModelState>;
     final element =
         ref.element
@@ -1253,16 +1248,16 @@ abstract class _$ModelController extends $AsyncNotifier<ModelState> {
               Object?,
               Object?
             >;
-    element.handleValue(ref, created);
+    return element.handleCreate(ref, build);
   }
 }
 
 @ProviderFor(StartupController)
-const startupControllerProvider = StartupControllerProvider._();
+final startupControllerProvider = StartupControllerProvider._();
 
 final class StartupControllerProvider
     extends $AsyncNotifierProvider<StartupController, StartupState> {
-  const StartupControllerProvider._()
+  StartupControllerProvider._()
     : super(
         from: null,
         argument: null,
@@ -1287,8 +1282,7 @@ abstract class _$StartupController extends $AsyncNotifier<StartupState> {
   FutureOr<StartupState> build();
   @$mustCallSuper
   @override
-  void runBuild() {
-    final created = build();
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<AsyncValue<StartupState>, StartupState>;
     final element =
         ref.element
@@ -1298,16 +1292,16 @@ abstract class _$StartupController extends $AsyncNotifier<StartupState> {
               Object?,
               Object?
             >;
-    element.handleValue(ref, created);
+    return element.handleCreate(ref, build);
   }
 }
 
 @ProviderFor(BenchmarkController)
-const benchmarkControllerProvider = BenchmarkControllerProvider._();
+final benchmarkControllerProvider = BenchmarkControllerProvider._();
 
 final class BenchmarkControllerProvider
     extends $NotifierProvider<BenchmarkController, BenchmarkState> {
-  const BenchmarkControllerProvider._()
+  BenchmarkControllerProvider._()
     : super(
         from: null,
         argument: null,
@@ -1341,8 +1335,7 @@ abstract class _$BenchmarkController extends $Notifier<BenchmarkState> {
   BenchmarkState build();
   @$mustCallSuper
   @override
-  void runBuild() {
-    final created = build();
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<BenchmarkState, BenchmarkState>;
     final element =
         ref.element
@@ -1352,6 +1345,6 @@ abstract class _$BenchmarkController extends $Notifier<BenchmarkState> {
               Object?,
               Object?
             >;
-    element.handleValue(ref, created);
+    return element.handleCreate(ref, build);
   }
 }
