@@ -38,7 +38,7 @@ against those pins before an entry counts as installed.
 
 ## Instruments
 
-Three gated integration tests carry this evidence. None runs in CI, and each
+Gated integration tests carry this evidence. None runs in CI, and each
 self-skips without its dart-defines.
 
 | Instrument | Answers |
@@ -46,6 +46,13 @@ self-skips without its dart-defines.
 | `integration_test/device_acceptance_test.dart` | one device/engine cell end to end: install, text turn, per-chat switch, image turn, persistence |
 | `integration_test/model_switch_acceptance_test.dart` | one process loading two artifacts under two chat templates |
 | `integration_test/real_soak_test.dart` | twelve turns across the context-window boundary without degrading |
+| `integration_test/custom_repository_acceptance_test.dart` | a hand-added, non-pinned repository resolving, downloading and running |
+| `integration_test/real_download_smoke_test.dart` | the download stack against real Hugging Face: pinned URLs, streaming SHA-256, skip-if-valid, delete |
+| `integration_test/download_lifecycle_test.dart` | reconciliation against the platform, and adoption instead of a second writer |
+
+The last one covers only what a test process can reach. Backgrounding, screen
+lock and process recreation are hand-driven on both platforms, for reasons and
+with commands in `notes/download-lifecycle.md`.
 
 Evidence lands on the host console as `GOLEM_CELL` lines beside the broker's own
 `INFERNO_METRICS` lines. That channel matters: a release build's `debugPrint` is

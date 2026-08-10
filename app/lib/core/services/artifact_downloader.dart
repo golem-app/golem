@@ -284,10 +284,22 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
       null,
     );
 
-    var received = resumeData?.requiredStartByte;
-    if (received == null && record != null && record.progress > 0) {
-      received = (record.progress * ref.expectedBytes).round();
-    }
+    // The larger of the two stores wins, because they answer different
+    // questions and either can be behind. Resume data records where a resumed
+    // transfer would restart — frozen at the last pause — while the tracking
+    // record follows a live one. Measured on an OnePlus 12R: preferring resume
+    // data reported a 145 MB transfer as 50 MB after a process kill, and a
+    // progress bar that jumps backwards reads as lost work.
+    final resumePoint = resumeData?.requiredStartByte;
+    final tracked = record != null && record.progress > 0
+        ? (record.progress * ref.expectedBytes).round()
+        : null;
+    final received = switch ((resumePoint, tracked)) {
+      (null, null) => null,
+      (final a?, null) => a,
+      (null, final b?) => b,
+      (final a?, final b?) => a > b ? a : b,
+    };
 
     final live = await _guard(
       () => _downloader.allTasks(group: _group),
