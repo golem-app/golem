@@ -57,10 +57,18 @@ only eos ids; the Qwen 3.5 model card is the recommendation source.
   their baselines (five of them byte-identical across engines).
 - The presence penalty did not exist in the engine ABI; **ABI 4** adds it to
   the generate request. llama.cpp applies `llama_sampler_init_penalties`
-  with a whole-context window ahead of top-k/top-p/temperature; MLX sets
+  with a window covering the whole generation (window = maxTokens) ahead of
+  top-k/top-p/temperature — not `-1`: the core sampler clamps negatives to
+  disabled, a silent no-op a review round caught, so the GGUF baselines
+  below are recorded with the penalty verifiably active (a gated native
+  test asserts it diverges output at a fixed seed). MLX sets
   `GenerateParameters.presencePenalty` with `presenceContextSize` widened
   from the library's 20-token default to the full budget — a 20-token window
-  can never see, let alone break, a budget-length loop.
+  can never see, let alone break, a budget-length loop. Edge semantics stay
+  engine-native: llama penalizes only sampled tokens, while MLX pre-seeds
+  its ring with the prompt, so prompt vocabulary and the stop token carry
+  the penalty there; reasoning hashes are therefore never comparable across
+  engines.
 - `budgetExhaustedBeforeAnswer` is untouched: it caught this and stays loud.
 
 Penalty-free rows re-run after the ABI change reproduce the pre-change rows
@@ -73,13 +81,18 @@ One harness invocation, both engines × both pinned sizes, seed 7, macOS.
 
 | combo | tokens | stop | fnv1a64 |
 | --- | ---: | --- | --- |
-| Qwen 3.5 4B GGUF Q4_0 | 497 | endOfSequence | `9c249e10bb15a40b` |
-| Qwen 3.5 2B GGUF Q4_0 | 3290 | endOfSequence | `b9d4bfa38e9e35dc` |
+| Qwen 3.5 4B GGUF Q4_0 | 1439 | endOfSequence | `aa525288c7f415bf` |
+| Qwen 3.5 2B GGUF Q4_0 | 3035 | endOfSequence | `09f1dfda98d020ca` |
 | Qwen 3.5 4B MLX 4-bit | 1666 | stopToken | `c86c939aabc2d409` |
 | Qwen 3.5 2B MLX 4-bit | 1900 | stopToken | `7a80aa446baadcb6` |
 
 The MLX token counts equal the probe's seed-7 `card-full` rows exactly —
-the probe and the production broker path agree token for token.
+the probe and the production broker path agree token for token — and
+reproduce byte-for-byte across harness runs. An interim run with the
+llama penalty still a no-op passed too (497 tokens, `9c249e10bb15a40b`
+on the 4B): penalty-free 1.0/0.95/k20 happens to close the GGUF builds at
+seed 7, which is exactly the accidental-pass class the probe grid warns
+about and why the no-op mattered despite green anchors.
 
 Every direct-mode anchor keeps its recorded baseline byte for byte where
 one exists (4B GGUF `anchor-jupiter` `436a1c1c87b8c9fd`, `long-synthesis`
@@ -98,7 +111,7 @@ Two new facts the widened matrix surfaced, recorded rather than hidden:
   vision-matrix counting miss (`2026-08-09-mlx-vision-matrix.md`). With
   thinking on, the same artifact answers the harder reasoning prompt
   correctly.
-- **2B GGUF thinks long**: 3290 of 4096 tokens on `reasoning-speed`.
+- **2B GGUF thinks long**: 3035 of 4096 tokens on `reasoning-speed`.
   Within budget, but the least headroom of the four combos.
 
 ## Caveats

@@ -49,7 +49,9 @@ final class BrokerSamplingParameters {
   final int? contextLength;
 
   /// Null keeps the presence penalty out of the chain; set, it penalizes
-  /// tokens already generated across the whole window on both engines (#80).
+  /// already-seen tokens over a window covering the whole generation (#80).
+  /// Edge semantics stay engine-native — llama.cpp counts only sampled
+  /// tokens, MLX also pre-seeds with the prompt.
   final double? presencePenalty;
 
   final int? seed;

@@ -88,13 +88,16 @@ modes), so a budget can never be unsatisfiable by construction; very long
 chats can still exhaust the reserve and surface the engines' budget
 error.
 
-Qwen's thinking-mode sampling (temperature 0.6 / top-p 0.95) is pinned
-against user overrides: off-spec thinking sampling reproduced
-endless-think repetition loops during the #33 bring-up (the committed
-evals in `docs/evals/` record the fixed configuration passing). Token
-budgets remain overridable in both modes. Top-k ships plumbed through
-both engines but off by default, so recorded eval baselines and
-determinism probes stay bit-identical.
+Qwen's thinking-mode sampling is pinned against user overrides: off-spec
+thinking sampling reproduced endless-think repetition loops during the
+#33 bring-up, and again on the quantized MLX builds during #80, which
+moved the pinned recipe to the Qwen 3.5 card's general-tasks values —
+temperature 1.0 / top-p 0.95 / top-k 20 / presence penalty 1.5 (the
+committed evals in `docs/evals/` record each configuration's evidence).
+Token budgets remain overridable in both modes. Top-k and the presence
+penalty stay off everywhere else, so every non-thinking baseline and the
+determinism probes stay bit-identical; the qwen35 reasoning baselines are
+recorded under the full recipe.
 
 ## Benchmark copy stays simulated
 

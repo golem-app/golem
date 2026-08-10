@@ -27,6 +27,13 @@ extern "C" {
 /// "swaFull": bool} — mirroring how generate crosses the boundary. Engines
 /// ignore fields that do not apply to them. Error codes remain JSON
 /// strings inside INFERNO_EVENT_ERROR payloads.
+///
+/// ABI 4: the generate request gains an optional `"presencePenalty"`
+/// (double|null). Null or absent keeps every penalty out of the sampler
+/// chain; a positive value applies an additive presence penalty whose
+/// window covers the whole generation (window = maxTokens). A shim that
+/// reports 4 must honor the field — dropping it silently reintroduces the
+/// budget-length think loop the field exists to break (#80).
 #define INFERNO_ABI_VERSION 4
 
 typedef struct inferno_engine inferno_engine;

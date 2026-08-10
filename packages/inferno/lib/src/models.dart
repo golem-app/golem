@@ -109,10 +109,13 @@ final class InfernoSamplingParameters {
   /// none, enforces the budget as its only bound.
   final int? contextLength;
 
-  /// Additive penalty on tokens already present in the generation, applied
-  /// over the whole generation window on both engines. Null keeps the
-  /// penalty out of the chain. This is the published Qwen 3.5 lever against
-  /// a quantized build's non-terminating think loop (#80).
+  /// Additive penalty on tokens already seen, with a window covering the
+  /// whole generation on both engines. Null keeps the penalty out of the
+  /// chain. Engine semantics differ at the edge and are left engine-native:
+  /// llama.cpp penalizes only tokens it sampled, while MLX pre-seeds its
+  /// ring with the prompt, so prompt vocabulary and the stop token carry
+  /// the penalty there too. This is the published Qwen 3.5 lever against a
+  /// quantized build's non-terminating think loop (#80).
   final double? presencePenalty;
 
   final int? seed;

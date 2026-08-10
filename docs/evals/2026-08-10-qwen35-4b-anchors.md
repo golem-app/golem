@@ -1,5 +1,10 @@
 # Qwen 3.5 4B text anchors after the #18 snapshot swap
 
+> **Superseded for `reasoning-speed` by #80**
+> (`2026-08-10-qwen35-mlx-thinking.md`): the thinking recipe changed to the
+> Qwen 3.5 card's, so the 449-token / `dba9ee464930b4e1` GGUF baseline below
+> is historical. Direct-mode anchors remain current.
+
 Re-run for #20. #18 replaced the Qwen 3.5 4B MLX artifact but did not re-run
 its text anchors; this closes that gap and compares the two engines on the
 exact artifacts the app pins today.

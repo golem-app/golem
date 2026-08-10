@@ -767,11 +767,16 @@ int32_t inferno_engine_generate(inferno_engine *engine,
 
     llama_sampler *sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
     if (presence_penalty > 0) {
-      // Whole-context window (-1): the penalty exists to break think loops
-      // that run the full budget, so a short window would miss them. Repeat
-      // and frequency stay at their disabled values.
+      // The window must cover the whole generation: the penalty exists to
+      // break think loops that run the full budget, and a short window
+      // misses them. Not -1 — the core sampler clamps negatives to zero and
+      // returns an empty sampler (llama-sampler.cpp; the "-1 = context"
+      // convention lives in common/, which this build compiles out). The
+      // ring only ever holds sampled tokens, never the prompt. Repeat and
+      // frequency stay at their disabled values.
       llama_sampler_chain_add(
-          sampler, llama_sampler_init_penalties(-1, 1.0F, 0.0F, presence_penalty));
+          sampler,
+          llama_sampler_init_penalties(max_tokens, 1.0F, 0.0F, presence_penalty));
     }
     if (top_k > 0) {
       llama_sampler_chain_add(sampler, llama_sampler_init_top_k(top_k));

@@ -51,8 +51,10 @@ final class ProfileSampling {
   final double temperature;
   final double topP;
 
-  /// Null keeps top-k filtering off — the recorded eval baselines and the
-  /// determinism probe were measured without it.
+  /// Null keeps top-k filtering off. Baselines recorded through 2026-08-09
+  /// and the determinism probe were measured without it; the qwen35
+  /// reasoning baselines (2026-08-10, #80) were measured with 20 and the
+  /// presence penalty — changing either invalidates them.
   final int? topK;
 
   /// Null keeps the presence penalty out of the engine's chain. Set, it is a
