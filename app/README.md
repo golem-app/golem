@@ -286,10 +286,16 @@ Startup failure modes are injectable at compile time:
 flutter run --dart-define=GOLEM_MISSING_MODEL=true
 flutter run --dart-define=GOLEM_SPLASH_FAILURE=true
 flutter run --dart-define=GOLEM_SPLASH_TIMEOUT=true
+flutter run --dart-define=GOLEM_LAUNCH_FAILURES=1
 ```
 
-The production-style splash always holds for at least 1.4 seconds; the missing-model
-scenario adds a three-second setup hold.
+The first three drive the startup gate's scripted scenarios; their failure
+demo always recovers on Try again. `GOLEM_LAUNCH_FAILURES=<n>` instead makes
+the first n **real** launch compositions throw, so one process demonstrates
+the bootstrap failure pane, Try again, and recovery
+(`../docs/decisions/0006-launch-bootstrap.md`). The production-style splash
+always holds for at least 1.4 seconds; the missing-model scenario adds a
+three-second setup hold.
 
 ## Generate and verify
 

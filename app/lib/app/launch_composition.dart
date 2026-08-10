@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -9,6 +10,7 @@ import '../broker/model_catalog.dart';
 import '../broker/model_profile.dart';
 import '../core/app_identity.dart';
 import '../core/domain/app_preferences.dart';
+import '../core/domain/app_state.dart';
 import '../core/domain/inference_backend.dart';
 import '../core/domain/model_catalog.dart';
 import '../core/providers/app_providers.dart';
@@ -68,10 +70,81 @@ final class LaunchDependencies {
 /// tests can substitute failure for the real thing.
 typedef LaunchComposer = Future<LaunchDependencies> Function();
 
+/// Deadline over the required launch stages: backend resolution, the
+/// application-directory lookups, the preferences read, and repository
+/// construction. The downloader start is bounded separately and can only
+/// degrade, never fail the launch — so a composition that times out has never
+/// constructed a downloader, and a retry can never race a second instance
+/// against the plugin's process-wide singletons.
+const launchDeadline = Duration(seconds: 8);
+
+/// Bound on the optional downloader start; on expiry the launch proceeds and
+/// the abandoned future is explicitly ignored.
+const downloaderStartDeadline = Duration(seconds: 5);
+
+/// Maps a composition error onto the failure pane's copy. `Error` covers the
+/// dart-define `StateError`s (and kin): developer text that goes to
+/// diagnostics, never onto a surface.
+LaunchFailure classifyLaunchFailure(Object error) => switch (error) {
+  TimeoutException() => const LaunchFailure(
+    kind: LaunchFailureKind.timedOut,
+    message: 'Starting is taking longer than expected.',
+  ),
+  MissingPluginException() || PlatformException() => const LaunchFailure(
+    kind: LaunchFailureKind.storageUnavailable,
+    message: 'Golem could not access its storage on this device.',
+  ),
+  Error() => const LaunchFailure(
+    kind: LaunchFailureKind.invalidConfiguration,
+    message: 'This build of Golem is misconfigured and cannot start.',
+  ),
+  _ => const LaunchFailure(
+    kind: LaunchFailureKind.unknown,
+    message: 'Golem could not finish starting.',
+  ),
+};
+
+/// Release-mode evidence seam: the first N compositions throw, then the real
+/// one proceeds, so one process can demonstrate failure, Try again, and
+/// recovery on a device.
+int _injectedFailuresRemaining = const int.fromEnvironment(
+  'GOLEM_LAUNCH_FAILURES',
+);
+
 /// Composes the production repository graph. Every fallible launch dependency
-/// lives here: backend resolution, the application-directory lookups, the
-/// preferences read, and the downloader start.
-Future<LaunchDependencies> composeLaunch() async {
+/// lives here; the bootstrap gate renders this future's outcome.
+Future<LaunchDependencies> composeLaunch({
+  Duration requiredDeadline = launchDeadline,
+  Duration downloaderDeadline = downloaderStartDeadline,
+}) async {
+  if (_injectedFailuresRemaining > 0) {
+    _injectedFailuresRemaining--;
+    throw Exception('Injected launch failure (GOLEM_LAUNCH_FAILURES).');
+  }
+  final (:dependencies, :downloader) = await _composeRequired().timeout(
+    requiredDeadline,
+  );
+  // Before the first chat or settings surface can ask for a download: the
+  // plugin discards updates that arrive with no listener attached, and startup
+  // replays every status delivered while this process did not exist. Bounded
+  // and guarded — a platform channel that refuses or hangs must not take the
+  // launch down with it; downloads degrade (the repository's next call retries
+  // the start), everything else still works.
+  if (downloader != null) {
+    final start = downloader.initialize();
+    try {
+      await start.timeout(downloaderDeadline);
+    } on TimeoutException {
+      start.ignore();
+    } catch (_) {}
+  }
+  return dependencies;
+}
+
+Future<
+  ({LaunchDependencies dependencies, BackgroundArtifactDownloader? downloader})
+>
+_composeRequired() async {
   const streamDelayMilliseconds = int.fromEnvironment(
     'GOLEM_STREAM_DELAY_MS',
     defaultValue: 34,
@@ -162,15 +235,7 @@ Future<LaunchDependencies> composeLaunch() async {
   final ModelManagementRepository modelManagement =
       realModels ??
       FakeModelManagementRepository(stateFile, catalog: mergedCatalog);
-  // Before the first chat or settings surface can ask for a download: the
-  // plugin discards updates that arrive with no listener attached, and startup
-  // replays every status delivered while this process did not exist. Guarded
-  // like the stores above — a platform channel that refuses must not take the
-  // launch down with it; downloads degrade, everything else still works.
-  try {
-    await artifactDownloader?.initialize();
-  } catch (_) {}
-  return LaunchDependencies(
+  final dependencies = LaunchDependencies(
     backendConfig: backendConfig,
     chatHistoryRepository: FileChatHistoryRepository(
       File('${support.path}/flutter-chat-v1.json'),
@@ -214,6 +279,7 @@ Future<LaunchDependencies> composeLaunch() async {
       readAsset: rootBundle.loadString,
     ),
   );
+  return (dependencies: dependencies, downloader: artifactDownloader);
 }
 
 /// Maps one coherent set of launch dependencies onto the provider seams.

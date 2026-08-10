@@ -96,6 +96,34 @@ final class StartupState {
   final double progress;
 }
 
+/// Why a launch composition failed, classified for copy and recovery. Only
+/// [invalidConfiguration] is terminal: a bad dart-define cannot be retried
+/// into working, everything else is environmental and worth another attempt.
+enum LaunchFailureKind {
+  invalidConfiguration,
+  storageUnavailable,
+  timedOut,
+  unknown,
+}
+
+/// A launch failure is its classification plus user-presentable copy; the
+/// throwing cause stays in diagnostics, never on a surface.
+final class LaunchFailure {
+  const LaunchFailure({required this.kind, required this.message});
+  final LaunchFailureKind kind;
+  final String message;
+
+  bool get retryable => kind != LaunchFailureKind.invalidConfiguration;
+
+  // Equal failures render the same pane, so the bootstrap can skip a rebuild.
+  @override
+  bool operator ==(Object other) =>
+      other is LaunchFailure && other.kind == kind && other.message == message;
+
+  @override
+  int get hashCode => Object.hash(kind, message);
+}
+
 final class BenchmarkState {
   const BenchmarkState({
     this.caseId = 'short-explanation',
