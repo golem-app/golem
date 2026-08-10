@@ -17,20 +17,14 @@ final class FileSettingsRepository implements SettingsRepository {
   static const _what = 'generation settings';
 
   @override
-  Future<GenerationSettings> load() async {
-    final raw = await readStore(file, what: _what);
-    if (raw == null) return const GenerationSettings();
-    try {
-      return GenerationSettings.fromJson(
-        Map<String, Object?>.from(jsonDecode(raw) as Map),
-      );
-    } catch (_) {
-      // Only pure decode/parse can throw here, so this is corruption by
-      // definition: preserve the file for inspection, fall back to defaults.
-      await quarantineStore(file, what: _what);
-      return const GenerationSettings();
-    }
-  }
+  Future<GenerationSettings> load() => loadStore(
+    file,
+    what: _what,
+    decode: (raw) => GenerationSettings.fromJson(
+      Map<String, Object?>.from(jsonDecode(raw) as Map),
+    ),
+    orElse: () => const GenerationSettings(),
+  );
 
   @override
   Future<void> save(GenerationSettings settings) {

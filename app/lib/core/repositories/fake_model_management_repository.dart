@@ -59,18 +59,15 @@ final class FakeModelManagementRepository implements ModelManagementRepository {
 
   @override
   Future<ModelState> load() async {
-    final raw = await readStore(file, what: 'model state');
-    if (raw != null) {
-      var loaded = const ModelState();
-      try {
-        loaded = ModelState.fromJson(
+    if (await file.exists()) {
+      final loaded = await loadStore(
+        file,
+        what: 'model state',
+        decode: (raw) => ModelState.fromJson(
           Map<String, Object?>.from(jsonDecode(raw) as Map),
-        );
-      } catch (_) {
-        // Only pure decode/parse can throw here — corruption by definition:
-        // preserve the file and fall back to the default simulated state.
-        await quarantineStore(file, what: 'model state');
-      }
+        ),
+        orElse: () => const ModelState(),
+      );
       _state = loaded.stamp(
         activeArtifactKey: activeArtifactKey,
         simulated: true,

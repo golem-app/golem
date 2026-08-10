@@ -13,36 +13,17 @@ final class FileChatHistoryRepository implements ChatHistoryRepository {
   static const _what = 'chat history';
 
   @override
-  Future<ChatHistorySnapshot> load() async {
-    final raw = await readStore(file, what: _what);
-    if (raw == null) return const ChatHistorySnapshot(conversations: []);
-    try {
-      return ChatHistorySnapshot.fromJson(
-        Map<String, Object?>.from(jsonDecode(raw) as Map),
-      );
-    } catch (_) {
-      // Only pure decode/parse can throw here, so this is corruption by
-      // definition: preserve the file for inspection, start empty.
-      await quarantineStore(file, what: _what);
-      return const ChatHistorySnapshot(conversations: []);
-    }
-  }
+  Future<ChatHistorySnapshot> load() => loadStore(
+    file,
+    what: _what,
+    decode: (raw) => ChatHistorySnapshot.fromJson(
+      Map<String, Object?>.from(jsonDecode(raw) as Map),
+    ),
+    orElse: () => const ChatHistorySnapshot(conversations: []),
+  );
 
   @override
-  Future<int> storedBytes() async {
-    try {
-      return await file.exists() ? await file.length() : 0;
-    } on FileSystemException catch (error, stackTrace) {
-      Error.throwWithStackTrace(
-        PersistenceException(
-          PersistenceFailureKind.read,
-          'Could not read the stored $_what.',
-          cause: error,
-        ),
-        stackTrace,
-      );
-    }
-  }
+  Future<int> storedBytes() => storeBytes(file, what: _what);
 
   @override
   Future<void> save(ChatHistorySnapshot snapshot) {

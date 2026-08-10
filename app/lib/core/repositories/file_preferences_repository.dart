@@ -17,20 +17,14 @@ final class FilePreferencesRepository implements PreferencesRepository {
   static const _what = 'preferences';
 
   @override
-  Future<AppPreferences> load() async {
-    final raw = await readStore(file, what: _what);
-    if (raw == null) return const AppPreferences();
-    try {
-      return AppPreferences.fromJson(
-        Map<String, Object?>.from(jsonDecode(raw) as Map),
-      );
-    } catch (_) {
-      // Only pure decode/parse can throw here, so this is corruption by
-      // definition: preserve the file for inspection, fall back to defaults.
-      await quarantineStore(file, what: _what);
-      return const AppPreferences();
-    }
-  }
+  Future<AppPreferences> load() => loadStore(
+    file,
+    what: _what,
+    decode: (raw) => AppPreferences.fromJson(
+      Map<String, Object?>.from(jsonDecode(raw) as Map),
+    ),
+    orElse: () => const AppPreferences(),
+  );
 
   @override
   Future<void> save(AppPreferences preferences) {

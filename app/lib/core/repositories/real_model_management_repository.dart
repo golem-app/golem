@@ -80,17 +80,15 @@ final class RealModelManagementRepository implements ModelManagementRepository {
 
   @override
   Future<ModelState> load() async {
-    final raw = await readStore(stateFile, what: 'model state');
-    if (raw != null) {
-      var loaded = const ModelState();
-      try {
-        loaded = ModelState.fromJson(
+    if (await stateFile.exists()) {
+      final loaded = await loadStore(
+        stateFile,
+        what: 'model state',
+        decode: (raw) => ModelState.fromJson(
           Map<String, Object?>.from(jsonDecode(raw) as Map),
-        );
-      } catch (_) {
-        // Only pure decode/parse can throw here — corruption by definition.
-        await quarantineStore(stateFile, what: 'model state');
-      }
+        ),
+        orElse: () => const ModelState(),
+      );
       _state = loaded.stamp(
         activeArtifactKey: activeArtifactKey,
         simulated: false,

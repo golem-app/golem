@@ -10,6 +10,7 @@ import 'broker/configured_inference_repository.dart';
 import 'broker/model_catalog.dart';
 import 'broker/model_profile.dart';
 import 'core/app_identity.dart';
+import 'core/domain/app_preferences.dart';
 import 'core/domain/inference_backend.dart';
 import 'core/providers/app_providers.dart';
 import 'core/repositories/contracts.dart';
@@ -62,7 +63,15 @@ Future<void> launch({
   final preferencesRepository = FilePreferencesRepository(
     File('${support.path}/flutter-ui-prefs-v1.json'),
   );
-  final preferences = await preferencesRepository.load();
+  AppPreferences preferences;
+  try {
+    preferences = await preferencesRepository.load();
+  } on Exception {
+    // A store the process cannot read must not kill the app before runApp:
+    // the catalog merge degrades to the pinned set, and the preferences
+    // surfaces present the read failure with a retry once the UI is up.
+    preferences = const AppPreferences();
+  }
   final pinnedKeys = {for (final entry in modelCatalog) entry.key};
   final customEntries = [
     for (final spec in preferences.customModels)

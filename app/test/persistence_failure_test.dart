@@ -91,6 +91,18 @@ void main() {
     expect(File('${file.path}.corrupt').existsSync(), isTrue);
   });
 
+  test('invalid UTF-8 bytes are corruption, not an I/O failure', () async {
+    // readAsString reports a decode failure as FileSystemException, which
+    // would masquerade as unreadable I/O and skip the quarantine forever;
+    // the store reads bytes and decodes on the corruption path instead.
+    final file = storeFile('settings.json');
+    file.writeAsBytesSync([0x7b, 0xff, 0xfe, 0x7d]);
+    final settings = await FileSettingsRepository(file).load();
+    expect(settings, const GenerationSettings());
+    expect(file.existsSync(), isFalse);
+    expect(File('${file.path}.corrupt').existsSync(), isTrue);
+  });
+
   test(
     'a failing quarantine surfaces instead of claiming recovery',
     () async {
