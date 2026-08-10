@@ -68,6 +68,10 @@ preflight, and delete. Downloads install under
 backups (iOS/macOS `NSURLIsExcludedFromBackupKey`, Android
 `dataExtractionRules`).
 
+Which artifact has actually been run on which hardware — and what is therefore
+not claimed — is recorded in `../docs/real-model-matrix.md`, together with the
+gated instruments that produced it.
+
 Image input follows proven capability, never a model name: only artifacts whose
 vision path has been validated accept a picture, and the attach sheet disables
 its rows with copy naming the model otherwise. Today that is Gemma 4 E2B on
@@ -413,6 +417,29 @@ logs one `INFERNO_PROBE` line hashing the raw pre-parser output, and
 `integration_test/real_backend_probe_test.dart` drives one seeded
 generation through the chat UI with a fixed prompt. Findings live in
 `../docs/notes/determinism-probe.md`.
+
+## Real-model acceptance (device)
+
+`integration_test/device_acceptance_test.dart` runs one device/engine cell end
+to end — install (verifying bytes already in the container, or downloading them
+for real), a text turn, a per-chat switch to a second artifact and a turn on it,
+an image turn, and history read back off disk:
+
+```sh
+flutter test integration_test/device_acceptance_test.dart -d <device> \
+  --flavor qa --dart-define=GOLEM_INFERENCE_BACKEND=auto \
+  --dart-define=GOLEM_DEVICE_ACCEPTANCE=true \
+  --dart-define=GOLEM_ACCEPT_PRIMARY=gemma4-gguf \
+  --dart-define=GOLEM_ACCEPT_SECONDARY=qwen35-2b-gguf \
+  --dart-define=GOLEM_ACCEPT_IMAGE=true
+```
+
+Two operational facts to plan around. A device test bundle install preserves the
+app's data, but **teardown uninstalls the app** — anything provisioned by hand is
+gone afterwards, so budget one provisioning pass per run. And a release build's
+`debugPrint` is os_log-privacy-redacted in an `ios syslog` capture, so read
+`GOLEM_CELL` and `INFERNO_METRICS` from the test harness console instead. Results
+live in `../docs/real-model-matrix.md`.
 
 ## Model evaluation harness (macOS)
 
