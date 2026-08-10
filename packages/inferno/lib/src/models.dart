@@ -86,6 +86,7 @@ final class InfernoSamplingParameters {
     this.topP = 0.95,
     this.topK,
     this.contextLength,
+    this.presencePenalty,
     this.seed,
     this.stopSequences = const [],
     this.stopTokenIds = const [],
@@ -93,7 +94,8 @@ final class InfernoSamplingParameters {
        assert(temperature >= 0),
        assert(topP > 0 && topP <= 1),
        assert(topK == null || topK > 0),
-       assert(contextLength == null || contextLength > 0);
+       assert(contextLength == null || contextLength > 0),
+       assert(presencePenalty == null || presencePenalty > 0);
 
   final int maxTokens;
   final double temperature;
@@ -106,6 +108,15 @@ final class InfernoSamplingParameters {
   /// Engines with a trained context window cap the budget there; MLX, having
   /// none, enforces the budget as its only bound.
   final int? contextLength;
+
+  /// Additive penalty on tokens already seen, with a window covering the
+  /// whole generation on both engines. Null keeps the penalty out of the
+  /// chain. Engine semantics differ at the edge and are left engine-native:
+  /// llama.cpp penalizes only tokens it sampled, while MLX pre-seeds its
+  /// ring with the prompt, so prompt vocabulary and the stop token carry
+  /// the penalty there too. This is the published Qwen 3.5 lever against a
+  /// quantized build's non-terminating think loop (#80).
+  final double? presencePenalty;
 
   final int? seed;
   final List<String> stopSequences;

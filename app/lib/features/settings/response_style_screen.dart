@@ -359,11 +359,12 @@ class GenerationCard extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           Text(
+            // Value-free on purpose: the pinned recipe lives with the
+            // profile, and a hardcoded copy of it has already drifted once.
             thinkingPinned
                 ? 'Token budgets always leave 512 context tokens free for '
                       'the prompt. Thinking mode keeps this model\'s pinned '
-                      'sampling (temperature 0.6 · top-p 0.95); budgets '
-                      'apply to both modes.'
+                      'sampling; budgets apply to both modes.'
                 : 'Token budgets always leave 512 context tokens free for '
                       'the prompt.',
             style: TextStyle(

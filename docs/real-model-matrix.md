@@ -149,22 +149,25 @@ golden suites plus the residency assertions in each cell, not by eye.
 
 Re-run because #18 swapped the Qwen 3.5 4B MLX artifact without re-running them
 (`evals/2026-08-10-qwen35-4b-anchors.md`). The shipping llama.cpp path passes all
-ten and reproduces the 2026-08-05 baseline byte for byte. The MLX path fails one:
-`reasoning-speed` spends its whole thinking budget without reaching an answer.
-That anchor's old baseline belonged to a *different* MLX artifact, so this is a
-gap on the currently pinned snapshot rather than a regression of anything that
-ships.
+ten and reproduces the 2026-08-05 baseline byte for byte. The MLX path failed
+one — `reasoning-speed` spent its whole thinking budget without answering —
+which #80 attributed to an off-card thinking recipe rather than the artifact:
+no penalty-free sampling closes the quantized think channel reliably. The
+`qwen35` profile now carries the Qwen 3.5 card's full thinking recipe
+(1.0/0.95, top-k 20, presence penalty 1.5 over ABI 4), and the anchor passes
+on both engines and both pinned sizes
+(`evals/2026-08-10-qwen35-mlx-thinking.md`). The GGUF `reasoning-speed`
+baseline is intentionally re-recorded there.
 
 ## Caveats and gaps
 
-- **Qwen 3.5 4B on MLX exhausts its thinking budget on one reasoning anchor.**
-  See above. MLX is not a shipping engine, so no `production` or `dev` build can
-  reach it; it needs its own ticket before MLX could ship.
-- **Qwen 3.5 2B on MLX mis-answers a counting question.** The #18 vision matrix
-  recorded it answering four of five graded fixtures, over-analysing the
-  object-count case rather than returning the number
-  (`docs/evals/2026-08-09-mlx-vision-matrix.md`). It still declares image input,
-  which is accurate — it reads pictures — but it is the weakest of the six.
+- **Qwen 3.5 2B on MLX mis-answers a counting question and a three-token
+  multiplication.** The #18 vision matrix recorded it over-analysing the
+  object-count fixture (`docs/evals/2026-08-09-mlx-vision-matrix.md`), and the
+  #80 re-run surfaced `arithmetic-17x23` answered 411 in direct mode — the
+  first text-anchor run this artifact ever had, not a regression. It still
+  declares image input, which is accurate — it reads pictures — but it is the
+  weakest of the six.
 - **Cross-engine switching is not offered.** `BrokerRuntime.load` takes an
   engine per call, but the only code that cycles engines in one process disposes
   the adapter between them, so switching llama.cpp ↔ MLX inside a live app is

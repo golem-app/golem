@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/models.dart';
+import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/broker/model_profile.dart';
 import 'package:golem_flutter/broker/qwen35_chat_template.dart';
 
@@ -151,12 +152,14 @@ void main() {
     expect(profile.key, 'qwen35');
     expect(profile.stopSequences, ['<|im_end|>']);
     expect(profile.stopTokenIds, [248046, 248044]);
-    // Mode-specific per Qwen3-family guidance; the thinking settings are
-    // load-bearing — non-thinking sampling loops mid-think on Q4_0
-    // (docs/evals evidence).
+    // Mode-specific per the Qwen 3.5 card; the thinking settings are
+    // load-bearing in both directions — non-thinking sampling loops mid-think
+    // on Q4_0 (#33), and the coding-tasks 0.6 loops the 4-bit MLX build (#80).
     final thinking = profile.sampling(reasoningEnabled: true);
-    expect(thinking.temperature, 0.6);
+    expect(thinking.temperature, 1);
     expect(thinking.topP, 0.95);
+    expect(thinking.topK, 20);
+    expect(thinking.presencePenalty, 1.5);
     expect(thinking.maxTokens, 4096);
     // Pinned: user sampling overrides must not reach thinking mode.
     expect(thinking.pinned, isTrue);
@@ -166,5 +169,23 @@ void main() {
     expect(direct.maxTokens, 2048);
     expect(direct.pinned, isFalse);
     expect(modelProfiles['qwen35'], isA<Qwen35Profile>());
+
+    // #80's grid showed thinking recipes inverting between snapshots of one
+    // family: sampling evidence is artifact-level, and a revision bump that
+    // skipped the anchors is how the think loop shipped once already (#18).
+    // This pins the proven pairing — change either side only together with
+    // a docs/evals anchor re-run, then update both here.
+    expect(
+      {
+        for (final entry in modelCatalog)
+          if (entry.profileKey == 'qwen35') entry.key: entry.revision,
+      },
+      {
+        'qwen35-2b-mlx': '674aaa7240b91e8012fcad5d791b7dfe5ba90207',
+        'qwen35-2b-gguf': 'f6d5376be1edb4d416d56da11e5397a961aca8ae',
+        'qwen35-mlx': '32f3e8ecf65426fc3306969496342d504bfa13f3',
+        'qwen35-gguf': '2d52e26bd96b49be5f8d37f1c85b27673adaa7da',
+      },
+    );
   });
 }

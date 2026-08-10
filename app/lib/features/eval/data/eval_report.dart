@@ -165,11 +165,10 @@ final class EvalRunReport {
           'thinking': profile.sampling(reasoningEnabled: true),
           'direct': profile.sampling(reasoningEnabled: false),
         }.entries)
-          key: {
-            'maxTokens': value.maxTokens,
-            'temperature': value.temperature,
-            'topP': value.topP,
-          },
+          // The full serialized sampling, so a recorded baseline attests
+          // every knob that produced it — top-k and the presence penalty
+          // are load-bearing for the thinking channel (#80).
+          key: value.toJson(),
       },
     },
     'enginePins': _enginePins,
@@ -327,7 +326,9 @@ final class EvalRunReport {
   }
 
   static String _sampling(ProfileSampling sampling) =>
-      '${sampling.maxTokens}/${sampling.temperature}/${sampling.topP}';
+      '${sampling.maxTokens}/${sampling.temperature}/${sampling.topP}'
+      '${sampling.topK == null ? '' : '/k${sampling.topK}'}'
+      '${sampling.presencePenalty == null ? '' : '/p${sampling.presencePenalty}'}';
 
   static String _gib(int bytes) =>
       (bytes / (1024 * 1024 * 1024)).toStringAsFixed(2);

@@ -209,6 +209,37 @@ void main() {
     await inferno.unload();
   }, skip: skipReason);
 
+  test('a presence penalty reaches the sampler chain', () async {
+    final inferno = Inferno.native();
+    await inferno.load(
+      engine: InfernoEngineKind.llamaCpp,
+      modelPath: modelPath!,
+    );
+    Future<String> generateText(double? penalty) async {
+      final events = await inferno
+          .generate(
+            InfernoGenerationRequest(
+              prompt: 'Hello',
+              sampling: InfernoSamplingParameters(
+                maxTokens: 24,
+                temperature: 1,
+                presencePenalty: penalty,
+                seed: 7,
+              ),
+            ),
+          )
+          .toList();
+      return events.whereType<InfernoTextDelta>().map((e) => e.text).join();
+    }
+
+    // Same seed, so a diverging stream proves the penalty entered the
+    // chain. The -1 "whole context" window regressed to a silent no-op —
+    // the core sampler clamps negatives and returns an empty sampler — and
+    // a no-op makes these byte-identical.
+    expect(await generateText(5), isNot(await generateText(null)));
+    await inferno.unload();
+  }, skip: skipReason);
+
   test(
     'a context budget below prompt plus max tokens fails clearly',
     () async {

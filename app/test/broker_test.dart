@@ -363,9 +363,10 @@ void main() {
       // (off-spec values loop mid-think — docs/evals evidence); only the
       // token budgets follow the user.
       final thinking = await effective(reasoningEnabled: true);
-      expect(thinking.temperature, 0.6);
+      expect(thinking.temperature, 1);
       expect(thinking.topP, 0.95);
-      expect(thinking.topK, isNull);
+      expect(thinking.topK, 20);
+      expect(thinking.presencePenalty, 1.5);
       expect(thinking.maxTokens, 128);
       expect(thinking.contextLength, 1024);
 

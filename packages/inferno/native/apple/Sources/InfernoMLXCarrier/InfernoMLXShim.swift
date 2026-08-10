@@ -9,7 +9,7 @@ import MLXLLM
 import MLXVLM
 import Tokenizers
 
-private let infernoMlxABI: UInt32 = 3
+private let infernoMlxABI: UInt32 = 4
 
 private enum EventKind {
     static let textDelta: Int32 = 1
@@ -98,10 +98,12 @@ private struct GenerationRequest: Decodable, Sendable {
     let maxTokens: Int
     let temperature: Float
     let topP: Float
-    // Absent-or-null when unset: nil keeps top-k filtering off and leaves
-    // the context unbudgeted, preserving pre-existing behavior.
+    // Absent-or-null when unset: nil keeps top-k filtering off, leaves the
+    // context unbudgeted, and keeps the presence penalty out of the chain,
+    // preserving pre-existing behavior.
     let topK: Int?
     let contextLength: Int?
+    let presencePenalty: Float?
     let seed: Int64?
     let stopSequences: [String]
     let stopTokenIds: [Int]
@@ -736,7 +738,8 @@ public func infernoMlxEngineGenerate(
               request.topP > 0,
               request.topP <= 1,
               request.topK ?? 0 >= 0,
-              request.contextLength ?? 0 >= 0
+              request.contextLength ?? 0 >= 0,
+              request.presencePenalty ?? 0 >= 0
         else {
             sink.fail(code: "generation_failed", message: "The generation request is invalid.")
             return 0
@@ -800,6 +803,12 @@ public func infernoMlxEngineGenerate(
                     topP: request.topP,
                     // 0 keeps the library's top-k filter disabled.
                     topK: request.topK ?? 0,
+                    presencePenalty: request.presencePenalty,
+                    // The library defaults to a 20-token window, which a
+                    // budget-length think loop never notices; the penalty
+                    // exists to break exactly that loop, so it watches the
+                    // whole generation.
+                    presenceContextSize: request.maxTokens,
                     seed: request.seed.map { UInt64(bitPattern: $0) }
                 )
                 // ABI-2 load option: an 8-bit quantized KV cache roughly
