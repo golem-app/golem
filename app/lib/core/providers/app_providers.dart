@@ -17,59 +17,60 @@ import '../services/custom_repository_resolver.dart';
 import '../services/device_storage.dart';
 import '../services/image_intake.dart';
 import '../startup/startup_sequence.dart';
+import 'retry.dart';
 
 part 'app_providers.g.dart';
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 ChatHistoryRepository chatHistoryRepository(Ref ref) =>
     throw UnimplementedError(
       'Override chatHistoryRepositoryProvider at startup',
     );
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 InferenceRepository inferenceRepository(Ref ref) =>
     throw UnimplementedError('Override inferenceRepositoryProvider at startup');
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 ModelManagementRepository modelManagementRepository(Ref ref) =>
     throw UnimplementedError(
       'Override modelManagementRepositoryProvider at startup',
     );
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 BenchmarkRepository benchmarkRepository(Ref ref) =>
     throw UnimplementedError('Override benchmarkRepositoryProvider at startup');
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 List<ModelCatalogEntry> modelCatalogEntries(Ref ref) =>
     throw UnimplementedError('Override modelCatalogEntriesProvider at startup');
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 CustomRepositoryResolver customRepositoryResolver(Ref ref) =>
     throw UnimplementedError(
       'Override customRepositoryResolverProvider at startup',
     );
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 SettingsRepository settingsRepository(Ref ref) =>
     throw UnimplementedError('Override settingsRepositoryProvider at startup');
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 PreferencesRepository preferencesRepository(Ref ref) =>
     throw UnimplementedError(
       'Override preferencesRepositoryProvider at startup',
     );
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 AttachmentRepository attachmentRepository(Ref ref) => throw UnimplementedError(
   'Override attachmentRepositoryProvider at startup',
 );
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 CacheProbe cacheProbe(Ref ref) =>
     throw UnimplementedError('Override cacheProbeProvider at startup');
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 DiskSpaceProbe diskFreeSpaceProbe(Ref ref) =>
     throw UnimplementedError('Override diskFreeSpaceProbeProvider at startup');
 
@@ -78,7 +79,7 @@ DiskSpaceProbe diskFreeSpaceProbe(Ref ref) =>
 /// discipline: dozens of widgets read it for honest "simulated" labeling, and
 /// host tests (the dev flavor) must see the fake without every container
 /// overriding it. main() always overrides it with the resolved config.
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 InferenceBackendConfig inferenceBackend(Ref ref) =>
     const InferenceBackendConfig.fake();
 
@@ -87,7 +88,7 @@ InferenceBackendConfig inferenceBackend(Ref ref) =>
 /// back to the configured artifact, so a lazy first load does not blank the
 /// chrome. Always null under a simulated backend, without touching the
 /// repository seam: label-only containers must not need one.
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 String? residentModelKey(Ref ref) {
   if (ref.watch(inferenceBackendProvider).simulatedInference) return null;
   final listenable = ref.watch(inferenceRepositoryProvider).residentModelKey;
@@ -97,11 +98,11 @@ String? residentModelKey(Ref ref) {
   return listenable.value;
 }
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 DiskCapacityProbe deviceCapacityProbe(Ref ref) =>
     throw UnimplementedError('Override deviceCapacityProbeProvider at startup');
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 String documentsPath(Ref ref) =>
     throw UnimplementedError('Override documentsPathProvider at startup');
 
@@ -122,7 +123,7 @@ extension StorageBreakdownTotals on StorageBreakdown {
 /// or removed. ChatController reassigns state on every streaming delta, so
 /// anything as heavy as disk probing must key on this rather than the raw chat
 /// state, or it re-runs per token for the always-mounted drawer meter.
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 (int, int) chatStorageSignature(Ref ref) {
   final conversations =
       ref.watch(chatControllerProvider).value?.conversations ??
@@ -137,7 +138,7 @@ extension StorageBreakdownTotals on StorageBreakdown {
 /// Storage accounting for the drawer meter and the Storage screen. Free and
 /// total bytes are null whenever the platform cannot report them (or the seams
 /// are unwired) — surfaces hide those figures instead of inventing them.
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 Future<StorageBreakdown> storageBreakdown(Ref ref) async {
   // Every dependency registers before the first await: a watch first taken
   // mid-computation would race its own invalidation.
@@ -204,7 +205,7 @@ Future<StorageBreakdown> storageBreakdown(Ref ref) async {
 
 /// Pinned entries plus the user's custom repositories, derived — never stored —
 /// so the pinned manifest stays the single source of model knowledge.
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 List<ModelCatalogEntry> effectiveModelCatalog(Ref ref) {
   final pinned = ref.watch(modelCatalogEntriesProvider);
   final custom =
@@ -221,7 +222,7 @@ List<ModelCatalogEntry> effectiveModelCatalog(Ref ref) {
 /// The models a per-chat selection may name: installed, and of the engine this
 /// build composed. Derived here so chat, Settings, and Storage cannot disagree
 /// about which model is live (#20).
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 Set<String> loadableModelKeys(Ref ref) => domain.loadableModelKeys(
   backend: ref.watch(inferenceBackendProvider),
   catalog: ref.watch(effectiveModelCatalogProvider),
@@ -230,7 +231,7 @@ Set<String> loadableModelKeys(Ref ref) => domain.loadableModelKeys(
 
 /// The raw field text stays widget-local in the search screen (debounced
 /// 350 ms); only the normalized query lands here, so results derive reactively.
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 class SearchQuery extends _$SearchQuery {
   @override
   String build() => '';
@@ -238,7 +239,7 @@ class SearchQuery extends _$SearchQuery {
   void publish(String raw) => state = raw.trim();
 }
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 List<ChatSearchResult> chatSearchResults(Ref ref) {
   final query = ref.watch(searchQueryProvider);
   final conversations = ref.watch(chatControllerProvider).value?.conversations;
@@ -246,7 +247,7 @@ List<ChatSearchResult> chatSearchResults(Ref ref) {
 }
 
 /// Only user-set values are stored; profile defaults resolve at the consumer.
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 class SettingsController extends _$SettingsController {
   @override
   Future<GenerationSettings> build() =>
@@ -272,7 +273,7 @@ class SettingsController extends _$SettingsController {
 
 /// Persisted app-wide preferences. Every command follows the settings idiom —
 /// drop taps that land in the cold-start load window, publish, then save.
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 class PreferencesController extends _$PreferencesController {
   @override
   Future<AppPreferences> build() =>
@@ -354,7 +355,7 @@ class PreferencesController extends _$PreferencesController {
   }
 }
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 class ChatController extends _$ChatController {
   int _generationEpoch = 0;
 
@@ -1000,7 +1001,7 @@ class ChatController extends _$ChatController {
   );
 }
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 class ModelController extends _$ModelController {
   int _operationEpoch = 0;
   // One mutating model operation at a time. Pause and cancel stay exempt:
@@ -1256,7 +1257,7 @@ class ModelController extends _$ModelController {
   }
 }
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 class StartupController extends _$StartupController {
   static const missingModel = bool.fromEnvironment('GOLEM_MISSING_MODEL');
   static const injectedFailure = bool.fromEnvironment('GOLEM_SPLASH_FAILURE');
@@ -1294,7 +1295,7 @@ class StartupController extends _$StartupController {
   }
 }
 
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: noRetry)
 class BenchmarkController extends _$BenchmarkController {
   int _epoch = 0;
 

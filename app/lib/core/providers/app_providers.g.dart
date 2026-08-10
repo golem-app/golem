@@ -24,7 +24,7 @@ final class ChatHistoryRepositoryProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'chatHistoryRepositoryProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -55,7 +55,7 @@ final class ChatHistoryRepositoryProvider
 }
 
 String _$chatHistoryRepositoryHash() =>
-    r'272ebcd1745a580ce2a622e5b227e91c4435f30e';
+    r'e05f4fc18a899e8797b4477e6a833b9b0819cdcf';
 
 @ProviderFor(inferenceRepository)
 final inferenceRepositoryProvider = InferenceRepositoryProvider._();
@@ -72,7 +72,7 @@ final class InferenceRepositoryProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'inferenceRepositoryProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -103,7 +103,7 @@ final class InferenceRepositoryProvider
 }
 
 String _$inferenceRepositoryHash() =>
-    r'82143828d32f1c068c8a1562f08085502e619275';
+    r'6c861649e47783f6fa0462b977ecbc44d477e9a2';
 
 @ProviderFor(modelManagementRepository)
 final modelManagementRepositoryProvider = ModelManagementRepositoryProvider._();
@@ -120,7 +120,7 @@ final class ModelManagementRepositoryProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'modelManagementRepositoryProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -151,7 +151,7 @@ final class ModelManagementRepositoryProvider
 }
 
 String _$modelManagementRepositoryHash() =>
-    r'883bf3845440e47f63576a82f18f225f31be3622';
+    r'3613b43a27a617fd059610ab8bf52cf8e1935b69';
 
 @ProviderFor(benchmarkRepository)
 final benchmarkRepositoryProvider = BenchmarkRepositoryProvider._();
@@ -168,7 +168,7 @@ final class BenchmarkRepositoryProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'benchmarkRepositoryProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -199,7 +199,7 @@ final class BenchmarkRepositoryProvider
 }
 
 String _$benchmarkRepositoryHash() =>
-    r'c71d916e23996f845670a9ad8da54540b73dcdb7';
+    r'0fab8c8808a2d269976912c1526b25dec4ee7af3';
 
 @ProviderFor(modelCatalogEntries)
 final modelCatalogEntriesProvider = ModelCatalogEntriesProvider._();
@@ -216,7 +216,7 @@ final class ModelCatalogEntriesProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'modelCatalogEntriesProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -247,7 +247,7 @@ final class ModelCatalogEntriesProvider
 }
 
 String _$modelCatalogEntriesHash() =>
-    r'12eee37f81325029df04be2d9a3f438baf556399';
+    r'20a6040238d621e1f74177f051d52cd23432281b';
 
 @ProviderFor(customRepositoryResolver)
 final customRepositoryResolverProvider = CustomRepositoryResolverProvider._();
@@ -264,7 +264,7 @@ final class CustomRepositoryResolverProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'customRepositoryResolverProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -295,7 +295,7 @@ final class CustomRepositoryResolverProvider
 }
 
 String _$customRepositoryResolverHash() =>
-    r'b2ada27fe20df8df9c83e4e35e85df85b35c9bb7';
+    r'a250f77e52b63df63d7ee26e8ad66e511957aa96';
 
 @ProviderFor(settingsRepository)
 final settingsRepositoryProvider = SettingsRepositoryProvider._();
@@ -312,7 +312,7 @@ final class SettingsRepositoryProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'settingsRepositoryProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -343,7 +343,7 @@ final class SettingsRepositoryProvider
 }
 
 String _$settingsRepositoryHash() =>
-    r'7f08be7173b537a7eccd726a624b784cc87b3fa3';
+    r'43697d2b39824fa73d1ee4289c6efd83fd57e1f4';
 
 @ProviderFor(preferencesRepository)
 final preferencesRepositoryProvider = PreferencesRepositoryProvider._();
@@ -360,7 +360,7 @@ final class PreferencesRepositoryProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'preferencesRepositoryProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -391,7 +391,7 @@ final class PreferencesRepositoryProvider
 }
 
 String _$preferencesRepositoryHash() =>
-    r'84f12c67b0492c83d2e641eac794500552c759e5';
+    r'd272370ad36e3fb91b553a2b3786234a2dfe8afd';
 
 @ProviderFor(attachmentRepository)
 final attachmentRepositoryProvider = AttachmentRepositoryProvider._();
@@ -408,7 +408,7 @@ final class AttachmentRepositoryProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'attachmentRepositoryProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -439,7 +439,7 @@ final class AttachmentRepositoryProvider
 }
 
 String _$attachmentRepositoryHash() =>
-    r'e36781dc865631b0997a4aa474a8c95b401c5d5b';
+    r'55dc90dfc35bb906a88a8b1b29b54b81dab4671a';
 
 @ProviderFor(cacheProbe)
 final cacheProbeProvider = CacheProbeProvider._();
@@ -451,7 +451,7 @@ final class CacheProbeProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'cacheProbeProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -480,7 +480,7 @@ final class CacheProbeProvider
   }
 }
 
-String _$cacheProbeHash() => r'900fcb1840982afab2b91e05f9883543a2d767a4';
+String _$cacheProbeHash() => r'37f95d013183a6ec649e264751218aebe8543de4';
 
 @ProviderFor(diskFreeSpaceProbe)
 final diskFreeSpaceProbeProvider = DiskFreeSpaceProbeProvider._();
@@ -492,7 +492,7 @@ final class DiskFreeSpaceProbeProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'diskFreeSpaceProbeProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -522,7 +522,7 @@ final class DiskFreeSpaceProbeProvider
 }
 
 String _$diskFreeSpaceProbeHash() =>
-    r'95441f7541254e1512e632401b909a1180691934';
+    r'3b7a8d9208a6ae4e4be69c4b6394744e41816afa';
 
 /// The resolved inference backend for this process. A fake default rather than
 /// a throwing seam — a documented exception to the repository-provider
@@ -556,7 +556,7 @@ final class InferenceBackendProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'inferenceBackendProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -586,7 +586,7 @@ final class InferenceBackendProvider
   }
 }
 
-String _$inferenceBackendHash() => r'679d3dfd7f9bdcc675a964fdfe9368052cc0b632';
+String _$inferenceBackendHash() => r'514f250994225e1c5e3830610653488e7a69988b';
 
 /// The catalog key of the model resident in the engine, straight from the
 /// residency owner (#42). Null while the engine is empty — label helpers fall
@@ -615,7 +615,7 @@ final class ResidentModelKeyProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'residentModelKeyProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -644,7 +644,7 @@ final class ResidentModelKeyProvider
   }
 }
 
-String _$residentModelKeyHash() => r'06d40b724654be95583dd2adef25a96f7354b1f3';
+String _$residentModelKeyHash() => r'a0072e8c58064797a9c045af4114c54a7db92439';
 
 @ProviderFor(deviceCapacityProbe)
 final deviceCapacityProbeProvider = DeviceCapacityProbeProvider._();
@@ -661,7 +661,7 @@ final class DeviceCapacityProbeProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'deviceCapacityProbeProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -692,7 +692,7 @@ final class DeviceCapacityProbeProvider
 }
 
 String _$deviceCapacityProbeHash() =>
-    r'bffceb765c5bf126c7449e4761b2c951e7495b9c';
+    r'd9f7649721fba1b27bda3931ab92f068359c19f6';
 
 @ProviderFor(documentsPath)
 final documentsPathProvider = DocumentsPathProvider._();
@@ -704,7 +704,7 @@ final class DocumentsPathProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'documentsPathProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -733,7 +733,7 @@ final class DocumentsPathProvider
   }
 }
 
-String _$documentsPathHash() => r'22f7639f5b12516f043a3f4971f84d9142ebf642';
+String _$documentsPathHash() => r'2642290dce766869e9b00ab9bc831b6a60672caf';
 
 /// A cheap signature that changes only when conversations or messages are added
 /// or removed. ChatController reassigns state on every streaming delta, so
@@ -759,7 +759,7 @@ final class ChatStorageSignatureProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'chatStorageSignatureProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -789,7 +789,7 @@ final class ChatStorageSignatureProvider
 }
 
 String _$chatStorageSignatureHash() =>
-    r'df201c6875f3c90d6cd294e37597891dfd4b41a3';
+    r'ebfde4072049845a37f487bcef5a939d1755019a';
 
 /// Storage accounting for the drawer meter and the Storage screen. Free and
 /// total bytes are null whenever the platform cannot report them (or the seams
@@ -817,7 +817,7 @@ final class StorageBreakdownProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'storageBreakdownProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -839,7 +839,7 @@ final class StorageBreakdownProvider
   }
 }
 
-String _$storageBreakdownHash() => r'7b13bb7429ac20321976a2578dcfac7c1713acfd';
+String _$storageBreakdownHash() => r'efce269eb798d6f314deee2b35ee75c6310daaba';
 
 /// Pinned entries plus the user's custom repositories, derived — never stored —
 /// so the pinned manifest stays the single source of model knowledge.
@@ -864,7 +864,7 @@ final class EffectiveModelCatalogProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'effectiveModelCatalogProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -895,7 +895,7 @@ final class EffectiveModelCatalogProvider
 }
 
 String _$effectiveModelCatalogHash() =>
-    r'e5ef1df3119d320d101a756b92fbef2cf4d28857';
+    r'd30df0161aff1d214c0d08f6e8533f60197f5df3';
 
 /// The models a per-chat selection may name: installed, and of the engine this
 /// build composed. Derived here so chat, Settings, and Storage cannot disagree
@@ -918,7 +918,7 @@ final class LoadableModelKeysProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'loadableModelKeysProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -947,7 +947,7 @@ final class LoadableModelKeysProvider
   }
 }
 
-String _$loadableModelKeysHash() => r'e1fc1aba3225db2d81c08133f3da197d03c492ef';
+String _$loadableModelKeysHash() => r'12e16f3f980da93856da1aa47fec36b9d9201e01';
 
 /// The raw field text stays widget-local in the search screen (debounced
 /// 350 ms); only the normalized query lands here, so results derive reactively.
@@ -964,7 +964,7 @@ final class SearchQueryProvider extends $NotifierProvider<SearchQuery, String> {
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'searchQueryProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -987,7 +987,7 @@ final class SearchQueryProvider extends $NotifierProvider<SearchQuery, String> {
   }
 }
 
-String _$searchQueryHash() => r'4dbfed33213193c0360e544ccb7b76d58c781f42';
+String _$searchQueryHash() => r'ac97fb52441d227b3e67648629ba76f54e633130';
 
 /// The raw field text stays widget-local in the search screen (debounced
 /// 350 ms); only the normalized query lands here, so results derive reactively.
@@ -1025,7 +1025,7 @@ final class ChatSearchResultsProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'chatSearchResultsProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -1055,7 +1055,7 @@ final class ChatSearchResultsProvider
   }
 }
 
-String _$chatSearchResultsHash() => r'4924c9bcb9501cbe48cf7c370df3e24254a943db';
+String _$chatSearchResultsHash() => r'5087660e551a3820d42b49a8336e9b3cd4cfbb81';
 
 /// Only user-set values are stored; profile defaults resolve at the consumer.
 
@@ -1070,7 +1070,7 @@ final class SettingsControllerProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'settingsControllerProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -1086,7 +1086,7 @@ final class SettingsControllerProvider
 }
 
 String _$settingsControllerHash() =>
-    r'7040b13d308b8e347c0b0c2872bd4ada1c6a5d5d';
+    r'daaf5617505e1bed4a8db7362ff8a964d6ba2808';
 
 /// Only user-set values are stored; profile defaults resolve at the consumer.
 
@@ -1125,7 +1125,7 @@ final class PreferencesControllerProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'preferencesControllerProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -1141,7 +1141,7 @@ final class PreferencesControllerProvider
 }
 
 String _$preferencesControllerHash() =>
-    r'3262f94c328a1845db90bcea44e3b348eb7363d7';
+    r'70ebbae2e3c0c15bd5c37f7153889c11a35a0ada';
 
 /// Persisted app-wide preferences. Every command follows the settings idiom —
 /// drop taps that land in the cold-start load window, publish, then save.
@@ -1173,7 +1173,7 @@ final class ChatControllerProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'chatControllerProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -1188,7 +1188,7 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'b5bdd8d9a3178e268018ecdf940f5370f835f52e';
+String _$chatControllerHash() => r'1370b6aea3dbce39a5c8ec2ed813b4ff06aca096';
 
 abstract class _$ChatController extends $AsyncNotifier<ChatState> {
   FutureOr<ChatState> build();
@@ -1217,7 +1217,7 @@ final class ModelControllerProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'modelControllerProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -1232,7 +1232,7 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'84cc0509e764484ae3c77b429f41122b36a8e4ca';
+String _$modelControllerHash() => r'13feb0274a7de49f9b86157a27e042d1f66af0f8';
 
 abstract class _$ModelController extends $AsyncNotifier<ModelState> {
   FutureOr<ModelState> build();
@@ -1261,7 +1261,7 @@ final class StartupControllerProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'startupControllerProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -1276,7 +1276,7 @@ final class StartupControllerProvider
   StartupController create() => StartupController();
 }
 
-String _$startupControllerHash() => r'937f4451c25348e2e4bdc562a9e8125d13f78af1';
+String _$startupControllerHash() => r'd4a2a4151c2a95fb1f9bd58bfee3cdd02463a04d';
 
 abstract class _$StartupController extends $AsyncNotifier<StartupState> {
   FutureOr<StartupState> build();
@@ -1305,7 +1305,7 @@ final class BenchmarkControllerProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: noRetry,
         name: r'benchmarkControllerProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -1329,7 +1329,7 @@ final class BenchmarkControllerProvider
 }
 
 String _$benchmarkControllerHash() =>
-    r'd5ac45951cd24b9be36e3f97bf4f3f09c4ebdbd8';
+    r'712ff941abd9db2d7880ee86b9217438d356f168';
 
 abstract class _$BenchmarkController extends $Notifier<BenchmarkState> {
   BenchmarkState build();
