@@ -15,8 +15,8 @@ const _knownArtifacts = <InfernoModelArtifact>[
 ];
 
 /// Which profile each pinned repository belongs to. The profile decides the
-/// template, stop policy, and sampling — evaluating a pinned artifact under
-/// another family's profile produces numbers that describe nothing, so the
+/// template, stop policy, and sampling, so evaluating a pinned artifact under
+/// another family's profile produces numbers that describe nothing — the
 /// driver fails loudly on a mismatch instead of recording them.
 const _pinnedProfileKeys = <String, String>{
   'unsloth/gemma-4-E2B-it-qat-GGUF': 'gemma4',
@@ -30,13 +30,13 @@ const _pinnedProfileKeys = <String, String>{
 String? profileKeyForPinnedRepository(String? repository) =>
     repository == null ? null : _pinnedProfileKeys[repository];
 
-/// Matches an artifact to a manifest pin. The name alone is not provenance —
-/// a requantized file with a pinned filename must not be cited as the pin —
-/// so a GGUF must also carry the pinned byte size, and an MLX directory must
-/// hold every pinned file at its exact pinned size ([fileSizes] is the
-/// on-disk inventory keyed by manifest-relative path; stray extras like
-/// `.DS_Store` are ignored). Byte-identity still isn't proven; for that,
-/// re-fetch through `tool/fetch_model.dart`, which verifies SHA-256.
+/// Matches an artifact to a manifest pin. The name alone is not provenance — a
+/// requantized file with a pinned filename must not be cited as the pin — so a
+/// GGUF must also carry the pinned byte size, and an MLX directory must hold
+/// every pinned file at its exact pinned size ([fileSizes] is the on-disk
+/// inventory keyed by manifest-relative path; extras like `.DS_Store` are
+/// ignored). Byte-identity still isn't proven: for that, re-fetch through
+/// `tool/fetch_model.dart`, which verifies SHA-256.
 InfernoModelArtifact? matchPinnedArtifact({
   required String label,
   required BrokerEngine engine,
@@ -79,10 +79,9 @@ final class EvalArtifactRecord {
       : '$pinnedRepository @ ${pinnedRevision!.substring(0, 8)}';
 }
 
-/// Stats an artifact on disk and matches it against the manifest pins. The
-/// directory total is informational only — a stray unreadable subdirectory
-/// degrades it to null instead of aborting the report, and pin matching
-/// stats the pinned paths directly.
+/// The directory total is informational only — a stray unreadable subdirectory
+/// degrades it to null instead of aborting the report, and pin matching stats
+/// the pinned paths directly.
 EvalArtifactRecord describeArtifact(EvalCombo combo) {
   final entity = FileSystemEntity.isDirectorySync(combo.path)
       ? Directory(combo.path)
@@ -136,11 +135,10 @@ final class EvalRunReport {
   final DateTime createdAt;
   final String host;
 
-  /// The run's template profile — an experimental variable, since
-  /// mode-specific sampling alone swings a run between an answer and a
-  /// budget-exhausted think loop, so the evidence must record it. Combos
-  /// that know their own family (catalog installs) record theirs per
-  /// result and this one only covers the rest.
+  /// The run's template profile — an experimental variable, since mode-specific
+  /// sampling alone swings a run between an answer and a budget-exhausted think
+  /// loop. Combos that know their own family (catalog installs) record theirs
+  /// per result and this one only covers the rest.
   final ModelProfile profile;
   final List<EvalComboResult> results;
   final Map<String, EvalArtifactRecord> artifacts;
@@ -152,9 +150,9 @@ final class EvalRunReport {
     'mlxSwiftLmVersion': mlxSwiftLmVersion,
   };
 
-  /// The machine-readable evidence. Like the Markdown, it never carries
-  /// absolute paths — artifacts are identified by label, size, and pin — so
-  /// both outputs are committable as-is.
+  /// The machine-readable evidence. Like the Markdown it never carries absolute
+  /// paths — artifacts are identified by label, size, and pin — so both outputs
+  /// are committable as-is.
   Map<String, Object?> toJson() => {
     'createdAt': createdAt.toIso8601String(),
     'host': host,
@@ -231,8 +229,8 @@ final class EvalRunReport {
 
   String toJsonString() => const JsonEncoder.withIndent('  ').convert(toJson());
 
-  /// The human-readable evidence. Carries labels, never absolute paths, so
-  /// a report can be committed under `docs/evals/` as-is.
+  /// Labels only, never absolute paths, so a report can be committed under
+  /// `docs/evals/` as-is.
   String renderMarkdown() {
     final buffer = StringBuffer()
       ..writeln(

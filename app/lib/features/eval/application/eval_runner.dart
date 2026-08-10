@@ -74,8 +74,6 @@ final class EvalComboResult {
   final double loadSeconds;
   final List<EvalPromptResult> promptResults;
 
-  /// Human-readable descriptions of every failed required check or errored
-  /// generation — empty when the combo passed.
   List<String> get failures => [
     for (final result in promptResults)
       if (result.error != null)
@@ -101,12 +99,11 @@ int uniformEvalSeed(List<EvalPrompt> prompts) {
   return seeds.single;
 }
 
-/// Loads the combo's artifact and runs every prompt through the app's own
-/// [InferenceRepository] — template rendering, sampling enforcement,
-/// reasoning parsing, and stop policy are exactly what ships (#42). A
-/// failed generation becomes an error row and the remaining prompts still
-/// run; a failed load propagates, because nothing after it could mean
-/// anything.
+/// Runs every prompt through the app's own [InferenceRepository], so template
+/// rendering, sampling enforcement, reasoning parsing, and stop policy are
+/// exactly what ships (#42). A failed generation becomes an error row and the
+/// rest still run; a failed load propagates, because nothing after it could
+/// mean anything.
 Future<EvalComboResult> runEvalCombo({
   required InferenceRepository repository,
   required EvalCombo combo,
@@ -150,9 +147,9 @@ Future<EvalPromptResult> _runPrompt(
           PromptMessage.text(message['role']!, message['content'] ?? ''),
       ],
       reasoningEnabled: prompt.reasoningEnabled,
-      // Per-prompt sampling rides the same sparse-override channel user
-      // settings use; unset fields fall to the profile's shipped
-      // mode-specific defaults, so the report reflects app behavior.
+      // Rides the same sparse-override channel user settings use; unset fields
+      // fall to the profile's shipped mode-specific defaults, so the report
+      // reflects app behavior.
       overrides: SamplingOverrides(
         maxTokens: prompt.maxTokens,
         temperature: prompt.temperature,
@@ -196,9 +193,8 @@ Future<EvalPromptResult> _runPrompt(
           passed: check.passes(answerText),
         ),
       // Implicit on every prompt: a truncated answer can still satisfy its
-      // content checks, so budget exhaustion must be visible in the check
-      // list, not only in the stop column. Informational — evidence, not a
-      // gate.
+      // content checks, so budget exhaustion must show up in the check list,
+      // not only in the stop column. Evidence, not a gate.
       EvalCheckResult(
         description: 'stopped before the token budget [informational]',
         required: false,

@@ -17,10 +17,9 @@ const _artifacts = <String, InfernoModelArtifact>{
   'qwen-mmproj': qwen35MmprojCandidates,
 };
 
-/// Downloads a pinned model artifact for local benching and device
-/// validation. Usage: `dart run tool/fetch_model.dart <key> [directory]`.
-/// Weights never enter the repository; the default destination is the
-/// gitignored `build/models/`.
+/// Downloads a pinned artifact for local benching and device validation:
+/// `dart run tool/fetch_model.dart <key> [directory]`. Weights never enter the
+/// repository; the default destination is the gitignored `build/models/`.
 Future<void> main(List<String> arguments) async {
   final artifact = arguments.isEmpty ? null : _artifacts[arguments.first];
   if (artifact == null) {
@@ -46,8 +45,7 @@ Future<void> main(List<String> arguments) async {
     stderr.writeln('fetching ${spec.path} (${spec.bytes} bytes)');
     await file.parent.create(recursive: true);
     final temporary = File('${file.path}.partial');
-    // A file may name its own repository — a projector is often published
-    // apart from the weights it pairs with.
+    // A file may name its own repository (projectors often do).
     final request = await HttpClient().getUrl(
       Uri.parse(
         'https://huggingface.co/${spec.repository ?? artifact.repository}'

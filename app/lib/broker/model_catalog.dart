@@ -1,9 +1,8 @@
 import '../core/domain/model_catalog.dart';
 import 'runtime.dart';
 
-/// The downloadable catalog: the pinned Inferno manifest artifacts mapped to
-/// app-domain entries with display metadata. Keys follow
-/// `<profile>-<engine>` so the active artifact derives from the
+/// The pinned Inferno manifest artifacts as app-domain entries. Keys follow
+/// `<profile>-<engine>`, so the active artifact derives from the
 /// GOLEM_MODEL_PROFILE and GOLEM_INFERENCE_BACKEND dart-defines.
 final List<ModelCatalogEntry> modelCatalog = [
   _entry(
@@ -64,9 +63,8 @@ final List<ModelCatalogEntry> modelCatalog = [
   ),
 ];
 
-/// The catalog key implied by the inference dart-defines, or null for the
-/// fake backend. The download surface and the inference configuration are
-/// independent axes; this is the only bridge between them.
+/// The download surface and the inference configuration are independent axes;
+/// this is the only bridge between them.
 String? activeArtifactKeyFor({
   required String backend,
   required String modelProfile,
@@ -76,10 +74,8 @@ String? activeArtifactKeyFor({
   _ => null,
 };
 
-/// The `documents:`-relative model path Inferno loads for an installed
-/// catalog entry: the single `.gguf` file for llama, the install directory
-/// for MLX. Derived from the pinned manifest so the path, profile, and
-/// artifact can never disagree.
+/// The `documents:`-relative path Inferno loads for an installed entry, derived
+/// from the pinned manifest so path, profile, and artifact cannot disagree.
 String primaryModelPathFor(String key) {
   final entry = modelCatalog.firstWhere(
     (item) => item.key == key,
@@ -96,9 +92,7 @@ String primaryModelPathFor(String key) {
   return path;
 }
 
-/// The `documents:`-relative path of an entry's multimodal projector, or null
-/// when it pins none. A projector is only ever loaded alongside the weights it
-/// was pinned with.
+/// Null when the entry pins no projector — or, defensively, more than one.
 String? projectorPathForEntry(ModelCatalogEntry entry) {
   final projectors = entry.files
       .where((file) => file.role == ModelFileRole.projector)
@@ -107,15 +101,12 @@ String? projectorPathForEntry(ModelCatalogEntry entry) {
   return 'documents:${entry.installDirectory}/${projectors.single.path}';
 }
 
-/// The `documents:`-relative path for any catalog entry — pinned or resolved
-/// custom — or null when the entry does not describe one loadable artifact.
-/// Runtime activation turns that null into a typed, actionable failure rather
-/// than a raw [StateError]; see `model_runtime_config.dart`.
+/// Null when the entry does not describe exactly one loadable artifact;
+/// activation turns that into a typed failure, not a raw [StateError].
 String? modelPathForEntry(ModelCatalogEntry entry) {
   switch (entry.engine) {
     case ModelEngine.gguf:
-      // Role, not extension: a multimodal artifact pins two .gguf files and
-      // only one of them is the language model.
+      // Role, not extension: a multimodal artifact pins two .gguf files.
       final weights = entry.files
           .where((file) => file.role == ModelFileRole.weights)
           .toList();

@@ -20,10 +20,8 @@ final class PreparedImage {
 /// Why an image was refused. Semantic rather than copy, so presentation owns
 /// the wording (handbook v4.2A §5.2).
 enum ImageRejection {
-  /// Not an image type any engine path accepts.
   unsupportedType,
 
-  /// Larger than the intake byte ceiling.
   tooLarge,
 
   /// The bytes are not a decodable image of the type they claim.
@@ -36,34 +34,29 @@ final class ImageRejectedException implements Exception {
   final ImageRejection reason;
 }
 
-/// Validates, bounds, and measures an image chosen for a chat.
-///
-/// Deliberately no image-processing dependency: `dart:ui`'s codec is the
-/// platform decoder Flutter already ships. Every accepted image is decoded
-/// and written as canonical PNG pixels, which applies EXIF orientation once
-/// and removes the platform-dependent metadata before either native engine
-/// sees it. `targetWidth`/`targetHeight` downscale during decode rather than
-/// after, so a 48-megapixel photo never materializes at full size.
+/// Validates, bounds, and measures an image chosen for a chat. No
+/// image-processing dependency: `dart:ui`'s codec is the platform decoder
+/// Flutter already ships. Every accepted image is re-encoded as canonical PNG,
+/// applying EXIF orientation once and removing platform-dependent metadata
+/// before either native engine sees it. `targetWidth`/`targetHeight` downscale
+/// during decode, so a 48-megapixel photo never materializes at full size.
 final class ImageIntake {
   const ImageIntake();
 
-  /// The types every declared image path accepts. HEIC is absent on purpose:
-  /// the pickers hand back JPEG for library photos, and letting an
-  /// undecodable-on-Android container into the store would strand a message.
+  /// HEIC is absent on purpose: the pickers hand back JPEG for library photos,
+  /// and an undecodable-on-Android container would strand a message.
   static const supportedMimeTypes = {'image/jpeg', 'image/png', 'image/webp'};
 
-  /// Source ceiling. Generous for a phone photo, low enough that a pathological
-  /// file cannot exhaust memory before it is measured.
+  /// Generous for a phone photo, low enough not to exhaust memory unmeasured.
   static const maxSourceBytes = 20 * 1024 * 1024;
 
-  /// Longest edge kept. Above this the image is re-decoded smaller: vision
-  /// encoders tile to a few hundred pixels, so more only costs memory.
+  /// Above this the image is re-decoded smaller: vision encoders tile to a few
+  /// hundred pixels, so more only costs memory.
   static const maxDimension = 2048;
 
-  /// Total decoded pixels kept. Qwen's proven processor path is capped at one
-  /// megapixel and the broker reserves 1,280 visual tokens per image; keeping
-  /// a multi-megapixel photo would violate both that memory and context
-  /// contract even when neither edge exceeds [maxDimension].
+  /// Total decoded pixels kept. Qwen's proven processor path caps at one
+  /// megapixel and the broker reserves 1,280 visual tokens per image; a
+  /// multi-megapixel photo violates both even within [maxDimension].
   static const maxPixelCount = 1024 * 1024;
 
   Future<PreparedImage> prepare(

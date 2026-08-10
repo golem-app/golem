@@ -34,8 +34,7 @@ void main() {
     final metrics = events.whereType<InfernoMetricsEvent>().single.metrics;
     expect(metrics.generatedTokenCount, greaterThan(0));
     expect(metrics.elapsedSeconds, greaterThanOrEqualTo(0));
-    // Peak footprint is measured on Apple platforms and null elsewhere,
-    // never a misleading zero.
+    // Measured on Apple platforms, null elsewhere — never a misleading zero.
     if (Platform.isMacOS || Platform.isIOS) {
       expect(metrics.peakPhysicalFootprintBytes, greaterThan(0));
     } else {
@@ -47,8 +46,7 @@ void main() {
 
   test('images without a projector fail as a typed error', () async {
     // Proves the ABI 3 image array marshals end to end: Dart copies the
-    // buffers, the shim sees a non-zero count, and a text-only load refuses
-    // it instead of silently answering about a picture it never saw.
+    // buffers, the shim sees a non-zero count, and a text-only load refuses it.
     final inferno = Inferno.native();
     await inferno.load(
       engine: InfernoEngineKind.llamaCpp,
@@ -88,13 +86,11 @@ void main() {
   }, skip: skipReason);
 
   test('ABI-2 load options apply against the real engine', () async {
-    // Full tensor validation, an explicit thread count, CPU-only layers
-    // (#13), and full-size SWA cache at once: the proof is that load and
-    // a short generation still complete — each option feeds a different
-    // llama.cpp code path that would reject invalid values. The q8_0 KV
-    // knob is deliberately absent: the toy fixture's 4-wide heads cannot
-    // take a 32-block quantized cache (a real model's 256-wide heads
-    // can), so that knob is validated against the pinned Gemma instead.
+    // Every option at once (#13 for CPU-only layers); the proof is that load
+    // and a short generation still complete, since each feeds a different
+    // llama.cpp path that would reject invalid values. The q8_0 KV knob is
+    // deliberately absent: the toy fixture's 4-wide heads cannot take a
+    // 32-block quantized cache, so it is proved against the pinned Gemma.
     final inferno = Inferno.native();
     await inferno.load(
       engine: InfernoEngineKind.llamaCpp,
@@ -208,8 +204,7 @@ void main() {
       return events.whereType<InfernoTextDelta>().map((e) => e.text).join();
     }
 
-    // With a single surviving candidate the seed cannot matter: two runs
-    // under different seeds must decode the same tokens.
+    // With a single surviving candidate the seed cannot matter.
     expect(await generateText(3), await generateText(1009));
     await inferno.unload();
   }, skip: skipReason);

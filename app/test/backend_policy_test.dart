@@ -102,7 +102,6 @@ void main() {
   });
 
   test('explicit defines override the flavor default in any build', () async {
-    // production + explicit fake stays fake.
     final fake = await _resolve(backend: 'fake');
     expect(fake.kind, InferenceBackendKind.fake);
 

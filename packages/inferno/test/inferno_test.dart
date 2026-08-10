@@ -21,9 +21,7 @@ void main() {
     final inferno = Inferno.withBackend(backend);
 
     await inferno.load(engine: InfernoEngineKind.mock, modelPath: model.path);
-    // Defaults are the ABI-2 contract: check_tensors off (upstream
-    // default), f16 KV, engine-default threads and GPU layers, SWA
-    // window-sized.
+    // These defaults are the ABI-2 contract, check_tensors matching upstream.
     expect(backend.lastLoadOptions?.checkTensors, isFalse);
     expect(backend.lastLoadOptions?.kvCacheType, InfernoKvCacheType.f16);
     expect(backend.lastLoadOptions?.threadCount, isNull);
@@ -210,8 +208,7 @@ void main() {
       engine: InfernoEngineKind.llamaCpp,
       modelPath: model.path,
     );
-    // The stream is lazy: obtain it while loaded, listen only after the
-    // model is gone.
+    // The stream is lazy: obtained while loaded, listened to after unload.
     final stream = inferno.generate(
       const InfernoGenerationRequest(prompt: 'late listener'),
     );
@@ -226,7 +223,6 @@ void main() {
         ),
       ),
     );
-    // The runtime is still usable afterwards.
     await inferno.load(
       engine: InfernoEngineKind.llamaCpp,
       modelPath: model.path,

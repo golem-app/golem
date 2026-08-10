@@ -11,9 +11,8 @@ import 'model_profile.dart';
 import 'model_runtime_config.dart';
 import 'runtime.dart';
 
-/// The single owner of engine residency (#42): exactly one model is loaded
-/// at a time, activation is keyed by catalog entry, and every load or
-/// unload of weights goes through this repository.
+/// The single owner of engine residency (#42): exactly one model is loaded at
+/// a time, keyed by catalog entry, and every load or unload goes through here.
 final class InfernoInferenceRepository implements InferenceRepository {
   InfernoInferenceRepository(
     this._runtime, {
@@ -42,16 +41,12 @@ final class InfernoInferenceRepository implements InferenceRepository {
   final BrokerRuntime _runtime;
   final int? seed;
 
-  /// Resolves an attachment id to its bytes. Null in builds with no
-  /// attachment store, which is also every build that declares no image
-  /// capability, so a request carrying an image cannot reach an engine.
+  /// Null in builds with no attachment store — which is every build that
+  /// declares no image capability, so an image cannot reach an engine.
   final Future<List<int>?> Function(String attachmentId)? readAttachment;
 
-  /// Reads the ordered images a rendered prompt's markers refer to.
-  ///
   /// A message can outlive its bytes — the OS may trim the container — so a
-  /// missing attachment is a typed, actionable failure rather than a prompt
-  /// silently short one picture.
+  /// missing attachment is a typed failure, not a prompt short one picture.
   Future<List<BrokerImageInput>> _loadImages(List<ImagePart> images) async {
     if (images.isEmpty) return const [];
     final reader = readAttachment;
@@ -79,30 +74,24 @@ final class InfernoInferenceRepository implements InferenceRepository {
   final String documentsDirectory;
   final ModelRuntimeConfig Function(String catalogKey) resolveConfig;
 
-  /// Free-memory probe for the load preflight; null (no probe) or a null
-  /// reading skips the preflight — the engine's own failure stays the
-  /// loud path when the platform cannot report headroom.
+  /// Free-memory probe for the load preflight; no probe or a null reading
+  /// skips it — the engine's own failure stays the loud path.
   final Future<int?> Function()? availableMemoryBytes;
 
-  /// Size of the artifact at a resolved path; null skips the preflight.
   final Future<int?> Function(String path) modelSizeBytes;
 
-  /// Engine knobs applied to every load this repository performs.
   final BrokerLoadOptions loadOptions;
 
-  /// Headroom the preflight demands beyond the weights themselves: KV
-  /// cache (low hundreds of MB at the 8192 budget per ADR 0003) plus
-  /// runtime overhead. Deliberately conservative-but-modest; the typed
+  /// Headroom beyond the weights: KV cache (low hundreds of MB at the 8192
+  /// budget per ADR 0003) plus runtime overhead. Modest on purpose — the typed
   /// failure is retryable, so a borderline refusal costs one tap.
   static const int loadHeadroomBytes = 512 << 20;
 
-  /// The boot-resolved configuration. Its model path may be an operator
-  /// sideload, so activation by its own key must reuse this path rather
-  /// than re-derive it from the catalog.
+  /// The boot-resolved configuration. Its path may be an operator sideload, so
+  /// activation by its own key reuses it rather than re-deriving from catalog.
   final _Target _initial;
 
-  /// The initial configuration's surface, kept public for construction
-  /// tests and diagnostics; the resident target may differ at runtime.
+  /// The initial configuration's surface; the resident target may differ.
   BrokerEngine get engine => _initial.engine;
   String get modelPath => _initial.modelPath;
   ModelProfile get profile => _initial.profile;
@@ -138,8 +127,6 @@ final class InfernoInferenceRepository implements InferenceRepository {
   @override
   Future<void> cancel() => _runtime.cancel();
 
-  /// The configuration a request addresses: the initial one for null or
-  /// its own key, otherwise the catalog resolution for [modelKey].
   _Target _targetFor(String? modelKey) {
     if (modelKey == null || modelKey == _initial.catalogKey) return _initial;
     final config = resolveConfig(modelKey);
@@ -153,10 +140,9 @@ final class InfernoInferenceRepository implements InferenceRepository {
     );
   }
 
-  /// Activates [target] unless it is already resident. Single-flight per
-  /// key: concurrent callers for the same key join the load in flight; a
-  /// different key queues behind it rather than tripping the runtime's
-  /// single-operation lifecycle.
+  /// Single-flight per key: concurrent callers for the same key join the load
+  /// in flight; a different key queues behind it rather than tripping the
+  /// runtime's single-operation lifecycle.
   Future<void> _ensureResident(_Target target) {
     if (_resident != null && _resident!.catalogKey == target.catalogKey) {
       return Future.value();
@@ -168,14 +154,13 @@ final class InfernoInferenceRepository implements InferenceRepository {
     _activatingKey = target.catalogKey;
     final activation = () async {
       if (previous != null) {
-        // A failed predecessor reports to its own caller; this activation
-        // still gets its attempt.
+        // A failed predecessor reports to its own caller; this attempt goes on.
         try {
           await previous;
         } catch (_) {}
       }
-      // Note `_resident == null` and a null-keyed target must not compare
-      // equal: a sideloaded initial configuration has no catalog key.
+      // `_resident == null` and a null-keyed target must not compare equal: a
+      // sideloaded initial configuration has no catalog key.
       if (_resident != null && _resident!.catalogKey == target.catalogKey) {
         return;
       }
@@ -221,11 +206,8 @@ final class InfernoInferenceRepository implements InferenceRepository {
       ? '$documentsDirectory/${path.substring('documents:'.length)}'
       : path;
 
-  /// Refuses a load that cannot fit — typed and retryable — instead of
-  /// letting the engine OOM into a crash or a misleading "damaged model"
-  /// verdict. Skipped whenever either reading is unknown (§8: the
-  /// repository hides the probe mechanism; the controller owns the copy's
-  /// consequences).
+  /// Refuses a load that cannot fit — typed and retryable — instead of letting
+  /// the engine OOM into a crash or a misleading "damaged model" verdict.
   Future<void> _preflightMemory(String path) async {
     final probe = availableMemoryBytes;
     if (probe == null) return;
@@ -248,9 +230,8 @@ final class InfernoInferenceRepository implements InferenceRepository {
     }
   }
 
-  /// Weights on disk: the file's own size, or a directory's file sum for
-  /// MLX artifacts. Null (skip) when the path does not resolve — the load
-  /// itself reports missing files with better copy.
+  /// The file's own size, or a directory's file sum for MLX. Null when the path
+  /// does not resolve — the load itself reports missing files with better copy.
   static Future<int?> _modelSizeOnDisk(String path) async {
     try {
       if (await File(path).exists()) return File(path).length();
@@ -277,8 +258,6 @@ final class InfernoInferenceRepository implements InferenceRepository {
     String? modelKey,
     String? systemPrompt,
   }) async* {
-    // Activate the addressed configuration when it is not already
-    // resident (#42); the load joins any activation in flight.
     final target = _targetFor(modelKey);
     await _ensureResident(target);
     final profile = target.profile;
@@ -292,9 +271,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
       0,
       (sum, message) => sum + message.text.length,
     );
-    // Window the conversation before rendering: newest turns that fit the
-    // budget, typed contextExhausted when even the final turn cannot. The
-    // engines' own budget check stays the backstop for estimation drift.
+    // The engines' own budget check stays the backstop for estimation drift.
     final List<PromptMessage> windowed;
     try {
       windowed = windowedContext(
@@ -317,21 +294,18 @@ final class InfernoInferenceRepository implements InferenceRepository {
       );
       rethrow;
     }
-    // Both profile templates accept an optional leading system turn; the
-    // custom prompt becomes exactly that, ahead of the conversation.
+    // Both templates accept an optional leading system turn; this is it.
     final renderedContext = systemPrompt == null || systemPrompt.isEmpty
         ? windowed
         : [PromptMessage.text('system', systemPrompt), ...windowed];
-    // Ordered to match the media markers the template just rendered: one
-    // image per marker, in the order the turns carry them.
+    // One image per rendered media marker, in the order the turns carry them.
     final images = [
       for (final message in renderedContext)
         for (final image in message.images) image,
     ];
     if (images.isNotEmpty && !target.supportsImages) {
-      // The composer gates this, so reaching here means a conversation
-      // carrying an image was pointed at a text-only model. Refuse before the
-      // engine rather than answer about a picture it never received.
+      // The composer gates this: reaching here means an image-carrying chat was
+      // pointed at a text-only model. Refuse before the engine.
       throw const InferenceException(
         InferenceFailureKind.engine,
         'This model cannot read images. Pick a model that can, or remove the '
@@ -416,10 +390,8 @@ final class InfernoInferenceRepository implements InferenceRepository {
     }
   }
 
-  /// Merges the user's sparse overrides onto the profile's defaults.
-  /// Pinned modes keep their sampling fields (a correctness constraint —
-  /// see the profile); token budgets stay the user's to size. Returns the
-  /// effective parameters and whether any override was actually consumed.
+  /// Pinned modes keep their sampling fields (a correctness constraint — see
+  /// the profile); token budgets stay the user's to size.
   (BrokerSamplingParameters, bool) _effectiveSampling(
     ModelProfile profile,
     ProfileSampling defaults,
@@ -455,10 +427,8 @@ final class InfernoInferenceRepository implements InferenceRepository {
     );
   }
 
-  /// One greppable line per completed generation; this is the capture channel
-  /// for on-device measurement (the app contract carries only core metrics).
-  /// The effective sampling fields are the evidence that a settings change
-  /// actually reached the engine.
+  /// One greppable line per completed generation — the on-device measurement
+  /// channel, and the evidence that a settings change reached the engine.
   void _logMetrics(
     BrokerEngine engine,
     BrokerRuntimeMetrics? metrics,
@@ -487,10 +457,8 @@ final class InfernoInferenceRepository implements InferenceRepository {
     );
   }
 
-  /// One greppable line per failure — the counterpart of INFERNO_METRICS
-  /// for paths that never reach a completion event, so failed loads and
-  /// generations leave evidence too (#63). Same space-separated key=value
-  /// grammar; user copy never rides here, only classification.
+  /// The INFERNO_METRICS counterpart for paths that never reach a completion
+  /// event (#63). User copy never rides here, only classification.
   void _logFailure(
     BrokerEngine engine, {
     required String phase,
@@ -512,10 +480,8 @@ final class InfernoInferenceRepository implements InferenceRepository {
     );
   }
 
-  /// One greppable line per seeded generation, hashing the raw pre-parser
-  /// text so two devices can be compared for token-identical output without
-  /// shipping the transcript through logs. Only emitted when a fixed seed is
-  /// configured (`GOLEM_SAMPLING_SEED`), i.e. during determinism probes.
+  /// Hashes the raw pre-parser text so two devices can be compared for
+  /// token-identical output without shipping transcripts through logs.
   void _logProbe(BrokerEngine engine, String rawText) {
     debugPrint(
       'INFERNO_PROBE engine=${engine.name}'
@@ -543,8 +509,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
   }
 }
 
-/// One activatable configuration. [catalogKey] is null only for a
-/// sideloaded initial configuration whose backend derives no artifact key.
+/// [catalogKey] is null only for a sideloaded initial configuration.
 final class _Target {
   const _Target({
     required this.catalogKey,
@@ -560,8 +525,7 @@ final class _Target {
   final String modelPath;
   final ModelProfile profile;
 
-  /// Resolved with [modelPath] so a projector is only ever paired with the
-  /// weights it was pinned against.
+  /// Only ever paired with the weights it was pinned against.
   final String? projectorPath;
   final bool supportsImages;
 }

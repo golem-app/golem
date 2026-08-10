@@ -11,7 +11,6 @@ import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
 import 'widgets/settings_rows.dart';
 
-/// Storage: the usage breakdown, per-model deletes, and the cache.
 class StorageScreen extends ConsumerWidget {
   const StorageScreen({super.key});
 
@@ -84,8 +83,8 @@ class _UsageCard extends StatelessWidget {
     const cacheColor = GolemTheme.amber;
     final used = breakdown.usedBytes;
     final free = breakdown.freeBytes;
-    // The bar shows the three buckets against each other (the design's
-    // stacked meter); disk-wide proportions belong to the free label.
+    // The bar shows the buckets against each other; disk-wide proportions
+    // belong to the free label.
     final attachmentsColor = CupertinoDynamicColor.resolve(
       GolemTheme.reasoningBorder,
       context,
@@ -152,9 +151,9 @@ class _UsageCard extends StatelessWidget {
                     color: chatsColor,
                     label: 'Chats ${_megabytes(breakdown.chatsBytes)}',
                   ),
-                  // Only once pictures exist: an always-present "Images 0 MB"
-                  // would be clutter on the many installs that never attach
-                  // one. The bar's arithmetic counts them either way.
+                  // An always-present "Images 0 MB" would be clutter on the
+                  // many installs that never attach one; the bar's arithmetic
+                  // counts them either way.
                   if (breakdown.attachmentsBytes > 0)
                     _Legend(
                       color: attachmentsColor,
@@ -192,8 +191,7 @@ class _Legend extends StatelessWidget {
         ),
       ),
       const SizedBox(width: 6),
-      // Flexible so an enlarged-text chip wraps instead of overflowing
-      // its Wrap run.
+      // Flexible so an enlarged-text chip wraps instead of overflowing its run.
       Flexible(
         child: Text(
           label,
@@ -214,8 +212,8 @@ class _DownloadedModels extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
-    // Anything holding bytes shows up — installed or partial — so what
-    // the meter counts and what can be freed always agree.
+    // Anything holding bytes shows up — installed or partial — so what the
+    // meter counts and what can be freed always agree.
     final rows = catalog
         .where((entry) => model.statusOf(entry.key).downloadedBytes > 0)
         .toList();
@@ -229,9 +227,9 @@ class _DownloadedModels extends ConsumerWidget {
       children: [
         for (final entry in rows)
           Padding(
-            // Natural height with a floor via the trash button's 44pt
-            // target: the test font renders far taller than SF Pro, so a
-            // fixed row height would overflow invisibly.
+            // Natural height, floored by the trash button's 44pt target: the
+            // test font renders far taller than SF Pro, so a fixed row height
+            // would overflow invisibly.
             padding: const EdgeInsets.symmetric(vertical: 7),
             child: Row(
               key: Key('storage-model-${entry.key}'),

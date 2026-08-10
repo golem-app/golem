@@ -29,12 +29,9 @@ String normalizeTitle(String value) {
       : '${normalized.substring(0, 47)}…';
 }
 
-/// One ordered piece of a message's content.
-///
-/// A message is a list of parts rather than a string so an image can sit at a
-/// known position relative to the text — which is what a multimodal prompt
-/// needs. Text-only messages carry exactly one [TextPart], which is how every
-/// pre-#18 conversation migrates.
+/// One ordered piece of a message's content. A list of parts rather than a
+/// string so an image can sit at a known position relative to the text;
+/// text-only messages carry one [TextPart], which is how pre-#18 chats migrate.
 sealed class MessagePart {
   const MessagePart();
 
@@ -59,11 +56,8 @@ final class TextPart extends MessagePart {
   Map<String, Object?> toJson() => {'type': 'text', 'text': text};
 }
 
-/// An image the user attached, held in the app-owned attachment store.
-///
 /// [attachmentId] is an opaque store identifier, never a photo-library or
-/// filesystem path: a transcript, share sheet or export must not be able to
-/// leak where the picture came from.
+/// filesystem path: an export must not leak where the picture came from.
 final class ImagePart extends MessagePart {
   const ImagePart({
     required this.attachmentId,
@@ -108,11 +102,9 @@ int _requireInt(Object? raw, String field) {
   throw FormatException('$field must be an integer');
 }
 
-/// One turn as the inference boundary sees it: a role and ordered content.
-///
-/// Deliberately not [ChatMessage] — ids, timestamps, metrics and streaming
-/// state are presentation concerns an engine has no business receiving. The
-/// system turn a build injects has no [ChatMessage] behind it at all.
+/// One turn as the inference boundary sees it. Deliberately not [ChatMessage]:
+/// ids, timestamps, metrics and streaming state are presentation concerns an
+/// engine has no business receiving, and a build's system turn has none.
 final class PromptMessage {
   const PromptMessage({required this.role, required this.parts});
 
@@ -120,7 +112,6 @@ final class PromptMessage {
   final String role;
   final List<MessagePart> parts;
 
-  /// A turn whose whole content is one run of text.
   factory PromptMessage.text(String role, String text) =>
       PromptMessage(role: role, parts: [TextPart(text)]);
 
@@ -142,7 +133,6 @@ final class ChatMessage {
     this.isStreaming = false,
   });
 
-  /// The common case: a message whose whole content is one run of text.
   factory ChatMessage.text({
     required String id,
     required MessageRole role,
@@ -169,9 +159,7 @@ final class ChatMessage {
   final DateTime createdAt;
   final bool isStreaming;
 
-  /// Every text part joined. Search, transcripts, share, accessibility labels
-  /// and the streaming accumulator all read messages as text; only rendering
-  /// and the prompt boundary care about part structure.
+  /// Every text part joined; only rendering and the prompt boundary see parts.
   String get text => parts.whereType<TextPart>().map((p) => p.text).join();
 
   Iterable<ImagePart> get images => parts.whereType<ImagePart>();
@@ -193,9 +181,8 @@ final class ChatMessage {
     isStreaming: isStreaming ?? this.isStreaming,
   );
 
-  /// Replaces the message's text while keeping its images, which stay ahead of
-  /// the text in the order a vision prompt expects. This is how a streaming
-  /// assistant draft accumulates.
+  /// Replaces the text, keeping images ahead of it as a vision prompt expects.
+  /// This is how a streaming assistant draft accumulates.
   ChatMessage withText(String text) =>
       copyWith(parts: [...parts.whereType<ImagePart>(), TextPart(text)]);
 
@@ -208,8 +195,7 @@ final class ChatMessage {
     'createdAt': createdAt.toIso8601String(),
   };
 
-  /// Reads schema v2 `parts` and migrates a v1 `text` message in place, so a
-  /// pre-#18 history loads without losing a single turn.
+  /// Reads v2 `parts`, migrating a v1 `text` message so pre-#18 history loads.
   factory ChatMessage.fromJson(Map<String, Object?> json) {
     final rawParts = json['parts'];
     final parts = rawParts is List
@@ -251,9 +237,8 @@ final class ChatConversation {
   final bool reasoningEnabled;
   final bool pinned;
 
-  /// Catalog key of the model chosen for this chat; null means the
-  /// build's default model. Engines act on it only where supported
-  /// (the fake today, real switching with #20).
+  /// Catalog key of the model chosen for this chat; null means the build's
+  /// default. Acted on only where supported (the fake today, real with #20).
   final String? modelKey;
 
   ChatConversation copyWith({
@@ -274,8 +259,7 @@ final class ChatConversation {
 
   ChatConversation togglePinned() => copyWith(pinned: !pinned);
 
-  /// Explicit because [copyWith] cannot null a field: null selects the
-  /// build's default model again.
+  /// Explicit because [copyWith] cannot null a field.
   ChatConversation withModel(String? key) => ChatConversation(
     id: id,
     title: title,
@@ -286,8 +270,6 @@ final class ChatConversation {
     modelKey: key,
   );
 
-  /// A new conversation holding the prefix up to and including
-  /// [messageId], or null when the message is unknown.
   ChatConversation? branchUpTo(
     String messageId, {
     required String id,
@@ -330,9 +312,7 @@ final class ChatConversation {
       )
       .toList(growable: false);
 
-  /// Every attachment this conversation still references. The attachment store
-  /// keeps exactly the union of these across all conversations; anything else
-  /// is unreferenced bytes.
+  /// The store keeps exactly the union of these across all conversations.
   Iterable<String> get attachmentIds =>
       messages.expand((message) => message.images).map((i) => i.attachmentId);
 
@@ -373,12 +353,10 @@ final class ChatHistorySnapshot {
   final List<ChatConversation> conversations;
   final String? activeId;
 
-  /// v2 replaced each message's flat `text` with ordered `parts` (#18).
-  /// v1 files load unchanged — every legacy message becomes one text part —
-  /// and are rewritten as v2 on the next ordinary save.
+  /// v2 replaced each message's flat `text` with ordered `parts` (#18); a v1
+  /// file loads unchanged and is rewritten as v2 on the next save.
   static const schemaVersion = 2;
 
-  /// Every attachment referenced anywhere in the store.
   Set<String> get referencedAttachmentIds => {
     for (final conversation in conversations) ...conversation.attachmentIds,
   };
@@ -425,8 +403,8 @@ final class InferenceMetrics {
   final int tokenCount;
   final double elapsedSeconds;
 
-  /// Measurement-grade fields a real engine reports and the fake leaves
-  /// null; serialized sparsely so persisted history stays stable.
+  /// Measurement-grade fields a real engine reports and the fake leaves null;
+  /// serialized sparsely so persisted history stays stable.
   final int? promptTokenCount;
   final double? timeToFirstTokenSeconds;
   final int? peakPhysicalFootprintBytes;
@@ -490,13 +468,11 @@ final class MetricsEvent extends InferenceEvent {
 final class CompletedEvent extends InferenceEvent {
   const CompletedEvent({this.stopReason, this.rawTextHash, this.rawTextLength});
 
-  /// Null when the source does not report one (the fake, cancellations
-  /// resolved above the engine).
+  /// Null when the source does not report one (the fake, cancellations).
   final InferenceStopReason? stopReason;
 
-  /// FNV-1a 64 hash and length of the raw pre-parser text, present only
-  /// when a fixed sampling seed is configured (determinism probes and the
-  /// eval harness); never the transcript itself.
+  /// FNV-1a 64 hash and length of the raw pre-parser text, present only under a
+  /// fixed sampling seed (determinism probes, eval); never the transcript.
   final String? rawTextHash;
   final int? rawTextLength;
 }
@@ -586,8 +562,7 @@ final class ModelState {
   ModelState withArtifact(String key, ArtifactStatus status) =>
       copyWith(artifacts: {...artifacts, key: status});
 
-  /// Applies repository wiring to a freshly deserialized state; [copyWith]
-  /// then carries the stamps through every subsequent transition.
+  /// [copyWith] then carries these stamps through every later transition.
   ModelState stamp({String? activeArtifactKey, required bool simulated}) =>
       ModelState(
         artifacts: artifacts,
@@ -641,9 +616,8 @@ final class BenchmarkRecord {
   final String output;
 
   // Deliberately hardcoded even in real-engine builds: the only benchmark
-  // implementation is the deterministic fake, so this labeling stays
-  // honest until a real benchmark exists
-  // (docs/decisions/0003-flavor-backend-defaults.md).
+  // implementation is the deterministic fake, so this labeling stays honest
+  // until a real one exists (docs/decisions/0003-flavor-backend-defaults.md).
   Map<String, Object?> toJson() => {
     'schemaVersion': 1,
     'simulated': true,

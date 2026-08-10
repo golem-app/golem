@@ -27,12 +27,10 @@ class Composer extends ConsumerStatefulWidget {
   final bool reasoningEnabled;
   final GenerationPhase generation;
 
-  /// The active conversation, if one exists yet; picking a model first
-  /// materializes the chat so the choice has somewhere to live.
+  /// The active conversation, if one exists yet.
   final String? activeId;
   final String? modelKey;
 
-  /// Injectable so widget tests exercise the attach flow without a plugin.
   final AttachmentPicker picker;
 
   @override
@@ -44,9 +42,8 @@ class _ComposerState extends ConsumerState<Composer> {
   /// nothing durable exists until send copies the bytes into the store.
   final List<PreparedImage> _pending = [];
 
-  /// Opens the sheet and keeps whatever came back. Rejections surface as a
-  /// toast rather than a banner: nothing was sent, and the user's next move is
-  /// simply to pick a different picture.
+  /// Rejections surface as a toast rather than a banner: nothing was sent, and
+  /// the user's next move is simply to pick a different picture.
   Future<void> _attach(String modelLabel, bool supportsImages) async {
     try {
       final source = await showAttachSheet(
@@ -69,7 +66,6 @@ class _ComposerState extends ConsumerState<Composer> {
     }
   }
 
-  /// Thumbnails of what is attached but not yet sent, each removable.
   Widget _tray(BuildContext context) => Padding(
     key: const Key('composer-attachments'),
     padding: const EdgeInsets.only(top: GolemSpace.s3, bottom: GolemSpace.s1),
@@ -87,8 +83,8 @@ class _ComposerState extends ConsumerState<Composer> {
                     width: 56,
                     height: 56,
                     fit: BoxFit.cover,
-                    // A decorative thumbnail: the remove button beside it
-                    // carries the accessible name.
+                    // Decorative: the remove button beside it carries the
+                    // accessible name.
                     excludeFromSemantics: true,
                   ),
                 ),
@@ -173,8 +169,7 @@ class _ComposerState extends ConsumerState<Composer> {
         GolemSpace.gutter,
         8 + MediaQuery.viewInsetsOf(context).bottom,
       ),
-      // The composer card: field above the power row, per the handoff —
-      // a solid card with the float shadow, not glass.
+      // Per the handoff: a solid card with the float shadow, not glass.
       child: Container(
         key: const Key('composer-card'),
         decoration: BoxDecoration(
@@ -197,11 +192,9 @@ class _ComposerState extends ConsumerState<Composer> {
                 controller: controller,
                 focusNode: focus,
                 enabled: !generating,
-                // A borderless field with no decoration paints Flutter's
-                // built-in disabled fill (near-black in dark mode) over
-                // the card while generating; an explicit empty decoration
-                // keeps the disabled state transparent. The stop button
-                // already communicates that input is closed.
+                // Left null, a borderless field paints Flutter's built-in
+                // disabled fill (near-black in dark mode) over the card while
+                // generating; an empty decoration keeps it transparent.
                 decoration: const BoxDecoration(),
                 minLines: 1,
                 maxLines: 6,
@@ -213,9 +206,8 @@ class _ComposerState extends ConsumerState<Composer> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // The left cluster yields as one group so the send button
-                  // stays pinned right; inside it only the model chip
-                  // shrinks (ellipsised label), never the buttons.
+                  // The left cluster yields as one group so send stays pinned
+                  // right; inside it only the model chip shrinks.
                   Flexible(
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -375,9 +367,9 @@ class _ComposerState extends ConsumerState<Composer> {
                       ],
                     ),
                   ),
-                  // Only the send button depends on the live text, so it
-                  // listens to the controller alone instead of rebuilding
-                  // the whole composer on every keystroke.
+                  // Only send depends on the live text, so it listens to the
+                  // controller alone instead of rebuilding the whole composer
+                  // on every keystroke.
                   ListenableBuilder(
                     listenable: controller,
                     builder: (context, _) {
@@ -461,7 +453,6 @@ class _ComposerState extends ConsumerState<Composer> {
   Future<void> _openModelPicker(BuildContext context, WidgetRef ref) async {
     var conversationId = activeId;
     if (conversationId == null) {
-      // Picking a model before the first message materializes the chat.
       final controller = ref.read(chatControllerProvider.notifier);
       await controller.newChat();
       conversationId = ref.read(chatControllerProvider).value?.activeId;

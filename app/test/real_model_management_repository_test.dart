@@ -99,17 +99,19 @@ void main() {
   late _FixedDiskSpace diskSpace;
   late _RecordingBackupExclusion backup;
 
-  RealModelManagementRepository repository({String? activeKey}) =>
-      RealModelManagementRepository(
-        stateFile: File('${temp.path}/state/flutter-model-v2.json'),
-        documentsDirectory: '${temp.path}/documents',
-        catalog: [_entry()],
-        downloader: downloader,
-        diskSpace: diskSpace,
-        backupExclusion: backup,
-        activeArtifactKey: activeKey,
-        diskSpaceMargin: 10,
-      );
+  RealModelManagementRepository repository({
+    String? activeKey,
+    List<ModelCatalogEntry>? catalog,
+  }) => RealModelManagementRepository(
+    stateFile: File('${temp.path}/state/flutter-model-v2.json'),
+    documentsDirectory: '${temp.path}/documents',
+    catalog: catalog ?? [_entry()],
+    downloader: downloader,
+    diskSpace: diskSpace,
+    backupExclusion: backup,
+    activeArtifactKey: activeKey,
+    diskSpaceMargin: 10,
+  );
 
   setUp(() {
     temp = Directory.systemTemp.createTempSync('golem-real-repo-');
@@ -142,7 +144,6 @@ void main() {
       'https://huggingface.co/projectors/test-weights/resolve/fedcba9876543210/$_fileTwo',
     ]);
     expect(backup.excluded, ['${temp.path}/documents/models']);
-    // The nested file landed inside the artifact directory.
     expect(
       File('${temp.path}/documents/models/test-mlx/$_fileTwo').existsSync(),
       isTrue,
@@ -402,5 +403,225 @@ void main() {
     final cleared = await repo.recordRuntime(RuntimePhase.unloaded);
     expect(cleared.runtime, RuntimePhase.unloaded);
     expect(cleared.failure, isNull);
+  });
+
+  group('addModel', () {
+    ModelCatalogEntry custom() => ModelCatalogEntry(
+      key: 'custom-example-12345678',
+      displayName: 'Example',
+      engine: ModelEngine.gguf,
+      quantization: 'Q4_0',
+      repository: 'example/custom',
+      revision: 'a' * 40,
+      profileKey: 'gemma4',
+      files: [
+        ModelArtifactFile(
+          path: _fileOne,
+          bytes: _contentOne.length,
+          sha256: sha256.convert(utf8.encode(_contentOne)).toString(),
+          role: ModelFileRole.weights,
+        ),
+      ],
+    );
+
+    test('a registered entry downloads like any pinned one', () async {
+      final repo = repository();
+      await repo.load();
+      final added = await repo.addModel(custom());
+      expect(
+        added.statusOf('custom-example-12345678').phase,
+        ArtifactPhase.notDownloaded,
+      );
+      final states = await repo.download('custom-example-12345678').toList();
+      expect(
+        states.last.statusOf('custom-example-12345678').phase,
+        ArtifactPhase.installed,
+      );
+      expect(
+        downloader.requestedUrls.single,
+        'https://huggingface.co/example/custom/resolve/${'a' * 40}/$_fileOne',
+      );
+    });
+
+    test('the caller\'s catalog list is never grown in place', () async {
+      // main.dart passes the shared top-level `modelCatalog`, which the model
+      // catalog provider also receives; extending it would leak custom entries
+      // into the pinned set and make a top-level value mutable.
+      final pinned = [_entry()];
+      final repo = RealModelManagementRepository(
+        stateFile: File('${temp.path}/state/flutter-model-v2.json'),
+        documentsDirectory: '${temp.path}/documents',
+        catalog: pinned,
+        downloader: downloader,
+        diskSpace: diskSpace,
+        backupExclusion: backup,
+      );
+      await repo.load();
+      await repo.addModel(custom());
+      expect(pinned, hasLength(1));
+      expect(pinned.single.key, 'test-mlx');
+    });
+
+    test('re-adding refreshes the entry without losing its install', () async {
+      final repo = repository();
+      await repo.load();
+      await repo.addModel(custom());
+      await repo.download('custom-example-12345678').drain<void>();
+
+      // A repaste that resolved to the same commit must not present as fresh.
+      final again = await repo.addModel(custom());
+      expect(
+        again.statusOf('custom-example-12345678').phase,
+        ArtifactPhase.installed,
+      );
+      downloader.requestedUrls.clear();
+      await repo.download('custom-example-12345678').drain<void>();
+      expect(downloader.requestedUrls, isEmpty);
+    });
+
+    test('a re-add at a new commit re-earns its verification', () async {
+      final repo = repository();
+      await repo.load();
+      await repo.addModel(custom());
+      await repo.download('custom-example-12345678').drain<void>();
+
+      // Receipts are scoped by revision, so the same bytes at a different
+      // commit are unproven rather than inheriting the previous proof.
+      final moved = ModelCatalogEntry(
+        key: 'custom-example-12345678',
+        displayName: 'Example',
+        engine: ModelEngine.gguf,
+        quantization: 'Q4_0',
+        repository: 'example/custom',
+        revision: 'b' * 40,
+        profileKey: 'gemma4',
+        files: custom().files,
+      );
+      final added = await repo.addModel(moved);
+      expect(
+        added.statusOf('custom-example-12345678').phase,
+        ArtifactPhase.notDownloaded,
+      );
+    });
+  });
+
+  group('files published without a hash', () {
+    // Hugging Face returns an LFS SHA-256 for large files and nothing for
+    // small metadata ones, so a resolved custom repository (#52) mixes both
+    // kinds inside one entry. The pinned half must lose no strictness.
+    const unhashed = 'tokenizer_config.json';
+    const unhashedBody = 'tokenizer configuration, unhashed upstream';
+
+    ModelCatalogEntry mixedEntry() => ModelCatalogEntry(
+      key: 'custom-mixed',
+      displayName: 'Mixed',
+      engine: ModelEngine.mlx,
+      quantization: 'custom',
+      repository: 'example/mixed',
+      revision: 'aaaabbbbccccdddd',
+      profileKey: 'gemma4',
+      files: [
+        ModelArtifactFile(
+          path: _fileOne,
+          bytes: _contentOne.length,
+          sha256: sha256.convert(utf8.encode(_contentOne)).toString(),
+        ),
+        // The distinguishing case: no published hash at all.
+        const ModelArtifactFile(path: unhashed, bytes: unhashedBody.length),
+      ],
+    );
+
+    Map<String, Object?> receiptOf(String key) => Map<String, Object?>.from(
+      jsonDecode(
+            File(
+              '${temp.path}/documents/models/$key/.golem-verified.json',
+            ).readAsStringSync(),
+          )
+          as Map,
+    );
+
+    setUp(() => downloader.contents[unhashed] = unhashedBody);
+
+    test('install records the digest the bytes actually hashed to', () async {
+      final repo = repository(catalog: [mixedEntry()]);
+      await repo.load();
+      final states = await repo.download('custom-mixed').toList();
+      expect(
+        states.last.statusOf('custom-mixed').phase,
+        ArtifactPhase.installed,
+      );
+      final files = receiptOf('custom-mixed')['files'] as Map;
+      // Both kinds are receipted the same way: by content. The pinned file's
+      // recorded value must equal what was published for it.
+      expect(
+        files[_fileOne],
+        sha256.convert(utf8.encode(_contentOne)).toString(),
+      );
+      expect(
+        files[unhashed],
+        sha256.convert(utf8.encode(unhashedBody)).toString(),
+      );
+    });
+
+    test('a matching size alone never re-earns the verified label', () async {
+      // The trap this guards: comparing `receipt[path] != spec.sha256` treats a
+      // missing entry and a null published hash as equal, so an unreceipted
+      // file of the right length would have counted as installed.
+      final repo = repository(catalog: [mixedEntry()]);
+      await repo.load();
+      await repo.download('custom-mixed').toList();
+
+      // Keep the bytes, drop the receipt — a sideload, or a verify killed
+      // midway.
+      File(
+        '${temp.path}/documents/models/custom-mixed/.golem-verified.json',
+      ).deleteSync();
+      final reloaded = await repository(catalog: [mixedEntry()]).load();
+      expect(
+        reloaded.statusOf('custom-mixed').phase,
+        ArtifactPhase.notDownloaded,
+      );
+
+      // Re-downloading hashes what is already there rather than refetching.
+      downloader.requestedUrls.clear();
+      final states = await repository(
+        catalog: [mixedEntry()],
+      ).download('custom-mixed').toList();
+      expect(
+        states.last.statusOf('custom-mixed').phase,
+        ArtifactPhase.installed,
+      );
+      expect(downloader.requestedUrls, isEmpty);
+    });
+
+    test('a pinned file in the same entry still needs its hash', () async {
+      // Same length, different bytes, so only the hash can reject it.
+      downloader.contents[_fileOne] = 'x' * _contentOne.length;
+      final states = await repository(
+        catalog: [mixedEntry()],
+      ).download('custom-mixed').toList();
+      final status = states.last.statusOf('custom-mixed');
+      expect(status.phase, ArtifactPhase.failed);
+      expect(status.failure, contains('failed SHA-256 verification'));
+    });
+
+    test('a wrong length is reported as a size failure', () async {
+      // An unhashed file can only fail on length, and saying "failed SHA-256
+      // verification" would name a check that never ran.
+      downloader.contents[unhashed] = 'short';
+      final states = await repository(
+        catalog: [mixedEntry()],
+      ).download('custom-mixed').toList();
+      final status = states.last.statusOf('custom-mixed');
+      expect(status.phase, ArtifactPhase.failed);
+      expect(status.failure, contains('did not arrive at its expected size'));
+      expect(status.failure, isNot(contains('SHA-256')));
+      expect(
+        File(
+          '${temp.path}/documents/models/custom-mixed/$unhashed',
+        ).existsSync(),
+        isFalse,
+      );
+    });
   });
 }

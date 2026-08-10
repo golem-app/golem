@@ -65,25 +65,20 @@ CacheProbe cacheProbe(Ref ref) =>
 DiskSpaceProbe diskFreeSpaceProbe(Ref ref) =>
     throw UnimplementedError('Override diskFreeSpaceProbeProvider at startup');
 
-/// The resolved inference backend for this process. Deliberately a fake
-/// default value rather than a throwing seam — a documented exception to
-/// the repository-provider discipline: this is a value signal that dozens
-/// of widgets read for honest "simulated" labeling, and host tests (which
-/// run as the dev flavor) must see the fake without every container
-/// overriding it. main() always overrides it with the resolved config;
-/// a regression test pins the fake default.
+/// The resolved inference backend for this process. A fake default rather than
+/// a throwing seam — a documented exception to the repository-provider
+/// discipline: dozens of widgets read it for honest "simulated" labeling, and
+/// host tests (the dev flavor) must see the fake without every container
+/// overriding it. main() always overrides it with the resolved config.
 @Riverpod(keepAlive: true)
 InferenceBackendConfig inferenceBackend(Ref ref) =>
     const InferenceBackendConfig.fake();
 
-/// The catalog key of the model currently resident in the engine, straight
-/// from the residency owner (#42). Null while the engine is empty — label
-/// helpers fall back to the configured artifact then, so a lazy first load
-/// does not blank the chrome. Under a simulated backend this is always
-/// null without touching the repository seam: fake labels follow the
-/// per-chat choice, and label-only widget containers must not need an
-/// inference repository just to render chrome (the same discipline
-/// exception [inferenceBackend] documents).
+/// The catalog key of the model resident in the engine, straight from the
+/// residency owner (#42). Null while the engine is empty — label helpers fall
+/// back to the configured artifact, so a lazy first load does not blank the
+/// chrome. Always null under a simulated backend, without touching the
+/// repository seam: label-only containers must not need one.
 @Riverpod(keepAlive: true)
 String? residentModelKey(Ref ref) {
   if (ref.watch(inferenceBackendProvider).simulatedInference) return null;
@@ -115,18 +110,10 @@ extension StorageBreakdownTotals on StorageBreakdown {
   int get usedBytes => modelsBytes + chatsBytes + attachmentsBytes + cacheBytes;
 }
 
-/// Storage accounting for the drawer meter and the Storage screen: model
-/// bytes from artifact state, chat bytes from the history store, cache
-/// bytes from the cache probe. [StorageBreakdown.freeBytes] and
-/// [StorageBreakdown.totalBytes] are null whenever the platform cannot
-/// report them (or the seams are unwired) — surfaces hide those figures
-/// instead of inventing them. Watching the chat controller keeps the chat
-/// bucket honest after sends and deletes.
-/// A cheap signature of the chat store that changes only when
-/// conversations or messages are added or removed. ChatController
-/// reassigns state on every streaming delta; anything as heavy as disk
-/// probing must key on this instead of the raw chat state, or it re-runs
-/// per token for the always-mounted drawer meter.
+/// A cheap signature that changes only when conversations or messages are added
+/// or removed. ChatController reassigns state on every streaming delta, so
+/// anything as heavy as disk probing must key on this rather than the raw chat
+/// state, or it re-runs per token for the always-mounted drawer meter.
 @Riverpod(keepAlive: true)
 (int, int) chatStorageSignature(Ref ref) {
   final conversations =
@@ -139,10 +126,12 @@ extension StorageBreakdownTotals on StorageBreakdown {
   return (conversations.length, messages);
 }
 
+/// Storage accounting for the drawer meter and the Storage screen. Free and
+/// total bytes are null whenever the platform cannot report them (or the seams
+/// are unwired) — surfaces hide those figures instead of inventing them.
 @Riverpod(keepAlive: true)
 Future<StorageBreakdown> storageBreakdown(Ref ref) async {
-  // Every dependency registers before the first await: the signature is
-  // what re-runs this after sends and deletes, and a watch first taken
+  // Every dependency registers before the first await: a watch first taken
   // mid-computation would race its own invalidation.
   ref.watch(chatStorageSignatureProvider);
   final history = ref.watch(chatHistoryRepositoryProvider);
@@ -205,9 +194,8 @@ Future<StorageBreakdown> storageBreakdown(Ref ref) async {
   );
 }
 
-/// The catalog the UI renders: pinned entries plus the user's custom
-/// repositories (Advanced mode), derived — never stored — so the pinned
-/// manifest stays the single source of model knowledge.
+/// Pinned entries plus the user's custom repositories, derived — never stored —
+/// so the pinned manifest stays the single source of model knowledge.
 @Riverpod(keepAlive: true)
 List<ModelCatalogEntry> effectiveModelCatalog(Ref ref) {
   final pinned = ref.watch(modelCatalogEntriesProvider);
@@ -222,10 +210,8 @@ List<ModelCatalogEntry> effectiveModelCatalog(Ref ref) {
   ];
 }
 
-/// The published cross-chat search query. The raw field text stays in
-/// the search screen (widget-local, debounced 350 ms); only the
-/// normalized query lands here, so results derive reactively without
-/// rebuilding on every keystroke.
+/// The raw field text stays widget-local in the search screen (debounced
+/// 350 ms); only the normalized query lands here, so results derive reactively.
 @Riverpod(keepAlive: true)
 class SearchQuery extends _$SearchQuery {
   @override
@@ -234,8 +220,6 @@ class SearchQuery extends _$SearchQuery {
   void publish(String raw) => state = raw.trim();
 }
 
-/// Search results over every conversation, derived from the published
-/// query and the chat state — one source of truth, no copies.
 @Riverpod(keepAlive: true)
 List<ChatSearchResult> chatSearchResults(Ref ref) {
   final query = ref.watch(searchQueryProvider);
@@ -243,9 +227,7 @@ List<ChatSearchResult> chatSearchResults(Ref ref) {
   return searchConversations(conversations ?? const [], query);
 }
 
-/// Persisted per-model generation settings. Reads resolve against the
-/// broker profile's recommended defaults at the consumer, never here —
-/// only user-set values are stored.
+/// Only user-set values are stored; profile defaults resolve at the consumer.
 @Riverpod(keepAlive: true)
 class SettingsController extends _$SettingsController {
   @override
@@ -258,8 +240,8 @@ class SettingsController extends _$SettingsController {
     String profileKey,
     SamplingOverrides overrides,
   ) async {
-    // A tap can land in the cold-start load window; dropping it beats
-    // throwing on requireValue while the store is still reading.
+    // A tap can land in the cold-start load window; dropping it beats throwing
+    // on requireValue while the store is still reading.
     if (!state.hasValue) return;
     final next = _value.withModel(profileKey, overrides);
     state = AsyncData(next);
@@ -270,10 +252,8 @@ class SettingsController extends _$SettingsController {
       updateModel(profileKey, const SamplingOverrides());
 }
 
-/// Persisted app-wide preferences: appearance, transcript behavior,
-/// privacy, Advanced mode, response styles, custom repositories. Every
-/// command follows the settings idiom — drop taps that land in the
-/// cold-start load window, publish optimistically, then save.
+/// Persisted app-wide preferences. Every command follows the settings idiom —
+/// drop taps that land in the cold-start load window, publish, then save.
 @Riverpod(keepAlive: true)
 class PreferencesController extends _$PreferencesController {
   @override
@@ -317,7 +297,7 @@ class PreferencesController extends _$PreferencesController {
     await _commit(_value.copyWith(advancedMode: value));
   }
 
-  /// Null or blank clears the custom prompt back to the model default.
+  /// Null or blank clears the prompt back to the model default.
   Future<void> setSystemPrompt(String? prompt) async {
     if (!state.hasValue) return;
     final trimmed = prompt?.trim();
@@ -333,10 +313,8 @@ class PreferencesController extends _$PreferencesController {
     await _commit(_value.withStyle(profileKey, style));
   }
 
-  /// Turning history off also empties the on-disk store immediately — the
-  /// design copy promises chats disappear, so nothing may linger on disk.
-  /// The confirmation alert lives at the widget layer; this is past the
-  /// point of consent. Turning it back on re-saves whatever is in memory.
+  /// Turning history off empties the on-disk store immediately: the design copy
+  /// promises chats disappear. Past consent — the alert lives in the widget.
   Future<void> setSaveHistory(bool save) async {
     if (!state.hasValue) return;
     await _commit(_value.copyWith(saveHistory: save));
@@ -349,8 +327,6 @@ class PreferencesController extends _$PreferencesController {
     }
   }
 
-  /// Persists the spec and registers its derived entry with the model
-  /// repository, so the card appears and can simulate a download at once.
   Future<void> addCustomModel(CustomModelSpec spec) async {
     if (!state.hasValue) return;
     await _commit(_value.withCustomModel(spec));
@@ -377,16 +353,14 @@ class ChatController extends _$ChatController {
 
   Future<void> _persist(ChatState value) async {
     // Every seam is read before the first await: this method outlives its
-    // provider on a fast dispose, and Ref is unusable past that point.
-    // Privacy gate: with history off, chats live in memory only. A cold
-    // start (preferences still loading) keeps the default and saves.
+    // provider on a fast dispose, and Ref is unusable past that point. Privacy
+    // gate: with history off, chats live in memory only; a cold start saves.
     final preferences = ref.read(preferencesControllerProvider).value;
     final history = ref.read(chatHistoryRepositoryProvider);
     final attachments = _attachments;
 
     // Attachment bytes follow the live conversations, not the disk snapshot:
-    // with history off the chats stay in memory for the session and their
-    // pictures must stay readable, but a deleted message's bytes still go.
+    // with history off the pictures must stay readable for the session.
     await _retainReferenced(attachments, value.conversations);
     if (preferences != null && !preferences.saveHistory) return;
     await history.save(
@@ -406,9 +380,8 @@ class ChatController extends _$ChatController {
     }
   }
 
-  /// Drops attachment bytes no conversation references any more. Failures are
-  /// swallowed: leaving an orphan costs disk, but letting a cleanup error
-  /// abort a send would cost the user their message.
+  /// Drops attachment bytes no conversation references. Failures are swallowed:
+  /// an orphan costs disk, an aborted send would cost the user their message.
   static Future<void> _retainReferenced(
     AttachmentRepository? attachments,
     List<ChatConversation> conversations,
@@ -421,8 +394,6 @@ class ChatController extends _$ChatController {
     } catch (_) {}
   }
 
-  /// Copies one prepared image into the attachment store and describes it as
-  /// a message part.
   Future<ImagePart> _storeAttachment(PreparedImage image) async {
     final attachments = _attachments;
     if (attachments == null) {
@@ -441,14 +412,13 @@ class ChatController extends _$ChatController {
     );
   }
 
-  /// Re-persists the in-memory state; the save-history re-enable path.
+  /// The save-history re-enable path.
   Future<void> persistCurrent() async {
     if (!state.hasValue) return;
     await _persist(_value);
   }
 
-  /// Removes every conversation, in memory and on disk. The confirmation
-  /// alert lives at the widget layer; this is past the point of consent.
+  /// The confirmation alert lives at the widget layer; this is past consent.
   Future<void> deleteAllChats() async {
     stop();
     final next = ChatState(conversations: const []);
@@ -462,9 +432,7 @@ class ChatController extends _$ChatController {
     await _retainReferenced(attachments, const []);
   }
 
-  /// The full history snapshot as pretty JSON — the user's own data
-  /// export, so unlike shared transcripts it keeps everything, reasoning
-  /// included.
+  /// The user's own export, so unlike a shared transcript it keeps reasoning.
   String? exportAllChats() {
     if (!state.hasValue) return null;
     return ChatHistorySnapshot(
@@ -584,9 +552,8 @@ class ChatController extends _$ChatController {
     await _persist(next);
   }
 
-  /// Sends a turn. [images] are attachments the composer has already
-  /// validated; their bytes are copied into the attachment store here, so the
-  /// message references ids rather than anything the picker handed over.
+  /// [images] are attachments the composer already validated; their bytes are
+  /// copied into the store here, so the message references ids only.
   Future<void> send(
     String rawText, {
     List<PreparedImage> images = const [],
@@ -692,12 +659,10 @@ class ChatController extends _$ChatController {
       return;
     }
     final epoch = ++_generationEpoch;
-    // Real backend with the active artifact not installed: fail fast into
-    // the banner's download CTA before touching the engine — prepare()
-    // would only produce a cryptic missing-file error after a hang-like
-    // pause. Only for catalog-derived paths: an operator-supplied
-    // GOLEM_MODEL_PATH (sideloads, the determinism probe) must reach
-    // prepare() untouched, which stays the loud failure path.
+    // Real backend with the active artifact not installed: fail fast into the
+    // banner's download CTA — prepare() would only give a cryptic missing-file
+    // error after a hang-like pause. Catalog-derived paths only: an
+    // operator-supplied GOLEM_MODEL_PATH must reach prepare() untouched.
     final backend = ref.read(inferenceBackendProvider);
     if (!backend.simulatedInference &&
         backend.artifactKey != null &&
@@ -738,21 +703,16 @@ class ChatController extends _$ChatController {
       ),
     );
     try {
-      // Address the conversation's own model, not the boot configuration:
-      // generate() below activates `active.modelKey`, so a keyless prepare
-      // would load the initial model only for the stream to unload it and
-      // load another — two multi-gigabyte loads per send, with the second
-      // preflight failing after preparation already reported success.
+      // The conversation's own model, not the boot configuration: generate()
+      // below activates `active.modelKey`, so a keyless prepare would cost two
+      // multi-gigabyte loads per send.
       await ref
           .read(inferenceRepositoryProvider)
           .prepare(modelKey: active.modelKey);
       if (!ref.mounted || epoch != _generationEpoch) return;
-      // The lazy load must keep the persisted RuntimePhase honest in both
-      // directions: after this prepare() the engine holds weights, so
-      // Settings may not keep claiming "Unloaded" (the mirror image of the
-      // toggle's honesty fix). Awaited: it is one small persist after a
-      // load measured in seconds, and a recorded phase must not race the
-      // stream it describes.
+      // After this prepare() the engine holds weights, so Settings may not keep
+      // claiming "Unloaded". Awaited on purpose: a recorded phase must not race
+      // the stream it describes.
       if (!backend.simulatedInference) {
         await ref.read(modelControllerProvider.notifier).reflectEngineLoaded();
         if (!ref.mounted || epoch != _generationEpoch) return;
@@ -816,10 +776,8 @@ class ChatController extends _$ChatController {
     }
   }
 
-  /// Maps a thrown error to the typed banner failure. Typed inference
-  /// exceptions carry their own user copy and recovery kind; anything
-  /// else gets fixed generic copy — raw exception text never reaches the
-  /// banner (§19.4).
+  /// Typed inference exceptions carry their own copy and recovery kind; the
+  /// rest get fixed generic copy — raw exception text never reaches it (§19.4).
   static ChatFailure _classifiedFailure(Object error) => switch (error) {
     InferenceException(:final kind, :final message) => ChatFailure(
       kind: switch (kind) {
@@ -840,9 +798,8 @@ class ChatController extends _$ChatController {
     ),
   };
 
-  /// Whether the active artifact is installed, or null when model state is
-  /// unavailable — then generation proceeds and prepare() stays the loud
-  /// failure path rather than this controller inventing a verdict.
+  /// Null when model state is unavailable — generation then proceeds and
+  /// prepare() stays the loud failure path, rather than inventing a verdict.
   Future<bool?> _activeModelInstalled() async {
     try {
       final models = await ref.read(modelControllerProvider.future);
@@ -852,11 +809,9 @@ class ChatController extends _$ChatController {
     }
   }
 
-  /// The effective sparse overrides for the active model profile: the
-  /// response style's values with the user's hand-set Advanced overrides
-  /// layered on top, knob by knob. Settings that fail to surface must
-  /// never block chat — each layer degrades independently to nothing,
-  /// leaving the profile defaults.
+  /// The response style's values with the user's hand-set Advanced overrides
+  /// layered on top, knob by knob. Settings that fail to surface must never
+  /// block chat, so each layer degrades independently to nothing.
   Future<SamplingOverrides?> _samplingOverrides() async {
     final profileKey = ref.read(inferenceBackendProvider).profileKey;
     var manual = const SamplingOverrides();
@@ -873,8 +828,7 @@ class ChatController extends _$ChatController {
     return merged.isEmpty ? null : merged;
   }
 
-  /// The custom system prompt (Advanced mode), or null for the model's
-  /// default behavior. Unavailable preferences degrade to no prompt.
+  /// Null for the model's default; unavailable preferences degrade to null.
   Future<String?> _systemPrompt() async {
     try {
       final preferences = await ref.read(preferencesControllerProvider.future);
@@ -962,9 +916,7 @@ class ChatController extends _$ChatController {
   }
 
   /// The context-exhausted recovery: retrying can never fit the same
-  /// conversation back into the window, so the banner offers a fresh chat
-  /// instead. Discards the failed draft like [discardFailure], then
-  /// creates and activates a new conversation.
+  /// conversation back into the window, so the banner offers a fresh chat.
   Future<void> startFreshChatFromFailure() async {
     await discardFailure();
     await newChat();
@@ -1005,8 +957,7 @@ class ModelController extends _$ModelController {
       }
     } catch (error) {
       // Operational failures arrive as failed-phase snapshots; anything that
-      // still throws must land on the card, not blank the whole screen as an
-      // AsyncError.
+      // still throws must land on the card, not blank the screen as AsyncError.
       _publishFailure(artifactKey, error);
     } finally {
       _busy = false;
@@ -1062,10 +1013,7 @@ class ModelController extends _$ModelController {
   }
 
   /// Records that the engine holds weights after ChatController's lazy
-  /// prepare(), so the persisted phase stays honest in the load direction
-  /// too. No-ops when the phase already says loaded, when model state is
-  /// unavailable, or when the active artifact is not installed (sideloaded
-  /// paths are outside the catalog's phase tracking).
+  /// prepare(). Skips sideloaded paths — outside the catalog's phase tracking.
   Future<void> reflectEngineLoaded() async {
     if (_busy) return;
     final current = state.value;
@@ -1088,9 +1036,7 @@ class ModelController extends _$ModelController {
     }
   }
 
-  /// Registers a custom repository's derived entry (Advanced mode). Fast
-  /// and non-streaming, so it skips the busy gate; a failure lands on the
-  /// new card like any other artifact failure.
+  /// Fast and non-streaming, so it skips the busy gate.
   Future<void> registerCustomModel(ModelCatalogEntry entry) async {
     try {
       final value = await ref
@@ -1117,13 +1063,10 @@ class ModelController extends _$ModelController {
     );
   }
 
-  /// The persisted RuntimePhase must reflect the engine, not bookkeeping:
-  /// Load drives a real `prepare()` before `loaded` is recorded, Unload a
-  /// real `unload()` before `unloaded` — the deferred #37 finding. The
-  /// inference repository is the only component touching the engine (#42);
-  /// the management repository just records the phase. Engine failures
-  /// stay in-memory as a failed phase with the message; the repository's
-  /// stale-`loading` reconciliation already covers crashes.
+  /// The persisted RuntimePhase must reflect the engine, not bookkeeping: a
+  /// real `prepare()`/`unload()` runs before the phase is recorded — the
+  /// deferred #37 finding, and only the inference repository touches the engine
+  /// (#42). Engine failures stay in memory as a failed phase.
   Future<void> toggleRuntime() async {
     if (_busy) return;
     _busy = true;
@@ -1145,14 +1088,12 @@ class ModelController extends _$ModelController {
         if (!ref.mounted) return;
         state = AsyncData(value);
       } else {
-        // Publish the loading phase immediately so the UI can disable the
-        // toggle while the engine loads.
+        // Publish loading at once so the UI can disable the toggle.
         state = AsyncData(
           current.copyWith(runtime: RuntimePhase.loading, clearFailure: true),
         );
         if (!current.activeModelInstalled) {
-          // Refuse with a persisted failed phase and a clear message; the
-          // engine is never touched.
+          // Refuse with a persisted failed phase; the engine is never touched.
           final value = await repository.recordRuntime(
             RuntimePhase.failed,
             failure: _installFirstFailure(current),
@@ -1180,13 +1121,10 @@ class ModelController extends _$ModelController {
     }
   }
 
-  /// Frees the engine on an OS memory-pressure signal or backgrounding —
-  /// the app must never hold multi-gigabyte weights it is not actively
-  /// using while the platform is reclaiming memory. Only when idle: an
-  /// advisory signal never cancels a visible stream (the typed OOM path
-  /// reports honestly if generation truly cannot continue), and the busy
-  /// guard keeps this off an in-flight model operation. Failures stay
-  /// silent — the next explicit operation reports normally.
+  /// Frees the engine on an OS memory-pressure signal or backgrounding — the
+  /// app must never hold multi-gigabyte weights it is not using while the
+  /// platform reclaims memory. Only when idle: an advisory signal never cancels
+  /// a visible stream, and the busy guard keeps it off a model operation.
   Future<void> releaseEngineWhileInactive() async {
     if (_busy) return;
     final current = state.value;
@@ -1196,10 +1134,8 @@ class ModelController extends _$ModelController {
     _busy = true;
     try {
       final inference = ref.read(inferenceRepositoryProvider);
-      // Residency decides, not the catalog phase: an operator-supplied
-      // GOLEM_MODEL_PATH load is outside the catalog's phase tracking
-      // (reflectEngineLoaded skips it), yet its weights are just as
-      // resident and just as liable to be jetsammed.
+      // Residency decides, not the catalog phase: a GOLEM_MODEL_PATH load is
+      // outside phase tracking, yet just as resident and just as jetsammable.
       final loaded = current.runtime == RuntimePhase.loaded;
       if (!loaded && inference.residentModelKey.value == null) return;
       await inference.unload();
@@ -1216,9 +1152,8 @@ class ModelController extends _$ModelController {
     }
   }
 
-  /// The load-refusal copy for a not-installed active model. Owned here
-  /// since #42: the management repository records phases and no longer
-  /// knows why a load was refused.
+  /// The load-refusal copy for a not-installed active model. Owned here since
+  /// #42: the management repository no longer knows why a load was refused.
   String _installFirstFailure(ModelState current) {
     if (current.activeArtifactKey == null) {
       return 'Inference is a build-time opt-in; no backend is configured.';
@@ -1259,9 +1194,8 @@ class StartupController extends _$StartupController {
 
   Future<void> retry() async {
     state = const AsyncData(StartupState(progress: 0.2));
-    // Recovery deliberately succeeds — the injected failure exists to show
-    // the failure UI, retry to show the recovery path — but it runs through
-    // the same StartupSequence timing policy as a real launch.
+    // Recovery deliberately succeeds: the injected failure exists to show the
+    // failure UI, retry the recovery path — with real StartupSequence timing.
     final result = await const StartupSequence().run(StartupScenario.ready);
     if (!ref.mounted) return;
     state = AsyncData(result);
@@ -1275,8 +1209,7 @@ class BenchmarkController extends _$BenchmarkController {
   @override
   BenchmarkState build() => const BenchmarkState();
 
-  // A result belongs to the exact case/phase combination it was produced
-  // for, so any selection change or new run discards it.
+  // A result belongs to the exact case/phase it was produced for.
   void selectCase(String caseId) =>
       state = state.copyWith(caseId: caseId, clearResult: true);
   void selectPhase(BenchmarkPhase phase) =>

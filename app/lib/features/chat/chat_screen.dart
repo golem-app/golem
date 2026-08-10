@@ -15,7 +15,6 @@ import 'widgets/conversation_drawer.dart';
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({this.picker = const AttachmentPicker(), super.key});
 
-  /// Injectable so widget tests drive attachment intake without a plugin.
   final AttachmentPicker picker;
 
   @override
@@ -23,7 +22,6 @@ class ChatScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
-  /// Only the free edge is rounded; the hinged edge meets the screen.
   static const _drawerRadius = BorderRadius.horizontal(
     right: Radius.circular(GolemRadius.drawer),
   );
@@ -37,9 +35,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _focus = FocusNode();
   bool _drawerOpen = false;
   bool _showJump = false;
-  // Whether the view follows the streaming tail. Only a deliberate upward
-  // drag detaches it; growing content never does — distance-based detach
-  // made fast responses outrun the animation and stop following mid-answer.
+  // Only a deliberate upward drag detaches the tail-follow; growing content
+  // never does — distance-based detach made fast responses outrun the
+  // animation and stop following mid-answer.
   bool _follow = true;
 
   @override
@@ -48,9 +46,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _scroll.addListener(_updateScrollState);
   }
 
-  /// Recomputed on offset changes and on content growth: while detached, a
-  /// streaming response moves the tail away without any scroll offset
-  /// change, and the jump affordance must still appear.
+  /// Also recomputed on content growth: while detached, a streaming response
+  /// moves the tail away with no offset change, and the jump affordance must
+  /// still appear.
   void _updateScrollState() {
     if (!_scroll.hasClients) return;
     final distance = _scroll.position.maxScrollExtent - _scroll.offset;
@@ -73,9 +71,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _animateToBottom() async {
-    // The list's maxScrollExtent is a lazy-layout estimate that grows as
-    // items build, so a single animation can undershoot; chase the extent
-    // until the tail is actually reached (or the user drags away).
+    // maxScrollExtent is a lazy-layout estimate that grows as items build, so
+    // one animation can undershoot; chase the extent until the tail is really
+    // reached (or the user drags away).
     for (var attempt = 0; attempt < 8; attempt++) {
       if (!_scroll.hasClients || !_follow) return;
       final target = _scroll.position.maxScrollExtent;
@@ -118,8 +116,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       } else if (nextValue?.generation == GenerationPhase.streaming) {
         _followTail();
       } else if (priorValue?.generation == GenerationPhase.streaming) {
-        // The last delta can extend the layout after the final jump; settle
-        // flush with the finished answer.
+        // The last delta can extend the layout after the final jump.
         _scrollToLatest();
       }
     });
@@ -138,16 +135,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget _buildShell(BuildContext context, ChatState chat) {
     final blocked =
         chat.generation != GenerationPhase.idle || chat.hasUnsavedAssistant;
-    // Canvas, not drawer: this is what shows behind the translucent
-    // keyboard in both appearances.
+    // Canvas, not drawer: this shows behind the translucent keyboard.
     return CupertinoPageScaffold(
       backgroundColor: GolemTheme.canvas,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // Capped at 330pt so a consistent tap-to-dismiss strip of chat
-          // stays visible on phone widths. Deliberately wider than the
-          // handoff's 318-of-417 (~307pt here), which read cramped on
-          // device against the conversation titles it has to hold.
+          // Capped at 330pt so a tap-to-dismiss strip of chat stays visible on
+          // phone widths — deliberately wider than the handoff's ~307pt, which
+          // read cramped on device against the conversation titles.
           final drawerWidth = (constraints.maxWidth * 0.9)
               .clamp(0, 330.0)
               .toDouble();
@@ -170,9 +165,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           modelKey: chat.active?.modelKey,
                           residentModelKey: ref.watch(residentModelKeyProvider),
                         ),
-                        // Contained glass buttons follow the iOS 26
-                        // toolbar style; bare nav-bar glyphs read too
-                        // small next to it.
+                        // Contained glass follows the iOS 26 toolbar style;
+                        // bare nav-bar glyphs read too small next to it.
                         leading: CupertinoButton(
                           key: const Key('open-drawer'),
                           padding: EdgeInsets.zero,
@@ -265,11 +259,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     opacity: _drawerOpen ? 1 : 0,
                     duration: GolemMotion.medium,
                     curve: GolemMotion.standard,
-                    // Labelled like the modal barrier it is, so the one
-                    // screen-sized tap target the open drawer adds still
-                    // announces itself, and carrying the dismiss action so
-                    // the screen-reader escape gesture closes the drawer
-                    // without hunting for the barrier.
+                    // Labelled like the modal barrier it is, so the
+                    // screen-sized tap target announces itself; the dismiss
+                    // action lets the screen-reader escape gesture close it.
                     child: Semantics(
                       button: true,
                       label: 'Close conversations',

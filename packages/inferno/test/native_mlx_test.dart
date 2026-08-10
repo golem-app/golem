@@ -6,9 +6,8 @@ import 'dart:io';
 import 'package:inferno/inferno.dart';
 import 'package:test/test.dart';
 
-/// MLX resolves its shader library beside the loaded binary before falling
-/// back to app-bundle lookups; CLI runs stage it there (see
-/// tokenization_parity_test.dart).
+/// MLX resolves its shader library beside the loaded binary before falling back
+/// to app-bundle lookups, so a CLI run must stage it there.
 void _stageMetallibForCliRun() {
   final dylib = File('.dart_tool/lib/libinferno_mlx.dylib');
   final metallib = File(
@@ -37,14 +36,11 @@ void main() {
     ),
   );
 
-  // One shared runtime: the multi-gigabyte artifact loads once in setUpAll
-  // and every test runs against the resident model. The `real-model` tag's
-  // budget in dart_test.yaml covers the load.
+  // The `real-model` tag's budget in dart_test.yaml covers the shared load.
   group('pinned MLX artifact', () {
-    // Constructed in setUpAll: a group body always executes at collection
-    // time, even when the whole group is skipped, and the native runtime
-    // must not spin up on skip. Nullable so a setUpAll failure before the
-    // assignment cannot turn tearDownAll into a LateInitializationError.
+    // Constructed in setUpAll: a group body runs at collection time even when
+    // skipped, and the native runtime must not spin up then. Nullable so a
+    // setUpAll failure cannot turn tearDownAll into a LateInitializationError.
     Inferno? inferno;
 
     setUpAll(() async {

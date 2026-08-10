@@ -1,6 +1,5 @@
-/// What a pinned file is for. An artifact's loadable path depends on it: the
-/// llama engine needs exactly one [weights] file and at most one [projector],
-/// while an MLX snapshot is a directory of [snapshot] files.
+/// What a pinned file is for: the llama engine needs exactly one [weights] file
+/// and at most one [projector]; an MLX snapshot is a directory of [snapshot]s.
 enum InfernoFileRole { weights, projector, snapshot }
 
 final class InfernoModelFile {
@@ -18,10 +17,9 @@ final class InfernoModelFile {
   final String sha256;
   final InfernoFileRole role;
 
-  /// Where this individual file comes from, when that is not the artifact's
-  /// own repository. A multimodal projector is commonly published separately
-  /// from the quantized weights it pairs with, and pretending otherwise would
-  /// mean pinning a repository that does not contain the file.
+  /// Where this file comes from when that is not the artifact's own repository:
+  /// a multimodal projector is commonly published apart from the weights it
+  /// pairs with, and pretending otherwise would pin a repository lacking it.
   final String? repository;
   final String? revision;
 }
@@ -107,9 +105,8 @@ const gemma4E2BGgufQ4 = InfernoModelArtifact(
       role: InfernoFileRole.weights,
     ),
     // Selected over the BF16 reference by the #18 bake-off: identical graded
-    // answers, 423 MB (30%) lower median peak resident memory — decisive on
-    // the 8 GB tier this app supports. Published separately from the QAT
-    // weights, hence its own repository pin.
+    // answers, 423 MB (30%) lower median peak resident memory — decisive on the
+    // 8 GB tier. Published apart from the QAT weights, hence its own pin.
     InfernoModelFile(
       path: 'mmproj-gemma-4-E2B-it-Q8_0.gguf',
       bytes: 557368064,
@@ -122,15 +119,11 @@ const gemma4E2BGgufQ4 = InfernoModelArtifact(
   ],
 );
 
-/// Gemma 4 E2B multimodal projector candidates (#18).
-///
-/// Evaluation inputs, not a shipping artifact: the 16-bit reference and the
-/// Q8_0 candidate are compared on the production path, and only the selected
-/// one becomes a [InfernoFileRole.projector] file on [gemma4E2BGgufQ4].
-///
-/// They are published by `ggml-org` while the shipping weights are unsloth's
-/// QAT build, so the pairing is a hypothesis this bake-off has to prove, not
-/// something the matching architecture guarantees.
+/// Gemma 4 E2B multimodal projector candidates (#18). Evaluation inputs only:
+/// one becomes the [InfernoFileRole.projector] on [gemma4E2BGgufQ4]. They are
+/// `ggml-org` builds while the shipping weights are unsloth's QAT, so the
+/// pairing is a hypothesis the bake-off must prove, not something the matching
+/// architecture guarantees.
 const gemma4E2BMmprojCandidates = InfernoModelArtifact(
   repository: 'ggml-org/gemma-4-E2B-it-GGUF',
   revision: '64ef033dc9f85a88f88e70cceb0a7457366bea64',
@@ -245,10 +238,9 @@ const qwen35TwoBGgufQ4 = InfernoModelArtifact(
   ],
 );
 
-/// Qwen 3.5 2B multimodal projector candidates (#18).
-///
-/// Evaluation inputs only until one passes against the exact shipping
-/// language artifact through the pinned production `libmtmd` path.
+/// Qwen 3.5 2B multimodal projector candidates (#18): evaluation inputs until
+/// one passes against the exact shipping language artifact through the pinned
+/// production `libmtmd` path.
 const qwen35TwoBMmprojCandidates = InfernoModelArtifact(
   repository: 'prithivMLmods/Qwen3.5-2B-MTP-GGUF',
   revision: 'd4a4b305fe76ab01b541278d3078cd25c825530a',
@@ -363,10 +355,9 @@ const qwen35GgufQ4 = InfernoModelArtifact(
   ],
 );
 
-/// Qwen 3.5 4B multimodal projector candidates (#18).
-///
-/// These are evaluated independently from the 2B files: the vision encoders
-/// are related, but their language projection dimensions are not compatible.
+/// Qwen 3.5 4B multimodal projector candidates (#18). Evaluated independently
+/// from the 2B files: the vision encoders are related, but their language
+/// projection dimensions are not compatible.
 const qwen35MmprojCandidates = InfernoModelArtifact(
   repository: 'prithivMLmods/Qwen3.5-4B-MTP-GGUF',
   revision: 'dd65086bdcdd7a8f242a2e54cfe11caf8cd51097',
