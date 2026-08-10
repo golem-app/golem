@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -132,14 +131,6 @@ class _GolemAppState extends ConsumerState<GolemApp>
       debugShowCheckedModeBanner: false,
       routerConfig: _router,
       theme: GolemTheme.theme(brightness),
-      // Copy is hardcoded English, but framework widgets still need the
-      // delegates — Material included: text-field selection toolbars resolve
-      // to the Material implementation on Android chrome.
-      localizationsDelegates: const [
-        GlobalCupertinoLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ],
       supportedLocales: const [Locale('en')],
       builder: (context, child) {
         var body = child ?? const SizedBox.shrink();
