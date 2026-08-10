@@ -144,6 +144,7 @@ Future<void> pumpWithRepositories(
   List<ModelCatalogEntry>? catalog,
   InferenceBackendConfig? backend,
   PreferencesRepository? preferences,
+  AttachmentRepository? attachments,
   CustomRepositoryResolver? resolver,
 }) async {
   setViewport(tester);
@@ -153,6 +154,7 @@ Future<void> pumpWithRepositories(
     catalog: catalog,
     backend: backend,
     preferences: preferences,
+    attachments: attachments,
     resolver: resolver,
   );
   addTearDown(container.dispose);

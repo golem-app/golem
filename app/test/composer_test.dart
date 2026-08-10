@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
@@ -306,6 +309,176 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('a denied camera permission says so instead of nothing', (
+    tester,
+  ) async {
+    // The picker is a platform channel; a denied permission is a
+    // PlatformException, not an ImageRejectedException, and used to escape the
+    // handler entirely — the sheet closed and nothing happened.
+    await pumpWithRepositories(
+      tester,
+      history: _picturesChat(),
+      child: ChatScreen(
+        picker: _StubPicker(
+          error: PlatformException(code: 'camera_access_denied'),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('composer-attach')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('attach-take-photo')));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('golem-toast')), findsOneWidget);
+    expect(find.textContaining('needs access'), findsOneWidget);
+    expect(find.byKey(const Key('composer-attachments')), findsNothing);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('an attachment that cannot be stored keeps the turn', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      history: _picturesChat(),
+      attachments: _UnwritableAttachmentRepository(),
+      child: ChatScreen(picker: _StubPicker()),
+    );
+
+    await tester.tap(find.byKey(const Key('composer-attach')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('attach-photo-library')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('chat-composer')),
+      'What is this?',
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('send-button')));
+    await tester.pumpAndSettle();
+
+    // The bytes never reached disk, so the turn was never sent. Both halves of
+    // it have to come back, or the picture is gone with no way to retry.
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining('could not be saved'), findsOneWidget);
+    expect(find.byKey(const Key('composer-attachments')), findsOneWidget);
+    final field = tester.widget<CupertinoTextField>(
+      find.byKey(const Key('chat-composer')),
+    );
+    expect(field.controller!.text, 'What is this?');
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ChatScreen)),
+    );
+    expect(
+      container.read(chatControllerProvider).requireValue.active!.messages,
+      isEmpty,
+    );
+  });
+
+  testWidgets('an attached image does not follow a chat switch', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      history: ChatHistorySnapshot(
+        activeId: 'chat',
+        conversations: [
+          ChatConversation(
+            id: 'chat',
+            title: 'Pictures',
+            updatedAt: DateTime.utc(2026, 8, 9),
+            messages: const [],
+            modelKey: 'gemma4-gguf',
+          ),
+          ChatConversation(
+            id: 'other',
+            title: 'Somewhere else',
+            updatedAt: DateTime.utc(2026, 8, 8),
+            messages: const [],
+            modelKey: 'gemma4-gguf',
+          ),
+        ],
+      ),
+      child: ChatScreen(picker: _StubPicker()),
+    );
+
+    await tester.tap(find.byKey(const Key('composer-attach')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('attach-photo-library')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('composer-attachments')), findsOneWidget);
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ChatScreen)),
+    );
+    await container
+        .read(chatControllerProvider.notifier)
+        .selectConversation('other');
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('composer-attachments')), findsNothing);
+  });
+
+  testWidgets('switching to a text-only model makes send unreachable', (
+    tester,
+  ) async {
+    final source = modelCatalog.firstWhere(
+      (entry) => entry.key == 'qwen35-gguf',
+    );
+    final textOnly = ModelCatalogEntry(
+      key: source.key,
+      displayName: source.displayName,
+      engine: source.engine,
+      quantization: source.quantization,
+      repository: source.repository,
+      revision: source.revision,
+      files: source.files,
+      profileKey: source.profileKey,
+    );
+    await pumpWithRepositories(
+      tester,
+      catalog: [
+        for (final entry in modelCatalog)
+          if (entry.key == source.key) textOnly else entry,
+      ],
+      history: _picturesChat(),
+      child: ChatScreen(picker: _StubPicker()),
+    );
+
+    await tester.tap(find.byKey(const Key('composer-attach')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('attach-photo-library')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<CupertinoButton>(find.byKey(const Key('send-button')))
+          .onPressed,
+      isNotNull,
+    );
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ChatScreen)),
+    );
+    await container
+        .read(chatControllerProvider.notifier)
+        .setConversationModel('chat', 'qwen35-gguf');
+    await tester.pumpAndSettle();
+
+    // The tray stays — discarding someone's picture on a model switch would be
+    // worse — but the turn cannot be fired at a model that cannot read it.
+    expect(find.byKey(const Key('composer-attachments')), findsOneWidget);
+    expect(
+      tester
+          .widget<CupertinoButton>(find.byKey(const Key('send-button')))
+          .onPressed,
+      isNull,
+    );
+  });
+
   testWidgets('a sent image stays mounted across parent rebuilds', (
     tester,
   ) async {
@@ -354,16 +527,32 @@ void main() {
   });
 }
 
+ChatHistorySnapshot _picturesChat() => ChatHistorySnapshot(
+  activeId: 'chat',
+  conversations: [
+    ChatConversation(
+      id: 'chat',
+      title: 'Pictures',
+      updatedAt: DateTime.utc(2026, 8, 9),
+      messages: const [],
+      // One of the exact artifacts proven image-capable (#18).
+      modelKey: 'gemma4-gguf',
+    ),
+  ],
+);
+
 /// A picker that never touches a plugin: it returns a 2x2 PNG, or raises the
-/// rejection under test.
+/// rejection — or the platform failure — under test.
 final class _StubPicker extends AttachmentPicker {
-  const _StubPicker({this.rejection});
+  const _StubPicker({this.rejection, this.error});
 
   final ImageRejection? rejection;
+  final Object? error;
 
   @override
   Future<PreparedImage?> pick(AttachSource source) async {
     if (rejection != null) throw ImageRejectedException(rejection!);
+    if (error != null) throw error!;
     return PreparedImage(
       bytes: tinyPngBytes,
       mimeType: 'image/png',
@@ -371,6 +560,24 @@ final class _StubPicker extends AttachmentPicker {
       height: 2,
     );
   }
+}
+
+/// A store on a full disk: everything else works, writing does not.
+final class _UnwritableAttachmentRepository implements AttachmentRepository {
+  @override
+  Future<StoredAttachment> store(
+    List<int> bytes, {
+    required String mimeType,
+  }) async => throw const FileSystemException('No space left on device');
+
+  @override
+  Future<List<int>?> read(String attachmentId) async => null;
+
+  @override
+  Future<void> retainOnly(Set<String> attachmentIds) async {}
+
+  @override
+  Future<int> storedBytes() async => 0;
 }
 
 final class _CountingAttachmentRepository implements AttachmentRepository {

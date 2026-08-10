@@ -42,6 +42,17 @@ class _ComposerState extends ConsumerState<Composer> {
   /// nothing durable exists until send copies the bytes into the store.
   final List<PreparedImage> _pending = [];
 
+  /// A picked image belongs to the chat it was picked in. The Composer element
+  /// is reused across a drawer switch, so without this the tray would follow
+  /// the user into the next conversation and send there.
+  @override
+  void didUpdateWidget(Composer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.activeId != oldWidget.activeId && _pending.isNotEmpty) {
+      setState(_pending.clear);
+    }
+  }
+
   /// Rejections surface as a toast rather than a banner: nothing was sent, and
   /// the user's next move is simply to pick a different picture.
   Future<void> _attach(String modelLabel, bool supportsImages) async {
@@ -63,6 +74,26 @@ class _ComposerState extends ConsumerState<Composer> {
         ImageRejection.tooLarge => 'That image is too large to attach.',
         ImageRejection.undecodable => 'That image could not be read.',
       });
+    } catch (error) {
+      // The picker is a platform channel: a denied permission, a revoked grant
+      // and a photo that never materialized all arrive as something other than
+      // a rejection. Silence would look like a dead button.
+      if (!mounted) return;
+      final denied =
+          error is PlatformException &&
+          const {
+            'camera_access_denied',
+            'camera_access_restricted',
+            'photo_access_denied',
+            'photo_access_restricted',
+          }.contains(error.code);
+      showGolemToast(
+        context,
+        denied
+            ? 'Golem needs access to your camera and photos. Turn it on in '
+                  'Settings to attach a picture.'
+            : 'That picture could not be added.',
+      );
     }
   }
 
@@ -377,8 +408,12 @@ class _ComposerState extends ConsumerState<Composer> {
                     listenable: controller,
                     builder: (context, _) {
                       final hasText = controller.text.trim().isNotEmpty;
-                      // An image alone is a complete turn.
-                      final canSend = hasText || _pending.isNotEmpty;
+                      // An image alone is a complete turn — but a tray the
+                      // current model cannot read is not one. The picture stays,
+                      // with its remove button, so the way out is visible.
+                      final canSend =
+                          (hasText || _pending.isNotEmpty) &&
+                          (_pending.isEmpty || supportsImages);
                       return CupertinoButton(
                         key: Key(generating ? 'stop-button' : 'send-button'),
                         padding: EdgeInsets.zero,
@@ -389,7 +424,7 @@ class _ComposerState extends ConsumerState<Composer> {
                                   .stop()
                             : !canSend
                             ? null
-                            : () {
+                            : () async {
                                 final text = controller.text;
                                 final images = List.of(_pending);
                                 controller.clear();
@@ -401,9 +436,19 @@ class _ComposerState extends ConsumerState<Composer> {
                                     true) {
                                   HapticFeedback.lightImpact();
                                 }
-                                ref
-                                    .read(chatControllerProvider.notifier)
-                                    .send(text, images: images);
+                                try {
+                                  await ref
+                                      .read(chatControllerProvider.notifier)
+                                      .send(text, images: images);
+                                } catch (_) {
+                                  // send() only throws when an attachment never
+                                  // reached disk; the banner is already up, so
+                                  // this puts the turn back within reach rather
+                                  // than losing the picture with it.
+                                  if (!mounted) return;
+                                  controller.text = text;
+                                  setState(() => _pending.addAll(images));
+                                }
                               },
                         child: Container(
                           width: 40,
