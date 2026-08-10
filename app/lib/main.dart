@@ -129,8 +129,12 @@ Future<void> launch({
       FakeModelManagementRepository(stateFile, catalog: mergedCatalog);
   // Before the first frame, and before anything can ask for a download: the
   // plugin discards updates that arrive with no listener attached, and startup
-  // replays every status delivered while this process did not exist.
-  await artifactDownloader?.initialize();
+  // replays every status delivered while this process did not exist. Guarded
+  // like the stores above — a platform channel that refuses must not black-screen
+  // the app before runApp; downloads degrade, everything else still works.
+  try {
+    await artifactDownloader?.initialize();
+  } catch (_) {}
   runApp(
     ProviderScope(
       overrides: [

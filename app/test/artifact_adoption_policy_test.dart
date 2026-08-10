@@ -106,22 +106,13 @@ void main() {
       expect(decision.bytesOnPlatform, 2 * 1000 * 1000 * 1000);
     });
 
-    // The plugin marks a record complete when the destination merely exists,
-    // at any size, so "finished" is a hint that the length check overrules.
-    test('a finished record over an incomplete file resumes when it can', () {
+    // A transfer the platform is not holding is absent however its tracking
+    // record reads — records for finished and cancelled tasks are kept
+    // indefinitely, so a record can never be allowed to mean "still there".
+    test('a stale record does not keep a dead transfer alive', () {
       expect(
-        decide(
-          presence: ArtifactTransferPresence.finished,
-          resumable: true,
-        ).action,
-        ArtifactTransferAction.resume,
-      );
-    });
-
-    test('a finished record with nothing to resume is replaced', () {
-      expect(
-        decide(presence: ArtifactTransferPresence.finished).action,
-        ArtifactTransferAction.replace,
+        decide(presence: ArtifactTransferPresence.absent).action,
+        ArtifactTransferAction.start,
       );
     });
   });

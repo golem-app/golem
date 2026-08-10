@@ -49,6 +49,11 @@ final class RealModelManagementRepository implements ModelManagementRepository {
 
   late ModelState _state;
   final Set<String> _stopRequested = {};
+
+  /// Artifacts a [download] generator is currently sequencing. Reconciliation
+  /// leaves these alone: it cannot see inside a hash or between two files, and
+  /// the generator is the more recent authority on both.
+  final Set<String> _active = {};
   Future<void> _writes = Future.value();
 
   /// Whether the state file has been read and the engine claim normalized.
@@ -139,6 +144,11 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     for (final entry in catalog) {
       final status = before[entry.key]!;
       artifacts[entry.key] = switch (status.phase) {
+        // A generator already owns this artifact and is mid-sequence — very
+        // possibly inside a multi-minute hash, during which no transfer is
+        // live. Reconciling it would flip a verifying card to Paused behind a
+        // Resume button that cannot act while the download holds the guard.
+        _ when _active.contains(entry.key) => status,
         ArtifactPhase.installed when !await _installVerified(entry) =>
           const ArtifactStatus(),
         ArtifactPhase.downloading ||
@@ -213,6 +223,15 @@ final class RealModelManagementRepository implements ModelManagementRepository {
 
   @override
   Stream<ModelState> download(String artifactKey) async* {
+    _active.add(artifactKey);
+    try {
+      yield* _download(artifactKey);
+    } finally {
+      _active.remove(artifactKey);
+    }
+  }
+
+  Stream<ModelState> _download(String artifactKey) async* {
     final entry = _entry(artifactKey);
     _stopRequested.remove(artifactKey);
     final root = Directory(_rootFor(entry));
@@ -236,7 +255,18 @@ final class RealModelManagementRepository implements ModelManagementRepository {
 
     // Size-matching unreceipted files will most likely verify in place, so they
     // do not count against free space; a corrupt one fails cleanly later.
-    final remaining = entry.totalBytes - verifiedBytes - presentUnverifiedBytes;
+    // Bytes already staged by an in-flight transfer likewise occupy the disk
+    // already: without this, re-attaching to a nearly-finished 4 GB download
+    // asks for another 4 GB and fails the artifact on every foreground return,
+    // while the transfer it just condemned keeps running unwatched.
+    var staged = 0;
+    for (final spec in pending) {
+      if (await _sizeMatches(entry, spec)) continue;
+      staged +=
+          (await downloader.inspect(_refFor(entry, spec))).receivedBytes ?? 0;
+    }
+    final remaining =
+        entry.totalBytes - verifiedBytes - presentUnverifiedBytes - staged;
     final free = await _freeBytesSafely();
     if (free != null && free < remaining + diskSpaceMargin) {
       yield await _persist(
@@ -311,7 +341,7 @@ final class RealModelManagementRepository implements ModelManagementRepository {
         }
       }
       switch (fileOutcome) {
-        case ArtifactFilePaused(:final userInitiated):
+        case ArtifactFilePaused(:final userInitiated, :final resumable):
           // A user pause already persisted out of band; an uncommanded one
           // (network loss, OS timeout) must be persisted here or the card
           // freezes on "downloading".
@@ -321,7 +351,13 @@ final class RealModelManagementRepository implements ModelManagementRepository {
                 artifactKey,
                 ArtifactStatus(
                   phase: ArtifactPhase.paused,
-                  downloadedBytes: verifiedBytes + lastReceived,
+                  // Streamed bytes count only while they can still be resumed
+                  // from. Crediting a partial the platform discarded shows a
+                  // card at 60% whose Resume restarts from zero, and a bar that
+                  // jumps backwards reads as lost work.
+                  downloadedBytes: resumable
+                      ? verifiedBytes + lastReceived
+                      : verifiedBytes,
                 ),
               ),
             );
@@ -557,8 +593,13 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   Future<ModelState> _discard(String artifactKey) async {
     final entry = _entry(artifactKey);
     _stopRequested.add(artifactKey);
-    await _cancelTransfers(entry);
-    await _deleteArtifactFiles(entry);
+    // The answer decides whether one sweep is enough. A transfer the platform
+    // could not confirm stopping may still land its staging file on the
+    // destination after the directory is gone, recreating it with weights that
+    // carry no receipt — bytes the UI then calls "not downloaded" and no user
+    // action can reach.
+    final cleared = await _cancelTransfers(entry);
+    await _deleteArtifactFiles(entry, sweepTwice: !cleared);
     return _persist(
       _withoutArtifact(
         artifactKey,
@@ -573,25 +614,27 @@ final class RealModelManagementRepository implements ModelManagementRepository {
       ? _state.copyWith(runtime: RuntimePhase.unloaded, clearFailure: true)
       : _state;
 
-  Future<void> _deleteArtifactFiles(ModelCatalogEntry entry) async {
-    // Swept twice: both platforms write the destination only at completion,
-    // from a temp file, recreating the directory on the way. A task that was
-    // already inside that move when the cancel landed would otherwise leave
-    // multi-gigabyte weights behind with no receipt — bytes the UI then reports
-    // as "not downloaded" and no user action can reach.
-    for (var attempt = 0; attempt < 2; attempt++) {
+  /// [sweepTwice] only when a transfer could not be confirmed stopped: both
+  /// platforms write the destination at completion from a staging file,
+  /// recreating the directory on the way, so a task already inside that move
+  /// can resurrect what was just deleted. A confirmed-clear delete pays no
+  /// second pass and no delay.
+  Future<void> _deleteArtifactFiles(
+    ModelCatalogEntry entry, {
+    bool sweepTwice = false,
+  }) async {
+    Future<void> sweep() async {
       final root = Directory(_rootFor(entry));
-      if (!await root.exists()) {
-        if (attempt > 0) return;
-      } else {
-        try {
-          await root.delete(recursive: true);
-        } catch (_) {}
-      }
-      if (attempt == 0) {
-        await Future<void>.delayed(const Duration(milliseconds: 150));
-      }
+      if (!await root.exists()) return;
+      try {
+        await root.delete(recursive: true);
+      } catch (_) {}
     }
+
+    await sweep();
+    if (!sweepTwice) return;
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    await sweep();
   }
 
   @override

@@ -73,6 +73,15 @@ final class ArtifactFileFailed extends ArtifactFileEvent {
   final String message;
 }
 
+/// The task the platform holds for a transfer, resolved together with what is
+/// known about it — so a decision and its execution cannot act on different
+/// tasks.
+final class _ResolvedTransfer {
+  const _ResolvedTransfer(this.task, this.snapshot);
+  final Task? task;
+  final ArtifactTransferSnapshot snapshot;
+}
+
 /// Downloads one file at a time into the app documents directory. The
 /// repository sequences files, verifies hashes, and owns all state; this
 /// seam only moves bytes and reports what the platform knows, so tests can
@@ -183,7 +192,17 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
   final List<String> temporaryDirectories;
 
   @override
-  Future<void> initialize() => _ready ??= _initialize();
+  Future<void> initialize() async {
+    // A failure is never cached: storing the rejected future would make every
+    // later inspect() throw, which reconciliation turns into an AsyncError and
+    // a permanently blank Models screen.
+    try {
+      await (_ready ??= _initialize());
+    } catch (_) {
+      _ready = null;
+      rethrow;
+    }
+  }
 
   Future<void> _initialize() async {
     // Attached before start() and never cancelled: the plugin drops updates
@@ -235,20 +254,37 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
     retries: 3,
   );
 
-  /// The live or paused task targeting [ref]'s destination, whichever the
-  /// platform holds. Matched on metaData, so generations never alias.
-  Future<Task?> _platformTask(ArtifactFileRef ref) async {
+  /// Whether [task] is this exact transfer — destination *and* source.
+  ///
+  /// The install directory is keyed by artifact, not by commit, so the
+  /// destination alone is identical across revisions; matching on it would let
+  /// a re-pinned entry adopt a transfer of the previous commit's bytes and then
+  /// fail them against the new hash.
+  bool _matches(Task task, ArtifactFileRef ref) {
+    try {
+      final meta = jsonDecode(task.metaData) as Map<String, Object?>;
+      return meta['path'] == ref.destination && meta['url'] == ref.sourceUrl;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// The task the platform is actually holding for [ref] — running, waiting to
+  /// retry, or paused. **Never** a tracking record: the plugin keeps records
+  /// for completed and cancelled tasks indefinitely, so treating one as a held
+  /// task makes cancellation structurally unconfirmable.
+  Future<Task?> _heldTask(ArtifactFileRef ref) async {
     for (final task in await _guard(
       () => _downloader.allTasks(group: _group),
       const <Task>[],
     )) {
-      if (_destinationOf(task) == ref.destination) return task;
+      if (_matches(task, ref)) return task;
     }
     for (final task in await _guard(
-      () => _downloader.database.allRecords(group: _group),
-      const <TaskRecord>[],
-    ).then((records) => records.map((record) => record.task))) {
-      if (_destinationOf(task) == ref.destination) return task;
+      () => _storage.retrieveAllPausedTasks(),
+      const <Task>[],
+    )) {
+      if (_matches(task, ref)) return task;
     }
     return null;
   }
@@ -261,26 +297,61 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
     }
   }
 
-  @override
-  Future<ArtifactTransferSnapshot> inspect(ArtifactFileRef ref) async {
-    await initialize();
-    return _snapshot(ref);
+  /// True when the downloader is usable. Never throws: a platform that refuses
+  /// to start degrades downloads, and must not take reconciliation — or the
+  /// screen reading it — down with them.
+  Future<bool> _started() async {
+    try {
+      await initialize();
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
-  /// Unions the plugin's four stores. Any one alone gives a wrong answer: after
-  /// a force-stop the database still reports `running` while the only surviving
-  /// state is the resume data, and a long-paused task outlives its record.
-  Future<ArtifactTransferSnapshot> _snapshot(ArtifactFileRef ref) async {
-    final task = await _platformTask(ref);
-    if (task == null) return const ArtifactTransferSnapshot();
+  @override
+  Future<ArtifactTransferSnapshot> inspect(ArtifactFileRef ref) async {
+    if (!await _started()) return const ArtifactTransferSnapshot();
+    return (await _resolve(ref)).snapshot;
+  }
+
+  /// Resolves the held task and what is known about it in one pass, so the
+  /// decision and its execution act on the same task.
+  ///
+  /// Liveness is authoritative and the stores are consulted only for progress:
+  /// a record can say `running` long after a force-stop, and `waitingToRetry`
+  /// outlives the retry itself. Resume data is the one thing that legitimately
+  /// survives with no task at all — that is a killed transfer, still resumable.
+  Future<_ResolvedTransfer> _resolve(ArtifactFileRef ref) async {
+    final held = await _heldTask(ref);
+    if (held == null) {
+      for (final record in await _guard(
+        () => _downloader.database.allRecords(group: _group),
+        const <TaskRecord>[],
+      )) {
+        if (!_matches(record.task, ref)) continue;
+        final resume = await _guard(
+          () => _storage.retrieveResumeData(record.task.taskId),
+          null,
+        );
+        if (resume == null) continue;
+        return _ResolvedTransfer(
+          record.task,
+          ArtifactTransferSnapshot(
+            receivedBytes: resume.requiredStartByte,
+            resumable: true,
+          ),
+        );
+      }
+      return const _ResolvedTransfer(null, ArtifactTransferSnapshot());
+    }
 
     final resumeData = await _guard(
-      () => _storage.retrieveResumeData(task.taskId),
+      () => _storage.retrieveResumeData(held.taskId),
       null,
     );
-    final resumable = resumeData != null;
     final record = await _guard(
-      () => _downloader.database.recordForId(task.taskId),
+      () => _downloader.database.recordForId(held.taskId),
       null,
     );
 
@@ -301,31 +372,24 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
       (final a?, final b?) => a > b ? a : b,
     };
 
-    final live = await _guard(
-      () => _downloader.allTasks(group: _group),
-      const <Task>[],
-    );
-    final isLive = live.any((each) => each.taskId == task.taskId);
-    final paused = (await _guard(
+    final isPaused = (await _guard(
       () => _storage.retrieveAllPausedTasks(),
       const <Task>[],
-    )).any((each) => each.taskId == task.taskId);
+    )).any((each) => each.taskId == held.taskId);
 
-    final presence = switch (record?.status) {
-      _ when paused => ArtifactTransferPresence.paused,
-      TaskStatus.waitingToRetry => ArtifactTransferPresence.waitingToRetry,
-      _ when isLive => ArtifactTransferPresence.running,
-      TaskStatus.complete ||
-      TaskStatus.failed ||
-      TaskStatus.canceled ||
-      TaskStatus.notFound => ArtifactTransferPresence.finished,
-      _ => ArtifactTransferPresence.absent,
-    };
+    final presence = isPaused
+        ? ArtifactTransferPresence.paused
+        : record?.status == TaskStatus.waitingToRetry
+        ? ArtifactTransferPresence.waitingToRetry
+        : ArtifactTransferPresence.running;
 
-    return ArtifactTransferSnapshot(
-      presence: presence,
-      receivedBytes: received,
-      resumable: resumable,
+    return _ResolvedTransfer(
+      held,
+      ArtifactTransferSnapshot(
+        presence: presence,
+        receivedBytes: received,
+        resumable: resumeData != null,
+      ),
     );
   }
 
@@ -357,14 +421,22 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
     Timer? watchdog;
     Timer? pauseFinalize;
     try {
-      await initialize();
+      if (!await _started()) {
+        yield const ArtifactFileFailed('The downloader is unavailable.');
+        return;
+      }
 
+      // One resolution, used for both the decision and its execution: two
+      // lookups are not atomic, and adopting a task other than the one whose
+      // liveness justified adopting would watch a dead generation while the
+      // live one runs unobserved.
+      final resolved = await _resolve(ref);
       final decision = decideArtifactTransfer(
-        platform: await _snapshot(ref),
+        platform: resolved.snapshot,
         destinationComplete: await _destinationComplete(ref),
       );
 
-      final existing = await _platformTask(ref);
+      final existing = resolved.task;
       Task task;
       switch (decision.action) {
         case ArtifactTransferAction.alreadyComplete:
@@ -444,7 +516,7 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
             yield const ArtifactFileComplete();
             return;
           }
-          final snapshot = await _snapshot(ref);
+          final snapshot = (await _resolve(ref)).snapshot;
           if (snapshot.presence == ArtifactTransferPresence.absent) {
             // Proven gone rather than merely quiet: the only point at which
             // silence becomes an actionable state.
@@ -458,7 +530,7 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
           continue;
         }
         if (identical(update, _finalizePause)) {
-          final snapshot = await _snapshot(ref);
+          final snapshot = (await _resolve(ref)).snapshot;
           yield ArtifactFilePaused(
             userInitiated: false,
             resumable: snapshot.resumable,
@@ -548,29 +620,38 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
     await _guard(() => _downloader.cancelTaskWithId(task.taskId), false);
     final deadline = DateTime.now().add(confirmationTimeout);
     while (DateTime.now().isBefore(deadline)) {
-      if (await _platformTask(ref) == null) return true;
+      if (await _heldTask(ref) == null) return true;
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }
-    return await _platformTask(ref) == null;
+    return await _heldTask(ref) == null;
   }
 
-  /// Destinations whose stop was commanded by the app, so the resulting
-  /// platform event is reported as user-initiated. Keyed by destination
-  /// because task ids change between generations.
+  /// Task ids whose stop was commanded by the app, so the resulting platform
+  /// event is reported as user-initiated.
+  ///
+  /// Keyed by task id, not destination: a commanded stop belongs to the exact
+  /// generation it was issued for. Keying by destination let an entry survive
+  /// a pause taken while no stream was attached, and the *next* transfer's
+  /// uncommanded pause — Android's ~9-minute transfer-service timeout — was
+  /// then reported as the user's own, so nothing persisted it and the card
+  /// stranded on "downloading".
   static final Set<String> _userPaused = {};
   static final Set<String> _userCanceled = {};
 
-  static const _finalizePause = Object();
-  static const _probe = Object();
+  // `static final`, never `const`: Dart canonicalizes const objects, so two
+  // `const Object()` sentinels are the *same* instance and `identical` cannot
+  // tell them apart.
+  static final Object _finalizePause = Object();
+  static final Object _probe = Object();
 
   @override
   Future<bool> pause(ArtifactFileRef ref) async {
-    await initialize();
-    final task = await _platformTask(ref);
+    if (!await _started()) return false;
+    final task = await _heldTask(ref);
     if (task is! DownloadTask) return false;
-    _userPaused.add(ref.destination);
+    _userPaused.add(task.taskId);
     if (!await _guard(() => _downloader.pause(task), false)) {
-      _userPaused.remove(ref.destination);
+      _userPaused.remove(task.taskId);
       return false;
     }
     // Android's native pause returns true even for a task it does not hold, and
@@ -585,49 +666,77 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
       if (paused.any((each) => each.taskId == task.taskId)) return true;
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }
-    _userPaused.remove(ref.destination);
+    _userPaused.remove(task.taskId);
     return false;
   }
 
   @override
   Future<bool> cancel(ArtifactFileRef ref) async {
-    await initialize();
-    final task = await _platformTask(ref);
+    if (!await _started()) return false;
+    final task = await _heldTask(ref);
     if (task == null) return true;
-    _userCanceled.add(ref.destination);
+    _userCanceled.add(task.taskId);
     return _cancelAndConfirm(ref, task);
   }
 
-  /// Deletes partial-transfer files no live resume data refers to.
+  /// How long a staging file must have sat untouched before it counts as an
+  /// orphan. The plugin writes resume data only when a transfer *pauses*, so a
+  /// running transfer's staging file is referenced by nothing — age is the only
+  /// signal that separates it from genuine debris. A live worker rewrites its
+  /// file continuously, so it can never look this stale.
+  static const _orphanAge = Duration(hours: 24);
+
+  /// Deletes partial-transfer files nothing refers to and nothing has touched
+  /// in [_orphanAge].
   ///
-  /// A hard kill during a multi-gigabyte download leaves its partial behind
-  /// forever: the plugin sweeps nothing, the Storage screen cannot see these
-  /// files, and the disk-space preflight eventually refuses the very download
-  /// that is leaking. Runs after start() has restored resume data, so a
-  /// resumable partial is never mistaken for an orphan.
+  /// A hard kill during a multi-gigabyte download otherwise leaves its partial
+  /// behind forever: the plugin sweeps nothing, the Storage screen cannot see
+  /// these files, and the disk-space preflight eventually refuses the very
+  /// download that is leaking. Runs after start() has restored resume data.
   Future<void> _sweepOrphanedPartials() async {
     if (temporaryDirectories.isEmpty) return;
-    final live = <String>{};
-    for (final data in await _guard(
-      () => _storage.retrieveAllResumeData(),
-      const <ResumeData>[],
-    )) {
-      live.add(data.tempFilepath);
-    }
+    final referenced = <String>{
+      for (final data in await _guard(
+        () => _storage.retrieveAllResumeData(),
+        const <ResumeData>[],
+      ))
+        data.tempFilepath,
+    };
+    // Deleting a running transfer's staging file does not stop it: the worker
+    // holds the descriptor and keeps writing to an unlinked inode, so progress
+    // still climbs and only the final move fails — a multi-gigabyte download
+    // lost with no symptom until the very end.
+    final anyLive = (await _guard(
+      () => _downloader.allTasks(group: _group),
+      const <Task>[],
+    )).isNotEmpty;
+    if (anyLive) return;
+
+    final cutoff = DateTime.now().subtract(_orphanAge);
     for (final path in temporaryDirectories) {
       final directory = Directory(path);
       if (!await directory.exists()) continue;
       try {
         await for (final entry in directory.list(followLinks: false)) {
           if (entry is! File) continue;
-          final name = entry.uri.pathSegments.last;
-          if (!name.startsWith('com.bbflight.background_downloader')) continue;
-          if (live.contains(entry.path)) continue;
+          if (!isPartialTransferFile(entry)) continue;
+          if (referenced.contains(entry.path)) continue;
           try {
+            if ((await entry.lastModified()).isAfter(cutoff)) continue;
             await entry.delete();
           } catch (_) {}
         }
       } catch (_) {}
     }
   }
+}
+
+/// Prefix the download plugin gives every partial-transfer file it stages.
+/// Shared so the sweep and the cache probe cannot disagree about which files
+/// are live download progress — one deleting what the other preserves.
+const partialTransferPrefix = 'com.bbflight.background_downloader';
+
+bool isPartialTransferFile(FileSystemEntity entry) {
+  final segments = entry.uri.pathSegments;
+  return segments.isNotEmpty && segments.last.startsWith(partialTransferPrefix);
 }

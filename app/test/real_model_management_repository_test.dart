@@ -326,6 +326,34 @@ void main() {
     );
   });
 
+  // Crediting a partial the platform threw away shows a card at 60% whose
+  // Resume restarts from zero — a bar that jumps backwards reads as lost work.
+  test('an unresumable pause credits only verified bytes', () async {
+    platform.terminalEvents[_fileOne] = const ArtifactFilePaused(
+      userInitiated: false,
+      resumable: false,
+    );
+    final repo = repository();
+    await repo.load();
+    final states = await repo.download('test-mlx').toList();
+    final status = states.last.statusOf('test-mlx');
+    expect(status.phase, ArtifactPhase.paused);
+    // Nothing was verified before the first file stopped, so nothing counts.
+    expect(status.downloadedBytes, 0);
+  });
+
+  test('a resumable pause keeps the streamed progress', () async {
+    platform.terminalEvents[_fileOne] = const ArtifactFilePaused(
+      userInitiated: false,
+    );
+    final repo = repository();
+    await repo.load();
+    final states = await repo.download('test-mlx').toList();
+    final status = states.last.statusOf('test-mlx');
+    expect(status.phase, ArtifactPhase.paused);
+    expect(status.downloadedBytes, greaterThan(0));
+  });
+
   // A second repository over the same platform is a relaunch: the app forgot
   // everything, the OS did not.
   group('reconciliation across a process recreation', () {

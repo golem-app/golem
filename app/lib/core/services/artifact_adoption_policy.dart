@@ -6,19 +6,14 @@
 /// gathers a snapshot, calls [decideArtifactTransfer], and executes the answer.
 library;
 
-/// What the platform still knows about one file's transfer.
+/// What the platform still holds for one file's transfer.
 ///
-/// [running] and [waitingToRetry] mean bytes are moving or about to; [paused]
-/// means the transfer stopped but may hold resumable partial data; [finished]
-/// is the plugin's own claim that the task ended, which is a hint and never a
-/// verdict — only the destination file and its hash decide that.
-enum ArtifactTransferPresence {
-  absent,
-  running,
-  waitingToRetry,
-  paused,
-  finished,
-}
+/// Derived from liveness, never from the tracking database: the plugin keeps
+/// records for finished and cancelled tasks indefinitely, and one can claim
+/// `running` long after a force-stop. A transfer the platform is not holding is
+/// [absent] however its record reads — which is what lets the stall probe ever
+/// conclude.
+enum ArtifactTransferPresence { absent, running, waitingToRetry, paused }
 
 /// A union of what the plugin's four stores say about one transfer: the live
 /// native queue, the tracking database, the paused-task store, and stored
@@ -114,17 +109,6 @@ ArtifactTransferDecision decideArtifactTransfer({
         bytesOnPlatform: bytes,
       ),
     ArtifactTransferPresence.paused => const ArtifactTransferDecision(
-      ArtifactTransferAction.replace,
-    ),
-
-    // The task ended but the destination is not whole: whatever the plugin
-    // thinks it finished, it is not the file we need.
-    ArtifactTransferPresence.finished when platform.resumable =>
-      ArtifactTransferDecision(
-        ArtifactTransferAction.resume,
-        bytesOnPlatform: bytes,
-      ),
-    ArtifactTransferPresence.finished => const ArtifactTransferDecision(
       ArtifactTransferAction.replace,
     ),
 
