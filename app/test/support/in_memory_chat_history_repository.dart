@@ -19,8 +19,20 @@ final class InMemoryChatHistoryRepository implements ChatHistoryRepository {
   /// suite's recompute observability.
   int storedBytesCalls = 0;
 
+  /// While > 0, each load throws a typed read failure and decrements.
+  int failingLoads = 0;
+
   @override
-  Future<ChatHistorySnapshot> load() async => snapshot;
+  Future<ChatHistorySnapshot> load() async {
+    if (failingLoads > 0) {
+      failingLoads--;
+      throw const PersistenceException(
+        PersistenceFailureKind.read,
+        'Could not read the stored chat history.',
+      );
+    }
+    return snapshot;
+  }
 
   @override
   Future<int> storedBytes() async {

@@ -7,13 +7,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // knowledge (profiles carry no Inferno import); the Inferno boundary is
 // unchanged — only lib/broker/ touches package:inferno.
 import '../../broker/model_profile.dart';
-import '../../core/chrome/golem_button.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/domain/app_preferences.dart';
 import '../../core/domain/generation_settings.dart';
 import '../../core/domain/response_style_mapping.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
+import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
 import '../chat/model_label.dart';
 import 'save_feedback.dart';
@@ -236,7 +236,9 @@ class GenerationCard extends ConsumerWidget {
     if (settings.hasError) {
       // Editing over invented defaults would overwrite whatever the store
       // holds on the next successful write; surface the failed read instead.
-      return _SettingsLoadError(
+      return RetryPane(
+        key: const Key('settings-load-error'),
+        message: "Couldn't load settings.",
         onRetry: () => ref.invalidate(settingsControllerProvider),
       );
     }
@@ -533,36 +535,6 @@ class _StepperRow extends StatelessWidget {
           child: const Icon(CupertinoIcons.plus_circle, size: 22),
         ),
       ],
-    );
-  }
-}
-
-class _SettingsLoadError extends StatelessWidget {
-  const _SettingsLoadError({required this.onRetry});
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
-    return GolemCard(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 18),
-        child: Column(
-          key: const Key('settings-load-error'),
-          children: [
-            Text(
-              "Couldn't load settings.",
-              style: GolemText.body.copyWith(color: muted),
-            ),
-            const SizedBox(height: 12),
-            GolemButton.filled(
-              label: 'Try again',
-              onPressed: onRetry,
-              expand: false,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -7,9 +7,9 @@ import '../../core/chrome/golem_toast.dart';
 import '../../core/domain/model_activation.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/models.dart';
-import '../../core/chrome/golem_button.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
+import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
 import 'widgets/settings_rows.dart';
 
@@ -35,10 +35,19 @@ class StorageScreen extends ConsumerWidget {
       child: SafeArea(
         bottom: false,
         child: failed
-            ? _StorageError(
+            ? RetryPane(
+                key: const Key('storage-error'),
+                message: "Couldn't read storage.",
                 onRetry: () {
-                  ref.invalidate(storageBreakdownProvider);
-                  ref.invalidate(modelControllerProvider);
+                  // Only the provider that actually failed: invalidating a
+                  // healthy ModelController would kill an in-flight download
+                  // (the epoch/mounted guards abandon its stream).
+                  if (breakdownValue.hasError) {
+                    ref.invalidate(storageBreakdownProvider);
+                  }
+                  if (modelValue.hasError) {
+                    ref.invalidate(modelControllerProvider);
+                  }
                 },
               )
             : breakdown == null || model == null
@@ -80,40 +89,6 @@ class StorageScreen extends ConsumerWidget {
     await ref.read(cacheProbeProvider).clear();
     ref.invalidate(storageBreakdownProvider);
     if (context.mounted) showGolemToast(context, 'Cache cleared');
-  }
-}
-
-class _StorageError extends StatelessWidget {
-  const _StorageError({required this.onRetry});
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          key: const Key('storage-error'),
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(CupertinoIcons.exclamationmark_triangle, color: muted),
-            const SizedBox(height: 12),
-            Text(
-              "Couldn't read storage.",
-              style: GolemText.body.copyWith(color: muted),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            GolemButton.filled(
-              label: 'Try again',
-              onPressed: onRetry,
-              expand: false,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 

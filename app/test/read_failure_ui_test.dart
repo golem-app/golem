@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
+import 'package:golem_flutter/features/chat/chat_screen.dart';
+import 'package:golem_flutter/features/settings/appearance_screen.dart';
 import 'package:golem_flutter/features/settings/response_style_screen.dart';
 import 'package:golem_flutter/features/settings/storage_screen.dart';
 import 'package:golem_flutter/features/settings/models_screen.dart';
@@ -60,6 +62,71 @@ void main() {
     expect(find.byKey(const Key('models-list')), findsOneWidget);
   });
 
+  testWidgets('a failed chat-history load offers a retry, not a dead root', (
+    tester,
+  ) async {
+    final chatHistory = InMemoryChatHistoryRepository(seedHistory())
+      ..failingLoads = 1;
+    await pumpWithRepositories(
+      tester,
+      chatHistory: chatHistory,
+      child: const ChatScreen(),
+    );
+
+    expect(find.byKey(const Key('chat-load-error')), findsOneWidget);
+    expect(find.text("Couldn't load chat history."), findsOneWidget);
+    expect(find.byKey(const Key('chat-composer')), findsNothing);
+
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('chat-load-error')), findsNothing);
+    expect(find.byKey(const Key('chat-composer')), findsOneWidget);
+  });
+
+  testWidgets('a failed preferences load surfaces on Appearance with retry', (
+    tester,
+  ) async {
+    final preferences = InMemoryPreferencesRepository()..failingLoads = 1;
+    await pumpWithRepositories(
+      tester,
+      preferences: preferences,
+      child: const AppearanceScreen(),
+    );
+
+    expect(find.byKey(const Key('preferences-load-error')), findsOneWidget);
+    expect(find.byKey(const Key('toggle-metrics')), findsNothing);
+
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('preferences-load-error')), findsNothing);
+    expect(find.byKey(const Key('toggle-metrics')), findsOneWidget);
+  });
+
+  testWidgets('the storage retry leaves a healthy model controller alone', (
+    tester,
+  ) async {
+    final chatHistory = InMemoryChatHistoryRepository()..failingStoredBytes = 1;
+    final models = _FlakyModels(failingLoads: 0);
+    await pumpWithRepositories(
+      tester,
+      chatHistory: chatHistory,
+      models: models,
+      child: const StorageScreen(),
+    );
+    expect(find.byKey(const Key('storage-error')), findsOneWidget);
+    final loadsBeforeRetry = models.loads;
+
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+
+    // Only the failed breakdown recomputed: invalidating a healthy
+    // ModelController would kill an in-flight download.
+    expect(find.byKey(const Key('storage-list')), findsOneWidget);
+    expect(models.loads, loadsBeforeRetry);
+  });
+
   testWidgets('failed settings block sampling edits until retried', (
     tester,
   ) async {
@@ -88,10 +155,12 @@ void main() {
 final class _FlakyModels implements ModelManagementRepository {
   _FlakyModels({required this.failingLoads});
   int failingLoads;
+  int loads = 0;
   static const _state = ModelState();
 
   @override
   Future<ModelState> load() async {
+    loads++;
     if (failingLoads > 0) {
       failingLoads--;
       throw const PersistenceException(

@@ -17,6 +17,7 @@ import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/labeled_row.dart';
 import '../../core/widgets/progress_track.dart';
+import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
 import 'application/custom_repository_workflow.dart';
 import 'widgets/settings_rows.dart';
@@ -62,21 +63,10 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
         bottom: false,
         child: model.when(
           loading: () => const Center(child: CupertinoActivityIndicator()),
-          // Fixed copy: raw exception text never reaches a surface (§8.1).
-          error: (error, stack) => Center(
-            child: Column(
-              key: const Key('models-load-error'),
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text("Couldn't load model state."),
-                const SizedBox(height: 12),
-                GolemButton.filled(
-                  label: 'Try again',
-                  onPressed: () => ref.invalidate(modelControllerProvider),
-                  expand: false,
-                ),
-              ],
-            ),
+          error: (error, stack) => RetryPane(
+            key: const Key('models-load-error'),
+            message: "Couldn't load model state.",
+            onRetry: () => ref.invalidate(modelControllerProvider),
           ),
           data: (value) => _body(context, value),
         ),

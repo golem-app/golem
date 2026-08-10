@@ -5,6 +5,7 @@ import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/domain/app_preferences.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
+import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
 import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
@@ -15,9 +16,27 @@ class AppearanceScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final preferences =
-        ref.watch(preferencesControllerProvider).value ??
-        const AppPreferences();
+    final preferencesValue = ref.watch(preferencesControllerProvider);
+    // The app root deliberately degrades a failed preferences read to
+    // defaults; this screen is where that failure surfaces with a retry —
+    // editing over invented defaults would overwrite the store blind.
+    if (preferencesValue.hasError) {
+      return CupertinoPageScaffold(
+        navigationBar: GolemNavBar(
+          title: 'Appearance',
+          previousPageTitle: 'Settings',
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: RetryPane(
+            key: const Key('preferences-load-error'),
+            message: "Couldn't load preferences.",
+            onRetry: () => ref.invalidate(preferencesControllerProvider),
+          ),
+        ),
+      );
+    }
+    final preferences = preferencesValue.value ?? const AppPreferences();
     final notifier = ref.read(preferencesControllerProvider.notifier);
     return CupertinoPageScaffold(
       navigationBar: GolemNavBar(
