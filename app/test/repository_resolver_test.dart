@@ -708,9 +708,59 @@ void main() {
         repository: _repo,
         engine: ModelEngine.gguf,
       );
+      // Refused for what it is: a listing disagreeing with itself, not an
+      // unsafe path — the copy the user sees must name the actual problem.
       expect(
         (outcome as RepositoryRejected).reason,
-        RepositoryRejection.unsafePath,
+        RepositoryRejection.inconsistentMetadata,
+      );
+    });
+
+    test('a weight file published with no size is refused', () async {
+      // Zero bytes cannot be probed: no read window clamps into an empty file.
+      // Both shapes reach it — an explicit zero, and a listing with no size at
+      // all — and neither may leave the resolver by throwing.
+      for (final entry in [
+        {'rfilename': _weights, 'size': 0},
+        {'rfilename': _weights},
+      ]) {
+        api.responses[_revisionUrl(_repo)] = revisionInfo(
+          sha: _sha,
+          siblings: [entry],
+        );
+        final outcome = await resolver().resolve(
+          repository: _repo,
+          engine: ModelEngine.gguf,
+        );
+        expect(
+          (outcome as RepositoryRejected).reason,
+          RepositoryRejection.malformedMetadata,
+          reason: 'listing $entry',
+        );
+      }
+    });
+
+    test('a non-string LFS hash is refused rather than thrown past', () async {
+      // A real size, so the refusal below can only come from the hash check —
+      // a zero size would trip the unrelated zero-byte guard first, and a
+      // silently null hash would install a multi-gigabyte file unverified.
+      api.responses[_revisionUrl(_repo)] = revisionInfo(
+        sha: _sha,
+        siblings: [
+          {
+            'rfilename': _weights,
+            'size': 4000000000,
+            'lfs': {'oid': 42, 'size': 4000000000},
+          },
+        ],
+      );
+      final outcome = await resolver().resolve(
+        repository: _repo,
+        engine: ModelEngine.gguf,
+      );
+      expect(
+        (outcome as RepositoryRejected).reason,
+        RepositoryRejection.malformedMetadata,
       );
     });
 

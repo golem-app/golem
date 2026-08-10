@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
@@ -521,10 +522,11 @@ void main() {
   /// Reveals the Advanced-mode custom repository card and types a name into it.
   Future<InMemoryPreferencesRepository> pumpCard(
     WidgetTester tester,
-    CustomRepositoryResolver resolver,
-  ) async {
+    CustomRepositoryResolver resolver, {
+    List<CustomModelSpec> customModels = const [],
+  }) async {
     final preferences = InMemoryPreferencesRepository(
-      const AppPreferences(advancedMode: true),
+      AppPreferences(advancedMode: true, customModels: customModels),
     );
     await pumpWithRepositories(
       tester,
@@ -710,4 +712,94 @@ void main() {
     expect(find.text('qwen35'), findsOneWidget);
     expect(find.text('ffffffffffff'), findsOneWidget);
   }, variant: iosChrome);
+
+  testWidgets('an unresolved entry resolves when it is added again', (
+    tester,
+  ) async {
+    // A repository persisted before resolutions existed loads unresolved, and
+    // its card says to add it again. The duplicate guard used to refuse exactly
+    // that, and no code path removes a spec — a permanent dead end.
+    await pumpCard(
+      tester,
+      const DeterministicRepositoryResolver(),
+      customModels: const [
+        CustomModelSpec(repository: 'org/tiny-GGUF', engine: ModelEngine.gguf),
+      ],
+    );
+    await tester.tap(find.byKey(const Key('custom-repo-resolve')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('custom-repo-detail')), findsOneWidget);
+    expect(find.byKey(const Key('custom-repo-error')), findsNothing);
+    expect(find.textContaining('already been added'), findsNothing);
+  }, variant: iosChrome);
+
+  testWidgets('a resolved entry with no recognized template can be added '
+      'again', (tester) async {
+    // Resolution can succeed while the chat template matches no profile;
+    // such an entry never activates, and its card says to add it again. The
+    // duplicate guard must not count it, or the advised repair dead-ends.
+    await pumpCard(
+      tester,
+      const DeterministicRepositoryResolver(),
+      customModels: [
+        CustomModelSpec(
+          repository: 'org/tiny-GGUF',
+          engine: ModelEngine.gguf,
+          resolved: _resolution(),
+        ),
+      ],
+    );
+    await tester.tap(find.byKey(const Key('custom-repo-resolve')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('custom-repo-detail')), findsOneWidget);
+    expect(find.byKey(const Key('custom-repo-error')), findsNothing);
+    expect(find.textContaining('already been added'), findsNothing);
+  }, variant: iosChrome);
+
+  testWidgets('an outcome landing after dispose touches nothing', (
+    tester,
+  ) async {
+    // Resolving is tens of seconds of network and Back is one tap, so the
+    // outcome can land after the screen is gone. The draft state and its two
+    // controllers belong to that screen: only it can decide whether the result
+    // still matters.
+    final gate = Completer<RepositoryResolution>();
+    await pumpCard(tester, _HangingResolver(gate.future));
+    await tester.tap(find.byKey(const Key('custom-repo-resolve')));
+    await tester.pump();
+    expect(find.textContaining('Reading the repository'), findsOneWidget);
+
+    // Dismantling the tree disposes the screen exactly as leaving the route
+    // does, without a second screen to lay out.
+    await tester.pumpWidget(const SizedBox.shrink());
+    gate.complete(
+      RepositoryResolved(
+        resolved: _resolution(),
+        profile: null,
+        templateFingerprint: null,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+  }, variant: iosChrome);
+}
+
+/// A resolver that answers only when the test says so, so the gap between the
+/// request and its outcome is under the test's control.
+final class _HangingResolver implements CustomRepositoryResolver {
+  const _HangingResolver(this.outcome);
+
+  final Future<RepositoryResolution> outcome;
+
+  @override
+  Future<RepositoryResolution> resolve({
+    required String repository,
+    required ModelEngine engine,
+    String ref = 'main',
+    String? weightsFile,
+    Set<String> existingKeys = const {},
+  }) => outcome;
 }
