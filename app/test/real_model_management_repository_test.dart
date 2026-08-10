@@ -326,6 +326,85 @@ void main() {
     );
   });
 
+  // A second repository over the same platform is a relaunch: the app forgot
+  // everything, the OS did not.
+  group('reconciliation across a process recreation', () {
+    Future<void> interrupt(RealModelManagementRepository repo) async {
+      await repo.load();
+      // Stop the stream the way a killed process would — mid-file, with no
+      // terminal event and nothing persisted past the interruption.
+      platform.terminalEvents[_fileOne] = const ArtifactFilePaused(
+        userInitiated: false,
+      );
+      await repo.download('test-mlx').drain<void>();
+      platform.terminalEvents.remove(_fileOne);
+    }
+
+    test('a transfer the OS is still running reads as downloading', () async {
+      await interrupt(repository());
+      // The platform kept the first file's transfer alive across the relaunch.
+      platform.surviving['models/test-mlx/$_fileOne'] = 512;
+      platform.inFlight.add('models/test-mlx/$_fileOne');
+
+      final relaunched = await repository().load();
+      // Not Paused: bytes are moving, and inviting Resume here is what put a
+      // second writer on the file.
+      expect(relaunched.statusOf('test-mlx').phase, ArtifactPhase.downloading);
+      expect(relaunched.statusOf('test-mlx').downloadedBytes, 512);
+    });
+
+    test('a transfer the OS dropped reads as paused', () async {
+      await interrupt(repository());
+      final relaunched = await repository().load();
+      expect(relaunched.statusOf('test-mlx').phase, ArtifactPhase.paused);
+    });
+
+    test('a resumable partial counts toward progress', () async {
+      await interrupt(repository());
+      // Partial bytes live in the plugin's staging file, never at the
+      // destination, so only the platform can report them.
+      platform.surviving['models/test-mlx/$_fileOne'] = 900;
+      platform.resumable.add('models/test-mlx/$_fileOne');
+
+      final relaunched = await repository().load();
+      expect(relaunched.statusOf('test-mlx').phase, ArtifactPhase.paused);
+      expect(relaunched.statusOf('test-mlx').downloadedBytes, 900);
+    });
+
+    test(
+      'resuming adopts the surviving transfer instead of a second one',
+      () async {
+        await interrupt(repository());
+        platform.surviving['models/test-mlx/$_fileOne'] = 900;
+        platform.resumable.add('models/test-mlx/$_fileOne');
+        platform.enqueued.clear();
+
+        final repo = repository();
+        await repo.load();
+        await repo.download('test-mlx').drain<void>();
+
+        // One enqueue per destination, ever: the surviving transfer was taken
+        // over, not duplicated.
+        expect(platform.enqueued, ['models/test-mlx/$_fileTwo']);
+      },
+    );
+
+    test(
+      'a stop after relaunch still reaches the surviving transfer',
+      () async {
+        await interrupt(repository());
+        platform.surviving['models/test-mlx/$_fileOne'] = 900;
+
+        // The previous process's downloader object is long gone; the refs are
+        // re-derived from the catalog, so the stop still lands.
+        final relaunched = repository();
+        await relaunched.load();
+        await relaunched.cancel('test-mlx');
+        expect(platform.surviving, isEmpty);
+      },
+    );
+  });
+
   test('load reconciles persisted state against the disk', () async {
     final repo = repository();
     await repo.load();

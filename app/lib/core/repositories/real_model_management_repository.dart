@@ -51,6 +51,24 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   final Set<String> _stopRequested = {};
   Future<void> _writes = Future.value();
 
+  /// Whether the state file has been read and the engine claim normalized.
+  /// Reconciliation runs again on every resume, and neither of those is
+  /// repeatable: re-reading would discard newer in-memory state, and demoting
+  /// the runtime a second time would unload a model that is legitimately live.
+  bool _hydrated = false;
+
+  Future<void> _reconciles = Future.value();
+
+  /// Serializes read-modify-write of [_state]. [_persist] serializes the writes
+  /// themselves, but reconciliation reads state, awaits a series of platform
+  /// probes, then writes a whole map — a window long enough for a download that
+  /// finishes in between to be overwritten by a snapshot taken before it did.
+  Future<T> _exclusive<T>(Future<T> Function() action) {
+    final result = _reconciles.then((_) => action());
+    _reconciles = result.then((_) {}, onError: (_) {});
+    return result;
+  }
+
   String _rootFor(ModelCatalogEntry entry) =>
       '$documentsDirectory/${entry.installDirectory}';
 
@@ -78,63 +96,96 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     ),
   );
 
+  /// Convergence, and safe to re-run: the composition root calls it at startup
+  /// and again whenever the app returns to the foreground, which is the only
+  /// moment a transfer the OS moved on without telling anyone can be noticed.
   @override
-  Future<ModelState> load() async {
-    if (await stateFile.exists()) {
-      final loaded = await loadStore(
-        stateFile,
-        what: 'model state',
-        decode: (raw) => ModelState.fromJson(
-          Map<String, Object?>.from(jsonDecode(raw) as Map),
-        ),
-        orElse: () => const ModelState(),
-      );
-      _state = loaded.stamp(
-        activeArtifactKey: activeArtifactKey,
-        simulated: false,
-      );
+  Future<ModelState> load() => _exclusive(_converge);
+
+  Future<ModelState> _converge() async {
+    if (!_hydrated) {
+      _hydrated = true;
+      if (await stateFile.exists()) {
+        final loaded = await loadStore(
+          stateFile,
+          what: 'model state',
+          decode: (raw) => ModelState.fromJson(
+            Map<String, Object?>.from(jsonDecode(raw) as Map),
+          ),
+          orElse: () => const ModelState(),
+        );
+        _state = loaded.stamp(
+          activeArtifactKey: activeArtifactKey,
+          simulated: false,
+        );
+      }
+      // Since #19 the loaded phase is a claim about the engine, and no engine
+      // survives its process. Failed stays — still accurate across a relaunch.
+      // First hydration only: on a later pass the engine may genuinely be
+      // loaded, and demoting it again would describe a live model as unloaded.
+      if (_state.runtime == RuntimePhase.loading ||
+          _state.runtime == RuntimePhase.loaded) {
+        _state = _state.copyWith(runtime: RuntimePhase.unloaded);
+      }
     }
-    // Since #19 the loaded phase is a claim about the engine, and no engine
-    // survives its process. Failed stays — still accurate across a relaunch.
-    if (_state.runtime == RuntimePhase.loading ||
-        _state.runtime == RuntimePhase.loaded) {
-      _state = _state.copyWith(runtime: RuntimePhase.unloaded);
-    }
-    // Disk is truth: persisted phases are reconciled against the files present,
-    // so a kill mid-download resumes from real bytes and an externally removed
-    // install stops claiming to exist. "Installed" also needs the receipt to
-    // cover every file — size alone never re-earns it.
+    // Disk and platform together. Disk alone cannot tell a transfer the OS is
+    // still running from one it silently dropped, so demoting every
+    // interrupted download to Paused made a live one look stopped — and the
+    // Resume it invited started a second writer on the same file.
+    final before = {
+      for (final entry in catalog) entry.key: _state.statusOf(entry.key),
+    };
     final artifacts = <String, ArtifactStatus>{};
     for (final entry in catalog) {
-      final status = _state.statusOf(entry.key);
+      final status = before[entry.key]!;
       artifacts[entry.key] = switch (status.phase) {
         ArtifactPhase.installed when !await _installVerified(entry) =>
           const ArtifactStatus(),
         ArtifactPhase.downloading ||
         ArtifactPhase.verifying ||
-        ArtifactPhase.paused => ArtifactStatus(
-          phase: ArtifactPhase.paused,
-          downloadedBytes: await _presentBytes(entry),
-        ),
+        ArtifactPhase.paused => await _reconcileTransfer(entry),
         _ => status,
       };
       if (artifacts[entry.key]!.phase == ArtifactPhase.notDownloaded) {
         artifacts[entry.key] = const ArtifactStatus();
       }
     }
-    _state = _state.copyWith(artifacts: artifacts);
+    // Applied only where nothing moved underneath. Hashing and probing an
+    // artifact takes long enough for a download running alongside to install
+    // it, and writing this pass's whole map would revert that install to the
+    // phase it held before the pass began.
+    final merged = {..._state.artifacts};
+    artifacts.forEach((key, reconciled) {
+      if (_state.statusOf(key) == before[key]) merged[key] = reconciled;
+    });
+    _state = _state.copyWith(artifacts: merged);
     return _persist(_state);
   }
 
-  /// Present by size — a progress hint for the paused card, not a verdict.
-  Future<int> _presentBytes(ModelCatalogEntry entry) async {
-    var bytes = 0;
+  /// What one artifact's transfer really is: bytes already on disk, plus
+  /// whatever the platform still holds for the files that are not.
+  Future<ArtifactStatus> _reconcileTransfer(ModelCatalogEntry entry) async {
+    var present = 0;
+    var live = false;
     for (final spec in entry.files) {
       if (await _sizeMatches(entry, spec)) {
-        bytes += spec.bytes;
+        present += spec.bytes;
+        continue;
       }
+      final snapshot = await downloader.inspect(_refFor(entry, spec));
+      if (snapshot.presence == ArtifactTransferPresence.running ||
+          snapshot.presence == ArtifactTransferPresence.waitingToRetry) {
+        live = true;
+      }
+      // Partial data lives in the plugin's staging file, never at the
+      // destination — both platforms move the file into place only once it is
+      // whole — so without this a resumed card reports a false regression.
+      present += snapshot.receivedBytes ?? 0;
     }
-    return bytes;
+    return ArtifactStatus(
+      phase: live ? ArtifactPhase.downloading : ArtifactPhase.paused,
+      downloadedBytes: present,
+    );
   }
 
   Future<bool> _installVerified(ModelCatalogEntry entry) async {
@@ -214,6 +265,10 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     );
 
     for (final spec in pending) {
+      // The install directory is keyed by artifact, not by commit, so a re-pin
+      // mid-download would land this commit's bytes under the new revision's
+      // name and let the engine map weights the catalog no longer describes.
+      if (_repinned(entry)) return;
       // Local content first: a size-matching file without a receipt entry is
       // hashed before any network use, then verifies in place or is re-fetched.
       if (await _sizeMatches(entry, spec)) {
@@ -339,6 +394,7 @@ final class RealModelManagementRepository implements ModelManagementRepository {
       if (_stopRequested.contains(artifactKey)) return;
     }
 
+    if (_repinned(entry)) return;
     yield await _persist(
       _state.withArtifact(
         artifactKey,
@@ -348,6 +404,18 @@ final class RealModelManagementRepository implements ModelManagementRepository {
         ),
       ),
     );
+  }
+
+  /// Whether the catalog moved to a different commit for this key since the
+  /// download started. [addModel] swaps the entry in place and cannot stop a
+  /// generator already running against the old one.
+  bool _repinned(ModelCatalogEntry entry) {
+    for (final current in catalog) {
+      if (current.key == entry.key) return current.revision != entry.revision;
+    }
+    // The entry left the catalog entirely; nothing may still be installed
+    // under its name.
+    return true;
   }
 
   /// Derived, never remembered: an out-of-band pause or cancel arriving in a
