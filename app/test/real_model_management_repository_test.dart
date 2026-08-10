@@ -38,46 +38,134 @@ ModelCatalogEntry _entry() => ModelCatalogEntry(
   ],
 );
 
-/// Scripted downloader: writes configured content (or garbage) into the
-/// destination and replays a configured terminal event.
-final class _ScriptedDownloader implements ArtifactFileDownloader {
-  _ScriptedDownloader(this.documentsDirectory);
+/// Stands in for the OS and the plugin's stores, and deliberately **outlives**
+/// any one repository: constructing a second [RealModelManagementRepository]
+/// over the same platform is how a process recreation is expressed, which is
+/// the only way the reconciliation this file pins can be tested at all.
+final class _FakePlatform {
+  _FakePlatform(this.documentsDirectory);
 
   final String documentsDirectory;
+
   final List<String> requestedUrls = [];
-  // Keyed by filename (the downloader seam sees basenames, not paths).
+
+  /// Every destination a transfer was started for. A second entry for one
+  /// destination is a second writer.
+  final List<String> enqueued = [];
+  final List<String> pausedRefs = [];
+  final List<String> canceledRefs = [];
+
+  /// Keyed by filename (the fixture's basenames are unique).
   final Map<String, ArtifactFileEvent> terminalEvents = {};
   final Map<String, String> contents = {
     'config.json': _contentOne,
     'model.bin': _contentTwo,
   };
+
+  /// Destinations a download() is currently streaming.
+  final Set<String> inFlight = {};
+
+  /// Transfers the platform still holds although no download() is streaming
+  /// them — what survives a process death. Value is the bytes already moved.
+  final Map<String, int> surviving = {};
+
+  /// Destinations whose surviving transfer has resume data.
+  final Set<String> resumable = {};
+
+  int initializeCalls = 0;
   int pauseCalls = 0;
   int cancelCalls = 0;
+}
+
+/// Scripted downloader: writes configured content (or garbage) into the
+/// destination and replays a configured terminal event.
+final class _ScriptedDownloader implements ArtifactFileDownloader {
+  _ScriptedDownloader(this.platform);
+
+  final _FakePlatform platform;
+
+  List<String> get requestedUrls => platform.requestedUrls;
+  Map<String, ArtifactFileEvent> get terminalEvents => platform.terminalEvents;
+  Map<String, String> get contents => platform.contents;
+  int get pauseCalls => platform.pauseCalls;
+  int get cancelCalls => platform.cancelCalls;
 
   @override
-  Stream<ArtifactFileEvent> download({
-    required String url,
-    required String directory,
-    required String filename,
-    required int expectedBytes,
-  }) async* {
-    requestedUrls.add(url);
-    yield ArtifactFileProgress(expectedBytes ~/ 2);
-    final terminal = terminalEvents[filename] ?? const ArtifactFileComplete();
-    if (terminal is ArtifactFileComplete) {
-      final file = File('$documentsDirectory/$directory/$filename');
-      await file.parent.create(recursive: true);
-      await file.writeAsString(contents[filename]!);
-      yield ArtifactFileProgress(expectedBytes);
+  Future<void> initialize() async => platform.initializeCalls++;
+
+  @override
+  Future<ArtifactTransferSnapshot> inspect(ArtifactFileRef ref) async {
+    final destination = ref.destination;
+    final resumable = platform.resumable.contains(destination);
+    if (platform.inFlight.contains(destination)) {
+      return ArtifactTransferSnapshot(
+        presence: ArtifactTransferPresence.running,
+        receivedBytes: platform.surviving[destination],
+        resumable: resumable,
+      );
     }
-    yield terminal;
+    final bytes = platform.surviving[destination];
+    if (bytes == null && !resumable) return const ArtifactTransferSnapshot();
+    return ArtifactTransferSnapshot(
+      presence: ArtifactTransferPresence.paused,
+      receivedBytes: bytes,
+      resumable: resumable,
+    );
   }
 
   @override
-  Future<void> pause() async => pauseCalls++;
+  Stream<ArtifactFileEvent> download(ArtifactFileRef ref) async* {
+    await initialize();
+    platform.requestedUrls.add(ref.sourceUrl);
+    // Adoption reuses the surviving transfer rather than starting a second one,
+    // so the enqueue log stays at one entry per destination.
+    final adopted = platform.surviving.remove(ref.destination);
+    if (adopted == null) {
+      platform.enqueued.add(ref.destination);
+    } else {
+      yield ArtifactFileProgress(adopted);
+    }
+    platform.resumable.remove(ref.destination);
+    platform.inFlight.add(ref.destination);
+    try {
+      yield ArtifactFileProgress(ref.expectedBytes ~/ 2);
+      final terminal =
+          platform.terminalEvents[ref.filename] ?? const ArtifactFileComplete();
+      if (terminal is ArtifactFileComplete) {
+        final file = File(
+          '${platform.documentsDirectory}/${ref.directory}/${ref.filename}',
+        );
+        await file.parent.create(recursive: true);
+        await file.writeAsString(platform.contents[ref.filename]!);
+        yield ArtifactFileProgress(ref.expectedBytes);
+      }
+      yield terminal;
+    } finally {
+      platform.inFlight.remove(ref.destination);
+    }
+  }
 
   @override
-  Future<void> cancel() async => cancelCalls++;
+  Future<bool> pause(ArtifactFileRef ref) async {
+    platform.pausedRefs.add(ref.destination);
+    // Only a transfer the platform actually holds can be paused; the seam
+    // reports that honestly so the repository never claims a false pause.
+    if (!platform.inFlight.contains(ref.destination) &&
+        !platform.surviving.containsKey(ref.destination)) {
+      return false;
+    }
+    platform.pauseCalls++;
+    return true;
+  }
+
+  @override
+  Future<bool> cancel(ArtifactFileRef ref) async {
+    platform.canceledRefs.add(ref.destination);
+    platform.cancelCalls++;
+    platform.surviving.remove(ref.destination);
+    platform.resumable.remove(ref.destination);
+    return true;
+  }
 }
 
 final class _FixedDiskSpace implements DiskSpaceProbe {
@@ -95,6 +183,7 @@ final class _RecordingBackupExclusion implements BackupExclusion {
 
 void main() {
   late Directory temp;
+  late _FakePlatform platform;
   late _ScriptedDownloader downloader;
   late _FixedDiskSpace diskSpace;
   late _RecordingBackupExclusion backup;
@@ -116,7 +205,8 @@ void main() {
   setUp(() {
     temp = Directory.systemTemp.createTempSync('golem-real-repo-');
     addTearDown(() => temp.deleteSync(recursive: true));
-    downloader = _ScriptedDownloader('${temp.path}/documents');
+    platform = _FakePlatform('${temp.path}/documents');
+    downloader = _ScriptedDownloader(platform);
     diskSpace = _FixedDiskSpace(1 << 30);
     backup = _RecordingBackupExclusion();
   });
@@ -215,7 +305,13 @@ void main() {
     await repo.load();
     await repo.download('test-mlx').drain<void>();
     final cancelled = await repo.cancel('test-mlx');
-    expect(downloader.cancelCalls, 1);
+    // A stop names only the artifact, so it must address every file of it —
+    // otherwise a transfer the app forgot keeps writing into the directory
+    // being deleted.
+    expect(platform.canceledRefs, [
+      'models/test-mlx/$_fileOne',
+      'models/test-mlx/$_fileTwo',
+    ]);
     expect(cancelled.statusOf('test-mlx').phase, ArtifactPhase.notDownloaded);
     expect(
       Directory('${temp.path}/documents/models/test-mlx').existsSync(),
@@ -347,8 +443,11 @@ void main() {
       expect(deleted.statusOf('test-mlx').phase, ArtifactPhase.notDownloaded);
       // Deleting the weights cannot leave a loaded runtime behind…
       expect(deleted.runtime, RuntimePhase.unloaded);
-      // …and delete cancels the downloader like cancel does.
-      expect(downloader.cancelCalls, 1);
+      // …and delete stops every one of the entry's transfers, like cancel.
+      expect(platform.canceledRefs, [
+        'models/test-mlx/$_fileOne',
+        'models/test-mlx/$_fileTwo',
+      ]);
 
       // Relaunch reconciliation applies the same rule to persisted state.
       await repo.download('test-mlx').drain<void>();

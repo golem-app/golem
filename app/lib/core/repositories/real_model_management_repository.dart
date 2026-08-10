@@ -236,15 +236,9 @@ final class RealModelManagementRepository implements ModelManagementRepository {
         await File('${_rootFor(entry)}/${spec.path}').delete();
       }
 
-      final url = entry.resolveUrlFor(spec).toString();
       ArtifactFileEvent fileOutcome = const ArtifactFileComplete();
       var lastReceived = 0;
-      await for (final event in downloader.download(
-        url: url,
-        directory: _directoryFor(entry, spec),
-        filename: _filenameFor(spec),
-        expectedBytes: spec.bytes,
-      )) {
+      await for (final event in downloader.download(_refFor(entry, spec))) {
         if (event is ArtifactFileProgress) {
           if (_stopRequested.contains(artifactKey)) continue;
           lastReceived = event.bytesReceived;
@@ -356,6 +350,18 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     );
   }
 
+  /// Derived, never remembered: an out-of-band pause or cancel arriving in a
+  /// fresh process must address the same transfer the previous process
+  /// started, and the catalog is the only thing both share.
+  ArtifactFileRef _refFor(ModelCatalogEntry entry, ModelArtifactFile spec) =>
+      ArtifactFileRef(
+        artifactKey: entry.key,
+        sourceUrl: entry.resolveUrlFor(spec).toString(),
+        directory: _directoryFor(entry, spec),
+        filename: _filenameFor(spec),
+        expectedBytes: spec.bytes,
+      );
+
   String _directoryFor(ModelCatalogEntry entry, ModelArtifactFile spec) {
     final segments = spec.path.split('/');
     return [
@@ -435,11 +441,35 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     }
   }
 
+  /// An out-of-band stop names only the artifact, so every file of the entry is
+  /// addressed; the platform holds at most one transfer per destination and
+  /// answers for the rest immediately.
+  Future<bool> _pauseTransfers(ModelCatalogEntry entry) async {
+    var paused = false;
+    for (final spec in entry.files) {
+      if (await downloader.pause(_refFor(entry, spec))) paused = true;
+    }
+    return paused;
+  }
+
+  /// True only when the platform holds nothing for any file — the precondition
+  /// for deleting the directory those transfers write into.
+  Future<bool> _cancelTransfers(ModelCatalogEntry entry) async {
+    var cleared = true;
+    for (final spec in entry.files) {
+      if (!await downloader.cancel(_refFor(entry, spec))) cleared = false;
+    }
+    return cleared;
+  }
+
   @override
   Future<ModelState> pause(String artifactKey) async {
-    _entry(artifactKey);
+    final entry = _entry(artifactKey);
+    // Confirmed first: a transfer the platform would not pause is still
+    // moving bytes, and a card reading "Paused" over a live writer is a lie
+    // the user acts on. Reconciliation converges it either way.
+    if (!await _pauseTransfers(entry)) return _state;
     _stopRequested.add(artifactKey);
-    await downloader.pause();
     return _persist(
       _state.withArtifact(
         artifactKey,
@@ -449,24 +479,17 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   }
 
   @override
-  Future<ModelState> cancel(String artifactKey) async {
-    final entry = _entry(artifactKey);
-    _stopRequested.add(artifactKey);
-    await downloader.cancel();
-    await _deleteArtifactFiles(entry);
-    return _persist(
-      _withoutArtifact(
-        artifactKey,
-      ).withArtifact(artifactKey, const ArtifactStatus()),
-    );
-  }
+  Future<ModelState> cancel(String artifactKey) => _discard(artifactKey);
 
   @override
-  Future<ModelState> delete(String artifactKey) async {
+  Future<ModelState> delete(String artifactKey) => _discard(artifactKey);
+
+  /// Cancel and delete differ only in what the user was looking at; both stop
+  /// every transfer, prove it stopped, and remove the install.
+  Future<ModelState> _discard(String artifactKey) async {
     final entry = _entry(artifactKey);
-    // Stop the download first, or bytes land in the directory just removed.
     _stopRequested.add(artifactKey);
-    await downloader.cancel();
+    await _cancelTransfers(entry);
     await _deleteArtifactFiles(entry);
     return _persist(
       _withoutArtifact(
@@ -483,9 +506,23 @@ final class RealModelManagementRepository implements ModelManagementRepository {
       : _state;
 
   Future<void> _deleteArtifactFiles(ModelCatalogEntry entry) async {
-    final root = Directory(_rootFor(entry));
-    if (await root.exists()) {
-      await root.delete(recursive: true);
+    // Swept twice: both platforms write the destination only at completion,
+    // from a temp file, recreating the directory on the way. A task that was
+    // already inside that move when the cancel landed would otherwise leave
+    // multi-gigabyte weights behind with no receipt — bytes the UI then reports
+    // as "not downloaded" and no user action can reach.
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final root = Directory(_rootFor(entry));
+      if (!await root.exists()) {
+        if (attempt > 0) return;
+      } else {
+        try {
+          await root.delete(recursive: true);
+        } catch (_) {}
+      }
+      if (attempt == 0) {
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+      }
     }
   }
 
