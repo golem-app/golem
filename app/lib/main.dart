@@ -8,7 +8,9 @@ import 'package:path_provider/path_provider.dart';
 import 'app/app.dart';
 import 'broker/configured_inference_repository.dart';
 import 'broker/model_catalog.dart';
+import 'broker/model_profile.dart';
 import 'core/app_identity.dart';
+import 'core/domain/inference_backend.dart';
 import 'core/providers/app_providers.dart';
 import 'core/repositories/contracts.dart';
 import 'core/repositories/fake_benchmark_repository.dart';
@@ -20,7 +22,10 @@ import 'core/repositories/file_settings_repository.dart';
 import 'core/repositories/real_model_management_repository.dart';
 import 'core/services/artifact_downloader.dart';
 import 'core/services/cache_probe.dart';
+import 'core/services/custom_repository_resolver.dart';
 import 'core/services/device_storage.dart';
+import 'core/services/hugging_face_api.dart';
+import 'core/services/repository_resolver.dart';
 import 'features/chat/widgets/attach_sheet.dart';
 
 Future<void> main() => launch();
@@ -114,6 +119,17 @@ Future<void> launch({
           ),
         ),
         modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
+        customRepositoryResolverProvider.overrideWithValue(
+          // The fake identity never reaches the network, so its resolution is
+          // synthesized; the real one carries the broker's profiles because
+          // core cannot import them itself.
+          backendConfig.kind == InferenceBackendKind.fake
+              ? const DeterministicRepositoryResolver()
+              : HuggingFaceRepositoryResolver(
+                  api: HttpClientHuggingFaceApi(),
+                  profiles: brokerProfileSpecs,
+                ),
+        ),
         modelManagementRepositoryProvider.overrideWithValue(modelManagement),
         deviceCapacityProbeProvider.overrideWithValue(
           const DeviceStorageChannel(),
