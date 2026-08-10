@@ -59,6 +59,7 @@ void main() {
         : 'Set --dart-define=GOLEM_CUSTOM_ACCEPTANCE=true to run the '
               'non-pinned repository acceptance.',
     () async {
+      AcceptanceHud.takeOver();
       AcceptanceHud.step('Resolving $_repository');
       final api = HttpClientHuggingFaceApi();
       addTearDown(api.close);
@@ -122,15 +123,22 @@ void main() {
       final added = await repository.addModel(entry);
       expect(added.statusOf(entry.key).phase, ArtifactPhase.notDownloaded);
 
-      AcceptanceHud.step(
-        'Downloading ${entry.files.length} file(s), '
-        '${(entry.totalBytes / 1e9).toStringAsFixed(2)} GB',
-      );
-      final states = await repository
-          .download(entry.key)
-          .timeout(const Duration(minutes: 20))
-          .toList();
-      final status = states.last.statusOf(entry.key);
+      AcceptanceHud.step('Downloading ${entry.files.length} file(s)');
+      // Progress comes off the download layer's own status stream, so the
+      // screen cannot claim more than the repository has actually banked.
+      ModelState? last;
+      await for (final state
+          in repository
+              .download(entry.key)
+              .timeout(const Duration(minutes: 20))) {
+        last = state;
+        AcceptanceHud.progress(
+          received: state.statusOf(entry.key).downloadedBytes,
+          total: entry.totalBytes,
+          detail: state.statusOf(entry.key).phase.name,
+        );
+      }
+      final status = last!.statusOf(entry.key);
       expect(
         status.phase,
         ArtifactPhase.installed,
