@@ -7,6 +7,10 @@ final class InMemoryChatHistoryRepository implements ChatHistoryRepository {
   ]);
   ChatHistorySnapshot snapshot;
 
+  /// While > 0, each save throws a typed write failure and decrements —
+  /// the fault-injection hook for rollback tests.
+  int failingSaves = 0;
+
   @override
   Future<ChatHistorySnapshot> load() async => snapshot;
 
@@ -14,5 +18,14 @@ final class InMemoryChatHistoryRepository implements ChatHistoryRepository {
   Future<int> storedBytes() async => snapshot.encode().length;
 
   @override
-  Future<void> save(ChatHistorySnapshot value) async => snapshot = value;
+  Future<void> save(ChatHistorySnapshot value) async {
+    if (failingSaves > 0) {
+      failingSaves--;
+      throw const PersistenceException(
+        PersistenceFailureKind.write,
+        'Could not save the chat history.',
+      );
+    }
+    snapshot = value;
+  }
 }

@@ -249,109 +249,154 @@ List<ChatSearchResult> chatSearchResults(Ref ref) {
 /// Only user-set values are stored; profile defaults resolve at the consumer.
 @Riverpod(keepAlive: true, retry: noRetry)
 class SettingsController extends _$SettingsController {
+  int _commitEpoch = 0;
+
   @override
   Future<GenerationSettings> build() =>
       ref.read(settingsRepositoryProvider).load();
 
   GenerationSettings get _value => state.requireValue;
 
-  Future<void> updateModel(
+  /// False means the write failed and the presented state was rolled back —
+  /// the caller owns telling the user. Commands never throw, so
+  /// fire-and-forget call sites stay safe.
+  Future<bool> updateModel(
     String profileKey,
     SamplingOverrides overrides,
   ) async {
     // A tap can land in the cold-start load window; dropping it beats throwing
     // on requireValue while the store is still reading.
-    if (!state.hasValue) return;
-    final next = _value.withModel(profileKey, overrides);
+    if (!state.hasValue) return false;
+    final previous = _value;
+    final next = previous.withModel(profileKey, overrides);
+    final epoch = ++_commitEpoch;
     state = AsyncData(next);
-    await ref.read(settingsRepositoryProvider).save(next);
+    try {
+      await ref.read(settingsRepositoryProvider).save(next);
+      return true;
+    } on Exception {
+      // The epoch keeps a stale failure from clobbering a newer commit.
+      if (ref.mounted && epoch == _commitEpoch) state = AsyncData(previous);
+      return false;
+    }
   }
 
-  Future<void> resetModel(String profileKey) =>
+  Future<bool> resetModel(String profileKey) =>
       updateModel(profileKey, const SamplingOverrides());
 }
 
 /// Persisted app-wide preferences. Every command follows the settings idiom —
-/// drop taps that land in the cold-start load window, publish, then save.
+/// drop taps that land in the cold-start load window, publish, then save —
+/// and returns false after rolling back a failed write, never throwing.
 @Riverpod(keepAlive: true, retry: noRetry)
 class PreferencesController extends _$PreferencesController {
+  int _commitEpoch = 0;
+
   @override
   Future<AppPreferences> build() =>
       ref.read(preferencesRepositoryProvider).load();
 
   AppPreferences get _value => state.requireValue;
 
-  Future<void> _commit(AppPreferences next) async {
+  Future<bool> _commit(AppPreferences next) async {
+    final previous = _value;
+    final epoch = ++_commitEpoch;
     state = AsyncData(next);
-    await ref.read(preferencesRepositoryProvider).save(next);
+    try {
+      await ref.read(preferencesRepositoryProvider).save(next);
+      return true;
+    } on Exception {
+      // The epoch keeps a stale failure from clobbering a newer commit.
+      if (ref.mounted && epoch == _commitEpoch) state = AsyncData(previous);
+      return false;
+    }
   }
 
-  Future<void> setTheme(ThemeSetting theme) async {
-    if (!state.hasValue) return;
-    await _commit(_value.copyWith(theme: theme));
+  Future<bool> setTheme(ThemeSetting theme) async {
+    if (!state.hasValue) return false;
+    return _commit(_value.copyWith(theme: theme));
   }
 
-  Future<void> setTextScale(double scale) async {
-    if (!state.hasValue) return;
-    await _commit(_value.copyWith(textScale: scale));
+  Future<bool> setTextScale(double scale) async {
+    if (!state.hasValue) return false;
+    return _commit(_value.copyWith(textScale: scale));
   }
 
-  Future<void> setShowMetrics(bool value) async {
-    if (!state.hasValue) return;
-    await _commit(_value.copyWith(showMetrics: value));
+  Future<bool> setShowMetrics(bool value) async {
+    if (!state.hasValue) return false;
+    return _commit(_value.copyWith(showMetrics: value));
   }
 
-  Future<void> setExpandReasoning(bool value) async {
-    if (!state.hasValue) return;
-    await _commit(_value.copyWith(expandReasoning: value));
+  Future<bool> setExpandReasoning(bool value) async {
+    if (!state.hasValue) return false;
+    return _commit(_value.copyWith(expandReasoning: value));
   }
 
-  Future<void> setHapticsOnSend(bool value) async {
-    if (!state.hasValue) return;
-    await _commit(_value.copyWith(hapticsOnSend: value));
+  Future<bool> setHapticsOnSend(bool value) async {
+    if (!state.hasValue) return false;
+    return _commit(_value.copyWith(hapticsOnSend: value));
   }
 
-  Future<void> setAdvancedMode(bool value) async {
-    if (!state.hasValue) return;
-    await _commit(_value.copyWith(advancedMode: value));
+  Future<bool> setAdvancedMode(bool value) async {
+    if (!state.hasValue) return false;
+    return _commit(_value.copyWith(advancedMode: value));
   }
 
   /// Null or blank clears the prompt back to the model default.
-  Future<void> setSystemPrompt(String? prompt) async {
-    if (!state.hasValue) return;
+  Future<bool> setSystemPrompt(String? prompt) async {
+    if (!state.hasValue) return false;
     final trimmed = prompt?.trim();
-    await _commit(
+    return _commit(
       _value.copyWith(
         systemPrompt: () => trimmed == null || trimmed.isEmpty ? null : trimmed,
       ),
     );
   }
 
-  Future<void> setResponseStyle(String profileKey, ResponseStyle style) async {
-    if (!state.hasValue) return;
-    await _commit(_value.withStyle(profileKey, style));
+  Future<bool> setResponseStyle(String profileKey, ResponseStyle style) async {
+    if (!state.hasValue) return false;
+    return _commit(_value.withStyle(profileKey, style));
   }
 
   /// Turning history off empties the on-disk store immediately: the design copy
   /// promises chats disappear. Past consent — the alert lives in the widget.
-  Future<void> setSaveHistory(bool save) async {
-    if (!state.hasValue) return;
-    await _commit(_value.copyWith(saveHistory: save));
+  /// The wipe runs before the commit, so a failed wipe can never present as
+  /// "history off" while chats still sit on disk.
+  Future<bool> setSaveHistory(bool save) async {
+    if (!state.hasValue) return false;
     if (save) {
-      await ref.read(chatControllerProvider.notifier).persistCurrent();
-    } else {
+      final committed = await _commit(_value.copyWith(saveHistory: true));
+      if (!committed) return false;
+      // Re-persisting the session is best-effort: the preference is saved, and
+      // the next chat mutation persists the same conversations again.
+      try {
+        await ref.read(chatControllerProvider.notifier).persistCurrent();
+      } on Exception {
+        // The toggle itself succeeded; history lands on the next mutation.
+      }
+      return true;
+    }
+    try {
       await ref
           .read(chatHistoryRepositoryProvider)
           .save(const ChatHistorySnapshot(conversations: []));
+    } on Exception {
+      return false;
     }
+    return _commit(_value.copyWith(saveHistory: false));
   }
 
-  Future<void> addCustomModel(CustomModelSpec spec) async {
-    if (!state.hasValue) return;
-    await _commit(_value.withCustomModel(spec));
+  /// The preference commit owns success: a failed model-card registration
+  /// surfaces on the card itself (its failed-phase channel) while the stored
+  /// spec is retained, so the next launch re-merges it into the catalog.
+  Future<bool> addCustomModel(CustomModelSpec spec) async {
+    if (!state.hasValue) return false;
+    final committed = await _commit(_value.withCustomModel(spec));
+    if (!committed) return false;
     await ref
         .read(modelControllerProvider.notifier)
         .registerCustomModel(spec.toCatalogEntry());
+    return true;
   }
 }
 
@@ -438,17 +483,24 @@ class ChatController extends _$ChatController {
   }
 
   /// The confirmation alert lives at the widget layer; this is past consent.
-  Future<void> deleteAllChats() async {
+  /// The disk wipe runs first and gates the in-memory clear: a failed wipe
+  /// returns false with the chats still shown, because "deleted" must never
+  /// be presented while the store still holds them.
+  Future<bool> deleteAllChats() async {
     stop();
-    final next = ChatState(conversations: const []);
-    state = AsyncData(next);
     // Both seams read before the first await, as in _persist.
     final history = ref.read(chatHistoryRepositoryProvider);
     final attachments = _attachments;
-    // Directly, not via _persist: the wipe must reach disk even when the
-    // save-history gate is closed.
-    await history.save(const ChatHistorySnapshot(conversations: []));
+    try {
+      // Directly, not via _persist: the wipe must reach disk even when the
+      // save-history gate is closed.
+      await history.save(const ChatHistorySnapshot(conversations: []));
+    } on Exception {
+      return false;
+    }
+    if (ref.mounted) state = AsyncData(ChatState(conversations: const []));
     await _retainReferenced(attachments, const []);
+    return true;
   }
 
   /// The user's own export, so unlike a shared transcript it keeps reasoning.

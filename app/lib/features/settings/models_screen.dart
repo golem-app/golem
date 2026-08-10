@@ -404,7 +404,7 @@ class _CustomRepositoryCard extends ConsumerWidget {
     RepositoryResolved outcome,
   ) async {
     final preferences = ref.read(preferencesControllerProvider.notifier);
-    await preferences.addCustomModel(
+    final added = await preferences.addCustomModel(
       CustomModelSpec(
         repository: controller.text.trim(),
         engine: engine,
@@ -413,6 +413,14 @@ class _CustomRepositoryCard extends ConsumerWidget {
         resolved: outcome.resolved,
       ),
     );
+    if (!added) {
+      // The preference write failed and rolled back; the resolution card is
+      // still on screen, so Add remains the retry affordance.
+      if (context.mounted) {
+        showGolemToast(context, "Couldn't save the model. Try again.");
+      }
+      return;
+    }
     // The controllers and the draft state belong to the screen, which may be
     // gone: only it can decide whether resetting them is still meaningful.
     onAdded();

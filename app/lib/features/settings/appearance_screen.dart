@@ -6,6 +6,7 @@ import '../../core/domain/app_preferences.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
+import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
 
 /// Appearance: theme, text size, and the transcript toggles.
@@ -32,7 +33,8 @@ class AppearanceScreen extends ConsumerWidget {
             const SizedBox(height: 8),
             GolemSegmented<ThemeSetting>(
               groupValue: preferences.theme,
-              onChanged: notifier.setTheme,
+              onChanged: (value) =>
+                  announceFailedSave(context, notifier.setTheme(value)),
               segments: const {
                 ThemeSetting.system: Text(
                   'System',
@@ -56,7 +58,8 @@ class AppearanceScreen extends ConsumerWidget {
             const SizedBox(height: 8),
             _TextSizeCard(
               scale: preferences.textScale,
-              onCommit: notifier.setTextScale,
+              onCommit: (value) =>
+                  announceFailedSave(context, notifier.setTextScale(value)),
             ),
             const SizedBox(height: 24),
             const SectionHeader('In the transcript'),
@@ -67,19 +70,28 @@ class AppearanceScreen extends ConsumerWidget {
                   toggleKey: const Key('toggle-metrics'),
                   label: 'Show inference metrics',
                   value: preferences.showMetrics,
-                  onChanged: notifier.setShowMetrics,
+                  onChanged: (value) => announceFailedSave(
+                    context,
+                    notifier.setShowMetrics(value),
+                  ),
                 ),
                 SettingsToggleRow(
                   toggleKey: const Key('toggle-reasoning'),
                   label: 'Always expand reasoning',
                   value: preferences.expandReasoning,
-                  onChanged: notifier.setExpandReasoning,
+                  onChanged: (value) => announceFailedSave(
+                    context,
+                    notifier.setExpandReasoning(value),
+                  ),
                 ),
                 SettingsToggleRow(
                   toggleKey: const Key('toggle-haptics'),
                   label: 'Haptics on send',
                   value: preferences.hapticsOnSend,
-                  onChanged: notifier.setHapticsOnSend,
+                  onChanged: (value) => announceFailedSave(
+                    context,
+                    notifier.setHapticsOnSend(value),
+                  ),
                 ),
               ],
             ),

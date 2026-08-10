@@ -93,6 +93,7 @@ ProviderContainer buildContainer({
   PreferencesRepository? preferences,
   AttachmentRepository? attachments,
   CustomRepositoryResolver? resolver,
+  ChatHistoryRepository? chatHistory,
 }) {
   final directory = Directory.systemTemp.createTempSync('golem-widget-test-');
   return ProviderContainer(
@@ -109,9 +110,10 @@ ProviderContainer buildContainer({
         preferences ?? InMemoryPreferencesRepository(),
       ),
       chatHistoryRepositoryProvider.overrideWithValue(
-        InMemoryChatHistoryRepository(
-          history ?? const ChatHistorySnapshot(conversations: []),
-        ),
+        chatHistory ??
+            InMemoryChatHistoryRepository(
+              history ?? const ChatHistorySnapshot(conversations: []),
+            ),
       ),
       inferenceRepositoryProvider.overrideWithValue(
         FakeInferenceRepository(eventDelay: Duration.zero),

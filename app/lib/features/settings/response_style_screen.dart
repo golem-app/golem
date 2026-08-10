@@ -15,6 +15,7 @@ import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
 import '../chat/model_label.dart';
+import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
 
 /// Response style: the three presets, and — in Advanced mode — the raw
@@ -60,9 +61,12 @@ class ResponseStyleScreen extends ConsumerWidget {
               _StyleCard(
                 style: style,
                 selected: style == selected,
-                onTap: () => ref
-                    .read(preferencesControllerProvider.notifier)
-                    .setResponseStyle(profileKey, style),
+                onTap: () => announceFailedSave(
+                  context,
+                  ref
+                      .read(preferencesControllerProvider.notifier)
+                      .setResponseStyle(profileKey, style),
+                ),
               ),
               const SizedBox(height: 10),
             ],
@@ -258,9 +262,12 @@ class GenerationCard extends ConsumerWidget {
     final effectiveBudget =
         overrides.maxTokens ?? max(defaults.maxTokens, thinking.maxTokens);
 
-    Future<void> update(SamplingOverrides next) => ref
-        .read(settingsControllerProvider.notifier)
-        .updateModel(profileKey, next);
+    Future<void> update(SamplingOverrides next) => announceFailedSave(
+      context,
+      ref
+          .read(settingsControllerProvider.notifier)
+          .updateModel(profileKey, next),
+    );
 
     return GolemCard(
       child: Column(
@@ -273,9 +280,12 @@ class GenerationCard extends ConsumerWidget {
                 key: Key('gen-reset-$profileKey'),
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 minimumSize: const Size(44, 30),
-                onPressed: () => ref
-                    .read(settingsControllerProvider.notifier)
-                    .resetModel(profileKey),
+                onPressed: () => announceFailedSave(
+                  context,
+                  ref
+                      .read(settingsControllerProvider.notifier)
+                      .resetModel(profileKey),
+                ),
                 child: const Text('Reset', style: TextStyle(fontSize: 14)),
               ),
             ),

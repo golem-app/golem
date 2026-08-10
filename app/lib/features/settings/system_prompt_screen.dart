@@ -7,6 +7,7 @@ import '../../core/chrome/golem_button.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
+import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
 
 /// The Advanced-mode system prompt editor. The draft is widget-local and
@@ -47,10 +48,15 @@ class _SystemPromptScreenState extends ConsumerState<SystemPromptScreen> {
     _debounce = null;
     if (_controller.text == _lastCommitted) return;
     _lastCommitted = _controller.text;
-    // The controller trims and stores null for blank.
-    ref
-        .read(preferencesControllerProvider.notifier)
-        .setSystemPrompt(_controller.text);
+    // The controller trims and stores null for blank. On a failed write the
+    // stored value rolled back; the toast is best-effort — a pop-flush
+    // failure has no surface left to show it on.
+    announceFailedSave(
+      context,
+      ref
+          .read(preferencesControllerProvider.notifier)
+          .setSystemPrompt(_controller.text),
+    );
   }
 
   @override
