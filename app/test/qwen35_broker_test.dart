@@ -151,12 +151,14 @@ void main() {
     expect(profile.key, 'qwen35');
     expect(profile.stopSequences, ['<|im_end|>']);
     expect(profile.stopTokenIds, [248046, 248044]);
-    // Mode-specific per Qwen3-family guidance; the thinking settings are
-    // load-bearing — non-thinking sampling loops mid-think on Q4_0
-    // (docs/evals evidence).
+    // Mode-specific per the Qwen 3.5 card; the thinking settings are
+    // load-bearing in both directions — non-thinking sampling loops mid-think
+    // on Q4_0 (#33), and the coding-tasks 0.6 loops the 4-bit MLX build (#80).
     final thinking = profile.sampling(reasoningEnabled: true);
-    expect(thinking.temperature, 0.6);
+    expect(thinking.temperature, 1);
     expect(thinking.topP, 0.95);
+    expect(thinking.topK, 20);
+    expect(thinking.presencePenalty, 1.5);
     expect(thinking.maxTokens, 4096);
     // Pinned: user sampling overrides must not reach thinking mode.
     expect(thinking.pinned, isTrue);

@@ -41,6 +41,7 @@ final class ProfileSampling {
     required this.topP,
     this.topK,
     this.contextLength = 8192,
+    this.presencePenalty,
     this.pinned = false,
   });
 
@@ -53,6 +54,11 @@ final class ProfileSampling {
   /// Null keeps top-k filtering off — the recorded eval baselines and the
   /// determinism probe were measured without it.
   final int? topK;
+
+  /// Null keeps the presence penalty out of the engine's chain. Set, it is a
+  /// profile-level correctness knob (never user-overridable): the published
+  /// Qwen 3.5 lever against quantized think loops (#80).
+  final double? presencePenalty;
 
   /// Token budget over prompt plus generation. 8192 sits far under Gemma's
   /// trained context and Qwen's 256k paper context, but keeps worst-case KV
@@ -70,6 +76,7 @@ final class ProfileSampling {
     'topP': topP,
     if (topK != null) 'topK': topK,
     'contextLength': contextLength,
+    if (presencePenalty != null) 'presencePenalty': presencePenalty,
     if (pinned) 'pinned': true,
   };
 
@@ -84,6 +91,13 @@ final class ProfileSampling {
       throw const FormatException('topP must be in (0, 1]');
     }
     final rawTopK = json['topK'];
+    final rawPenalty = json['presencePenalty'];
+    final presencePenalty = rawPenalty == null
+        ? null
+        : _requireDouble(rawPenalty, 'presencePenalty');
+    if (presencePenalty != null && presencePenalty <= 0) {
+      throw const FormatException('presencePenalty must be positive');
+    }
     return ProfileSampling(
       maxTokens: maxTokens,
       temperature: temperature,
@@ -93,6 +107,7 @@ final class ProfileSampling {
         json['contextLength'] ?? 8192,
         'contextLength',
       ),
+      presencePenalty: presencePenalty,
       pinned: json['pinned'] as bool? ?? false,
     );
   }

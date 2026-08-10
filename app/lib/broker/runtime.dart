@@ -32,6 +32,7 @@ final class BrokerSamplingParameters {
     required this.topP,
     this.topK,
     this.contextLength,
+    this.presencePenalty,
     required this.seed,
     required this.stopSequences,
     required this.stopTokenIds,
@@ -46,6 +47,10 @@ final class BrokerSamplingParameters {
 
   /// Null falls back to the engine's own bound (llama's trained context).
   final int? contextLength;
+
+  /// Null keeps the presence penalty out of the chain; set, it penalizes
+  /// tokens already generated across the whole window on both engines (#80).
+  final double? presencePenalty;
 
   final int? seed;
   final List<String> stopSequences;
@@ -226,6 +231,7 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
           topP: request.sampling.topP,
           topK: request.sampling.topK,
           contextLength: request.sampling.contextLength,
+          presencePenalty: request.sampling.presencePenalty,
           seed: request.sampling.seed,
           stopSequences: request.sampling.stopSequences,
           stopTokenIds: request.sampling.stopTokenIds,

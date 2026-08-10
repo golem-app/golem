@@ -162,13 +162,19 @@ const gemma4ProfileSpec = ModelProfileSpec(
   imageTokenCost: 256,
 );
 
-/// The pinned repository publishes no sampling recommendation
-/// (generation_config carries only eos ids), so these are the Qwen3-family
-/// published mode-specific defaults. The split matters: thinking sampled at the
+/// The pinned snapshot publishes no sampling recommendation
+/// (generation_config carries only eos ids); these are the Qwen 3.5 model
+/// card's mode-specific settings. The split matters: thinking sampled at the
 /// non-thinking settings looped mid-think until the token budget on the Q4_0
 /// build during the #33 bring-up (docs/evals, 2026-08-05 records the fix
-/// passing). Thinking runs far longer than Gemma's channel, hence 4096, and is
-/// pinned because overriding it revives that loop.
+/// passing). Thinking runs the card's full general-tasks recipe — 1.0/0.95,
+/// top-k 20, presence penalty 1.5 — because no penalty-free recipe closes the
+/// think channel reliably across the quantized builds: the coding-tasks 0.6
+/// loops the pinned 4-bit MLX 4B on most seeds and the 2B on every seed, and
+/// bare 1.0 still loops per artifact and seed (#80; probe grid in
+/// docs/evals/2026-08-10-qwen35-mlx-thinking.md). The penalty is what ABI 4
+/// exists to carry. Thinking runs far longer than Gemma's channel, hence
+/// 4096, and stays pinned because overriding it revives the loop.
 const qwen35ProfileSpec = ModelProfileSpec(
   key: 'qwen35',
   template: qwen35TemplateSpec,
@@ -180,8 +186,10 @@ const qwen35ProfileSpec = ModelProfileSpec(
   ],
   reasoningSampling: ProfileSampling(
     maxTokens: 4096,
-    temperature: 0.6,
+    temperature: 1,
     topP: 0.95,
+    topK: 20,
+    presencePenalty: 1.5,
     pinned: true,
   ),
   directSampling: ProfileSampling(maxTokens: 2048, temperature: 0.7, topP: 0.8),

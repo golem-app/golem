@@ -418,6 +418,8 @@ final class InfernoInferenceRepository implements InferenceRepository {
         topK: samplingOverridable
             ? (user.topK ?? defaults.topK)
             : defaults.topK,
+        // A correctness knob, never a preference: no user channel exists.
+        presencePenalty: defaults.presencePenalty,
         contextLength: user.contextLength ?? defaults.contextLength,
         seed: seed,
         stopSequences: profile.stopSequences,
@@ -450,6 +452,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
       ' temperature=${sampling.temperature}'
       ' topP=${sampling.topP}'
       ' topK=${sampling.topK}'
+      ' presencePenalty=${sampling.presencePenalty}'
       ' maxTokens=${sampling.maxTokens}'
       ' contextLength=${sampling.contextLength}'
       ' seed=${sampling.seed}'

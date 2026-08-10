@@ -77,7 +77,7 @@ void main() {
     test('sampling follows the reasoning mode', () {
       expect(
         qwen35ProfileSpec.samplingFor(reasoningEnabled: true).temperature,
-        0.6,
+        1,
       );
       expect(
         qwen35ProfileSpec.samplingFor(reasoningEnabled: true).pinned,
@@ -109,6 +109,17 @@ void main() {
     rejects(
       'an unknown schema version',
       _validProfile()..['schemaVersion'] = 2,
+    );
+
+    rejects(
+      'a non-positive presence penalty',
+      _validProfile()
+        ..['reasoningSampling'] = {
+          'maxTokens': 64,
+          'temperature': 0.6,
+          'topP': 0.95,
+          'presencePenalty': 0,
+        },
     );
     rejects('an unknown parser mode', _validProfile()..['parser'] = 'jinja');
     // These once escaped as a TypeError, which the preferences guard does not
