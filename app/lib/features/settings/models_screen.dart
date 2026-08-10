@@ -18,6 +18,7 @@ import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/labeled_row.dart';
 import '../../core/widgets/progress_track.dart';
 import '../../core/widgets/section_header.dart';
+import 'application/custom_repository_workflow.dart';
 import 'widgets/settings_rows.dart';
 
 enum _CatalogTab { all, installed }
@@ -372,37 +373,24 @@ class _CustomRepositoryCard extends ConsumerWidget {
   Future<void> _resolve(WidgetRef ref, {String? weightsFile}) async {
     final repository = controller.text.trim();
     if (repository.isEmpty) return;
-    // Every seam is read before the first await.
-    final resolver = ref.read(customRepositoryResolverProvider);
-    final existingKeys = <String>{
-      for (final entry in ref.read(modelCatalogEntriesProvider)) entry.key,
-      // Only entries with a recognized profile collide. Both an unresolved
-      // spec and a resolved one whose template matched no known profile are
-      // told by their card to add the repository again, so counting either
-      // would refuse the only repair the card offers.
-      ...?ref
-          .read(preferencesControllerProvider)
-          .value
-          ?.customModels
-          .where((spec) => spec.profile != null)
-          .map((spec) => spec.key),
-    };
+    // Every seam is read before the first await; the workflow owns the
+    // collision derivation and the resolver's failure contract.
+    final workflow = CustomRepositoryWorkflow(
+      resolver: ref.read(customRepositoryResolverProvider),
+    );
+    final pinned = ref.read(modelCatalogEntriesProvider);
+    final custom =
+        ref.read(preferencesControllerProvider).value?.customModels ??
+        const <CustomModelSpec>[];
     onState(const _Resolving());
-    final RepositoryResolution outcome;
-    try {
-      outcome = await resolver.resolve(
-        repository: repository,
-        engine: engine,
-        ref: _ref,
-        weightsFile: weightsFile,
-        existingKeys: existingKeys,
-      );
-    } catch (_) {
-      // A resolver that escapes its own failure contract must not strand the
-      // card on a spinner with no message and no way back.
-      onState(_Refused(RepositoryRejection.malformedMetadata.message));
-      return;
-    }
+    final outcome = await workflow.resolve(
+      repository: repository,
+      engine: engine,
+      ref: _ref,
+      weightsFile: weightsFile,
+      pinned: pinned,
+      custom: custom,
+    );
     onState(switch (outcome) {
       RepositoryResolved() => _Resolved(outcome),
       RepositoryNeedsWeightChoice(:final candidates) => _WeightChoice(

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../application/storage_breakdown_service.dart';
 import '../domain/app_preferences.dart';
 import '../domain/app_state.dart';
 import '../domain/chat_search.dart';
@@ -18,6 +19,11 @@ import '../services/device_storage.dart';
 import '../services/image_intake.dart';
 import '../startup/startup_sequence.dart';
 import 'retry.dart';
+
+// The breakdown types moved with their service; consumers keep importing
+// them from here beside the provider that produces them.
+export '../application/storage_breakdown_service.dart'
+    show StorageBreakdown, StorageBreakdownTotals;
 
 part 'app_providers.g.dart';
 
@@ -106,19 +112,6 @@ DiskCapacityProbe deviceCapacityProbe(Ref ref) =>
 String documentsPath(Ref ref) =>
     throw UnimplementedError('Override documentsPathProvider at startup');
 
-typedef StorageBreakdown = ({
-  int modelsBytes,
-  int chatsBytes,
-  int attachmentsBytes,
-  int cacheBytes,
-  int? freeBytes,
-  int? totalBytes,
-});
-
-extension StorageBreakdownTotals on StorageBreakdown {
-  int get usedBytes => modelsBytes + chatsBytes + attachmentsBytes + cacheBytes;
-}
-
 /// A cheap signature that changes only when conversations or messages are added
 /// or removed. ChatController reassigns state on every streaming delta, so
 /// anything as heavy as disk probing must key on this rather than the raw chat
@@ -137,7 +130,9 @@ extension StorageBreakdownTotals on StorageBreakdown {
 
 /// Storage accounting for the drawer meter and the Storage screen. Free and
 /// total bytes are null whenever the platform cannot report them (or the seams
-/// are unwired) — surfaces hide those figures instead of inventing them.
+/// are unwired) — surfaces hide those figures instead of inventing them. The
+/// provider owns seam tolerance; the service owns the computation and its
+/// required-vs-optional failure policy.
 @Riverpod(keepAlive: true, retry: noRetry)
 Future<StorageBreakdown> storageBreakdown(Ref ref) async {
   // Every dependency registers before the first await: a watch first taken
@@ -165,43 +160,14 @@ Future<StorageBreakdown> storageBreakdown(Ref ref) async {
     path = ref.watch(documentsPathProvider);
   } catch (_) {}
   final models = await ref.watch(modelControllerProvider.future);
-  final modelsBytes = models.artifacts.values.fold(
-    0,
-    (sum, status) => sum + status.downloadedBytes,
-  );
-  // Required inputs propagate: a failed model load (the await above) or an
-  // unreadable chat store must error this provider — a swallowed failure
-  // here used to render as a plausible "0 MB". Only the optional platform
-  // probes below keep their null/zero degrade; unknown is their contract.
-  final chatsBytes = await history.storedBytes();
-  var attachmentsBytes = 0;
-  try {
-    attachmentsBytes = await attachments?.storedBytes() ?? 0;
-  } catch (_) {}
-  var cacheBytes = 0;
-  try {
-    cacheBytes = await cache?.sizeBytes() ?? 0;
-  } catch (_) {}
-  int? freeBytes;
-  try {
-    freeBytes = path == null ? null : await free?.freeBytes(path);
-  } catch (_) {
-    freeBytes = null;
-  }
-  int? totalBytes;
-  try {
-    totalBytes = path == null ? null : await capacity?.totalBytes(path);
-  } catch (_) {
-    totalBytes = null;
-  }
-  return (
-    modelsBytes: modelsBytes,
-    chatsBytes: chatsBytes,
-    attachmentsBytes: attachmentsBytes,
-    cacheBytes: cacheBytes,
-    freeBytes: freeBytes,
-    totalBytes: totalBytes,
-  );
+  return StorageBreakdownService(
+    history: history,
+    attachments: attachments,
+    cache: cache,
+    free: free,
+    capacity: capacity,
+    documentsPath: path,
+  ).compute(models: models);
 }
 
 /// Pinned entries plus the user's custom repositories, derived — never stored —
