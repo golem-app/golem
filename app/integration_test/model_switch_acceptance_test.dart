@@ -11,6 +11,8 @@ import 'package:golem_flutter/core/domain/models.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'support/acceptance_hud.dart';
+
 /// Proves a real engine actually swaps models mid-conversation, and that each
 /// turn is rendered and sampled with *its own* model's profile (#20).
 ///
@@ -67,6 +69,8 @@ void main() {
               'GGUF artifacts to run the model-switch acceptance.'
         : false,
     () async {
+      AcceptanceHud.takeOver();
+      AcceptanceHud.step('Linking both artifacts into the container');
       final metrics = <String>[];
       final original = debugPrint;
       debugPrint = (String? message, {int? wrapWidth}) {
@@ -108,13 +112,19 @@ void main() {
       addTearDown(repository.unload);
 
       Future<String> ask(String modelKey, String question) async {
+        AcceptanceHud.step('Loading $modelKey');
         final answer = StringBuffer();
+        var tokens = 0;
         await for (final event in repository.generate(
           context: [PromptMessage.text('user', question)],
           reasoningEnabled: false,
           modelKey: modelKey,
         )) {
-          if (event is AnswerDelta) answer.write(event.text);
+          if (event is AnswerDelta) {
+            if (tokens == 0) AcceptanceHud.step('Answering on $modelKey');
+            answer.write(event.text);
+            AcceptanceHud.progress(detail: 'tokens: ${++tokens}');
+          }
         }
         return answer.toString();
       }
@@ -150,6 +160,7 @@ void main() {
       expect(repository.residentModelKey.value, 'switch-gemma');
       expect(third, contains('Rome'), reason: third);
 
+      AcceptanceHud.step('Checking each turn sampled under its own profile');
       // Each turn's sampling came from its own profile. Qwen 3.5 pins its
       // non-thinking sampling; Gemma's defaults differ, so the metrics lines
       // are the evidence the profile travelled with the model.
@@ -172,6 +183,7 @@ void main() {
         'GOLEM_SWITCH gemma="${first.trim()}" qwen="${second.trim()}" '
         'gemma="${third.trim()}"',
       );
+      AcceptanceHud.finish('Done — three turns, two templates, one process');
     },
     timeout: const Timeout(Duration(minutes: 15)),
   );
