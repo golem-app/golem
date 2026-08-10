@@ -2,10 +2,16 @@ import 'inference_backend.dart';
 import 'model_catalog.dart';
 import 'models.dart';
 
-/// The keys a real engine can activate right now: installed, and of the engine
-/// this build composed. A per-chat selection is constrained to this set, which
-/// is what lets every label follow the selection without naming weights the
-/// next send would fail to load (#20).
+/// The keys a real engine can activate right now: installed, of the engine this
+/// build composed, and carrying a chat template the broker recognizes. A
+/// per-chat selection is constrained to this set, which is what lets every label
+/// follow the selection without naming weights the next send would fail to load
+/// (#20).
+///
+/// The template condition is not cosmetic: a custom repository whose template
+/// matched no fingerprint resolves and installs anyway, and only
+/// resolveModelRuntimeConfig refuses it — one send too late to keep the promise
+/// above.
 Set<String> loadableModelKeys({
   required InferenceBackendConfig backend,
   required List<ModelCatalogEntry> catalog,
@@ -14,7 +20,8 @@ Set<String> loadableModelKeys({
   if (models == null) return const {};
   return {
     for (final entry in catalog)
-      if (backend.kind.loads(entry.engine) &&
+      if (entry.profileKey != unresolvedProfileKey &&
+          backend.kind.loads(entry.engine) &&
           models.statusOf(entry.key).phase == ArtifactPhase.installed)
         entry.key,
   };

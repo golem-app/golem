@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_activation.dart';
+import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/chat/model_label.dart';
 
@@ -96,6 +97,46 @@ void main() {
     expect(
       loadableModelKeys(backend: real, catalog: modelCatalog, models: null),
       isEmpty,
+    );
+  });
+
+  test('an installed entry with no recognized template is not loadable', () {
+    // A custom repository whose chat template matched no fingerprint resolves,
+    // downloads and installs — resolveModelRuntimeConfig is what refuses it.
+    // Offering it as a selection would put that refusal one send in the future,
+    // which is exactly what the loadable set exists to prevent.
+    const unrecognized = ModelCatalogEntry(
+      key: 'custom-someones-build-0000002a',
+      displayName: 'Someone Else',
+      engine: ModelEngine.mlx,
+      quantization: '4-bit',
+      repository: 'someone/their-model',
+      revision: 'c0ffee',
+      files: [ModelArtifactFile(path: 'model.safetensors', bytes: 1)],
+      profileKey: unresolvedProfileKey,
+    );
+    expect(
+      loadableModelKeys(
+        backend: real,
+        catalog: [...modelCatalog, unrecognized],
+        models: installed({'gemma4-mlx', unrecognized.key}),
+      ),
+      {'gemma4-mlx'},
+    );
+    expect(
+      effectiveModelKey(
+        backend: real,
+        catalog: [...modelCatalog, unrecognized],
+        modelKey: unrecognized.key,
+        residentModelKey: 'gemma4-mlx',
+        loadableKeys: loadableModelKeys(
+          backend: real,
+          catalog: [...modelCatalog, unrecognized],
+          models: installed({'gemma4-mlx', unrecognized.key}),
+        ),
+      ),
+      'gemma4-mlx',
+      reason: 'the label falls back to residency rather than naming it',
     );
   });
 
