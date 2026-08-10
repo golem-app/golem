@@ -5,7 +5,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../application/storage_breakdown_service.dart';
 import '../domain/app_preferences.dart';
 import '../domain/app_state.dart';
-import '../domain/chat_search.dart';
 import '../domain/generation_settings.dart';
 import '../domain/inference_backend.dart';
 import '../domain/model_activation.dart' as domain;
@@ -222,27 +221,6 @@ Set<String> loadableModelKeys(Ref ref) => domain.loadableModelKeys(
   catalog: ref.watch(effectiveModelCatalogProvider),
   models: ref.watch(modelControllerProvider).value,
 );
-
-/// The raw field text stays widget-local in the search screen (debounced
-/// 350 ms); only the normalized query lands here, so results derive reactively.
-/// AutoDispose: screen-scoped — the search screen watches it for its whole
-/// life, and disposal on pop resets the query for the next visit.
-@Riverpod(retry: noRetry)
-class SearchQuery extends _$SearchQuery {
-  @override
-  String build() => '';
-
-  void publish(String raw) => state = raw.trim();
-}
-
-/// AutoDispose: derives from the query and lives exactly as long as the
-/// search screen watches it.
-@Riverpod(retry: noRetry)
-List<ChatSearchResult> chatSearchResults(Ref ref) {
-  final query = ref.watch(searchQueryProvider);
-  final conversations = ref.watch(chatControllerProvider).value?.conversations;
-  return searchConversations(conversations ?? const [], query);
-}
 
 /// Only user-set values are stored; profile defaults resolve at the consumer.
 /// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
@@ -1353,42 +1331,5 @@ class StartupController extends _$StartupController {
     final result = await const StartupSequence().run(StartupScenario.ready);
     if (!ref.mounted) return;
     state = AsyncData(result);
-  }
-}
-
-/// KeepAlive — a decision, not the old blanket default: a running benchmark
-/// keeps running and its result survives leaving the screen.
-@Riverpod(keepAlive: true, retry: noRetry)
-class BenchmarkController extends _$BenchmarkController {
-  int _epoch = 0;
-
-  @override
-  BenchmarkState build() => const BenchmarkState();
-
-  // A result belongs to the exact case/phase it was produced for.
-  void selectCase(String caseId) =>
-      state = state.copyWith(caseId: caseId, clearResult: true);
-  void selectPhase(BenchmarkPhase phase) =>
-      state = state.copyWith(phase: phase, clearResult: true);
-
-  Future<void> run() async {
-    final epoch = ++_epoch;
-    state = state.copyWith(isRunning: true, clearResult: true);
-    final result = await ref
-        .read(benchmarkRepositoryProvider)
-        .run(state.caseId, state.phase);
-    if (epoch != _epoch) return;
-    state = state.copyWith(isRunning: false, result: result);
-  }
-
-  void stop() {
-    _epoch++;
-    state = state.copyWith(isRunning: false);
-  }
-
-  Future<String?> export() async {
-    final result = state.result;
-    if (result == null) return null;
-    return ref.read(benchmarkRepositoryProvider).export(result);
   }
 }

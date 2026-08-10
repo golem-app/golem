@@ -1,4 +1,4 @@
-import 'models.dart';
+import '../../../core/domain/models.dart';
 
 /// One conversation's hit in cross-chat search.
 ///

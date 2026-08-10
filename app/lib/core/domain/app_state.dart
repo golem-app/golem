@@ -1,3 +1,7 @@
+/// Stays in core (#69): ChatState/StartupState/BenchmarkState are named by
+/// the controllers in core/providers and consumed across features.
+library;
+
 import 'dart:collection';
 
 import 'models.dart';

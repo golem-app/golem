@@ -12,6 +12,7 @@ import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
+import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';

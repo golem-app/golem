@@ -6,7 +6,7 @@ import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_sheet.dart';
 import '../../core/domain/app_state.dart';
 import '../../core/domain/models.dart';
-import '../../core/providers/app_providers.dart';
+import 'application/benchmark_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/labeled_row.dart';
 import '../../core/widgets/section_header.dart';

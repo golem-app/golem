@@ -1,3 +1,7 @@
+/// Stays in core (#69): named by the PreferencesRepository contract and
+/// read by the app root, chat, settings, and the model catalog merge.
+library;
+
 import 'dart:collection';
 import 'dart:convert';
 

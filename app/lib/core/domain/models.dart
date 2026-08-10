@@ -1,3 +1,7 @@
+/// Stays in core (#69): chat, settings, and storage all consume these
+/// entities, and the repository contracts name them.
+library;
+
 import 'dart:collection';
 import 'dart:convert';
 

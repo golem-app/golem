@@ -10,7 +10,7 @@ import '../../../core/chrome/golem_menu.dart';
 import '../../../core/chrome/golem_sheet.dart';
 import '../../../core/chrome/golem_toast.dart';
 import '../../../core/domain/app_state.dart';
-import '../../../core/domain/chat_sections.dart';
+import '../domain/chat_sections.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';

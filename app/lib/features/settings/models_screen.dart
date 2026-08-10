@@ -10,7 +10,7 @@ import '../../core/domain/app_preferences.dart';
 import '../../core/domain/inference_backend.dart';
 import '../../core/domain/model_activation.dart';
 import '../../core/domain/model_catalog.dart';
-import '../../core/domain/model_speed.dart';
+import 'domain/model_speed.dart';
 import '../../core/domain/models.dart';
 import '../../core/services/repository_resolver.dart';
 import '../../core/providers/app_providers.dart';

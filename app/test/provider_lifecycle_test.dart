@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
+import 'package:golem_flutter/features/chat/application/search_providers.dart';
 
 import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';

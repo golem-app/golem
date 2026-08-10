@@ -4,7 +4,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/domain/chat_search.dart';
+import 'application/search_providers.dart';
+import 'domain/chat_search.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 

@@ -23,6 +23,7 @@ import 'package:golem_flutter/features/settings/storage_screen.dart';
 import 'package:golem_flutter/features/settings/system_prompt_screen.dart';
 import 'package:golem_flutter/features/splash/splash_screen.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
+import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
 
 import 'support/harness.dart';
 import 'support/in_memory_preferences_repository.dart';

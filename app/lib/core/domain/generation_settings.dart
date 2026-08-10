@@ -1,3 +1,7 @@
+/// Stays in core (#69): named by the SettingsRepository contract and the
+/// file store beside it; consumed by settings UI and the chat send path.
+library;
+
 import 'dart:collection';
 import 'dart:convert';
 
