@@ -74,7 +74,11 @@ void main() {
     Duration timeout = const Duration(minutes: 8),
   }) async {
     final deadline = DateTime.now().add(timeout);
-    while (!predicate()) {
+    // One frame before the first check, always. Predicates read controller
+    // state, which runs ahead of what is painted, so a wait that happens to be
+    // satisfied on entry would otherwise pump nothing and leave the next tap
+    // hit-testing the previous frame's tree.
+    do {
       if (DateTime.now().isAfter(deadline)) {
         fail('Timed out waiting for $description');
       }
@@ -82,7 +86,7 @@ void main() {
         fail('A recovery banner appeared while waiting for $description');
       }
       await tester.pump(const Duration(milliseconds: 250));
-    }
+    } while (!predicate());
   }
 
   testWidgets(
@@ -121,6 +125,19 @@ void main() {
       final documents = providers.read(documentsPathProvider);
       final catalog = providers.read(modelCatalogEntriesProvider);
 
+      // A pinned key this build actually carries. The cell names catalog keys
+      // on the command line, and a typo deserves the list of what was meant
+      // rather than a bare "No element" out of firstWhere.
+      ModelCatalogEntry entryFor(String key) {
+        for (final entry in catalog) {
+          if (entry.key == key) return entry;
+        }
+        fail(
+          '"$key" is not a pinned catalog key. This cell runs the pinned '
+          'catalog: ${catalog.map((entry) => entry.key).join(', ')}.',
+        );
+      }
+
       // Every file of the entry already on disk at its pinned length. Not a
       // verdict — the download path still hashes them — but enough to know
       // whether this install needs the network at all.
@@ -137,7 +154,7 @@ void main() {
       }
 
       Future<void> install(String key) async {
-        final entry = catalog.firstWhere((entry) => entry.key == key);
+        final entry = entryFor(key);
         final before = providers
             .read(modelControllerProvider)
             .requireValue
@@ -157,12 +174,13 @@ void main() {
         if (!present && !_allowDownload) {
           AcceptanceHud.finish('$key is not provisioned on this device');
           fail(
-            '$key is not provisioned on this device. Copy its '
-            '${entry.files.length} pinned file(s) into '
-            '$documents/${entry.installDirectory}/ and run again, or pass '
-            '--dart-define=GOLEM_ACCEPT_DOWNLOAD=true to fetch them from the '
-            'Hub for real. Either way pass --no-uninstall, or teardown '
-            'deletes them again.',
+            '$key is not provisioned on this device (phase '
+            '${before.phase.name}, ${before.downloadedBytes} of '
+            '${entry.totalBytes} bytes). Copy its ${entry.files.length} '
+            'pinned file(s) into $documents/${entry.installDirectory}/, or '
+            'pass --dart-define=GOLEM_ACCEPT_DOWNLOAD=true to fetch — or '
+            'resume — them from the Hub for real. Either way pass '
+            '--no-uninstall, or teardown deletes them again.',
           );
         }
 
@@ -175,6 +193,7 @@ void main() {
           'bytes=${before.downloadedBytes} total=${entry.totalBytes}',
         );
         models.download(key);
+        var verifying = false;
         await pumpUntil(tester, '$key to install', () {
           final status = providers
               .read(modelControllerProvider)
@@ -183,12 +202,37 @@ void main() {
           if (status.phase == ArtifactPhase.failed) {
             fail('$key failed to install: ${status.failure}');
           }
+          verifying |= status.phase == ArtifactPhase.verifying;
+          // The offline promise, enforced rather than asserted up front.
+          // Every file was present at its pinned length, so the repository
+          // hashes them all before it fetches anything; a download phase after
+          // a verifying one is it having rejected one and reached for the
+          // network. Catch it at the first progress tick instead of after
+          // gigabytes.
+          if (present &&
+              verifying &&
+              status.phase == ArtifactPhase.downloading) {
+            fail(
+              'A sideloaded file of $key is the right size but failed its '
+              'pinned SHA-256, and the run is fetching a replacement. Re-copy '
+              '$documents/${entry.installDirectory}/ from a trusted source, '
+              'or pass --dart-define=GOLEM_ACCEPT_DOWNLOAD=true to allow it.',
+            );
+          }
           // Straight off the download layer's own status stream, so the screen
-          // can never claim more than the repository has banked.
+          // can never claim more than the repository has banked. Verification
+          // credits a whole file before hashing it, so a bar there would sit
+          // at 100% for minutes; the byte count is the honest part.
           AcceptanceHud.progress(
-            received: status.downloadedBytes,
-            total: entry.totalBytes,
-            detail: status.phase.name,
+            received: status.phase == ArtifactPhase.verifying
+                ? null
+                : status.downloadedBytes,
+            total: status.phase == ArtifactPhase.verifying
+                ? null
+                : entry.totalBytes,
+            detail: status.phase == ArtifactPhase.verifying
+                ? 'hashing ${formatBytes(entry.totalBytes)} against the pins'
+                : status.phase.name,
           );
           return status.phase == ArtifactPhase.installed;
         }, timeout: const Duration(minutes: 40));
@@ -299,10 +343,15 @@ void main() {
         );
         // Waits, not pumpAndSettle: the HUD's liveness pulse never stops
         // scheduling frames, so settling is not a state this screen reaches.
+        // The composer must repaint before the tap — attach is mounted even
+        // mid-generation but refuses the press, so tapping the frame the last
+        // turn left behind would be swallowed.
         await pumpUntil(
           tester,
-          'the attach button to be tappable',
-          () => find.byKey(const Key('composer-attach')).evaluate().isNotEmpty,
+          'the composer to leave the last turn behind',
+          () =>
+              find.byKey(const Key('stop-button')).evaluate().isEmpty &&
+              find.byKey(const Key('send-button')).evaluate().isNotEmpty,
         );
         await tester.tap(find.byKey(const Key('composer-attach')));
         await pumpUntil(

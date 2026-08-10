@@ -60,6 +60,16 @@ void main() {
       expect(const HudProgress(received: 10).fraction, isNull);
     });
 
+    test('still reads the count when no total was given', () {
+      // A bar needs both operands; the number does not, and dropping it would
+      // paint an empty caption line under the step.
+      expect(const HudProgress(received: 4200000).caption, '4 MB');
+    });
+
+    test('is empty only when it was given nothing', () {
+      expect(const HudProgress().caption, isEmpty);
+    });
+
     test('clamps a total that under-reports the bytes on disk', () {
       // A resumed download can report more received than the catalog claims;
       // a bar past 100% would read as a bug in the run rather than the pin.
@@ -93,5 +103,8 @@ void main() {
 
     // The pulse repeats forever; unmount it rather than leave a live ticker.
     await tester.pumpWidget(const SizedBox.shrink());
+    // And leave the statics as they were found, or the next run of anything
+    // that mounts the HUD inherits this test's steps.
+    AcceptanceHud.reset();
   });
 }

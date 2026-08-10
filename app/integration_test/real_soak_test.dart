@@ -73,11 +73,12 @@ void main() {
       final restored = await settings.exists()
           ? await settings.readAsString()
           : null;
-      addTearDown(
-        () => restored == null
-            ? settings.delete()
-            : settings.writeAsString(restored),
-      );
+      // Never throw out of teardown: a delete of a file something else already
+      // removed would replace the soak's real failure with a file-system one.
+      addTearDown(() async {
+        if (restored != null) return settings.writeAsString(restored);
+        if (await settings.exists()) await settings.delete();
+      });
       await settings.writeAsString(
         jsonEncode({
           'schemaVersion': 1,

@@ -31,23 +31,43 @@ abstract final class AcceptanceHud {
 
   /// Paints a band above the running app, leaving it interactive.
   ///
-  /// The band is inserted into the app's own overlay, so it survives route
+  /// The band goes into the app's own root overlay, so it survives route
   /// pushes; a modal sheet briefly covers it, which is the price of not
   /// intercepting the taps the instrument still has to make.
+  ///
+  /// Once this is mounted the pulse schedules a frame forever, so
+  /// `pumpAndSettle` can never return — wait on a predicate instead.
   static Future<void> attach(WidgetTester tester) async {
     if (_running) return;
+    // First in tree order is the outermost, which is the root overlay a nested
+    // navigator would otherwise shadow. Deliberately not an exactly-one
+    // assertion: a shell route added later must not fail every instrument
+    // before it reaches its first assertion.
     final overlays = find.byType(Overlay).evaluate();
-    expect(
-      overlays,
-      hasLength(1),
-      reason:
-          'the HUD band needs exactly one overlay to attach to; the app now '
-          'mounts ${overlays.length}',
-    );
+    if (overlays.isEmpty) {
+      fail('The HUD band found no Overlay to attach to; is the app mounted?');
+    }
     _running = true;
-    final overlay = (overlays.single as StatefulElement).state as OverlayState;
-    overlay.insert(OverlayEntry(builder: (context) => const _HudBand()));
+    final overlay = (overlays.first as StatefulElement).state as OverlayState;
+    final entry = OverlayEntry(builder: (context) => const _HudBand());
+    overlay.insert(entry);
+    // Leave nothing attached to a tree the harness is about to unmount, and let
+    // a second test in the same file mount its own band on its own app.
+    addTearDown(() {
+      entry.remove();
+      entry.dispose();
+      reset();
+    });
     await tester.pump();
+  }
+
+  /// Forgets every step and unlatches the mount, so the next one starts clean.
+  static void reset() {
+    _running = false;
+    _status.value = 'Starting…';
+    _done.value = const [];
+    _progress.value = null;
+    _stepStartedAt = DateTime.now();
   }
 
   /// Shows [status] as the current step, clearing any per-step progress.
@@ -94,11 +114,15 @@ final class HudProgress {
       : null;
 
   /// The caption under the current step: bytes when they are known, the free
-  /// text otherwise, both when both were given.
+  /// text otherwise, both when both were given. A count without a total still
+  /// reads as the count — dropping it would paint an empty line.
   String get caption {
-    final bytes = received != null && total != null
-        ? '${formatBytes(received!)} / ${formatBytes(total!)}'
-        : null;
+    final bytes = switch ((received, total)) {
+      (final received?, final total?) =>
+        '${formatBytes(received)} / ${formatBytes(total)}',
+      (final received?, null) => formatBytes(received),
+      _ => null,
+    };
     return [?bytes, ?detail].join(' · ');
   }
 }
@@ -262,23 +286,31 @@ class _HudScreen extends StatelessWidget {
                   style: TextStyle(color: _muted, fontSize: 14),
                 ),
                 const SizedBox(height: 26),
-                ValueListenableBuilder<List<String>>(
-                  valueListenable: AcceptanceHud._done,
-                  builder: (context, done, _) => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (final step in done)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Text(
-                            '✓  $step',
-                            style: const TextStyle(
-                              color: Color(0xFF5C7A5C),
-                              fontSize: 15,
+                // Scrollable and yielding: the step list has no bound, and a
+                // RenderFlex overflow here would fail an acceptance run from
+                // inside the thing that exists to report on it.
+                Flexible(
+                  child: ValueListenableBuilder<List<String>>(
+                    valueListenable: AcceptanceHud._done,
+                    builder: (context, done, _) => SingleChildScrollView(
+                      reverse: true,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (final step in done)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Text(
+                                '✓  $step',
+                                style: const TextStyle(
+                                  color: Color(0xFF5C7A5C),
+                                  fontSize: 15,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                    ],
+                        ],
+                      ),
+                    ),
                   ),
                 ),
                 ValueListenableBuilder<String>(
