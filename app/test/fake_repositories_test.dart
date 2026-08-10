@@ -45,9 +45,7 @@ void main() {
       final repository = FakeInferenceRepository(eventDelay: Duration.zero);
       final events = await repository
           .generate(
-            context: const [
-              {'role': 'user', 'content': 'Hello'},
-            ],
+            context: [PromptMessage.text('user', 'Hello')],
             reasoningEnabled: true,
           )
           .toList();
@@ -67,9 +65,7 @@ void main() {
       // reasoning stream.
       final events = await repository
           .generate(
-            context: const [
-              {'role': 'user', 'content': 'Hello'},
-            ],
+            context: [PromptMessage.text('user', 'Hello')],
             reasoningEnabled: true,
             systemPrompt: 'Answer briefly.',
           )
@@ -89,9 +85,7 @@ void main() {
       await expectLater(
         repository
             .generate(
-              context: const [
-                {'role': 'user', 'content': '[fail]'},
-              ],
+              context: [PromptMessage.text('user', '[fail]')],
               reasoningEnabled: false,
               systemPrompt: 'Answer briefly.',
             )
@@ -113,9 +107,7 @@ void main() {
     late StreamSubscription<InferenceEvent> subscription;
     subscription = repository
         .generate(
-          context: const [
-            {'role': 'user', 'content': 'cancel'},
-          ],
+          context: [PromptMessage.text('user', 'cancel')],
           reasoningEnabled: true,
         )
         .listen((event) {
@@ -127,9 +119,7 @@ void main() {
     expect(
       repository
           .generate(
-            context: const [
-              {'role': 'user', 'content': '[fail]'},
-            ],
+            context: [PromptMessage.text('user', '[fail]')],
             reasoningEnabled: false,
           )
           .toList(),

@@ -14,15 +14,34 @@
 extern "C" {
 #endif
 
-/// ABI 2: `inferno_engine_load` receives one JSON payload instead of a raw
-/// path — {"modelPath": string, "checkTensors": bool, "kvCacheType":
+/// ABI 3: `inferno_engine_generate` additionally receives an ordered array of
+/// encoded images. Image bytes are far too large to ride inside the request
+/// JSON, so they cross as a separate borrowed buffer array.
+///
+/// The load payload gains an optional `"projectorPath"`: the multimodal
+/// projector that pairs with this model, or null/absent for a text-only load.
+///
+/// ABI 2 (unchanged): `inferno_engine_load` receives one JSON payload instead
+/// of a raw path — {"modelPath": string, "checkTensors": bool, "kvCacheType":
 /// "f16"|"q8_0", "threadCount": int|null, "gpuLayers": int|null,
 /// "swaFull": bool} — mirroring how generate crosses the boundary. Engines
 /// ignore fields that do not apply to them. Error codes remain JSON
 /// strings inside INFERNO_EVENT_ERROR payloads.
-#define INFERNO_ABI_VERSION 2
+#define INFERNO_ABI_VERSION 3
 
 typedef struct inferno_engine inferno_engine;
+
+/// One encoded image (the PNG/JPEG/WebP bytes as they sit on disk), decoded by
+/// the engine rather than the caller.
+///
+/// The array and every buffer it points at are **borrowed for the duration of
+/// the `inferno_engine_generate` call only**. Generation runs on a native
+/// worker thread that outlives the call, so an implementation MUST copy the
+/// bytes it needs before returning.
+typedef struct inferno_image_input {
+  const uint8_t *bytes;
+  size_t length;
+} inferno_image_input;
 
 typedef enum inferno_event_kind {
   INFERNO_EVENT_TEXT_DELTA = 1,
@@ -55,9 +74,14 @@ INFERNO_EXPORT int32_t inferno_engine_load(
     uint64_t operation_id,
     inferno_event_callback callback,
     void *user_data);
+/// `images` may be NULL when `image_count` is 0. Both are borrowed; see
+/// `inferno_image_input`. The rendered prompt must contain one media marker
+/// per image, in the same order.
 INFERNO_EXPORT int32_t inferno_engine_generate(
     inferno_engine *engine,
     const char *request_json,
+    const inferno_image_input *images,
+    size_t image_count,
     uint64_t operation_id,
     inferno_event_callback callback,
     void *user_data);

@@ -31,18 +31,26 @@ Backend selection is flavor-coupled with dart-define overrides
 (`docs/decisions/0003-flavor-backend-defaults.md`): `qa` and test builds
 keep the deterministic fake, while `production` and `dev` default to
 `auto` — real llama.cpp inference with the device-policy model (Gemma 4
-E2B at ≥ 7 GiB reported memory, Qwen 3.5 4B below), downloaded on first
+E2B at ≥ 7 GiB reported memory, Qwen 3.5 2B below), downloaded on first
 need behind an explicit consent tap. An explicit define always wins in
 any flavor:
 
 ```sh
 flutter run --release \
-  --dart-define=GOLEM_INFERENCE_BACKEND=llama \  # or: mlx, fake, auto
+  --dart-define=GOLEM_INFERENCE_BACKEND=llama \
+  --dart-define=GOLEM_MODEL_ARTIFACT=qwen35-2b-gguf
+
+# Or run an operator-supplied sideload with an explicit prompt profile:
+flutter run --release \
+  --dart-define=GOLEM_INFERENCE_BACKEND=llama \
+  --dart-define=GOLEM_MODEL_PROFILE=gemma4 \
   --dart-define=GOLEM_MODEL_PATH=documents:models/gemma.gguf
 ```
 
 `GOLEM_MODEL_PATH` is an absolute path, or `documents:<relative>` resolved
 against the app documents directory; `auto` derives it from the catalog.
+`GOLEM_MODEL_ARTIFACT` instead selects an exact installed catalog key and
+cannot be combined with `GOLEM_MODEL_PATH`.
 Building any flavor with a real backend (including the `dev` default)
 executes the Inferno build hooks and requires
 `flutter config --enable-native-assets` once per machine.

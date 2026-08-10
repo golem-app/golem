@@ -21,7 +21,7 @@ ChatHistorySnapshot _longHistory() => ChatHistorySnapshot(
       updatedAt: DateTime(2026),
       messages: [
         for (var i = 0; i < 10; i++) ...[
-          ChatMessage(
+          ChatMessage.text(
             id: 'u$i',
             role: MessageRole.user,
             createdAt: DateTime(2026),
@@ -29,7 +29,7 @@ ChatHistorySnapshot _longHistory() => ChatHistorySnapshot(
                 'Seed question $i, padded so every bubble wraps across '
                 'several lines and the list is comfortably scrollable.',
           ),
-          ChatMessage(
+          ChatMessage.text(
             id: 'a$i',
             role: MessageRole.assistant,
             createdAt: DateTime(2026),

@@ -8,11 +8,15 @@ import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import 'model_label.dart';
+import 'widgets/attach_sheet.dart';
 import 'widgets/chat_canvas.dart';
 import 'widgets/conversation_drawer.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
-  const ChatScreen({super.key});
+  const ChatScreen({this.picker = const AttachmentPicker(), super.key});
+
+  /// Injectable so widget tests drive attachment intake without a plugin.
+  final AttachmentPicker picker;
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
@@ -228,6 +232,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           onUserScroll: _onUserScroll,
                           onScrollMetrics: _updateScrollState,
                           showJump: _showJump,
+                          picker: widget.picker,
                         ),
                       ),
                     ),

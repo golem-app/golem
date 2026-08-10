@@ -13,6 +13,7 @@ const _gib = 1024 * 1024 * 1024;
 Future<InferenceBackendConfig> _resolve({
   String backend = '',
   String profile = '',
+  String artifact = '',
   String modelPath = '',
   AppIdentity identity = AppIdentity.production,
   int memoryOverride = 0,
@@ -20,6 +21,7 @@ Future<InferenceBackendConfig> _resolve({
 }) => resolveBackendPolicy(
   backendDefine: backend,
   profileDefine: profile,
+  artifactDefine: artifact,
   modelPathDefine: modelPath,
   identity: identity,
   memoryOverrideBytes: memoryOverride,
@@ -62,10 +64,10 @@ void main() {
   test('below the memory threshold the lighter Qwen is the default', () async {
     final config = await _resolve(probe: () async => 4 * _gib);
     expect(config.profileKey, 'qwen35');
-    expect(config.artifactKey, 'qwen35-gguf');
+    expect(config.artifactKey, 'qwen35-2b-gguf');
     expect(
       config.modelPath,
-      'documents:models/qwen35-gguf/Qwen3.5-4B-qat-Q4_0.gguf',
+      'documents:models/qwen35-2b-gguf/Qwen3.5-2B-Q4_0.gguf',
     );
   });
 
@@ -86,6 +88,7 @@ void main() {
     ]) {
       final config = await _resolve(probe: probe);
       expect(config.profileKey, 'qwen35', reason: 'probe: $probe');
+      expect(config.artifactKey, 'qwen35-2b-gguf', reason: 'probe: $probe');
     }
   });
 
@@ -95,6 +98,7 @@ void main() {
       probe: () async => fail('the override must bypass the probe'),
     );
     expect(config.profileKey, 'qwen35');
+    expect(config.artifactKey, 'qwen35-2b-gguf');
   });
 
   test('explicit defines override the flavor default in any build', () async {
@@ -108,8 +112,7 @@ void main() {
     expect(auto.kind, InferenceBackendKind.llama);
     expect(auto.artifactKey, 'gemma4-gguf');
 
-    // Today's explicit opt-in contract is unchanged: path supplied by the
-    // operator, profile defaulting to gemma4.
+    // A supplied path is an operator sideload, profile defaulting to gemma4.
     final llama = await _resolve(
       backend: 'llama',
       modelPath: 'documents:models/x.gguf',
@@ -129,6 +132,18 @@ void main() {
     expect(mlx.kind, InferenceBackendKind.mlx);
     expect(mlx.artifactKey, 'qwen35-mlx');
     expect(mlx.modelPath, '/abs/mlx-dir');
+    expect(mlx.modelPathFromCatalog, isFalse);
+
+    // Without an operator path, an explicit engine resolves the exact pinned
+    // catalog artifact and retains its capability proof.
+    final catalogMlx = await _resolve(
+      backend: 'mlx',
+      profile: 'gemma4',
+      identity: AppIdentity.qa,
+    );
+    expect(catalogMlx.artifactKey, 'gemma4-mlx');
+    expect(catalogMlx.modelPath, 'documents:models/gemma4-mlx');
+    expect(catalogMlx.modelPathFromCatalog, isTrue);
   });
 
   test('explicit profile and path override the auto policy choices', () async {
@@ -145,11 +160,74 @@ void main() {
     expect(config.modelPathFromCatalog, isFalse);
   });
 
+  test(
+    'an exact catalog artifact selects size separately from profile',
+    () async {
+      final config = await _resolve(
+        backend: 'mlx',
+        artifact: 'qwen35-2b-mlx',
+        identity: AppIdentity.qa,
+        probe: () async => fail('an exact artifact must not probe memory'),
+      );
+      expect(config.kind, InferenceBackendKind.mlx);
+      expect(config.profileKey, 'qwen35');
+      expect(config.artifactKey, 'qwen35-2b-mlx');
+      expect(config.modelPath, 'documents:models/qwen35-2b-mlx');
+      expect(config.modelPathFromCatalog, isTrue);
+    },
+  );
+
+  test('an exact auto artifact bypasses the device policy', () async {
+    final config = await _resolve(
+      backend: 'auto',
+      artifact: 'qwen35-2b-gguf',
+      probe: () async => fail('an exact artifact must not probe memory'),
+    );
+    expect(config.kind, InferenceBackendKind.llama);
+    expect(config.profileKey, 'qwen35');
+    expect(config.artifactKey, 'qwen35-2b-gguf');
+  });
+
+  test('catalog artifact overrides reject incoherent composition', () async {
+    await expectLater(
+      _resolve(backend: 'mlx', artifact: 'qwen35-2b-gguf'),
+      throwsA(isA<StateError>()),
+    );
+    await expectLater(
+      _resolve(backend: 'mlx', profile: 'gemma4', artifact: 'qwen35-2b-mlx'),
+      throwsA(isA<StateError>()),
+    );
+    await expectLater(
+      _resolve(backend: 'mlx', artifact: 'missing'),
+      throwsA(isA<StateError>()),
+    );
+    await expectLater(
+      _resolve(
+        backend: 'mlx',
+        artifact: 'qwen35-2b-mlx',
+        modelPath: '/tmp/sideload',
+      ),
+      throwsA(isA<StateError>()),
+    );
+    await expectLater(
+      _resolve(backend: 'fake', artifact: 'qwen35-2b-mlx'),
+      throwsA(isA<StateError>()),
+    );
+  });
+
   test('an unknown backend value fails loudly', () async {
     await expectLater(_resolve(backend: 'metal'), throwsA(isA<StateError>()));
   });
 
   test('primaryModelPathFor derives paths from the pinned catalog', () {
+    expect(
+      primaryModelPathFor('qwen35-2b-gguf'),
+      'documents:models/qwen35-2b-gguf/Qwen3.5-2B-Q4_0.gguf',
+    );
+    expect(
+      primaryModelPathFor('qwen35-2b-mlx'),
+      'documents:models/qwen35-2b-mlx',
+    );
     expect(primaryModelPathFor('qwen35-mlx'), 'documents:models/qwen35-mlx');
     expect(
       primaryModelPathFor('gemma4-gguf'),

@@ -6,12 +6,19 @@ import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 
 final class _StubRuntime implements BrokerRuntime {
+  String? loadedModelPath;
+  String? loadedProjectorPath;
+
   @override
   Future<void> load({
     required BrokerEngine engine,
     required String modelPath,
     BrokerLoadOptions options = const BrokerLoadOptions(),
-  }) async {}
+    String? projectorPath,
+  }) async {
+    loadedModelPath = modelPath;
+    loadedProjectorPath = projectorPath;
+  }
 
   @override
   Future<void> unload() async {}
@@ -29,14 +36,19 @@ InferenceRepository _select({
   String modelPath = '',
   String modelProfile = 'gemma4',
   int samplingSeed = 0,
+  String? initialCatalogKey,
+  String? initialProjectorPath,
+  _StubRuntime? runtime,
 }) => selectInferenceRepository(
   backend: backend,
   modelPath: modelPath,
   modelProfile: modelProfile,
+  initialCatalogKey: initialCatalogKey,
+  initialProjectorPath: initialProjectorPath,
   samplingSeed: samplingSeed,
   fakeStreamDelay: Duration.zero,
   documentsDirectory: '/documents',
-  createRuntime: _StubRuntime.new,
+  createRuntime: () => runtime ?? _StubRuntime(),
 );
 
 void main() {
@@ -59,6 +71,29 @@ void main() {
         _select(backend: 'llama', modelPath: 'documents:models/m.gguf')
             as InfernoInferenceRepository;
     expect(repository.modelPath, '/documents/models/m.gguf');
+  });
+
+  test('the resolved startup artifact and projector stay together', () async {
+    final runtime = _StubRuntime();
+    final repository =
+        _select(
+              backend: 'llama',
+              modelPath: 'documents:models/gemma4-gguf/model.gguf',
+              initialCatalogKey: 'gemma4-gguf',
+              initialProjectorPath:
+                  'documents:models/gemma4-gguf/projector.gguf',
+              runtime: runtime,
+            )
+            as InfernoInferenceRepository;
+
+    await repository.prepare();
+
+    expect(repository.residentModelKey.value, 'gemma4-gguf');
+    expect(runtime.loadedModelPath, '/documents/models/gemma4-gguf/model.gguf');
+    expect(
+      runtime.loadedProjectorPath,
+      '/documents/models/gemma4-gguf/projector.gguf',
+    );
   });
 
   test('sampling stays engine-seeded unless a probe seed is configured', () {

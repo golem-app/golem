@@ -1,3 +1,4 @@
+import '../core/domain/models.dart';
 import '../core/repositories/contracts.dart';
 
 /// The prompt reserve the windowing budget always leaves free, promoted
@@ -17,6 +18,14 @@ int estimatedTokenCount(String text) => (text.length / 4).ceil();
 int _messageCost(String content) =>
     (estimatedTokenCount(content) * 5 + 3) ~/ 4 + 8;
 
+/// A turn's cost, counting each image at the profile's declared token price.
+///
+/// An image's cost has nothing to do with any string length — a vision
+/// encoder emits a fixed number of tokens per picture — so it is data the
+/// profile carries, not something this file can estimate.
+int _promptMessageCost(PromptMessage message, int imageTokenCost) =>
+    _messageCost(message.text) + message.images.length * imageTokenCost;
+
 /// The newest suffix of [context] whose estimated cost fits the window:
 /// `contextLength − maxTokens − 512`, minus the system prompt's cost when
 /// present. Whole messages are evicted oldest-first, the final message is
@@ -27,11 +36,12 @@ int _messageCost(String content) =>
 /// [InferenceFailureKind.contextExhausted] when the final message alone
 /// cannot fit — the one case no window can save, and the reason this
 /// failure's banner action is never Retry.
-List<Map<String, String>> windowedContext({
-  required List<Map<String, String>> context,
+List<PromptMessage> windowedContext({
+  required List<PromptMessage> context,
   required int contextLength,
   required int maxTokens,
   String? systemPrompt,
+  int imageTokenCost = 0,
 }) {
   if (context.isEmpty) return context;
   var budget = contextLength - maxTokens - contextPromptReserveTokens;
@@ -40,7 +50,7 @@ List<Map<String, String>> windowedContext({
   }
 
   final last = context.last;
-  final lastCost = _messageCost(last['content'] ?? '');
+  final lastCost = _promptMessageCost(last, imageTokenCost);
   if (lastCost > budget) {
     throw const InferenceException(
       InferenceFailureKind.contextExhausted,
@@ -52,14 +62,14 @@ List<Map<String, String>> windowedContext({
   var start = context.length - 1;
   var used = lastCost;
   while (start > 0) {
-    final cost = _messageCost(context[start - 1]['content'] ?? '');
+    final cost = _promptMessageCost(context[start - 1], imageTokenCost);
     if (used + cost > budget) break;
     used += cost;
     start--;
   }
   // Eviction can leave an assistant turn in front; the conversation the
   // model sees should still open with the user speaking.
-  while (start < context.length - 1 && context[start]['role'] == 'assistant') {
+  while (start < context.length - 1 && context[start].role == 'assistant') {
     start++;
   }
   return start == 0 ? context : context.sublist(start);

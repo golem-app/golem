@@ -22,7 +22,7 @@ const _pinnedProfileKeys = <String, String>{
   'unsloth/gemma-4-E2B-it-qat-GGUF': 'gemma4',
   'mlx-community/gemma-4-e2b-it-4bit': 'gemma4',
   'YoozLabs/Qwen3.5-4B-qat-GGUF': 'qwen35',
-  'YoozLabs/Qwen3.5-4B-qat-lean-4bit-mlx': 'qwen35',
+  'mlx-community/Qwen3.5-4B-MLX-4bit': 'qwen35',
 };
 
 /// The profile family of a pin-cited artifact, or null when the artifact is

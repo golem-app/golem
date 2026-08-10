@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/broker/runtime.dart';
+import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 
 void main() {
@@ -65,12 +66,16 @@ void main() {
     expect(byKey.keys, [
       'gemma4-mlx',
       'gemma4-gguf',
+      'qwen35-2b-mlx',
+      'qwen35-2b-gguf',
       'qwen35-mlx',
       'qwen35-gguf',
     ]);
     const artifacts = {
       'gemma4-mlx': gemma4E2BMlx4Bit,
       'gemma4-gguf': gemma4E2BGgufQ4,
+      'qwen35-2b-mlx': qwen35TwoBMlx4Bit,
+      'qwen35-2b-gguf': qwen35TwoBGgufQ4,
       'qwen35-mlx': qwen35Mlx4Bit,
       'qwen35-gguf': qwen35GgufQ4,
     };
@@ -83,6 +88,16 @@ void main() {
         expect(entry.files[i].path, artifact.files[i].path, reason: key);
         expect(entry.files[i].bytes, artifact.files[i].bytes, reason: key);
         expect(entry.files[i].sha256, artifact.files[i].sha256, reason: key);
+        expect(
+          entry.files[i].repository,
+          artifact.files[i].repository,
+          reason: key,
+        );
+        expect(
+          entry.files[i].revision,
+          artifact.files[i].revision,
+          reason: key,
+        );
       }
       expect(
         entry.totalBytes,
@@ -96,6 +111,19 @@ void main() {
         reason: key,
       );
     }
+  });
+
+  test('a per-file source overrides the artifact download location', () {
+    final entry = modelCatalog.singleWhere((item) => item.key == 'gemma4-gguf');
+    final projector = entry.files.singleWhere(
+      (file) => file.role == ModelFileRole.projector,
+    );
+    expect(
+      entry.resolveUrlFor(projector).toString(),
+      'https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/'
+      'resolve/64ef033dc9f85a88f88e70cceb0a7457366bea64/'
+      'mmproj-gemma-4-E2B-it-Q8_0.gguf',
+    );
   });
 
   test('the active artifact derives from the inference dart-defines', () {

@@ -145,7 +145,10 @@ Future<EvalPromptResult> _runPrompt(
 
   try {
     final events = repository.generate(
-      context: prompt.messages,
+      context: [
+        for (final message in prompt.messages)
+          PromptMessage.text(message['role']!, message['content'] ?? ''),
+      ],
       reasoningEnabled: prompt.reasoningEnabled,
       // Per-prompt sampling rides the same sparse-override channel user
       // settings use; unset fields fall to the profile's shipped

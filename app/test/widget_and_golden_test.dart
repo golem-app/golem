@@ -754,7 +754,7 @@ void main() {
           ),
         ),
       );
-      final ghost = ChatMessage(
+      final ghost = ChatMessage.text(
         id: 'assistant-ghost',
         role: MessageRole.assistant,
         text: '',

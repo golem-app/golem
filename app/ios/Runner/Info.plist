@@ -24,7 +24,11 @@
 		<string>????</string>
 		<key>CFBundleVersion</key>
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
-		<key>LSRequiresIPhoneOS</key>
+		<key>NSCameraUsageDescription</key>
+	<string>Golem uses the camera only when you take a photo to attach to a chat. Photos stay on this device.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Golem reads a photo only when you attach one to a chat. Photos stay on this device.</string>
+	<key>LSRequiresIPhoneOS</key>
 		<true/>
 		<key>UIApplicationSceneManifest</key>
 		<dict>

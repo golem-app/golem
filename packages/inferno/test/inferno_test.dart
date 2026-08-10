@@ -54,6 +54,7 @@ void main() {
       'threadCount': 6,
       'gpuLayers': 0,
       'swaFull': true,
+      'projectorPath': null,
     });
   });
 
@@ -239,12 +240,36 @@ void main() {
 
   test('model and native inputs stay immutably pinned', () {
     expect(gemma4E2BMlx4Bit.revision, hasLength(40));
-    expect(gemma4E2BMlx4Bit.files, hasLength(7));
-    expect(gemma4E2BGgufQ4.files.single.bytes, 2620370976);
+    expect(gemma4E2BMlx4Bit.files, hasLength(8));
+    expect(
+      gemma4E2BGgufQ4.files
+          .singleWhere((file) => file.role == InfernoFileRole.weights)
+          .bytes,
+      2620370976,
+    );
+    expect(qwen35TwoBMlx4Bit.files, hasLength(10));
+    expect(
+      qwen35TwoBGgufQ4.files
+          .singleWhere((file) => file.role == InfernoFileRole.weights)
+          .bytes,
+      1214873856,
+    );
+    expect(
+      qwen35TwoBGgufQ4.files
+          .singleWhere((file) => file.role == InfernoFileRole.projector)
+          .bytes,
+      364664384,
+    );
     expect(infernoToyGguf.files.single.bytes, lessThan(3000000));
     for (final artifact in [
       gemma4E2BMlx4Bit,
       gemma4E2BGgufQ4,
+      qwen35TwoBMlx4Bit,
+      qwen35TwoBGgufQ4,
+      qwen35TwoBMmprojCandidates,
+      qwen35Mlx4Bit,
+      qwen35GgufQ4,
+      qwen35MmprojCandidates,
       infernoToyGguf,
     ]) {
       for (final file in artifact.files) {

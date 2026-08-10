@@ -9,6 +9,7 @@ import '../core/providers/app_providers.dart';
 import '../core/theme/golem_theme.dart';
 import '../features/benchmark/benchmark_screen.dart';
 import '../features/chat/chat_screen.dart';
+import '../features/chat/widgets/attach_sheet.dart';
 import '../features/chat/search_screen.dart';
 import '../features/settings/appearance_screen.dart';
 import '../features/settings/models_screen.dart';
@@ -19,9 +20,12 @@ import '../features/settings/storage_screen.dart';
 import '../features/settings/system_prompt_screen.dart';
 import '../features/splash/splash_screen.dart';
 
-final _router = GoRouter(
+GoRouter _createRouter(AttachmentPicker picker) => GoRouter(
   routes: [
-    GoRoute(path: '/', builder: (context, state) => const ChatScreen()),
+    GoRoute(
+      path: '/',
+      builder: (context, state) => ChatScreen(picker: picker),
+    ),
     GoRoute(path: '/search', builder: (context, state) => const SearchScreen()),
     GoRoute(
       path: '/settings',
@@ -59,7 +63,9 @@ final _router = GoRouter(
 );
 
 class GolemApp extends ConsumerStatefulWidget {
-  const GolemApp({super.key});
+  const GolemApp({this.picker = const AttachmentPicker(), super.key});
+
+  final AttachmentPicker picker;
 
   @override
   ConsumerState<GolemApp> createState() => _GolemAppState();
@@ -67,15 +73,19 @@ class GolemApp extends ConsumerStatefulWidget {
 
 class _GolemAppState extends ConsumerState<GolemApp>
     with WidgetsBindingObserver {
+  late final GoRouter _router;
+
   @override
   void initState() {
     super.initState();
+    _router = _createRouter(widget.picker);
     WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _router.dispose();
     super.dispose();
   }
 

@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:typed_data';
 
 enum InfernoEngineKind { llamaCpp, mlx, mock }
 
@@ -43,6 +44,7 @@ final class InfernoLoadOptions {
     this.threadCount,
     this.gpuLayers,
     this.swaFull = false,
+    this.projectorPath,
   }) : assert(
          threadCount == null || threadCount > 0,
          'threadCount must be positive when set',
@@ -70,12 +72,19 @@ final class InfernoLoadOptions {
   /// models like Gemma.
   final bool swaFull;
 
+  /// The multimodal projector paired with this model, or null for a
+  /// text-only load. An engine that cannot use one ignores it; an engine
+  /// that can refuses a projector built for a different model rather than
+  /// loading it and producing noise.
+  final String? projectorPath;
+
   Map<String, Object?> toJson() => {
     'checkTensors': checkTensors,
     'kvCacheType': kvCacheType.name,
     'threadCount': threadCount,
     'gpuLayers': gpuLayers,
     'swaFull': swaFull,
+    'projectorPath': projectorPath,
   };
 }
 
@@ -114,15 +123,29 @@ final class InfernoSamplingParameters {
   final List<int> stopTokenIds;
 }
 
+/// One encoded image handed to an engine: the file's own bytes (PNG, JPEG,
+/// WebP), decoded natively rather than in Dart.
+final class InfernoImageInput {
+  const InfernoImageInput(this.bytes);
+
+  final Uint8List bytes;
+}
+
 /// Input to an engine. The prompt is already rendered by the caller.
 final class InfernoGenerationRequest {
   const InfernoGenerationRequest({
     required this.prompt,
     this.sampling = const InfernoSamplingParameters(),
+    this.images = const [],
   });
 
   final String prompt;
   final InfernoSamplingParameters sampling;
+
+  /// Ordered images for this generation. The rendered [prompt] must carry one
+  /// media marker per entry, in this order — the engine substitutes each
+  /// marker with that image's encoded tokens.
+  final List<InfernoImageInput> images;
 }
 
 enum InfernoStopReason {

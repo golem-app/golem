@@ -2,6 +2,8 @@
 
 #include "ggml-backend.h"
 #include "llama.h"
+#include "mtmd-helper.h"
+#include "mtmd.h"
 #include "nlohmann/json.hpp"
 
 #include <algorithm>
@@ -13,6 +15,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -40,6 +43,9 @@ struct inferno_engine {
   std::atomic<bool> cancel_requested{false};
   std::atomic<bool> busy{false};
   llama_model *model = nullptr;
+  // The multimodal projector, when this model was loaded with one (ABI 3).
+  // Owned here and freed before the model it was initialized against.
+  mtmd_context *mtmd = nullptr;
   // Load options that apply per generation context (ABI 2). Written once
   // by the load worker before `model` becomes non-null, read by generate.
   ggml_type kv_cache_type = GGML_TYPE_F16;
@@ -309,6 +315,20 @@ double seconds_between(steady_clock::time_point start,
   return std::chrono::duration<double>(end - start).count();
 }
 
+// Owning handles for the multimodal inputs, so every early return on the
+// error paths below releases them exactly once.
+struct MtmdBitmapDeleter {
+  void operator()(mtmd_bitmap *bitmap) const { mtmd_bitmap_free(bitmap); }
+};
+using MtmdBitmap = std::unique_ptr<mtmd_bitmap, MtmdBitmapDeleter>;
+
+struct MtmdChunksDeleter {
+  void operator()(mtmd_input_chunks *chunks) const {
+    mtmd_input_chunks_free(chunks);
+  }
+};
+using MtmdChunks = std::unique_ptr<mtmd_input_chunks, MtmdChunksDeleter>;
+
 uint64_t physical_footprint_bytes() {
 #if defined(__APPLE__)
   task_vm_info_data_t info{};
@@ -382,11 +402,16 @@ int32_t inferno_engine_load(inferno_engine *engine,
       return;
     }
     std::string path;
+    std::string projector_path;
     bool check_tensors = false;
     int32_t gpu_layers_override = INT32_MIN;
     try {
       const json request = json::parse(encoded);
       path = request.at("modelPath").get<std::string>();
+      if (request.contains("projectorPath") &&
+          !request["projectorPath"].is_null()) {
+        projector_path = request["projectorPath"].get<std::string>();
+      }
       check_tensors = request.value("checkTensors", false);
       const std::string kv = request.value("kvCacheType", "f16");
       engine->kv_cache_type = kv == "q8_0" ? GGML_TYPE_Q8_0 : GGML_TYPE_F16;
@@ -463,6 +488,53 @@ int32_t inferno_engine_load(inferno_engine *engine,
                  user_data);
       return;
     }
+    if (!projector_path.empty()) {
+      // Ask the projector what it can do before spending anything on it: a
+      // file that carries no vision tower can never make this model
+      // image-capable, and saying so here beats failing at the first image.
+      const mtmd_caps caps = mtmd_get_cap_from_file(projector_path.c_str());
+      if (!caps.inp_vision) {
+        llama_model_free(loaded);
+        emit_error(callback,
+                   operation_id,
+                   "incompatible_model",
+                   with_log_detail(
+                       "The image projector does not provide a vision encoder."),
+                   user_data);
+        return;
+      }
+      mtmd_context_params projector_params = mtmd_context_params_default();
+      projector_params.print_timings = false;
+      projector_params.n_threads =
+          engine->thread_count > 0 ? engine->thread_count : 4;
+#if defined(INFERNO_USE_METAL)
+      projector_params.use_gpu = true;
+#else
+      projector_params.use_gpu = false;
+#endif
+      consume_log_error();
+      mtmd_context *projector = nullptr;
+      try {
+        projector =
+            mtmd_init_from_file(projector_path.c_str(), loaded, projector_params);
+      } catch (...) {
+        projector = nullptr;
+      }
+      if (projector == nullptr) {
+        // The usual cause is a projector built for a different model: its
+        // output dimension has to match this model's embedding width, and
+        // mtmd refuses the pairing rather than producing noise.
+        llama_model_free(loaded);
+        emit_error(callback,
+                   operation_id,
+                   "incompatible_model",
+                   with_log_detail(
+                       "The image projector does not match this model."),
+                   user_data);
+        return;
+      }
+      engine->mtmd = projector;
+    }
     engine->model = loaded;
     emit(callback, operation_id, INFERNO_EVENT_OPERATION_COMPLETED, "", user_data);
   });
@@ -470,12 +542,25 @@ int32_t inferno_engine_load(inferno_engine *engine,
 
 int32_t inferno_engine_generate(inferno_engine *engine,
                                 const char *request_json,
+                                const inferno_image_input *images,
+                                size_t image_count,
                                 uint64_t operation_id,
                                 inferno_event_callback callback,
                                 void *user_data) {
   if (engine == nullptr || engine->model == nullptr || request_json == nullptr) return -1;
+  if (image_count > 0 && images == nullptr) return -1;
   const std::string encoded(request_json);
-  return start_worker(engine, [=] {
+  // The caller lends these buffers for this call only, and generation runs on
+  // a worker that outlives it — so the bytes are copied here, before the
+  // worker starts, not read from the caller's memory later.
+  std::vector<std::vector<uint8_t>> image_bytes;
+  image_bytes.reserve(image_count);
+  for (size_t index = 0; index < image_count; ++index) {
+    const inferno_image_input &image = images[index];
+    if (image.bytes == nullptr || image.length == 0) return -1;
+    image_bytes.emplace_back(image.bytes, image.bytes + image.length);
+  }
+  return start_worker(engine, [=, image_bytes = std::move(image_bytes)] {
     json request;
     try {
       request = json::parse(encoded);
@@ -514,24 +599,108 @@ int32_t inferno_engine_generate(inferno_engine *engine,
       return;
     }
 
-    const llama_vocab *vocab = llama_model_get_vocab(engine->model);
-    const auto prompt_tokens = tokenize(vocab, prompt);
-    if (prompt_tokens.empty()) {
+    const bool has_images = !image_bytes.empty();
+    if (has_images && engine->mtmd == nullptr) {
       emit_error(callback,
                  operation_id,
                  "generation_failed",
-                 "The rendered prompt could not be tokenized.",
+                 "This model was not loaded with an image projector.",
                  user_data);
       return;
     }
-    const llama_token bos = llama_vocab_bos(vocab);
-    if (prompt_tokens.size() > 1 && prompt_tokens[0] == bos && prompt_tokens[1] == bos) {
-      emit_error(callback,
-                 operation_id,
-                 "generation_failed",
-                 "The rendered prompt contains a duplicated BOS token.",
-                 user_data);
-      return;
+
+    const llama_vocab *vocab = llama_model_get_vocab(engine->model);
+
+    // Text-only prompts keep the original path byte for byte; the recorded
+    // cross-engine token fixtures assert against exactly this tokenization.
+    std::vector<llama_token> prompt_tokens;
+    // Owned by this operation whenever images are present.
+    MtmdChunks chunks;
+    std::vector<MtmdBitmap> bitmaps;
+    size_t prompt_token_count = 0;
+
+    if (has_images) {
+      bitmaps.reserve(image_bytes.size());
+      for (const auto &encoded_image : image_bytes) {
+        const mtmd_helper_bitmap_wrapper wrapper =
+            mtmd_helper_bitmap_init_from_buf(engine->mtmd,
+                                             encoded_image.data(),
+                                             encoded_image.size(),
+                                             false);
+        if (wrapper.video_ctx != nullptr) {
+          mtmd_helper_video_free(wrapper.video_ctx);
+        }
+        if (wrapper.bitmap == nullptr) {
+          emit_error(callback,
+                     operation_id,
+                     "generation_failed",
+                     "An attached image could not be decoded.",
+                     user_data);
+          return;
+        }
+        bitmaps.emplace_back(wrapper.bitmap);
+      }
+      std::vector<const mtmd_bitmap *> bitmap_pointers;
+      bitmap_pointers.reserve(bitmaps.size());
+      for (const auto &bitmap : bitmaps) bitmap_pointers.push_back(bitmap.get());
+
+      chunks.reset(mtmd_input_chunks_init());
+      if (chunks.get() == nullptr) {
+        emit_error(callback, operation_id, "out_of_memory", "", user_data);
+        return;
+      }
+      mtmd_input_text text{};
+      text.text = prompt.c_str();
+      text.text_len = prompt.size();
+      // The broker renders the whole prompt, media markers included, and both
+      // engines tokenize with automatic BOS insertion disabled.
+      text.add_special = false;
+      text.parse_special = true;
+      const int32_t tokenized = mtmd_tokenize(engine->mtmd,
+                                              chunks.get(),
+                                              &text,
+                                              bitmap_pointers.data(),
+                                              bitmap_pointers.size());
+      if (tokenized != 0) {
+        emit_error(
+            callback,
+            operation_id,
+            "generation_failed",
+            tokenized == 1
+                ? "The prompt does not carry one image marker per image."
+                : "An attached image could not be prepared for this model.",
+            user_data);
+        return;
+      }
+      prompt_token_count = mtmd_helper_get_n_tokens(chunks.get());
+      if (prompt_token_count == 0) {
+        emit_error(callback,
+                   operation_id,
+                   "generation_failed",
+                   "The rendered prompt could not be tokenized.",
+                   user_data);
+        return;
+      }
+    } else {
+      prompt_tokens = tokenize(vocab, prompt);
+      if (prompt_tokens.empty()) {
+        emit_error(callback,
+                   operation_id,
+                   "generation_failed",
+                   "The rendered prompt could not be tokenized.",
+                   user_data);
+        return;
+      }
+      const llama_token bos = llama_vocab_bos(vocab);
+      if (prompt_tokens.size() > 1 && prompt_tokens[0] == bos && prompt_tokens[1] == bos) {
+        emit_error(callback,
+                   operation_id,
+                   "generation_failed",
+                   "The rendered prompt contains a duplicated BOS token.",
+                   user_data);
+        return;
+      }
+      prompt_token_count = prompt_tokens.size();
     }
     const int32_t model_context = llama_model_n_ctx_train(engine->model);
     // The caller's context budget can only tighten the trained window, never
@@ -541,7 +710,7 @@ int32_t inferno_engine_generate(inferno_engine *engine,
         context_length > 0 ? std::min<int64_t>(context_length, model_context)
                            : model_context;
     const int64_t requested_context =
-        static_cast<int64_t>(prompt_tokens.size()) + max_tokens;
+        static_cast<int64_t>(prompt_token_count) + max_tokens;
     if (requested_context > context_budget) {
       emit_error(callback,
                  operation_id,
@@ -554,7 +723,7 @@ int32_t inferno_engine_generate(inferno_engine *engine,
     llama_context_params context_params = llama_context_default_params();
     context_params.n_ctx = static_cast<uint32_t>(std::max<int64_t>(requested_context, 64));
     context_params.n_batch = static_cast<uint32_t>(
-        std::max<size_t>(1, std::min<size_t>(prompt_tokens.size(), 512)));
+        std::max<size_t>(1, std::min<size_t>(prompt_token_count, 512)));
     context_params.n_ubatch = context_params.n_batch;
     context_params.no_perf = false;
     // Load-time knobs stored on the engine (ABI 2). A quantized value
@@ -600,20 +769,37 @@ int32_t inferno_engine_generate(inferno_engine *engine,
 
     const auto operation_start = steady_clock::now();
     bool decode_failed = false;
-    for (size_t offset = 0; offset < prompt_tokens.size();) {
-      if (engine->cancel_requested.load()) break;
-      const size_t count = std::min<size_t>(context_params.n_batch,
-                                            prompt_tokens.size() - offset);
-      llama_batch batch = llama_batch_get_one(
-          const_cast<llama_token *>(prompt_tokens.data() + offset),
-          static_cast<int32_t>(count));
-      // llama_decode returns 2 when the abort callback fired — that is the
-      // caller's own cancellation tripping mid-decode, not a failure.
-      if (const int32_t status = llama_decode(context, batch); status != 0) {
-        decode_failed = status != 2;
-        break;
+    if (has_images) {
+      // mtmd interleaves the prompt's text runs with encoded image
+      // embeddings and decodes them in order, leaving logits on the last
+      // token exactly as the text prefill below does.
+      llama_pos evaluated = 0;
+      const int32_t status =
+          mtmd_helper_eval_chunks(engine->mtmd,
+                                  context,
+                                  chunks.get(),
+                                  /*n_past=*/0,
+                                  /*seq_id=*/0,
+                                  static_cast<int32_t>(context_params.n_batch),
+                                  /*logits_last=*/true,
+                                  &evaluated);
+      decode_failed = status != 0 && !engine->cancel_requested.load();
+    } else {
+      for (size_t offset = 0; offset < prompt_tokens.size();) {
+        if (engine->cancel_requested.load()) break;
+        const size_t count = std::min<size_t>(context_params.n_batch,
+                                              prompt_tokens.size() - offset);
+        llama_batch batch = llama_batch_get_one(
+            const_cast<llama_token *>(prompt_tokens.data() + offset),
+            static_cast<int32_t>(count));
+        // llama_decode returns 2 when the abort callback fired — that is the
+        // caller's own cancellation tripping mid-decode, not a failure.
+        if (const int32_t status = llama_decode(context, batch); status != 0) {
+          decode_failed = status != 2;
+          break;
+        }
+        offset += count;
       }
-      offset += count;
     }
     const auto prompt_end = steady_clock::now();
 
@@ -672,10 +858,10 @@ int32_t inferno_engine_generate(inferno_engine *engine,
       const json metrics{
           {"decodeTokensPerSecond", decode_seconds > 0 ? generated / decode_seconds : 0},
           {"promptTokensPerSecond",
-           prompt_seconds > 0 ? prompt_tokens.size() / prompt_seconds : 0},
+           prompt_seconds > 0 ? prompt_token_count / prompt_seconds : 0},
           {"generatedTokenCount", generated},
           {"elapsedSeconds", elapsed_seconds},
-          {"promptTokenCount", prompt_tokens.size()},
+          {"promptTokenCount", prompt_token_count},
           {"timeToFirstTokenSeconds",
            first_token == steady_clock::time_point{}
                ? json(nullptr)
@@ -737,6 +923,12 @@ int32_t inferno_engine_unload(inferno_engine *engine,
                               void *user_data) {
   if (engine == nullptr) return -1;
   return start_worker(engine, [=] {
+    // The projector holds references into the model it was initialized
+    // against, so it goes first.
+    if (engine->mtmd != nullptr) {
+      mtmd_free(engine->mtmd);
+      engine->mtmd = nullptr;
+    }
     if (engine->model != nullptr) {
       llama_model_free(engine->model);
       engine->model = nullptr;
@@ -749,6 +941,7 @@ void inferno_engine_destroy(inferno_engine *engine) {
   if (engine == nullptr) return;
   engine->cancel_requested.store(true);
   if (engine->worker.joinable()) engine->worker.join();
+  if (engine->mtmd != nullptr) mtmd_free(engine->mtmd);
   if (engine->model != nullptr) llama_model_free(engine->model);
   delete engine;
 }

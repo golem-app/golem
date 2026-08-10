@@ -46,6 +46,7 @@ class MessageBubble extends ConsumerWidget {
     // bubble stays visible as the typing indicator.
     final hasContent =
         message.text.isNotEmpty ||
+        message.hasImages ||
         (message.reasoning?.isNotEmpty ?? false) ||
         message.metrics != null;
     if (!isUser && !hasContent && !message.isStreaming) {
@@ -102,12 +103,19 @@ class MessageBubble extends ConsumerWidget {
                             ?.expandReasoning ??
                         false),
               ),
-            if (isUser)
+            // Images sit above the text, the order a vision prompt uses.
+            for (final image in message.images)
+              Padding(
+                padding: EdgeInsets.only(bottom: message.text.isEmpty ? 0 : 8),
+                child: _AttachedImage(image: image),
+              ),
+            if (isUser && message.text.isNotEmpty)
               Text(
                 message.text,
                 style: GolemText.body.copyWith(color: GolemTheme.textOnDark),
               )
-            else if (message.text.isNotEmpty || message.isStreaming)
+            else if (!isUser &&
+                (message.text.isNotEmpty || message.isStreaming))
               DefaultTextStyle.merge(
                 style: GolemText.body.copyWith(
                   color: CupertinoDynamicColor.resolve(GolemTheme.ink, context),
@@ -151,7 +159,7 @@ class MessageBubble extends ConsumerWidget {
     );
     return Semantics(
       key: Key('message-${message.id}'),
-      label: isUser ? 'You: ${message.text}' : 'Golem: ${message.text}',
+      label: _semanticLabel(message, isUser: isUser),
       child: Padding(
         padding: const EdgeInsets.only(bottom: 14),
         child: Column(
@@ -573,4 +581,100 @@ class _MetricsPill extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// The accessible name for a bubble. Images are announced by count so a
+/// screen reader says a picture is present instead of skipping it.
+String _semanticLabel(ChatMessage message, {required bool isUser}) {
+  final speaker = isUser ? 'You' : 'Golem';
+  final images = message.images.length;
+  final picture = switch (images) {
+    0 => '',
+    1 => '1 image. ',
+    _ => '$images images. ',
+  };
+  return '$speaker: $picture${message.text}';
+}
+
+/// One attached image inside a bubble, loaded from the app-owned store.
+///
+/// A message can outlive its bytes if the OS trims the container, so a missing
+/// attachment renders a labelled placeholder rather than a broken box.
+class _AttachedImage extends ConsumerStatefulWidget {
+  const _AttachedImage({required this.image});
+
+  final ImagePart image;
+
+  @override
+  ConsumerState<_AttachedImage> createState() => _AttachedImageState();
+}
+
+class _AttachedImageState extends ConsumerState<_AttachedImage> {
+  late Future<Uint8List?> _bytes = _read();
+
+  Future<Uint8List?> _read() async {
+    final bytes = await ref
+        .read(attachmentRepositoryProvider)
+        .read(widget.image.attachmentId);
+    return bytes == null ? null : Uint8List.fromList(bytes);
+  }
+
+  @override
+  void didUpdateWidget(covariant _AttachedImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.image.attachmentId != widget.image.attachmentId) {
+      _bytes = _read();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final image = widget.image;
+    final aspect = image.height == 0 ? 1.0 : image.width / image.height;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(GolemRadius.field),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 260),
+        child: AspectRatio(
+          aspectRatio: aspect <= 0 ? 1 : aspect,
+          child: FutureBuilder<Uint8List?>(
+            future: _bytes,
+            builder: (context, snapshot) {
+              final bytes = snapshot.data;
+              if (bytes == null) {
+                return Semantics(
+                  label: snapshot.connectionState == ConnectionState.done
+                      ? 'Image is no longer available'
+                      : 'Loading image',
+                  child: ColoredBox(
+                    color: CupertinoDynamicColor.resolve(
+                      GolemTheme.divider,
+                      context,
+                    ),
+                    child: snapshot.connectionState == ConnectionState.done
+                        ? Center(
+                            child: Icon(
+                              CupertinoIcons.photo,
+                              color: CupertinoDynamicColor.resolve(
+                                GolemTheme.mutedInk,
+                                context,
+                              ),
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                );
+              }
+              return Image.memory(
+                bytes,
+                key: Key('message-image-${image.attachmentId}'),
+                fit: BoxFit.cover,
+                excludeFromSemantics: true,
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
 }

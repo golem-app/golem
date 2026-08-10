@@ -271,6 +271,8 @@ void main() {
     for (final key in const [
       'gemma4-mlx',
       'gemma4-gguf',
+      'qwen35-2b-mlx',
+      'qwen35-2b-gguf',
       'qwen35-mlx',
       'qwen35-gguf',
     ]) {
@@ -395,7 +397,7 @@ void main() {
     setViewport(tester);
     final container = buildContainer();
     addTearDown(container.dispose);
-    ChatMessage message({required bool streaming}) => ChatMessage(
+    ChatMessage message({required bool streaming}) => ChatMessage.text(
       id: 'a1',
       role: MessageRole.assistant,
       text: 'The answer.',

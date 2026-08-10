@@ -1,15 +1,29 @@
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/chrome/golem_sheet.dart';
+import '../../../core/services/image_intake.dart';
 import '../../../core/theme/golem_theme.dart';
 
-/// The "Add to this chat" sheet. Deliberately inert: the rows dismiss
-/// without acting — attachment behavior belongs to the image-input
-/// ticket (#18) — but the surface and its honesty copy ship now.
-Future<void> showAttachSheet(
+/// Where an image came from. The sheet returns one of these; reading the bytes
+/// is the caller's job, so this file owns no I/O beyond the platform picker.
+enum AttachSource { photoLibrary, camera, files }
+
+/// The attachment sheet.
+///
+/// Reports which source the user chose, or null when they backed out. Reading
+/// the image is the caller's job, so the sheet dismisses first and any
+/// rejection is handled in one place.
+///
+/// Rows are disabled — with copy naming the model — when the chat's model
+/// cannot read an image, so the refusal happens before a picker ever opens
+/// rather than after the user has chosen a photo.
+Future<AttachSource?> showAttachSheet(
   BuildContext context, {
   required String modelLabel,
-}) => showGolemSheet<void>(
+  required bool supportsImages,
+}) => showGolemSheet<AttachSource>(
   context: context,
   sheetKey: const Key('attach-sheet'),
   builder: (context) => SafeArea(
@@ -17,85 +31,165 @@ Future<void> showAttachSheet(
     child: Padding(
       padding: const EdgeInsets.fromLTRB(
         GolemSpace.gutter,
-        GolemSpace.s4,
+        GolemSpace.s5,
         GolemSpace.gutter,
-        GolemSpace.s3,
+        GolemSpace.s5,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Add to this chat',
-            textAlign: TextAlign.center,
-            style: GolemText.cardTitle,
-          ),
-          const SizedBox(height: GolemSpace.s3),
-          const _AttachRow(
-            rowKey: Key('attach-photo-library'),
+          Center(child: Text('Add to this chat', style: GolemText.cardTitle)),
+          const SizedBox(height: GolemSpace.s4),
+          _AttachRow(
+            rowKey: const Key('attach-photo-library'),
             icon: CupertinoIcons.photo_on_rectangle,
             label: 'Photo library',
+            enabled: supportsImages,
+            source: AttachSource.photoLibrary,
           ),
-          const _AttachRow(
-            rowKey: Key('attach-take-photo'),
+          _AttachRow(
+            rowKey: const Key('attach-take-photo'),
             icon: CupertinoIcons.camera,
             label: 'Take a photo',
+            enabled: supportsImages,
+            source: AttachSource.camera,
           ),
-          const _AttachRow(
-            rowKey: Key('attach-files'),
+          _AttachRow(
+            rowKey: const Key('attach-files'),
             icon: CupertinoIcons.folder,
             label: 'Files',
+            enabled: supportsImages,
+            source: AttachSource.files,
           ),
-          const SizedBox(height: GolemSpace.s2),
+          const SizedBox(height: GolemSpace.s3),
           Text(
-            'Attachments are read on device. $modelLabel handles text; '
-            'images need a vision model.',
-            style: GolemText.caption.copyWith(
+            supportsImages
+                ? 'Images are read on this device. $modelLabel can see them; '
+                      'nothing is uploaded.'
+                : '$modelLabel handles text only. Switch to a model that '
+                      'reads images to attach one.',
+            style: GolemText.footnote.copyWith(
               color: CupertinoDynamicColor.resolve(
                 GolemTheme.mutedInk,
                 context,
               ),
             ),
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: GolemSpace.s2),
         ],
       ),
     ),
   ),
 );
 
-final class _AttachRow extends StatelessWidget {
+/// The platform pickers, behind an injectable seam so widget tests drive the
+/// sheet without a plugin (handbook v4.2A §2.2 platform adapter).
+class AttachmentPicker {
+  const AttachmentPicker({this.intake = const ImageIntake()});
+
+  final ImageIntake intake;
+
+  Future<PreparedImage?> pick(AttachSource source) async {
+    switch (source) {
+      case AttachSource.photoLibrary:
+      case AttachSource.camera:
+        // The plugin downscales natively and resolves EXIF orientation, so a
+        // 48-megapixel photo never crosses into Dart at full size.
+        final file = await ImagePicker().pickImage(
+          source: source == AttachSource.camera
+              ? ImageSource.camera
+              : ImageSource.gallery,
+          maxWidth: ImageIntake.maxDimension.toDouble(),
+          maxHeight: ImageIntake.maxDimension.toDouble(),
+          imageQuality: 90,
+        );
+        if (file == null) return null;
+        return intake.prepare(
+          await file.readAsBytes(),
+          mimeType: _mimeFor(file.name, file.mimeType),
+        );
+      case AttachSource.files:
+        final file = await openFile(
+          acceptedTypeGroups: const [
+            XTypeGroup(
+              label: 'Images',
+              extensions: ['jpg', 'jpeg', 'png', 'webp'],
+              mimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+              uniformTypeIdentifiers: [
+                'public.jpeg',
+                'public.png',
+                'org.webmproject.webp',
+              ],
+            ),
+          ],
+        );
+        if (file == null) return null;
+        return intake.prepare(
+          await file.readAsBytes(),
+          mimeType: _mimeFor(file.name, file.mimeType),
+        );
+    }
+  }
+
+  /// Platform pickers do not always report a type; the extension is the
+  /// fallback, and an unrecognized one is refused by the intake rather than
+  /// guessed at.
+  static String _mimeFor(String name, String? reported) {
+    if (reported != null && ImageIntake.supportedMimeTypes.contains(reported)) {
+      return reported;
+    }
+    final lower = name.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    return reported ?? 'application/octet-stream';
+  }
+}
+
+class _AttachRow extends StatelessWidget {
   const _AttachRow({
     required this.rowKey,
     required this.icon,
     required this.label,
+    required this.enabled,
+    required this.source,
   });
+
   final Key rowKey;
   final IconData icon;
   final String label;
+  final bool enabled;
+  final AttachSource source;
 
   @override
-  Widget build(BuildContext context) => CupertinoButton(
-    key: rowKey,
-    padding: EdgeInsets.zero,
-    minimumSize: const Size.fromHeight(GolemSize.hitTarget),
-    alignment: Alignment.centerLeft,
-    onPressed: () => Navigator.pop(context),
-    child: Row(
-      children: [
-        Icon(
-          icon,
-          size: 20,
-          color: CupertinoDynamicColor.resolve(GolemTheme.accentIcon, context),
-        ),
-        const SizedBox(width: GolemSpace.s3),
-        Text(
-          label,
-          style: GolemText.body.copyWith(
-            color: CupertinoDynamicColor.resolve(GolemTheme.ink, context),
+  Widget build(BuildContext context) {
+    final accent = CupertinoDynamicColor.resolve(
+      GolemTheme.accentIcon,
+      context,
+    );
+    final ink = CupertinoDynamicColor.resolve(GolemTheme.ink, context);
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: label,
+      child: CupertinoButton(
+        key: rowKey,
+        padding: EdgeInsets.zero,
+        minimumSize: const Size.fromHeight(GolemSize.hitTarget),
+        alignment: Alignment.centerLeft,
+        onPressed: enabled ? () => Navigator.pop(context, source) : null,
+        child: Opacity(
+          opacity: enabled ? 1 : 0.45,
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: accent),
+              const SizedBox(width: GolemSpace.s3),
+              Text(label, style: GolemText.body.copyWith(color: ink)),
+            ],
           ),
         ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }

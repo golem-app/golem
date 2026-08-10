@@ -58,3 +58,27 @@ String chatModelSubtitle({
       ? '$label · simulated'
       : '$label · on device';
 }
+
+/// Whether the model this chat effectively runs accepts images.
+///
+/// Read from the catalog entry, never from a display name: capability belongs
+/// to an exact artifact on an exact engine, and the same model family can be
+/// image-capable through one engine and text-only through another (#18).
+bool chatModelSupportsImages({
+  required InferenceBackendConfig backend,
+  required List<ModelCatalogEntry> catalog,
+  String? modelKey,
+  String? residentModelKey,
+}) {
+  final key = effectiveModelKey(
+    backend: backend,
+    catalog: catalog,
+    modelKey: modelKey,
+    residentModelKey: residentModelKey,
+  );
+  return catalog
+          .where((entry) => entry.key == key)
+          .firstOrNull
+          ?.supportsImages ??
+      false;
+}

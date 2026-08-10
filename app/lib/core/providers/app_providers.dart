@@ -13,6 +13,7 @@ import '../domain/response_style_mapping.dart';
 import '../repositories/contracts.dart';
 import '../services/cache_probe.dart';
 import '../services/device_storage.dart';
+import '../services/image_intake.dart';
 import '../startup/startup_sequence.dart';
 
 part 'app_providers.g.dart';
@@ -50,6 +51,11 @@ PreferencesRepository preferencesRepository(Ref ref) =>
     throw UnimplementedError(
       'Override preferencesRepositoryProvider at startup',
     );
+
+@Riverpod(keepAlive: true)
+AttachmentRepository attachmentRepository(Ref ref) => throw UnimplementedError(
+  'Override attachmentRepositoryProvider at startup',
+);
 
 @Riverpod(keepAlive: true)
 CacheProbe cacheProbe(Ref ref) =>
@@ -99,13 +105,14 @@ String documentsPath(Ref ref) =>
 typedef StorageBreakdown = ({
   int modelsBytes,
   int chatsBytes,
+  int attachmentsBytes,
   int cacheBytes,
   int? freeBytes,
   int? totalBytes,
 });
 
 extension StorageBreakdownTotals on StorageBreakdown {
-  int get usedBytes => modelsBytes + chatsBytes + cacheBytes;
+  int get usedBytes => modelsBytes + chatsBytes + attachmentsBytes + cacheBytes;
 }
 
 /// Storage accounting for the drawer meter and the Storage screen: model
@@ -139,6 +146,10 @@ Future<StorageBreakdown> storageBreakdown(Ref ref) async {
   // mid-computation would race its own invalidation.
   ref.watch(chatStorageSignatureProvider);
   final history = ref.watch(chatHistoryRepositoryProvider);
+  AttachmentRepository? attachments;
+  try {
+    attachments = ref.watch(attachmentRepositoryProvider);
+  } catch (_) {}
   CacheProbe? cache;
   try {
     cache = ref.watch(cacheProbeProvider);
@@ -164,6 +175,10 @@ Future<StorageBreakdown> storageBreakdown(Ref ref) async {
   try {
     chatsBytes = await history.storedBytes();
   } catch (_) {}
+  var attachmentsBytes = 0;
+  try {
+    attachmentsBytes = await attachments?.storedBytes() ?? 0;
+  } catch (_) {}
   var cacheBytes = 0;
   try {
     cacheBytes = await cache?.sizeBytes() ?? 0;
@@ -183,6 +198,7 @@ Future<StorageBreakdown> storageBreakdown(Ref ref) async {
   return (
     modelsBytes: modelsBytes,
     chatsBytes: chatsBytes,
+    attachmentsBytes: attachmentsBytes,
     cacheBytes: cacheBytes,
     freeBytes: freeBytes,
     totalBytes: totalBytes,
@@ -352,6 +368,7 @@ class ChatController extends _$ChatController {
   Future<ChatState> build() async {
     ref.onDispose(() => _generationEpoch++);
     final snapshot = await ref.read(chatHistoryRepositoryProvider).load();
+    await _retainReferenced(_attachments, snapshot.conversations);
     return ChatState(
       conversations: snapshot.conversations,
       activeId: snapshot.activeId,
@@ -359,18 +376,69 @@ class ChatController extends _$ChatController {
   }
 
   Future<void> _persist(ChatState value) async {
+    // Every seam is read before the first await: this method outlives its
+    // provider on a fast dispose, and Ref is unusable past that point.
     // Privacy gate: with history off, chats live in memory only. A cold
     // start (preferences still loading) keeps the default and saves.
     final preferences = ref.read(preferencesControllerProvider).value;
+    final history = ref.read(chatHistoryRepositoryProvider);
+    final attachments = _attachments;
+
+    // Attachment bytes follow the live conversations, not the disk snapshot:
+    // with history off the chats stay in memory for the session and their
+    // pictures must stay readable, but a deleted message's bytes still go.
+    await _retainReferenced(attachments, value.conversations);
     if (preferences != null && !preferences.saveHistory) return;
-    await ref
-        .read(chatHistoryRepositoryProvider)
-        .save(
-          ChatHistorySnapshot(
-            conversations: value.conversations,
-            activeId: value.activeId,
-          ),
-        );
+    await history.save(
+      ChatHistorySnapshot(
+        conversations: value.conversations,
+        activeId: value.activeId,
+      ),
+    );
+  }
+
+  /// Null when the seam is unwired, which label-only test containers rely on.
+  AttachmentRepository? get _attachments {
+    try {
+      return ref.read(attachmentRepositoryProvider);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Drops attachment bytes no conversation references any more. Failures are
+  /// swallowed: leaving an orphan costs disk, but letting a cleanup error
+  /// abort a send would cost the user their message.
+  static Future<void> _retainReferenced(
+    AttachmentRepository? attachments,
+    List<ChatConversation> conversations,
+  ) async {
+    if (attachments == null) return;
+    try {
+      await attachments.retainOnly({
+        for (final conversation in conversations) ...conversation.attachmentIds,
+      });
+    } catch (_) {}
+  }
+
+  /// Copies one prepared image into the attachment store and describes it as
+  /// a message part.
+  Future<ImagePart> _storeAttachment(PreparedImage image) async {
+    final attachments = _attachments;
+    if (attachments == null) {
+      throw StateError('No attachment store is wired.');
+    }
+    final stored = await attachments.store(
+      image.bytes,
+      mimeType: image.mimeType,
+    );
+    return ImagePart(
+      attachmentId: stored.id,
+      mimeType: stored.mimeType,
+      width: image.width,
+      height: image.height,
+      byteCount: stored.byteCount,
+    );
   }
 
   /// Re-persists the in-memory state; the save-history re-enable path.
@@ -385,11 +453,13 @@ class ChatController extends _$ChatController {
     stop();
     final next = ChatState(conversations: const []);
     state = AsyncData(next);
+    // Both seams read before the first await, as in _persist.
+    final history = ref.read(chatHistoryRepositoryProvider);
+    final attachments = _attachments;
     // Directly, not via _persist: the wipe must reach disk even when the
     // save-history gate is closed.
-    await ref
-        .read(chatHistoryRepositoryProvider)
-        .save(const ChatHistorySnapshot(conversations: []));
+    await history.save(const ChatHistorySnapshot(conversations: []));
+    await _retainReferenced(attachments, const []);
   }
 
   /// The full history snapshot as pretty JSON — the user's own data
@@ -514,18 +584,52 @@ class ChatController extends _$ChatController {
     await _persist(next);
   }
 
-  Future<void> send(String rawText) async {
+  /// Sends a turn. [images] are attachments the composer has already
+  /// validated; their bytes are copied into the attachment store here, so the
+  /// message references ids rather than anything the picker handed over.
+  Future<void> send(
+    String rawText, {
+    List<PreparedImage> images = const [],
+  }) async {
     final text = rawText.trim();
-    if (text.isEmpty || _value.generation != GenerationPhase.idle) return;
+    // An image alone is a complete turn — "what is this?" is implied.
+    if ((text.isEmpty && images.isEmpty) ||
+        _value.generation != GenerationPhase.idle) {
+      return;
+    }
     if (_value.active == null) await newChat();
     final active = _value.active!;
+
+    final List<MessagePart> parts;
+    try {
+      parts = [
+        for (final image in images) await _storeAttachment(image),
+        if (text.isNotEmpty) TextPart(text),
+      ];
+    } catch (error, stackTrace) {
+      // The bytes never reached disk, so nothing is half-sent: surface the
+      // failure and keep the composer's content for another try.
+      state = AsyncData(
+        _value.copyWith(
+          failure: const ChatFailure(
+            kind: ChatFailureKind.generic,
+            message: 'That image could not be saved. Try attaching it again.',
+          ),
+        ),
+      );
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+    if (!ref.mounted) return;
+
     final user = ChatMessage(
       id: newId(),
       role: MessageRole.user,
-      text: text,
+      parts: parts,
       createdAt: DateTime.now(),
     );
-    final title = active.messages.isEmpty ? normalizeTitle(text) : active.title;
+    final title = active.messages.isEmpty
+        ? normalizeTitle(text.isEmpty ? 'Image' : text)
+        : active.title;
     final updated = active.copyWith(
       title: title,
       messages: [...active.messages, user],
@@ -563,7 +667,7 @@ class ChatController extends _$ChatController {
     }
     final index = active.messages.indexWhere((item) => item.id == messageId);
     if (index < 0 || active.messages[index].role != MessageRole.user) return;
-    final edited = ChatMessage(
+    final edited = ChatMessage.text(
       id: active.messages[index].id,
       role: MessageRole.user,
       text: text,
@@ -616,7 +720,7 @@ class ChatController extends _$ChatController {
         return;
       }
     }
-    final assistant = ChatMessage(
+    final assistant = ChatMessage.text(
       id: newId(),
       role: MessageRole.assistant,
       text: '',
@@ -679,11 +783,11 @@ class ChatController extends _$ChatController {
             reasoning: '${draft.reasoning ?? ''}${event.text}',
           );
         } else if (event is AnswerDelta) {
-          messages[messages.length - 1] = draft.copyWith(
-            text: '${draft.text}${event.text}',
+          messages[messages.length - 1] = draft.withText(
+            '${draft.text}${event.text}',
           );
         } else if (event is AnswerResetEvent) {
-          messages[messages.length - 1] = draft.copyWith(text: '');
+          messages[messages.length - 1] = draft.withText('');
         } else if (event is MetricsEvent) {
           messages[messages.length - 1] = draft.copyWith(
             metrics: event.metrics,

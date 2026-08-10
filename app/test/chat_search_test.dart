@@ -15,7 +15,7 @@ ChatConversation _chat(
   updatedAt: updatedAt ?? DateTime.utc(2026, 8, 1),
   messages: [
     for (final (index, text) in messages.indexed)
-      ChatMessage(
+      ChatMessage.text(
         id: '$id-$index',
         role: index.isEven ? MessageRole.user : MessageRole.assistant,
         text: text,

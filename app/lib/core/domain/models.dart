@@ -29,61 +29,208 @@ String normalizeTitle(String value) {
       : '${normalized.substring(0, 47)}…';
 }
 
+/// One ordered piece of a message's content.
+///
+/// A message is a list of parts rather than a string so an image can sit at a
+/// known position relative to the text — which is what a multimodal prompt
+/// needs. Text-only messages carry exactly one [TextPart], which is how every
+/// pre-#18 conversation migrates.
+sealed class MessagePart {
+  const MessagePart();
+
+  Map<String, Object?> toJson();
+
+  static MessagePart fromJson(Map<String, Object?> json) =>
+      switch (json['type']) {
+        'text' => TextPart(_requireString(json['text'], 'text')),
+        'image' => ImagePart.fromJson(json),
+        final unsupported => throw FormatException(
+          'Unsupported message part type: $unsupported',
+        ),
+      };
+}
+
+final class TextPart extends MessagePart {
+  const TextPart(this.text);
+
+  final String text;
+
+  @override
+  Map<String, Object?> toJson() => {'type': 'text', 'text': text};
+}
+
+/// An image the user attached, held in the app-owned attachment store.
+///
+/// [attachmentId] is an opaque store identifier, never a photo-library or
+/// filesystem path: a transcript, share sheet or export must not be able to
+/// leak where the picture came from.
+final class ImagePart extends MessagePart {
+  const ImagePart({
+    required this.attachmentId,
+    required this.mimeType,
+    required this.width,
+    required this.height,
+    required this.byteCount,
+  });
+
+  final String attachmentId;
+  final String mimeType;
+  final int width;
+  final int height;
+  final int byteCount;
+
+  @override
+  Map<String, Object?> toJson() => {
+    'type': 'image',
+    'attachmentId': attachmentId,
+    'mimeType': mimeType,
+    'width': width,
+    'height': height,
+    'byteCount': byteCount,
+  };
+
+  factory ImagePart.fromJson(Map<String, Object?> json) => ImagePart(
+    attachmentId: _requireString(json['attachmentId'], 'attachmentId'),
+    mimeType: _requireString(json['mimeType'], 'mimeType'),
+    width: _requireInt(json['width'], 'width'),
+    height: _requireInt(json['height'], 'height'),
+    byteCount: _requireInt(json['byteCount'], 'byteCount'),
+  );
+}
+
+String _requireString(Object? raw, String field) {
+  if (raw is String) return raw;
+  throw FormatException('$field must be a string');
+}
+
+int _requireInt(Object? raw, String field) {
+  if (raw is int) return raw;
+  throw FormatException('$field must be an integer');
+}
+
+/// One turn as the inference boundary sees it: a role and ordered content.
+///
+/// Deliberately not [ChatMessage] — ids, timestamps, metrics and streaming
+/// state are presentation concerns an engine has no business receiving. The
+/// system turn a build injects has no [ChatMessage] behind it at all.
+final class PromptMessage {
+  const PromptMessage({required this.role, required this.parts});
+
+  /// `user`, `assistant`, or `system`.
+  final String role;
+  final List<MessagePart> parts;
+
+  /// A turn whose whole content is one run of text.
+  factory PromptMessage.text(String role, String text) =>
+      PromptMessage(role: role, parts: [TextPart(text)]);
+
+  String get text => parts.whereType<TextPart>().map((p) => p.text).join();
+
+  Iterable<ImagePart> get images => parts.whereType<ImagePart>();
+
+  bool get hasImages => parts.any((part) => part is ImagePart);
+}
+
 final class ChatMessage {
   const ChatMessage({
     required this.id,
     required this.role,
-    required this.text,
+    required this.parts,
     required this.createdAt,
     this.reasoning,
     this.metrics,
     this.isStreaming = false,
   });
 
+  /// The common case: a message whose whole content is one run of text.
+  factory ChatMessage.text({
+    required String id,
+    required MessageRole role,
+    required String text,
+    required DateTime createdAt,
+    String? reasoning,
+    InferenceMetrics? metrics,
+    bool isStreaming = false,
+  }) => ChatMessage(
+    id: id,
+    role: role,
+    parts: [TextPart(text)],
+    createdAt: createdAt,
+    reasoning: reasoning,
+    metrics: metrics,
+    isStreaming: isStreaming,
+  );
+
   final String id;
   final MessageRole role;
-  final String text;
+  final List<MessagePart> parts;
   final String? reasoning;
   final InferenceMetrics? metrics;
   final DateTime createdAt;
   final bool isStreaming;
 
+  /// Every text part joined. Search, transcripts, share, accessibility labels
+  /// and the streaming accumulator all read messages as text; only rendering
+  /// and the prompt boundary care about part structure.
+  String get text => parts.whereType<TextPart>().map((p) => p.text).join();
+
+  Iterable<ImagePart> get images => parts.whereType<ImagePart>();
+
+  bool get hasImages => parts.any((part) => part is ImagePart);
+
   ChatMessage copyWith({
-    String? text,
+    List<MessagePart>? parts,
     String? reasoning,
     InferenceMetrics? metrics,
     bool? isStreaming,
   }) => ChatMessage(
     id: id,
     role: role,
-    text: text ?? this.text,
+    parts: parts ?? this.parts,
     reasoning: reasoning ?? this.reasoning,
     metrics: metrics ?? this.metrics,
     createdAt: createdAt,
     isStreaming: isStreaming ?? this.isStreaming,
   );
 
+  /// Replaces the message's text while keeping its images, which stay ahead of
+  /// the text in the order a vision prompt expects. This is how a streaming
+  /// assistant draft accumulates.
+  ChatMessage withText(String text) =>
+      copyWith(parts: [...parts.whereType<ImagePart>(), TextPart(text)]);
+
   Map<String, Object?> toJson() => {
     'id': id,
     'role': role.name,
-    'text': text,
+    'parts': parts.map((part) => part.toJson()).toList(),
     'reasoning': reasoning,
     'metrics': metrics?.toJson(),
     'createdAt': createdAt.toIso8601String(),
   };
 
-  factory ChatMessage.fromJson(Map<String, Object?> json) => ChatMessage(
-    id: json['id']! as String,
-    role: MessageRole.values.byName(json['role']! as String),
-    text: json['text']! as String,
-    reasoning: json['reasoning'] as String?,
-    metrics: json['metrics'] == null
-        ? null
-        : InferenceMetrics.fromJson(
-            Map<String, Object?>.from(json['metrics']! as Map),
-          ),
-    createdAt: DateTime.parse(json['createdAt']! as String),
-  );
+  /// Reads schema v2 `parts` and migrates a v1 `text` message in place, so a
+  /// pre-#18 history loads without losing a single turn.
+  factory ChatMessage.fromJson(Map<String, Object?> json) {
+    final rawParts = json['parts'];
+    final parts = rawParts is List
+        ? [
+            for (final item in rawParts)
+              MessagePart.fromJson(Map<String, Object?>.from(item as Map)),
+          ]
+        : [TextPart(_requireString(json['text'], 'text'))];
+    return ChatMessage(
+      id: _requireString(json['id'], 'id'),
+      role: MessageRole.values.byName(_requireString(json['role'], 'role')),
+      parts: parts,
+      reasoning: json['reasoning'] as String?,
+      metrics: json['metrics'] == null
+          ? null
+          : InferenceMetrics.fromJson(
+              Map<String, Object?>.from(json['metrics']! as Map),
+            ),
+      createdAt: DateTime.parse(_requireString(json['createdAt'], 'createdAt')),
+    );
+  }
 }
 
 final class ChatConversation {
@@ -175,10 +322,19 @@ final class ChatConversation {
   }
 
   /// Prompt context intentionally excludes private reasoning.
-  List<Map<String, String>> get promptContext => messages
+  List<PromptMessage> get promptContext => messages
       .where((message) => !message.isStreaming)
-      .map((message) => {'role': message.role.name, 'content': message.text})
+      .map(
+        (message) =>
+            PromptMessage(role: message.role.name, parts: message.parts),
+      )
       .toList(growable: false);
+
+  /// Every attachment this conversation still references. The attachment store
+  /// keeps exactly the union of these across all conversations; anything else
+  /// is unreferenced bytes.
+  Iterable<String> get attachmentIds =>
+      messages.expand((message) => message.images).map((i) => i.attachmentId);
 
   // pinned/modelKey stay additive under schemaVersion 1: absent keys
   // default below, so pre-#47 histories load unchanged.
@@ -217,14 +373,25 @@ final class ChatHistorySnapshot {
   final List<ChatConversation> conversations;
   final String? activeId;
 
+  /// v2 replaced each message's flat `text` with ordered `parts` (#18).
+  /// v1 files load unchanged — every legacy message becomes one text part —
+  /// and are rewritten as v2 on the next ordinary save.
+  static const schemaVersion = 2;
+
+  /// Every attachment referenced anywhere in the store.
+  Set<String> get referencedAttachmentIds => {
+    for (final conversation in conversations) ...conversation.attachmentIds,
+  };
+
   Map<String, Object?> toJson() => {
-    'schemaVersion': 1,
+    'schemaVersion': schemaVersion,
     'activeConversationId': activeId,
     'conversations': conversations.map((item) => item.toJson()).toList(),
   };
 
   factory ChatHistorySnapshot.fromJson(Map<String, Object?> json) {
-    if (json['schemaVersion'] != 1) {
+    final version = json['schemaVersion'];
+    if (version != 1 && version != schemaVersion) {
       throw const FormatException('Unsupported chat history schema');
     }
     final conversations = (json['conversations']! as List)

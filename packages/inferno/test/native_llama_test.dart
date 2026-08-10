@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:inferno/inferno.dart';
 import 'package:test/test.dart';
@@ -42,6 +43,48 @@ void main() {
     }
     expect(events.last, isA<InfernoGenerationCompleted>());
     await inferno.unload();
+  }, skip: skipReason);
+
+  test('images without a projector fail as a typed error', () async {
+    // Proves the ABI 3 image array marshals end to end: Dart copies the
+    // buffers, the shim sees a non-zero count, and a text-only load refuses
+    // it instead of silently answering about a picture it never saw.
+    final inferno = Inferno.native();
+    await inferno.load(
+      engine: InfernoEngineKind.llamaCpp,
+      modelPath: modelPath!,
+    );
+    addTearDown(inferno.unload);
+
+    // A one-pixel PNG; it is never decoded, the refusal comes first.
+    final png = Uint8List.fromList(const [
+      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, //
+      0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+    ]);
+    await expectLater(
+      inferno
+          .generate(
+            InfernoGenerationRequest(
+              prompt: 'Describe <__media__>',
+              sampling: const InfernoSamplingParameters(maxTokens: 4),
+              images: [InfernoImageInput(png)],
+            ),
+          )
+          .toList(),
+      throwsA(
+        isA<InfernoException>()
+            .having(
+              (error) => error.code,
+              'code',
+              InfernoErrorCode.generationFailed,
+            )
+            .having(
+              (error) => error.message,
+              'message',
+              contains('image projector'),
+            ),
+      ),
+    );
   }, skip: skipReason);
 
   test('ABI-2 load options apply against the real engine', () async {

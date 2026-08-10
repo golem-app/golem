@@ -86,9 +86,14 @@ class _UsageCard extends StatelessWidget {
     final free = breakdown.freeBytes;
     // The bar shows the three buckets against each other (the design's
     // stacked meter); disk-wide proportions belong to the free label.
+    final attachmentsColor = CupertinoDynamicColor.resolve(
+      GolemTheme.reasoningBorder,
+      context,
+    );
     final segments = [
       (breakdown.modelsBytes, accent),
       (breakdown.chatsBytes, chatsColor),
+      (breakdown.attachmentsBytes, attachmentsColor),
       (breakdown.cacheBytes, cacheColor),
     ].where((segment) => segment.$1 > 0).toList();
     return SettingsCard(
@@ -147,6 +152,14 @@ class _UsageCard extends StatelessWidget {
                     color: chatsColor,
                     label: 'Chats ${_megabytes(breakdown.chatsBytes)}',
                   ),
+                  // Only once pictures exist: an always-present "Images 0 MB"
+                  // would be clutter on the many installs that never attach
+                  // one. The bar's arithmetic counts them either way.
+                  if (breakdown.attachmentsBytes > 0)
+                    _Legend(
+                      color: attachmentsColor,
+                      label: 'Images ${_megabytes(breakdown.attachmentsBytes)}',
+                    ),
                   _Legend(
                     color: cacheColor,
                     label: 'Cache ${_megabytes(breakdown.cacheBytes)}',

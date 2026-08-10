@@ -1,13 +1,29 @@
+/// What a pinned file is for. An artifact's loadable path depends on it: the
+/// llama engine needs exactly one [weights] file and at most one [projector],
+/// while an MLX snapshot is a directory of [snapshot] files.
+enum InfernoFileRole { weights, projector, snapshot }
+
 final class InfernoModelFile {
   const InfernoModelFile({
     required this.path,
     required this.bytes,
     required this.sha256,
+    this.role = InfernoFileRole.snapshot,
+    this.repository,
+    this.revision,
   });
 
   final String path;
   final int bytes;
   final String sha256;
+  final InfernoFileRole role;
+
+  /// Where this individual file comes from, when that is not the artifact's
+  /// own repository. A multimodal projector is commonly published separately
+  /// from the quantized weights it pairs with, and pretending otherwise would
+  /// mean pinning a repository that does not contain the file.
+  final String? repository;
+  final String? revision;
 }
 
 final class InfernoModelArtifact {
@@ -22,7 +38,8 @@ final class InfernoModelArtifact {
   final List<InfernoModelFile> files;
 }
 
-/// Text-only MLX snapshot. Vision/audio processor files are intentionally out.
+/// Full Gemma 4 E2B MLX snapshot. The processor file is pinned because the
+/// native VLM path derives dynamic image-token counts from it.
 const gemma4E2BMlx4Bit = InfernoModelArtifact(
   repository: 'mlx-community/gemma-4-e2b-it-4bit',
   revision: '238767527555cb75a05732a84dff5d6ba0dd6809',
@@ -58,6 +75,12 @@ const gemma4E2BMlx4Bit = InfernoModelArtifact(
           'edb157dbf495e23f37377af4a628a9ad13c4ee7937f93ccb36ec9e9a19940f16',
     ),
     InfernoModelFile(
+      path: 'processor_config.json',
+      bytes: 1316,
+      sha256:
+          'de3e580aebdc98272d4c4547daffe6525fcbae18a83a0e0bcf0d7444d4ee6f37',
+    ),
+    InfernoModelFile(
       path: 'tokenizer.json',
       bytes: 32169626,
       sha256:
@@ -81,15 +104,176 @@ const gemma4E2BGgufQ4 = InfernoModelArtifact(
       bytes: 2620370976,
       sha256:
           'e531007218dfab990486a5de7676a6932d6ea8dea233d1f698d7c21cf8a16889',
+      role: InfernoFileRole.weights,
+    ),
+    // Selected over the BF16 reference by the #18 bake-off: identical graded
+    // answers, 423 MB (30%) lower median peak resident memory — decisive on
+    // the 8 GB tier this app supports. Published separately from the QAT
+    // weights, hence its own repository pin.
+    InfernoModelFile(
+      path: 'mmproj-gemma-4-E2B-it-Q8_0.gguf',
+      bytes: 557368064,
+      sha256:
+          '9406f99c16d68cda4f1f0552192dcc99021ea1fc6d2fd50b1dc3ccf30d04b292',
+      role: InfernoFileRole.projector,
+      repository: 'ggml-org/gemma-4-E2B-it-GGUF',
+      revision: '64ef033dc9f85a88f88e70cceb0a7457366bea64',
     ),
   ],
 );
 
-/// Text-only MLX snapshot of the QAT lean-4bit build; the only 4B QAT MLX
-/// variant published at pin time.
+/// Gemma 4 E2B multimodal projector candidates (#18).
+///
+/// Evaluation inputs, not a shipping artifact: the 16-bit reference and the
+/// Q8_0 candidate are compared on the production path, and only the selected
+/// one becomes a [InfernoFileRole.projector] file on [gemma4E2BGgufQ4].
+///
+/// They are published by `ggml-org` while the shipping weights are unsloth's
+/// QAT build, so the pairing is a hypothesis this bake-off has to prove, not
+/// something the matching architecture guarantees.
+const gemma4E2BMmprojCandidates = InfernoModelArtifact(
+  repository: 'ggml-org/gemma-4-E2B-it-GGUF',
+  revision: '64ef033dc9f85a88f88e70cceb0a7457366bea64',
+  files: [
+    InfernoModelFile(
+      path: 'mmproj-gemma-4-E2B-it-BF16.gguf',
+      bytes: 986833664,
+      sha256:
+          '711e1e8f43fa0664adbac493129be1e6c25b81af4b4cdea97c7d798b25c0a3a4',
+      role: InfernoFileRole.projector,
+    ),
+    InfernoModelFile(
+      path: 'mmproj-gemma-4-E2B-it-Q8_0.gguf',
+      bytes: 557368064,
+      sha256:
+          '9406f99c16d68cda4f1f0552192dcc99021ea1fc6d2fd50b1dc3ccf30d04b292',
+      role: InfernoFileRole.projector,
+    ),
+  ],
+);
+
+/// Full multimodal MLX snapshot for the low-memory Qwen 3.5 tier.
+const qwen35TwoBMlx4Bit = InfernoModelArtifact(
+  repository: 'mlx-community/Qwen3.5-2B-4bit',
+  revision: '674aaa7240b91e8012fcad5d791b7dfe5ba90207',
+  files: [
+    InfernoModelFile(
+      path: 'chat_template.jinja',
+      bytes: 7755,
+      sha256:
+          '273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80',
+    ),
+    InfernoModelFile(
+      path: 'config.json',
+      bytes: 3113,
+      sha256:
+          'beb7fc5a6e0405fe332821cf1a8ef7b69bb390a8c8933171647de5579debf949',
+    ),
+    InfernoModelFile(
+      path: 'model.safetensors',
+      bytes: 1722271785,
+      sha256:
+          '713fe7e5d3c3965f7106b0d0ee17615f7869c23c8d327996df8c1196fbcf07d5',
+    ),
+    InfernoModelFile(
+      path: 'model.safetensors.index.json',
+      bytes: 81722,
+      sha256:
+          '8294c05cca7d53a6c33e3db2b379539bd296d054e0b689711b16b6ac93c7e49d',
+    ),
+    InfernoModelFile(
+      path: 'preprocessor_config.json',
+      bytes: 390,
+      sha256:
+          '27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516',
+    ),
+    InfernoModelFile(
+      path: 'processor_config.json',
+      bytes: 1300,
+      sha256:
+          '14932921ca485d458a04dafd8069fbb0a4505622a48208d19ed247115801385b',
+    ),
+    InfernoModelFile(
+      path: 'tokenizer.json',
+      bytes: 19989343,
+      sha256:
+          '87a7830d63fcf43bf241c3c5242e96e62dd3fdc29224ca26fed8ea333db72de4',
+    ),
+    InfernoModelFile(
+      path: 'tokenizer_config.json',
+      bytes: 1139,
+      sha256:
+          'e98f1901ac6f0adff67b1d540bfa0c36ac1a0cf59eb72ed78146ef89aafa1182',
+    ),
+    InfernoModelFile(
+      path: 'video_preprocessor_config.json',
+      bytes: 385,
+      sha256:
+          '7768af27c1fafa9cc9011c1dc20067e03f8915e03b63504550e11d5066986d13',
+    ),
+    InfernoModelFile(
+      path: 'vocab.json',
+      bytes: 6722759,
+      sha256:
+          'ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003',
+    ),
+  ],
+);
+
+/// Multimodal low-memory llama.cpp tier. The Q8_0 projector was selected by
+/// the #18 Mac bake-off and is pinned independently from the weights.
+const qwen35TwoBGgufQ4 = InfernoModelArtifact(
+  repository: 'unsloth/Qwen3.5-2B-GGUF',
+  revision: 'f6d5376be1edb4d416d56da11e5397a961aca8ae',
+  files: [
+    InfernoModelFile(
+      path: 'Qwen3.5-2B-Q4_0.gguf',
+      bytes: 1214873856,
+      sha256:
+          'cd70221bebaee0503e0f6717e174250cd7825aa88438b3aabec9ad55731d9bb1',
+      role: InfernoFileRole.weights,
+    ),
+    InfernoModelFile(
+      path: 'Qwen3.5-2B.mmproj-q8_0.gguf',
+      bytes: 364664384,
+      sha256:
+          '526dbf85f350baf3a5107b1f14e629e94571c7cbab4277476fbdaaa8c4a31a64',
+      role: InfernoFileRole.projector,
+      repository: 'prithivMLmods/Qwen3.5-2B-MTP-GGUF',
+      revision: 'd4a4b305fe76ab01b541278d3078cd25c825530a',
+    ),
+  ],
+);
+
+/// Qwen 3.5 2B multimodal projector candidates (#18).
+///
+/// Evaluation inputs only until one passes against the exact shipping
+/// language artifact through the pinned production `libmtmd` path.
+const qwen35TwoBMmprojCandidates = InfernoModelArtifact(
+  repository: 'prithivMLmods/Qwen3.5-2B-MTP-GGUF',
+  revision: 'd4a4b305fe76ab01b541278d3078cd25c825530a',
+  files: [
+    InfernoModelFile(
+      path: 'Qwen3.5-2B.mmproj-f16.gguf',
+      bytes: 671372864,
+      sha256:
+          '91ea86496a1c02d7cd32fbfa963e103d2a512fa29ca4a22dca1a9c92c3fd30d8',
+      role: InfernoFileRole.projector,
+    ),
+    InfernoModelFile(
+      path: 'Qwen3.5-2B.mmproj-q8_0.gguf',
+      bytes: 364664384,
+      sha256:
+          '526dbf85f350baf3a5107b1f14e629e94571c7cbab4277476fbdaaa8c4a31a64',
+      role: InfernoFileRole.projector,
+    ),
+  ],
+);
+
+/// Full multimodal MLX snapshot for the larger Qwen 3.5 tier.
 const qwen35Mlx4Bit = InfernoModelArtifact(
-  repository: 'YoozLabs/Qwen3.5-4B-qat-lean-4bit-mlx',
-  revision: 'dc6b06e7ac5279a1d3ac716342644efe848dfcb7',
+  repository: 'mlx-community/Qwen3.5-4B-MLX-4bit',
+  revision: '32f3e8ecf65426fc3306969496342d504bfa13f3',
   files: [
     InfernoModelFile(
       path: 'chat_template.jinja',
@@ -99,44 +283,63 @@ const qwen35Mlx4Bit = InfernoModelArtifact(
     ),
     InfernoModelFile(
       path: 'config.json',
-      bytes: 2426,
+      bytes: 3366,
       sha256:
-          '4b8c4af0434e57f2b2c49b885d5deac288a0fd53d596cb3f6b87bb70aadb0d3e',
-    ),
-    InfernoModelFile(
-      path: 'generation_config.json',
-      bytes: 108,
-      sha256:
-          '757083276a24890fd6a94876bdaa460b3d1232cba3fa8b998c4188a0cea5764d',
+          'f3efc81b2ea8d96a45301037d3ccccbcccdef44a961845c87f286aaddbc6eaaa',
     ),
     InfernoModelFile(
       path: 'model.safetensors',
-      bytes: 2367237149,
+      bytes: 3034300695,
       sha256:
-          '36f7f2d16e6eac68e6638976de2c48372af22d77a46026e270af1fdf2566c909',
+          '5fb9acd0246866381cf8c5c354c6db1019f6498eec4ccb4f5edcc71ffeacb2db',
     ),
     InfernoModelFile(
       path: 'model.safetensors.index.json',
-      bytes: 81008,
+      bytes: 101944,
       sha256:
-          '5a3779ecc1a94f395f26612fdc9a491c1884250eda9353d214322717564a69c7',
+          '52e534c41f7b97708329c85f762e5882bf48bd5955a422c6ae74eba321e6048a',
+    ),
+    InfernoModelFile(
+      path: 'preprocessor_config.json',
+      bytes: 390,
+      sha256:
+          '27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516',
+    ),
+    InfernoModelFile(
+      path: 'processor_config.json',
+      bytes: 1300,
+      sha256:
+          '14932921ca485d458a04dafd8069fbb0a4505622a48208d19ed247115801385b',
     ),
     InfernoModelFile(
       path: 'tokenizer.json',
-      bytes: 19989325,
+      bytes: 19989343,
       sha256:
-          '06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523',
+          '87a7830d63fcf43bf241c3c5242e96e62dd3fdc29224ca26fed8ea333db72de4',
     ),
     InfernoModelFile(
       path: 'tokenizer_config.json',
-      bytes: 1161,
+      bytes: 1139,
       sha256:
-          '95c557768e6b88a7128befc7bfd3c7de50e5d51af9b8b33a9f4dee0e04f99679',
+          'e98f1901ac6f0adff67b1d540bfa0c36ac1a0cf59eb72ed78146ef89aafa1182',
+    ),
+    InfernoModelFile(
+      path: 'video_preprocessor_config.json',
+      bytes: 385,
+      sha256:
+          '7768af27c1fafa9cc9011c1dc20067e03f8915e03b63504550e11d5066986d13',
+    ),
+    InfernoModelFile(
+      path: 'vocab.json',
+      bytes: 6722759,
+      sha256:
+          'ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003',
     ),
   ],
 );
 
-/// The only quantization published in the QAT GGUF repository at pin time.
+/// The only language quantization published in the QAT GGUF repository at pin
+/// time, paired with the independently validated Q8_0 vision projector.
 const qwen35GgufQ4 = InfernoModelArtifact(
   repository: 'YoozLabs/Qwen3.5-4B-qat-GGUF',
   revision: '2d52e26bd96b49be5f8d37f1c85b27673adaa7da',
@@ -146,6 +349,41 @@ const qwen35GgufQ4 = InfernoModelArtifact(
       bytes: 2543899040,
       sha256:
           '1367a2b4f8dc63a1782aa1f4006767d5451b8e5d491cc241cb656fbf4b4b5e62',
+      role: InfernoFileRole.weights,
+    ),
+    InfernoModelFile(
+      path: 'Qwen3.5-4B.mmproj-q8_0.gguf',
+      bytes: 366894656,
+      sha256:
+          '40a4f07d7bbdbb43011d6cf35ef751e4b1829ff47ee8aa4964c6296f571725ad',
+      role: InfernoFileRole.projector,
+      repository: 'prithivMLmods/Qwen3.5-4B-MTP-GGUF',
+      revision: 'dd65086bdcdd7a8f242a2e54cfe11caf8cd51097',
+    ),
+  ],
+);
+
+/// Qwen 3.5 4B multimodal projector candidates (#18).
+///
+/// These are evaluated independently from the 2B files: the vision encoders
+/// are related, but their language projection dimensions are not compatible.
+const qwen35MmprojCandidates = InfernoModelArtifact(
+  repository: 'prithivMLmods/Qwen3.5-4B-MTP-GGUF',
+  revision: 'dd65086bdcdd7a8f242a2e54cfe11caf8cd51097',
+  files: [
+    InfernoModelFile(
+      path: 'Qwen3.5-4B.mmproj-f16.gguf',
+      bytes: 675569216,
+      sha256:
+          '463f39bd1c291c1186c319a8c90ff8640aafa678b14cbee2232d695113dfbb66',
+      role: InfernoFileRole.projector,
+    ),
+    InfernoModelFile(
+      path: 'Qwen3.5-4B.mmproj-q8_0.gguf',
+      bytes: 366894656,
+      sha256:
+          '40a4f07d7bbdbb43011d6cf35ef751e4b1829ff47ee8aa4964c6296f571725ad',
+      role: InfernoFileRole.projector,
     ),
   ],
 );
@@ -169,7 +407,7 @@ const infernoToyGguf = InfernoModelArtifact(
 // any of them, run `dart run tool/verify_pins.dart` (network) to confirm.
 const llamaCppRevision = '9bd4c09ea571a9020f30eeef169b552625b5b5a4';
 const llamaCppRelease = 'b10241';
-const mlxSwiftLmRevision = 'bd4b7434e6bdb588c7ef55706ff8904cb7fd4c57';
-const mlxSwiftLmVersion = '3.31.4';
+const mlxSwiftLmRevision = '60bd0d7880c82980f9481f8be78862e9b63c58a3';
+const mlxSwiftLmVersion = '3.31.4+31.g60bd0d78';
 const mlxSwiftRevision = '0bb916c67f4b9e5c682cbe02a42c701c93ab5021';
 const mlxSwiftVersion = '0.31.6';

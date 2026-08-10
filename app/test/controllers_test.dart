@@ -70,7 +70,7 @@ final class _RecordingInferenceRepository implements InferenceRepository {
 
   @override
   Stream<InferenceEvent> generate({
-    required List<Map<String, String>> context,
+    required List<PromptMessage> context,
     required bool reasoningEnabled,
     SamplingOverrides? overrides,
     String? modelKey,

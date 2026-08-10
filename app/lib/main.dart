@@ -13,6 +13,7 @@ import 'core/providers/app_providers.dart';
 import 'core/repositories/contracts.dart';
 import 'core/repositories/fake_benchmark_repository.dart';
 import 'core/repositories/fake_model_management_repository.dart';
+import 'core/repositories/file_attachment_repository.dart';
 import 'core/repositories/file_chat_history_repository.dart';
 import 'core/repositories/file_preferences_repository.dart';
 import 'core/repositories/file_settings_repository.dart';
@@ -20,8 +21,16 @@ import 'core/repositories/real_model_management_repository.dart';
 import 'core/services/artifact_downloader.dart';
 import 'core/services/cache_probe.dart';
 import 'core/services/device_storage.dart';
+import 'features/chat/widgets/attach_sheet.dart';
 
-Future<void> main() async {
+Future<void> main() => launch();
+
+/// Composes and launches the app. The picker seam lets the integration
+/// journey exercise the complete attach sheet and composer flow without
+/// handing control to an OS photo-library UI; production uses the default.
+Future<void> launch({
+  AttachmentPicker picker = const AttachmentPicker(),
+}) async {
   WidgetsFlutterBinding.ensureInitialized();
   const streamDelayMilliseconds = int.fromEnvironment(
     'GOLEM_STREAM_DELAY_MS',
@@ -60,6 +69,12 @@ Future<void> main() async {
     for (final spec in preferences.customModels)
       if (!pinnedKeys.contains(spec.key)) spec.toCatalogEntry(),
   ];
+  // Created before the scope so the inference repository can read the bytes
+  // an image part refers to without going through a provider.
+  final attachments = FileAttachmentRepository(
+    Directory('${support.path}/attachments'),
+  );
+
   final ModelManagementRepository modelManagement = useFakeModels
       ? FakeModelManagementRepository(stateFile, catalog: mergedCatalog)
       : RealModelManagementRepository(
@@ -83,6 +98,9 @@ Future<void> main() async {
           FileSettingsRepository(File('${support.path}/flutter-prefs-v1.json')),
         ),
         preferencesRepositoryProvider.overrideWithValue(preferencesRepository),
+        // Beside the other per-flavor stores in application support, so the
+        // container stays self-contained and each flavor keeps its own.
+        attachmentRepositoryProvider.overrideWithValue(attachments),
         cacheProbeProvider.overrideWithValue(
           useFakeModels
               ? FakeCacheProbe()
@@ -97,6 +115,7 @@ Future<void> main() async {
             config: backendConfig,
             fakeStreamDelay: Duration(milliseconds: streamDelayMilliseconds),
             documentsDirectory: documents.path,
+            readAttachment: attachments.read,
           ),
         ),
         modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
@@ -112,7 +131,7 @@ Future<void> main() async {
           ),
         ),
       ],
-      child: const GolemApp(),
+      child: GolemApp(picker: picker),
     ),
   );
 }

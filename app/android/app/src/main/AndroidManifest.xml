@@ -2,6 +2,11 @@
     <!-- Model downloads from Hugging Face; the debug/profile overlays carry
          their own copy for tooling, this one covers release builds. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Only for "Take a photo". The photo library needs no permission: the
+         picker runs out of process (Android Photo Picker on 13+), so Golem
+         never gains read access to the gallery. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"

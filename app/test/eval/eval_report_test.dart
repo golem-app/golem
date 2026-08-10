@@ -140,7 +140,7 @@ void main() {
       'qwen35',
     );
     expect(
-      profileKeyForPinnedRepository('YoozLabs/Qwen3.5-4B-qat-lean-4bit-mlx'),
+      profileKeyForPinnedRepository('mlx-community/Qwen3.5-4B-MLX-4bit'),
       'qwen35',
     );
     expect(
@@ -157,7 +157,11 @@ void main() {
   });
 
   test('a pin citation requires both the name and the pinned size', () {
-    final ggufBytes = gemma4E2BGgufQ4.files.single.bytes;
+    // The artifact now pins a projector beside the weights, so the citation
+    // has to name the language model specifically.
+    final ggufBytes = gemma4E2BGgufQ4.files
+        .singleWhere((file) => file.role == InfernoFileRole.weights)
+        .bytes;
     expect(
       matchPinnedArtifact(
         label: 'gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf',

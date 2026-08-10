@@ -18,7 +18,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/ml-explore/mlx-swift-lm",
-            revision: "bd4b7434e6bdb588c7ef55706ff8904cb7fd4c57"
+            revision: "60bd0d7880c82980f9481f8be78862e9b63c58a3"
         ),
         .package(
             url: "https://github.com/ml-explore/mlx-swift",
@@ -39,6 +39,7 @@ let package = Package(
             dependencies: [
                 .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXLLM", package: "mlx-swift-lm"),
+                .product(name: "MLXVLM", package: "mlx-swift-lm"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "MLXHuggingFace", package: "mlx-swift-lm"),
                 .product(name: "HuggingFace", package: "swift-huggingface"),

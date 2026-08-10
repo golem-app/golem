@@ -32,6 +32,8 @@ ModelCatalogEntry _entry() => ModelCatalogEntry(
       path: _fileTwo,
       bytes: _contentTwo.length,
       sha256: sha256.convert(utf8.encode(_contentTwo)).toString(),
+      repository: 'projectors/test-weights',
+      revision: 'fedcba9876543210',
     ),
   ],
 );
@@ -137,7 +139,7 @@ void main() {
     expect(states.last.simulated, isFalse);
     expect(downloader.requestedUrls, [
       'https://huggingface.co/example/test-mlx/resolve/0123456789abcdef/$_fileOne',
-      'https://huggingface.co/example/test-mlx/resolve/0123456789abcdef/$_fileTwo',
+      'https://huggingface.co/projectors/test-weights/resolve/fedcba9876543210/$_fileTwo',
     ]);
     expect(backup.excluded, ['${temp.path}/documents/models']);
     // The nested file landed inside the artifact directory.

@@ -13,6 +13,7 @@ final List<ModelCatalogEntry> modelCatalog = [
     quantization: '4-bit',
     artifact: gemma4E2BMlx4Bit,
     profileKey: 'gemma4',
+    inputModalities: const {ModelInputModality.text, ModelInputModality.image},
   ),
   _entry(
     key: 'gemma4-gguf',
@@ -21,22 +22,45 @@ final List<ModelCatalogEntry> modelCatalog = [
     quantization: 'Q4_K_XL',
     artifact: gemma4E2BGgufQ4,
     profileKey: 'gemma4',
+    // llama.cpp/libmtmd with the pinned projector passed the #18 bake-off.
+    // Capability belongs to this exact artifact, not the whole family.
+    inputModalities: const {ModelInputModality.text, ModelInputModality.image},
+  ),
+  _entry(
+    key: 'qwen35-2b-mlx',
+    displayName: 'Qwen 3.5 2B',
+    engine: ModelEngine.mlx,
+    quantization: '4-bit',
+    artifact: qwen35TwoBMlx4Bit,
+    profileKey: 'qwen35',
+    inputModalities: const {ModelInputModality.text, ModelInputModality.image},
+  ),
+  _entry(
+    key: 'qwen35-2b-gguf',
+    displayName: 'Qwen 3.5 2B',
+    engine: ModelEngine.gguf,
+    quantization: 'Q4_0',
+    artifact: qwen35TwoBGgufQ4,
+    profileKey: 'qwen35',
+    inputModalities: const {ModelInputModality.text, ModelInputModality.image},
   ),
   _entry(
     key: 'qwen35-mlx',
-    displayName: 'Qwen 3.5 4B QAT',
+    displayName: 'Qwen 3.5 4B',
     engine: ModelEngine.mlx,
     quantization: '4-bit',
     artifact: qwen35Mlx4Bit,
     profileKey: 'qwen35',
+    inputModalities: const {ModelInputModality.text, ModelInputModality.image},
   ),
   _entry(
     key: 'qwen35-gguf',
-    displayName: 'Qwen 3.5 4B QAT',
+    displayName: 'Qwen 3.5 4B',
     engine: ModelEngine.gguf,
     quantization: 'Q4_0',
     artifact: qwen35GgufQ4,
     profileKey: 'qwen35',
+    inputModalities: const {ModelInputModality.text, ModelInputModality.image},
   ),
 ];
 
@@ -72,6 +96,17 @@ String primaryModelPathFor(String key) {
   return path;
 }
 
+/// The `documents:`-relative path of an entry's multimodal projector, or null
+/// when it pins none. A projector is only ever loaded alongside the weights it
+/// was pinned with.
+String? projectorPathForEntry(ModelCatalogEntry entry) {
+  final projectors = entry.files
+      .where((file) => file.role == ModelFileRole.projector)
+      .toList();
+  if (projectors.length != 1) return null;
+  return 'documents:${entry.installDirectory}/${projectors.single.path}';
+}
+
 /// The `documents:`-relative path for any catalog entry — pinned or resolved
 /// custom — or null when the entry does not describe one loadable artifact.
 /// Runtime activation turns that null into a typed, actionable failure rather
@@ -79,9 +114,18 @@ String primaryModelPathFor(String key) {
 String? modelPathForEntry(ModelCatalogEntry entry) {
   switch (entry.engine) {
     case ModelEngine.gguf:
+      // Role, not extension: a multimodal artifact pins two .gguf files and
+      // only one of them is the language model.
       final weights = entry.files
-          .where((file) => file.path.endsWith('.gguf'))
+          .where((file) => file.role == ModelFileRole.weights)
           .toList();
+      if (weights.isEmpty) {
+        final unroled = entry.files
+            .where((file) => file.path.endsWith('.gguf'))
+            .toList();
+        if (unroled.length != 1) return null;
+        return 'documents:${entry.installDirectory}/${unroled.single.path}';
+      }
       if (weights.length != 1) return null;
       return 'documents:${entry.installDirectory}/${weights.single.path}';
     case ModelEngine.mlx:
@@ -96,6 +140,7 @@ ModelCatalogEntry _entry({
   required String quantization,
   required InfernoModelArtifact artifact,
   required String profileKey,
+  Set<ModelInputModality> inputModalities = const {ModelInputModality.text},
 }) => ModelCatalogEntry(
   key: key,
   displayName: displayName,
@@ -104,12 +149,20 @@ ModelCatalogEntry _entry({
   repository: artifact.repository,
   revision: artifact.revision,
   profileKey: profileKey,
+  inputModalities: inputModalities,
   files: [
     for (final file in artifact.files)
       ModelArtifactFile(
         path: file.path,
         bytes: file.bytes,
         sha256: file.sha256,
+        repository: file.repository,
+        revision: file.revision,
+        role: switch (file.role) {
+          InfernoFileRole.weights => ModelFileRole.weights,
+          InfernoFileRole.projector => ModelFileRole.projector,
+          InfernoFileRole.snapshot => ModelFileRole.snapshot,
+        },
       ),
   ],
 );

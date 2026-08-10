@@ -4,22 +4,50 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
+import 'package:golem_flutter/core/services/image_intake.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
+import 'package:golem_flutter/features/chat/widgets/attach_sheet.dart';
 import 'package:integration_test/integration_test.dart';
 
 import 'package:golem_flutter/main.dart' as app;
+
+import '../test/support/image_fixtures.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('complete fake-only Golem journey', (tester) async {
-    await app.main();
+    await app.launch(picker: const _JourneyPicker());
     await tester.pumpAndSettle(const Duration(seconds: 2));
     if (find.byKey(const Key('empty-chat')).evaluate().isEmpty) {
       await tester.tap(find.byKey(const Key('new-chat-header')));
       await tester.pumpAndSettle();
     }
     expect(find.byKey(const Key('empty-chat')), findsOneWidget);
+
+    // The integration journey owns the picker response but drives the real
+    // sheet, composer tray, attachment store, fake inference, and bubble.
+    await tester.tap(find.byKey(const Key('composer-attach')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('attach-photo-library')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('composer-attachments')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('send-button')));
+    await tester.pumpAndSettle();
+
+    final imageContainer = ProviderScope.containerOf(
+      tester.element(find.byType(ChatScreen)),
+    );
+    final imageMessages = imageContainer
+        .read(chatControllerProvider)
+        .requireValue
+        .active!
+        .messages;
+    final imageTurn = imageMessages.first;
+    expect(imageTurn.hasImages, isTrue);
+    expect(imageTurn.images.single.mimeType, 'image/png');
+    expect(imageMessages.last.text, contains('image you attached'));
+    expect(find.byKey(const Key('composer-attachments')), findsNothing);
 
     await tester.tap(find.byKey(const Key('chat-composer')));
     await tester.enterText(
@@ -354,4 +382,16 @@ String _conversationId(WidgetTester tester) {
     }
   }
   throw StateError('Conversation menu was not found');
+}
+
+final class _JourneyPicker extends AttachmentPicker {
+  const _JourneyPicker();
+
+  @override
+  Future<PreparedImage?> pick(AttachSource source) async => PreparedImage(
+    bytes: tinyPngBytes,
+    mimeType: 'image/png',
+    width: 2,
+    height: 2,
+  );
 }

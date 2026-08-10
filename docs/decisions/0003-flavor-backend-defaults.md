@@ -19,6 +19,14 @@ documented in `../device_floor.md` (added with epic #61).
   qa/flavorless). `auto` on a qa build reproduces the exact production
   composition — the only real-path route on the physical iPhone, where the
   production and dev bundle ids belong to the native app.
+- An explicit engine with no `GOLEM_MODEL_PATH` resolves that engine/profile's
+  exact pinned catalog artifact and retains its capability proof. Supplying a
+  path is the separate operator-sideload contract and does not inherit catalog
+  projectors or image capability.
+- `GOLEM_MODEL_ARTIFACT` selects an exact catalog key independently from its
+  prompt-family profile. This is how builds select Qwen 2B versus 4B without
+  inventing a second Qwen template. The artifact must match the selected
+  engine and profile, and cannot be combined with the sideload path override.
 - Coherence corollary (caught in device QA): overriding a qa build to real
   inference carries **model management** to the real implementation as
   well. A real engine fed by the download simulation would "install"
@@ -43,7 +51,7 @@ together as one value, eliminating the mismatched profile/path hazard.
 
 Devices reporting **≥ 7 GiB** physical memory default to **Gemma 4 E2B**
 (`gemma4-gguf`, 2.62 GB); below that — or when memory cannot be read —
-the lighter **Qwen 3.5 4B** (`qwen35-gguf`, 2.54 GB).
+the lighter **Qwen 3.5 2B** (`qwen35-2b-gguf`, 1.21 GB).
 
 - The threshold is 7 GiB rather than a literal 8 GB because Android's
   `ActivityManager.MemoryInfo.totalMem` reports net of kernel/firmware

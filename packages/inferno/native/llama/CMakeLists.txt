@@ -15,6 +15,13 @@ set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+# libmtmd supplies the vision path (#18). Upstream builds it standalone when
+# LLAMA_BUILD_MTMD is on and the tools tree is off, which is exactly this
+# configuration: mtmd links only ggml and llama — never llama-common — so it
+# costs no extra dependency. Video decoding needs a subprocess helper the app
+# has no use for, and it is forced off rather than left to a default.
+set(LLAMA_BUILD_MTMD ON CACHE BOOL "" FORCE)
+set(MTMD_VIDEO OFF CACHE BOOL "" FORCE)
 set(LLAMA_CURL OFF CACHE BOOL "" FORCE)
 set(GGML_BACKEND_DL OFF CACHE BOOL "" FORCE)
 set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
@@ -52,7 +59,9 @@ target_include_directories(inferno PRIVATE
   "${LLAMA_SOURCE_DIR}/ggml/include"
   "${LLAMA_SOURCE_DIR}/vendor"
 )
-target_link_libraries(inferno PRIVATE llama)
+# mtmd exports its own include directory as PUBLIC, so the shim sees mtmd.h
+# and mtmd-helper.h through the link alone.
+target_link_libraries(inferno PRIVATE llama mtmd)
 set_target_properties(inferno PROPERTIES
   OUTPUT_NAME inferno
   PREFIX "lib"

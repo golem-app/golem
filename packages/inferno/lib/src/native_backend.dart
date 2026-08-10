@@ -26,6 +26,25 @@ typedef _AsyncOperationNative =
       Pointer<NativeFunction<_NativeCallback>>,
       Pointer<Void>,
     );
+
+/// One encoded image, borrowed by native code for the duration of the
+/// generate call only (ABI 3).
+final class _InfernoImageInput extends Struct {
+  external Pointer<Uint8> bytes;
+  @Size()
+  external int length;
+}
+
+typedef _GenerateNative =
+    Int32 Function(
+      Pointer<Void>,
+      Pointer<Utf8>,
+      Pointer<_InfernoImageInput>,
+      Size,
+      Uint64,
+      Pointer<NativeFunction<_NativeCallback>>,
+      Pointer<Void>,
+    );
 typedef _UnloadNative =
     Int32 Function(
       Pointer<Void>,
@@ -39,6 +58,11 @@ typedef _StringFreeNative = Void Function(Pointer<Utf8>);
 
 const _llamaAssetId = 'package:inferno/inferno.dart';
 const _mlxAssetId = 'package:inferno/inferno_mlx.dart';
+
+/// The C ABI revision this package speaks. Both shims report it from
+/// `INFERNO_ABI_VERSION`, and a mismatch fails before any native object is
+/// created rather than crashing inside one.
+const infernoAbiVersion = 3;
 
 @Native<Uint32 Function()>(
   symbol: 'inferno_abi_version',
@@ -70,13 +94,15 @@ external int _infernoLoad(
   Pointer<Void> userData,
 );
 
-@Native<_AsyncOperationNative>(
+@Native<_GenerateNative>(
   symbol: 'inferno_engine_generate',
   assetId: _llamaAssetId,
 )
 external int _infernoGenerate(
   Pointer<Void> engine,
   Pointer<Utf8> request,
+  Pointer<_InfernoImageInput> images,
+  int imageCount,
   int operationId,
   Pointer<NativeFunction<_NativeCallback>> callback,
   Pointer<Void> userData,
@@ -150,13 +176,15 @@ external int _infernoMlxLoad(
   Pointer<Void> userData,
 );
 
-@Native<_AsyncOperationNative>(
+@Native<_GenerateNative>(
   symbol: 'inferno_mlx_engine_generate',
   assetId: _mlxAssetId,
 )
 external int _infernoMlxGenerate(
   Pointer<Void> engine,
   Pointer<Utf8> request,
+  Pointer<_InfernoImageInput> images,
+  int imageCount,
   int operationId,
   Pointer<NativeFunction<_NativeCallback>> callback,
   Pointer<Void> userData,
@@ -217,6 +245,8 @@ abstract interface class _NativeApi {
   int generate(
     Pointer<Void> engine,
     Pointer<Utf8> request,
+    Pointer<_InfernoImageInput> images,
+    int imageCount,
     int operationId,
     Pointer<NativeFunction<_NativeCallback>> callback,
     Pointer<Void> userData,
@@ -258,10 +288,20 @@ final class _LlamaNativeApi implements _NativeApi {
   int generate(
     Pointer<Void> engine,
     Pointer<Utf8> request,
+    Pointer<_InfernoImageInput> images,
+    int imageCount,
     int operationId,
     Pointer<NativeFunction<_NativeCallback>> callback,
     Pointer<Void> userData,
-  ) => _infernoGenerate(engine, request, operationId, callback, userData);
+  ) => _infernoGenerate(
+    engine,
+    request,
+    images,
+    imageCount,
+    operationId,
+    callback,
+    userData,
+  );
   @override
   int tokenize(
     Pointer<Void> engine,
@@ -304,10 +344,20 @@ final class _MlxNativeApi implements _NativeApi {
   int generate(
     Pointer<Void> engine,
     Pointer<Utf8> request,
+    Pointer<_InfernoImageInput> images,
+    int imageCount,
     int operationId,
     Pointer<NativeFunction<_NativeCallback>> callback,
     Pointer<Void> userData,
-  ) => _infernoMlxGenerate(engine, request, operationId, callback, userData);
+  ) => _infernoMlxGenerate(
+    engine,
+    request,
+    images,
+    imageCount,
+    operationId,
+    callback,
+    userData,
+  );
   @override
   int tokenize(
     Pointer<Void> engine,
@@ -389,10 +439,10 @@ final class _PendingGeneration extends _PendingOperation {
 final class NativeInfernoBackend implements InfernoBackend {
   NativeInfernoBackend() : _llamaApi = _LlamaNativeApi() {
     final version = _llamaApi.abiVersion();
-    if (version != 2) {
+    if (version != infernoAbiVersion) {
       throw InfernoException(
         InfernoErrorCode.nativeUnavailable,
-        'Unsupported native ABI $version (expected 2).',
+        'Unsupported native ABI $version (expected $infernoAbiVersion).',
       );
     }
     _callback = NativeCallable<_NativeCallback>.listener(_handleNativeEvent);
@@ -476,10 +526,10 @@ final class NativeInfernoBackend implements InfernoBackend {
       ),
     };
     final version = api.abiVersion();
-    if (version != 2) {
+    if (version != infernoAbiVersion) {
       throw InfernoException(
         InfernoErrorCode.nativeUnavailable,
-        'Unsupported $name native ABI $version (expected 2).',
+        'Unsupported $name native ABI $version (expected $infernoAbiVersion).',
       );
     }
     _activeApi = api;
@@ -550,14 +600,41 @@ final class NativeInfernoBackend implements InfernoBackend {
           'stopSequences': request.sampling.stopSequences,
           'stopTokenIds': request.sampling.stopTokenIds,
         }).toNativeUtf8();
-        final result = api.generate(
-          _engine,
-          encoded,
-          operationId,
-          _callback.nativeFunction,
-          nullptr,
-        );
-        malloc.free(encoded);
+        // Image bytes are copied into native memory for the call and freed
+        // as soon as it returns: the shim copies what it needs before its
+        // worker starts, so nothing here has to outlive the call (ABI 3).
+        final images = request.images;
+        final imageArray = images.isEmpty
+            ? nullptr as Pointer<_InfernoImageInput>
+            : malloc<_InfernoImageInput>(images.length);
+        final buffers = <Pointer<Uint8>>[];
+        for (var index = 0; index < images.length; index++) {
+          final bytes = images[index].bytes;
+          final buffer = malloc<Uint8>(bytes.length);
+          buffer.asTypedList(bytes.length).setAll(0, bytes);
+          buffers.add(buffer);
+          imageArray[index]
+            ..bytes = buffer
+            ..length = bytes.length;
+        }
+        final int result;
+        try {
+          result = api.generate(
+            _engine,
+            encoded,
+            imageArray,
+            images.length,
+            operationId,
+            _callback.nativeFunction,
+            nullptr,
+          );
+        } finally {
+          for (final buffer in buffers) {
+            malloc.free(buffer);
+          }
+          if (imageArray != nullptr) malloc.free(imageArray);
+          malloc.free(encoded);
+        }
         if (result != 0) {
           _operations.remove(operationId);
           controller.addError(_startError('generation', result));
