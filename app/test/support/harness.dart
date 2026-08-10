@@ -17,6 +17,7 @@ import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 import 'package:golem_flutter/core/services/cache_probe.dart';
 import 'package:golem_flutter/core/services/device_storage.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
+import 'package:golem_flutter/core/services/custom_repository_resolver.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/search_screen.dart';
 
@@ -91,6 +92,7 @@ ProviderContainer buildContainer({
   SettingsRepository? settings,
   PreferencesRepository? preferences,
   AttachmentRepository? attachments,
+  CustomRepositoryResolver? resolver,
 }) {
   final directory = Directory.systemTemp.createTempSync('golem-widget-test-');
   return ProviderContainer(
@@ -118,6 +120,9 @@ ProviderContainer buildContainer({
         settings ?? InMemorySettingsRepository(),
       ),
       modelCatalogEntriesProvider.overrideWithValue(catalog ?? modelCatalog),
+      customRepositoryResolverProvider.overrideWithValue(
+        resolver ?? const DeterministicRepositoryResolver(),
+      ),
       modelManagementRepositoryProvider.overrideWithValue(StaticModels(model)),
       benchmarkRepositoryProvider.overrideWithValue(
         FakeBenchmarkRepository(
@@ -139,6 +144,7 @@ Future<void> pumpWithRepositories(
   List<ModelCatalogEntry>? catalog,
   InferenceBackendConfig? backend,
   PreferencesRepository? preferences,
+  CustomRepositoryResolver? resolver,
 }) async {
   setViewport(tester);
   final container = buildContainer(
@@ -147,6 +153,7 @@ Future<void> pumpWithRepositories(
     catalog: catalog,
     backend: backend,
     preferences: preferences,
+    resolver: resolver,
   );
   addTearDown(container.dispose);
   await tester.pumpWidget(

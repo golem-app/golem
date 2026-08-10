@@ -64,10 +64,22 @@ Future<void> launch({
   );
   final preferences = await preferencesRepository.load();
   final pinnedKeys = {for (final entry in modelCatalog) entry.key};
+  final customEntries = [
+    for (final spec in preferences.customModels)
+      if (!pinnedKeys.contains(spec.key)) spec,
+  ];
   final mergedCatalog = [
     ...modelCatalog,
-    for (final spec in preferences.customModels)
-      if (!pinnedKeys.contains(spec.key)) spec.toCatalogEntry(),
+    for (final spec in customEntries) spec.toCatalogEntry(),
+  ];
+  // The real downloader only takes repositories that resolved: an unresolved
+  // entry's file list is synthesized, so offering to fetch it would put a
+  // request on the wire for a file nobody has seen. Those stay out of its
+  // catalog and their card keeps saying it cannot download here.
+  final realCatalog = [
+    ...modelCatalog,
+    for (final spec in customEntries)
+      if (spec.resolved != null) spec.toCatalogEntry(),
   ];
   // Created before the scope so the inference repository can read an image
   // part's bytes without going through a provider.
@@ -80,7 +92,7 @@ Future<void> launch({
       : RealModelManagementRepository(
           stateFile: stateFile,
           documentsDirectory: documents.path,
-          catalog: modelCatalog,
+          catalog: realCatalog,
           downloader: BackgroundArtifactDownloader(),
           diskSpace: const DeviceStorageChannel(),
           backupExclusion: const DeviceStorageChannel(),

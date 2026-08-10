@@ -3,12 +3,16 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/broker/model_profile.dart';
 import 'package:golem_flutter/core/app_version.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
+import 'package:golem_flutter/core/domain/resolved_repository.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
+import 'package:golem_flutter/core/services/custom_repository_resolver.dart';
+import 'package:golem_flutter/core/services/repository_resolver.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
 import 'package:golem_flutter/features/settings/appearance_screen.dart';
@@ -20,6 +24,43 @@ import 'package:golem_flutter/features/settings/system_prompt_screen.dart';
 import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
+
+/// Replays a scripted resolution so the card's states are reachable without a
+/// network. A list, because the weight-choice flow resolves twice.
+final class _ScriptedResolver implements CustomRepositoryResolver {
+  _ScriptedResolver(this.outcomes);
+
+  final List<RepositoryResolution> outcomes;
+  final List<String?> requestedWeights = [];
+  int _calls = 0;
+
+  @override
+  Future<RepositoryResolution> resolve({
+    required String repository,
+    required ModelEngine engine,
+    String ref = 'main',
+    String? weightsFile,
+    Set<String> existingKeys = const {},
+  }) async {
+    requestedWeights.add(weightsFile);
+    final index = _calls < outcomes.length ? _calls : outcomes.length - 1;
+    _calls++;
+    return outcomes[index];
+  }
+}
+
+ResolvedRepository _resolution({int bytes = 1214873856}) => ResolvedRepository(
+  commitSha: 'f' * 40,
+  quantization: 'Q4_0',
+  displayName: 'Tiny',
+  files: [
+    ModelArtifactFile(
+      path: 'tiny-Q4_0.gguf',
+      bytes: bytes,
+      role: ModelFileRole.weights,
+    ),
+  ],
+);
 
 void main() {
   test('the About version constant matches pubspec.yaml', () {
@@ -174,17 +215,17 @@ void main() {
         )
         .first;
     await tester.scrollUntilVisible(
-      find.byKey(const Key('custom-repo-add')),
+      find.byKey(const Key('custom-repo-resolve')),
       240,
       scrollable: scrollable,
     );
     await tester.pumpAndSettle();
-    // Empty field: nothing to add yet.
+    // Empty field: nothing to resolve yet.
     expect(
       tester
           .widget<CupertinoButton>(
             find.ancestor(
-              of: find.text('Add model'),
+              of: find.text('Resolve'),
               matching: find.byType(CupertinoButton),
             ),
           )
@@ -198,6 +239,14 @@ void main() {
       'org/tiny-model-GGUF',
     );
     await tester.pumpAndSettle();
+
+    // Nothing is stored by resolving; the user sees what it found first.
+    await tester.tap(find.byKey(const Key('custom-repo-resolve')));
+    await tester.pumpAndSettle();
+    expect(preferences.preferences.customModels, isEmpty);
+    expect(find.byKey(const Key('custom-repo-detail')), findsOneWidget);
+    expect(find.text('Not recognized'), findsOneWidget);
+
     await tester.tap(find.byKey(const Key('custom-repo-add')));
     await tester.pumpAndSettle();
 
@@ -205,6 +254,13 @@ void main() {
     expect(spec.repository, 'org/tiny-model-GGUF');
     expect(spec.key, startsWith('custom-org-tiny-model-gguf-'));
     expect(spec.engine, ModelEngine.gguf);
+    // The resolution is what got stored, pinned to a commit rather than a ref.
+    expect(spec.resolved, isNotNull);
+    expect(spec.resolved!.commitSha, hasLength(40));
+    expect(spec.resolved!.files, isNotEmpty);
+    // A simulation proves no profile, so the entry still cannot be activated.
+    expect(spec.profile, isNull);
+    expect(spec.toCatalogEntry().profileKey, unresolvedProfileKey);
     expect(find.byKey(const Key('golem-toast')), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 1600));
     // The derived card joins the catalog list.
@@ -340,7 +396,7 @@ void main() {
     );
 
     await tester.scrollUntilVisible(
-      find.byKey(const Key('custom-repo-add')),
+      find.byKey(const Key('custom-repo-resolve')),
       240,
       scrollable: scrollable,
     );
@@ -350,18 +406,21 @@ void main() {
       'org/some-model',
     );
     await tester.pumpAndSettle();
+    // Resolving is offered on a real engine now, and the copy no longer
+    // promises a future update.
     expect(
       tester
           .widget<CupertinoButton>(
             find.ancestor(
-              of: find.text('Add model'),
+              of: find.text('Resolve'),
               matching: find.byType(CupertinoButton),
             ),
           )
           .onPressed,
-      isNull,
+      isNotNull,
     );
-    expect(find.textContaining('arrive in a future update'), findsOneWidget);
+    expect(find.textContaining('arrive in a future update'), findsNothing);
+    expect(find.textContaining('Only public repositories'), findsOneWidget);
   }, variant: iosChrome);
 
   testWidgets('the system prompt editor commits and resets', (tester) async {
@@ -458,5 +517,152 @@ void main() {
           .first,
     );
     expect(find.text(appVersion), findsOneWidget);
+  }, variant: iosChrome);
+
+  /// Reveals the Advanced-mode custom repository card and types a name into it.
+  Future<InMemoryPreferencesRepository> pumpCard(
+    WidgetTester tester,
+    CustomRepositoryResolver resolver,
+  ) async {
+    final preferences = InMemoryPreferencesRepository(
+      const AppPreferences(advancedMode: true),
+    );
+    await pumpWithRepositories(
+      tester,
+      preferences: preferences,
+      model: const ModelState(simulated: true),
+      resolver: resolver,
+      child: const ModelsScreen(),
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('custom-repo-resolve')),
+      240,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('models-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('custom-repo-field')),
+      'org/tiny-GGUF',
+    );
+    await tester.pumpAndSettle();
+    return preferences;
+  }
+
+  testWidgets('a refused repository says why and stores nothing', (
+    tester,
+  ) async {
+    final preferences = await pumpCard(
+      tester,
+      _ScriptedResolver([const RepositoryRejected(RepositoryRejection.gated)]),
+    );
+    await tester.tap(find.byKey(const Key('custom-repo-resolve')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('custom-repo-error')), findsOneWidget);
+    expect(find.textContaining('accepting its licence'), findsOneWidget);
+    expect(find.byKey(const Key('custom-repo-detail')), findsNothing);
+    // Refusal must not leave a half-added entry behind.
+    expect(preferences.preferences.customModels, isEmpty);
+    // Retry is offered rather than making the user retype.
+    expect(find.text('Try again'), findsOneWidget);
+  }, variant: iosChrome);
+
+  testWidgets('editing after a refusal clears it', (tester) async {
+    await pumpCard(
+      tester,
+      _ScriptedResolver([
+        const RepositoryRejected(RepositoryRejection.notFoundOrPrivate),
+      ]),
+    );
+    await tester.tap(find.byKey(const Key('custom-repo-resolve')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('custom-repo-error')), findsOneWidget);
+
+    // A message about the previous name would be wrong for the new one.
+    await tester.enterText(
+      find.byKey(const Key('custom-repo-field')),
+      'org/other-GGUF',
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('custom-repo-error')), findsNothing);
+    expect(find.text('Resolve'), findsOneWidget);
+  }, variant: iosChrome);
+
+  testWidgets('several weight files ask which, then resolve it', (
+    tester,
+  ) async {
+    final resolver = _ScriptedResolver([
+      const RepositoryNeedsWeightChoice([
+        ResolvedWeightCandidate('tiny-Q4_0.gguf', 1214873856),
+        ResolvedWeightCandidate('tiny-Q8_0.gguf', 2214873856),
+      ]),
+      RepositoryResolved(
+        resolved: _resolution(),
+        profile: null,
+        templateFingerprint: 'ab' * 32,
+      ),
+    ]);
+    final preferences = await pumpCard(tester, resolver);
+    await tester.tap(find.byKey(const Key('custom-repo-resolve')));
+    await tester.pumpAndSettle();
+
+    // Nothing is chosen for the user, and nothing is stored yet.
+    expect(find.byKey(const Key('custom-repo-detail')), findsNothing);
+    expect(preferences.preferences.customModels, isEmpty);
+    expect(
+      find.byKey(const Key('custom-repo-candidate-tiny-Q8_0.gguf')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const Key('custom-repo-candidate-tiny-Q4_0.gguf')),
+    );
+    await tester.pumpAndSettle();
+    // The choice is carried into the second resolution, not guessed again.
+    expect(resolver.requestedWeights, [null, 'tiny-Q4_0.gguf']);
+    expect(find.byKey(const Key('custom-repo-detail')), findsOneWidget);
+  }, variant: iosChrome);
+
+  testWidgets('a recognized template names the profile and stores it', (
+    tester,
+  ) async {
+    final preferences = await pumpCard(
+      tester,
+      _ScriptedResolver([
+        RepositoryResolved(
+          resolved: _resolution(),
+          profile: qwen35ProfileSpec,
+          templateFingerprint: 'cd' * 32,
+        ),
+      ]),
+    );
+    await tester.enterText(
+      find.byKey(const Key('custom-repo-revision')),
+      'v1.2',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('custom-repo-resolve')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('qwen35'), findsOneWidget);
+    expect(find.text('Not recognized'), findsNothing);
+    // The commit is shown, abbreviated — never the ref that was typed.
+    expect(find.text('ffffffffffff'), findsOneWidget);
+    expect(find.text('1.21 GB'), findsWidgets);
+
+    await tester.tap(find.byKey(const Key('custom-repo-add')));
+    await tester.pumpAndSettle();
+    final spec = preferences.preferences.customModels.single;
+    expect(spec.revision, 'v1.2', reason: 'the ref the user asked for');
+    expect(spec.resolved!.commitSha, 'f' * 40, reason: 'what installs');
+    expect(spec.profile?.key, 'qwen35');
+    // A proven profile is what lets this entry be activated at all.
+    expect(spec.toCatalogEntry().profileKey, 'qwen35');
+    await tester.pump(const Duration(milliseconds: 1600));
   }, variant: iosChrome);
 }

@@ -182,7 +182,9 @@ camera, or a file — gated on what the selected model can actually read —
 confirmation toasts, the redesigned minimal Settings (root rows plus Models,
 Response style, System prompt, Appearance, Privacy & data, and Storage
 sub-screens, with an Advanced mode switch gating the sampling controls, the
-system prompt, and the custom-repository loader), runtime controls, Benchmark,
+system prompt, and the custom-repository loader, which resolves a repository to
+an immutable commit and shows its files and prompt profile before anything is
+added), runtime controls, Benchmark,
 JSON export, and the native share sheet. Privacy & data can stop saving chat
 history (confirming, then emptying the on-disk store), export every chat as
 JSON, and delete all chats; Storage breaks usage into models, chats, and
@@ -223,7 +225,9 @@ identifiers are `launch-splash`, `chat-composer`, `send-button`, `stop-button`,
 `model-delete-<key>`, `confirm-model-delete` (catalog keys: `gemma4-mlx`,
 `gemma4-gguf`, `qwen35-mlx`, `qwen35-gguf`, plus derived
 `custom-<repository-slug>` entries),
-`custom-repo-{engine-mlx,engine-gguf,field,add}`, `download-active-model`
+`custom-repo-{engine-mlx,engine-gguf,field,revision,resolve,add,error,detail}`
+(`resolve` reads the repository, `add` commits what it found, and `add` only
+exists once a resolution is on screen), `download-active-model`
 (the chat failure banner's consent CTA when a real backend's model is not
 downloaded yet), `style-{precise,balanced,creative}`,
 `gen-temperature-<profile>`, `gen-top-p-<profile>`,
