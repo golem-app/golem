@@ -99,13 +99,23 @@ Future<void> launch({
   // The real repository's catalog grows in place as repositories are added, so
   // holding the concrete instance is what lets the engine resolve an entry that
   // did not exist at launch (#20).
-  final realModels = useFakeModels
+  // Held rather than constructed inline: it has to be started before the first
+  // frame, and only the real path may touch the plugin at all.
+  final artifactDownloader = useFakeModels
+      ? null
+      : BackgroundArtifactDownloader(
+          // Where the plugin stages partial transfers: Android uses the cache
+          // directory for small files and application support for large ones,
+          // and orphans in either survive a kill with nothing to sweep them.
+          temporaryDirectories: [temporary.path, support.path],
+        );
+  final realModels = artifactDownloader == null
       ? null
       : RealModelManagementRepository(
           stateFile: stateFile,
           documentsDirectory: documents.path,
           catalog: realCatalog,
-          downloader: BackgroundArtifactDownloader(),
+          downloader: artifactDownloader,
           diskSpace: const DeviceStorageChannel(),
           backupExclusion: const DeviceStorageChannel(),
           // A sideload has no catalog entry, so no pinned artifact may be
@@ -117,6 +127,10 @@ Future<void> launch({
   final ModelManagementRepository modelManagement =
       realModels ??
       FakeModelManagementRepository(stateFile, catalog: mergedCatalog);
+  // Before the first frame, and before anything can ask for a download: the
+  // plugin discards updates that arrive with no listener attached, and startup
+  // replays every status delivered while this process did not exist.
+  await artifactDownloader?.initialize();
   runApp(
     ProviderScope(
       overrides: [
