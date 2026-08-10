@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'artifact_downloader.dart' show isPartialTransferFile;
+
 /// The "inference cache" surfaced in Settings ▸ Storage: transient bytes the
 /// app can drop without losing models or chats. Concretely, the app's
 /// temporary directory — downloader scratch and engine spill land there.
@@ -11,6 +13,12 @@ abstract interface class CacheProbe {
 /// Sums and clears the contents of one directory. The directory itself is
 /// preserved; unreadable entries are skipped rather than failing the whole
 /// measurement.
+///
+/// Partial model transfers are excluded from both. Android stages a small
+/// file's partial data in the cache directory — the very directory this
+/// clears — so counting those bytes would promise space that clearing cannot
+/// deliver, and deleting them would throw away a paused download's progress
+/// behind the user's back.
 final class DirectoryCacheProbe implements CacheProbe {
   const DirectoryCacheProbe(this.path);
   final String path;
@@ -25,7 +33,7 @@ final class DirectoryCacheProbe implements CacheProbe {
         recursive: true,
         followLinks: false,
       )) {
-        if (entry is File) {
+        if (entry is File && !isPartialTransferFile(entry)) {
           try {
             total += await entry.length();
           } catch (_) {}
@@ -40,6 +48,7 @@ final class DirectoryCacheProbe implements CacheProbe {
     final directory = Directory(path);
     if (!await directory.exists()) return;
     await for (final entry in directory.list(followLinks: false)) {
+      if (isPartialTransferFile(entry)) continue;
       try {
         await entry.delete(recursive: true);
       } catch (_) {

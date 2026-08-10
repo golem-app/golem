@@ -1064,10 +1064,54 @@ class ModelController extends _$ModelController {
   // One mutating model operation at a time. Pause and cancel stay exempt:
   // they are the escape hatches that end an in-flight download.
   bool _busy = false;
+  bool _releasing = false;
+
+  /// The subset of [_busy] operations that command the engine. Freeing the
+  /// engine skips these but not a download: unloading beneath `prepare()` or
+  /// beneath `delete()`'s own unload is a real collision, while a transfer
+  /// stuck on an unresponsive platform must never block memory relief.
+  bool _engineBusy = false;
 
   @override
   Future<ModelState> build() =>
       ref.read(modelManagementRepositoryProvider).load();
+
+  /// Re-runs reconciliation and re-attaches to anything the platform is still
+  /// transferring. Called at startup once the first state has settled, and on
+  /// every return to the foreground — the only moment a transfer the OS moved
+  /// on without telling anyone can be noticed.
+  ///
+  /// Deliberately outside the busy guard: a download stuck waiting on a
+  /// platform that stopped answering is precisely when this has to run.
+  Future<void> reconcileDownloads() async {
+    try {
+      // Never before build has installed its own value: Riverpod assigns that
+      // result after the fact, and would overwrite the fresher snapshot below
+      // with the one the launch pass resolved to — leaving the card stale and
+      // the busy guard raised, so the user's own tap does nothing.
+      await future;
+      final value = await ref.read(modelManagementRepositoryProvider).load();
+      if (!ref.mounted) return;
+      state = AsyncData(value);
+      await _reattach(value);
+    } catch (_) {
+      // Reconciliation is a repair pass; a failed one must not blank the
+      // screen or replace a usable snapshot with an error.
+    }
+  }
+
+  /// Streams a transfer the platform is already running so its progress
+  /// reaches the UI. [download] adopts rather than enqueues, so this never
+  /// starts a second writer.
+  Future<void> _reattach(ModelState value) async {
+    if (_busy) return;
+    for (final entry in value.artifacts.entries) {
+      if (entry.value.phase == ArtifactPhase.downloading) {
+        await download(entry.key);
+        return;
+      }
+    }
+  }
 
   Future<void> download(String artifactKey) async {
     if (_busy) return;
@@ -1119,6 +1163,7 @@ class ModelController extends _$ModelController {
   Future<void> delete(String artifactKey) async {
     if (_busy) return;
     _busy = true;
+    _engineBusy = true;
     try {
       // Never delete weights the engine may still have mapped: releasing
       // the runtime comes first, and an unload failure aborts the delete.
@@ -1140,6 +1185,7 @@ class ModelController extends _$ModelController {
       _publishFailure(artifactKey, error);
     } finally {
       _busy = false;
+      _engineBusy = false;
     }
   }
 
@@ -1156,6 +1202,7 @@ class ModelController extends _$ModelController {
       return;
     }
     _busy = true;
+    _engineBusy = true;
     try {
       final value = await ref
           .read(modelManagementRepositoryProvider)
@@ -1166,6 +1213,7 @@ class ModelController extends _$ModelController {
       // Phase bookkeeping must never disturb an in-flight generation.
     } finally {
       _busy = false;
+      _engineBusy = false;
     }
   }
 
@@ -1203,6 +1251,7 @@ class ModelController extends _$ModelController {
   Future<void> toggleRuntime() async {
     if (_busy) return;
     _busy = true;
+    _engineBusy = true;
     try {
       final repository = ref.read(modelManagementRepositoryProvider);
       final current = state.requireValue;
@@ -1258,6 +1307,7 @@ class ModelController extends _$ModelController {
       }
     } finally {
       _busy = false;
+      _engineBusy = false;
     }
   }
 
@@ -1266,12 +1316,22 @@ class ModelController extends _$ModelController {
   /// platform reclaims memory. Only when idle: an advisory signal never cancels
   /// a visible stream, and the busy guard keeps it off a model operation.
   Future<void> releaseEngineWhileInactive() async {
-    if (_busy) return;
+    // Not gated on the download guard. This is the only defence against holding
+    // multi-gigabyte weights under the platform's background memory ceiling,
+    // and a download stuck on an unresponsive platform would otherwise disable
+    // it for the rest of the process — the app is then jetsammed on the next
+    // background transition, which is exactly what this exists to prevent.
+    // Engine operations are a different matter: unloading underneath one is a
+    // collision, not a rescue.
+    if (_engineBusy) return;
     final current = state.value;
     if (current == null) return;
     final chat = ref.read(chatControllerProvider).value;
     if (chat != null && chat.generation != GenerationPhase.idle) return;
-    _busy = true;
+    // Its own guard: backgrounding and memory pressure can both fire, and this
+    // still must not unload twice.
+    if (_releasing) return;
+    _releasing = true;
     try {
       final inference = ref.read(inferenceRepositoryProvider);
       // Residency decides, not the catalog phase: a GOLEM_MODEL_PATH load is
@@ -1288,7 +1348,7 @@ class ModelController extends _$ModelController {
     } catch (_) {
       // Advisory signal: no user-visible failure state.
     } finally {
-      _busy = false;
+      _releasing = false;
     }
   }
 

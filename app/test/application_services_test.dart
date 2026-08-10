@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/application/storage_breakdown_service.dart';
@@ -16,6 +18,45 @@ import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
 
 void main() {
+  group('DirectoryCacheProbe', () {
+    late Directory temp;
+
+    setUp(() {
+      temp = Directory.systemTemp.createTempSync('golem-cache-probe-');
+      addTearDown(() => temp.deleteSync(recursive: true));
+    });
+
+    test('sums and clears ordinary scratch', () async {
+      File('${temp.path}/spill.bin').writeAsStringSync('0123456789');
+      final probe = DirectoryCacheProbe(temp.path);
+      expect(await probe.sizeBytes(), 10);
+      await probe.clear();
+      expect(await probe.sizeBytes(), 0);
+      expect(temp.existsSync(), isTrue);
+    });
+
+    // Android stages a small file's partial transfer in the cache directory,
+    // so an unguarded clear silently discards a paused download's progress.
+    test('a partial transfer survives Clear cache', () async {
+      final partial = File(
+        '${temp.path}/com.bbflight.background_downloader1234',
+      )..writeAsStringSync('half a model');
+      File('${temp.path}/spill.bin').writeAsStringSync('junk');
+      await DirectoryCacheProbe(temp.path).clear();
+      expect(partial.existsSync(), isTrue);
+      expect(File('${temp.path}/spill.bin').existsSync(), isFalse);
+    });
+
+    // Counting bytes that Clear cannot free would promise space the button
+    // does not deliver.
+    test('a partial transfer is not counted as reclaimable', () async {
+      File(
+        '${temp.path}/com.bbflight.background_downloader1234',
+      ).writeAsStringSync('half a model');
+      expect(await DirectoryCacheProbe(temp.path).sizeBytes(), 0);
+    });
+  });
+
   group('StorageBreakdownService', () {
     test('sums required inputs and reads the probes', () async {
       final history = InMemoryChatHistoryRepository(seedHistory());

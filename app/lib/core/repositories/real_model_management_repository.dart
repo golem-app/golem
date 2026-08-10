@@ -49,7 +49,30 @@ final class RealModelManagementRepository implements ModelManagementRepository {
 
   late ModelState _state;
   final Set<String> _stopRequested = {};
+
+  /// Artifacts a [download] generator is currently sequencing. Reconciliation
+  /// leaves these alone: it cannot see inside a hash or between two files, and
+  /// the generator is the more recent authority on both.
+  final Set<String> _active = {};
   Future<void> _writes = Future.value();
+
+  /// Whether the state file has been read and the engine claim normalized.
+  /// Reconciliation runs again on every resume, and neither of those is
+  /// repeatable: re-reading would discard newer in-memory state, and demoting
+  /// the runtime a second time would unload a model that is legitimately live.
+  bool _hydrated = false;
+
+  Future<void> _reconciles = Future.value();
+
+  /// Serializes read-modify-write of [_state]. [_persist] serializes the writes
+  /// themselves, but reconciliation reads state, awaits a series of platform
+  /// probes, then writes a whole map — a window long enough for a download that
+  /// finishes in between to be overwritten by a snapshot taken before it did.
+  Future<T> _exclusive<T>(Future<T> Function() action) {
+    final result = _reconciles.then((_) => action());
+    _reconciles = result.then((_) {}, onError: (_) {});
+    return result;
+  }
 
   String _rootFor(ModelCatalogEntry entry) =>
       '$documentsDirectory/${entry.installDirectory}';
@@ -78,63 +101,101 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     ),
   );
 
+  /// Convergence, and safe to re-run: the composition root calls it at startup
+  /// and again whenever the app returns to the foreground, which is the only
+  /// moment a transfer the OS moved on without telling anyone can be noticed.
   @override
-  Future<ModelState> load() async {
-    if (await stateFile.exists()) {
-      final loaded = await loadStore(
-        stateFile,
-        what: 'model state',
-        decode: (raw) => ModelState.fromJson(
-          Map<String, Object?>.from(jsonDecode(raw) as Map),
-        ),
-        orElse: () => const ModelState(),
-      );
-      _state = loaded.stamp(
-        activeArtifactKey: activeArtifactKey,
-        simulated: false,
-      );
+  Future<ModelState> load() => _exclusive(_converge);
+
+  Future<ModelState> _converge() async {
+    if (!_hydrated) {
+      _hydrated = true;
+      if (await stateFile.exists()) {
+        final loaded = await loadStore(
+          stateFile,
+          what: 'model state',
+          decode: (raw) => ModelState.fromJson(
+            Map<String, Object?>.from(jsonDecode(raw) as Map),
+          ),
+          orElse: () => const ModelState(),
+        );
+        _state = loaded.stamp(
+          activeArtifactKey: activeArtifactKey,
+          simulated: false,
+        );
+      }
+      // Since #19 the loaded phase is a claim about the engine, and no engine
+      // survives its process. Failed stays — still accurate across a relaunch.
+      // First hydration only: on a later pass the engine may genuinely be
+      // loaded, and demoting it again would describe a live model as unloaded.
+      if (_state.runtime == RuntimePhase.loading ||
+          _state.runtime == RuntimePhase.loaded) {
+        _state = _state.copyWith(runtime: RuntimePhase.unloaded);
+      }
     }
-    // Since #19 the loaded phase is a claim about the engine, and no engine
-    // survives its process. Failed stays — still accurate across a relaunch.
-    if (_state.runtime == RuntimePhase.loading ||
-        _state.runtime == RuntimePhase.loaded) {
-      _state = _state.copyWith(runtime: RuntimePhase.unloaded);
-    }
-    // Disk is truth: persisted phases are reconciled against the files present,
-    // so a kill mid-download resumes from real bytes and an externally removed
-    // install stops claiming to exist. "Installed" also needs the receipt to
-    // cover every file — size alone never re-earns it.
+    // Disk and platform together. Disk alone cannot tell a transfer the OS is
+    // still running from one it silently dropped, so demoting every
+    // interrupted download to Paused made a live one look stopped — and the
+    // Resume it invited started a second writer on the same file.
+    final before = {
+      for (final entry in catalog) entry.key: _state.statusOf(entry.key),
+    };
     final artifacts = <String, ArtifactStatus>{};
     for (final entry in catalog) {
-      final status = _state.statusOf(entry.key);
+      final status = before[entry.key]!;
       artifacts[entry.key] = switch (status.phase) {
+        // A generator already owns this artifact and is mid-sequence — very
+        // possibly inside a multi-minute hash, during which no transfer is
+        // live. Reconciling it would flip a verifying card to Paused behind a
+        // Resume button that cannot act while the download holds the guard.
+        _ when _active.contains(entry.key) => status,
         ArtifactPhase.installed when !await _installVerified(entry) =>
           const ArtifactStatus(),
         ArtifactPhase.downloading ||
         ArtifactPhase.verifying ||
-        ArtifactPhase.paused => ArtifactStatus(
-          phase: ArtifactPhase.paused,
-          downloadedBytes: await _presentBytes(entry),
-        ),
+        ArtifactPhase.paused => await _reconcileTransfer(entry),
         _ => status,
       };
       if (artifacts[entry.key]!.phase == ArtifactPhase.notDownloaded) {
         artifacts[entry.key] = const ArtifactStatus();
       }
     }
-    _state = _state.copyWith(artifacts: artifacts);
+    // Applied only where nothing moved underneath. Hashing and probing an
+    // artifact takes long enough for a download running alongside to install
+    // it, and writing this pass's whole map would revert that install to the
+    // phase it held before the pass began.
+    final merged = {..._state.artifacts};
+    artifacts.forEach((key, reconciled) {
+      if (_state.statusOf(key) == before[key]) merged[key] = reconciled;
+    });
+    _state = _state.copyWith(artifacts: merged);
     return _persist(_state);
   }
 
-  /// Present by size — a progress hint for the paused card, not a verdict.
-  Future<int> _presentBytes(ModelCatalogEntry entry) async {
-    var bytes = 0;
+  /// What one artifact's transfer really is: bytes already on disk, plus
+  /// whatever the platform still holds for the files that are not.
+  Future<ArtifactStatus> _reconcileTransfer(ModelCatalogEntry entry) async {
+    var present = 0;
+    var live = false;
     for (final spec in entry.files) {
       if (await _sizeMatches(entry, spec)) {
-        bytes += spec.bytes;
+        present += spec.bytes;
+        continue;
       }
+      final snapshot = await downloader.inspect(_refFor(entry, spec));
+      if (snapshot.presence == ArtifactTransferPresence.running ||
+          snapshot.presence == ArtifactTransferPresence.waitingToRetry) {
+        live = true;
+      }
+      // Partial data lives in the plugin's staging file, never at the
+      // destination — both platforms move the file into place only once it is
+      // whole — so without this a resumed card reports a false regression.
+      present += snapshot.receivedBytes ?? 0;
     }
-    return bytes;
+    return ArtifactStatus(
+      phase: live ? ArtifactPhase.downloading : ArtifactPhase.paused,
+      downloadedBytes: present,
+    );
   }
 
   Future<bool> _installVerified(ModelCatalogEntry entry) async {
@@ -162,6 +223,15 @@ final class RealModelManagementRepository implements ModelManagementRepository {
 
   @override
   Stream<ModelState> download(String artifactKey) async* {
+    _active.add(artifactKey);
+    try {
+      yield* _download(artifactKey);
+    } finally {
+      _active.remove(artifactKey);
+    }
+  }
+
+  Stream<ModelState> _download(String artifactKey) async* {
     final entry = _entry(artifactKey);
     _stopRequested.remove(artifactKey);
     final root = Directory(_rootFor(entry));
@@ -185,7 +255,18 @@ final class RealModelManagementRepository implements ModelManagementRepository {
 
     // Size-matching unreceipted files will most likely verify in place, so they
     // do not count against free space; a corrupt one fails cleanly later.
-    final remaining = entry.totalBytes - verifiedBytes - presentUnverifiedBytes;
+    // Bytes already staged by an in-flight transfer likewise occupy the disk
+    // already: without this, re-attaching to a nearly-finished 4 GB download
+    // asks for another 4 GB and fails the artifact on every foreground return,
+    // while the transfer it just condemned keeps running unwatched.
+    var staged = 0;
+    for (final spec in pending) {
+      if (await _sizeMatches(entry, spec)) continue;
+      staged +=
+          (await downloader.inspect(_refFor(entry, spec))).receivedBytes ?? 0;
+    }
+    final remaining =
+        entry.totalBytes - verifiedBytes - presentUnverifiedBytes - staged;
     final free = await _freeBytesSafely();
     if (free != null && free < remaining + diskSpaceMargin) {
       yield await _persist(
@@ -214,6 +295,10 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     );
 
     for (final spec in pending) {
+      // The install directory is keyed by artifact, not by commit, so a re-pin
+      // mid-download would land this commit's bytes under the new revision's
+      // name and let the engine map weights the catalog no longer describes.
+      if (_repinned(entry)) return;
       // Local content first: a size-matching file without a receipt entry is
       // hashed before any network use, then verifies in place or is re-fetched.
       if (await _sizeMatches(entry, spec)) {
@@ -236,15 +321,9 @@ final class RealModelManagementRepository implements ModelManagementRepository {
         await File('${_rootFor(entry)}/${spec.path}').delete();
       }
 
-      final url = entry.resolveUrlFor(spec).toString();
       ArtifactFileEvent fileOutcome = const ArtifactFileComplete();
       var lastReceived = 0;
-      await for (final event in downloader.download(
-        url: url,
-        directory: _directoryFor(entry, spec),
-        filename: _filenameFor(spec),
-        expectedBytes: spec.bytes,
-      )) {
+      await for (final event in downloader.download(_refFor(entry, spec))) {
         if (event is ArtifactFileProgress) {
           if (_stopRequested.contains(artifactKey)) continue;
           lastReceived = event.bytesReceived;
@@ -262,7 +341,7 @@ final class RealModelManagementRepository implements ModelManagementRepository {
         }
       }
       switch (fileOutcome) {
-        case ArtifactFilePaused(:final userInitiated):
+        case ArtifactFilePaused(:final userInitiated, :final resumable):
           // A user pause already persisted out of band; an uncommanded one
           // (network loss, OS timeout) must be persisted here or the card
           // freezes on "downloading".
@@ -272,7 +351,13 @@ final class RealModelManagementRepository implements ModelManagementRepository {
                 artifactKey,
                 ArtifactStatus(
                   phase: ArtifactPhase.paused,
-                  downloadedBytes: verifiedBytes + lastReceived,
+                  // Streamed bytes count only while they can still be resumed
+                  // from. Crediting a partial the platform discarded shows a
+                  // card at 60% whose Resume restarts from zero, and a bar that
+                  // jumps backwards reads as lost work.
+                  downloadedBytes: resumable
+                      ? verifiedBytes + lastReceived
+                      : verifiedBytes,
                 ),
               ),
             );
@@ -345,6 +430,7 @@ final class RealModelManagementRepository implements ModelManagementRepository {
       if (_stopRequested.contains(artifactKey)) return;
     }
 
+    if (_repinned(entry)) return;
     yield await _persist(
       _state.withArtifact(
         artifactKey,
@@ -355,6 +441,30 @@ final class RealModelManagementRepository implements ModelManagementRepository {
       ),
     );
   }
+
+  /// Whether the catalog moved to a different commit for this key since the
+  /// download started. [addModel] swaps the entry in place and cannot stop a
+  /// generator already running against the old one.
+  bool _repinned(ModelCatalogEntry entry) {
+    for (final current in catalog) {
+      if (current.key == entry.key) return current.revision != entry.revision;
+    }
+    // The entry left the catalog entirely; nothing may still be installed
+    // under its name.
+    return true;
+  }
+
+  /// Derived, never remembered: an out-of-band pause or cancel arriving in a
+  /// fresh process must address the same transfer the previous process
+  /// started, and the catalog is the only thing both share.
+  ArtifactFileRef _refFor(ModelCatalogEntry entry, ModelArtifactFile spec) =>
+      ArtifactFileRef(
+        artifactKey: entry.key,
+        sourceUrl: entry.resolveUrlFor(spec).toString(),
+        directory: _directoryFor(entry, spec),
+        filename: _filenameFor(spec),
+        expectedBytes: spec.bytes,
+      );
 
   String _directoryFor(ModelCatalogEntry entry, ModelArtifactFile spec) {
     final segments = spec.path.split('/');
@@ -435,11 +545,35 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     }
   }
 
+  /// An out-of-band stop names only the artifact, so every file of the entry is
+  /// addressed; the platform holds at most one transfer per destination and
+  /// answers for the rest immediately.
+  Future<bool> _pauseTransfers(ModelCatalogEntry entry) async {
+    var paused = false;
+    for (final spec in entry.files) {
+      if (await downloader.pause(_refFor(entry, spec))) paused = true;
+    }
+    return paused;
+  }
+
+  /// True only when the platform holds nothing for any file — the precondition
+  /// for deleting the directory those transfers write into.
+  Future<bool> _cancelTransfers(ModelCatalogEntry entry) async {
+    var cleared = true;
+    for (final spec in entry.files) {
+      if (!await downloader.cancel(_refFor(entry, spec))) cleared = false;
+    }
+    return cleared;
+  }
+
   @override
   Future<ModelState> pause(String artifactKey) async {
-    _entry(artifactKey);
+    final entry = _entry(artifactKey);
+    // Confirmed first: a transfer the platform would not pause is still
+    // moving bytes, and a card reading "Paused" over a live writer is a lie
+    // the user acts on. Reconciliation converges it either way.
+    if (!await _pauseTransfers(entry)) return _state;
     _stopRequested.add(artifactKey);
-    await downloader.pause();
     return _persist(
       _state.withArtifact(
         artifactKey,
@@ -449,25 +583,23 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   }
 
   @override
-  Future<ModelState> cancel(String artifactKey) async {
-    final entry = _entry(artifactKey);
-    _stopRequested.add(artifactKey);
-    await downloader.cancel();
-    await _deleteArtifactFiles(entry);
-    return _persist(
-      _withoutArtifact(
-        artifactKey,
-      ).withArtifact(artifactKey, const ArtifactStatus()),
-    );
-  }
+  Future<ModelState> cancel(String artifactKey) => _discard(artifactKey);
 
   @override
-  Future<ModelState> delete(String artifactKey) async {
+  Future<ModelState> delete(String artifactKey) => _discard(artifactKey);
+
+  /// Cancel and delete differ only in what the user was looking at; both stop
+  /// every transfer, prove it stopped, and remove the install.
+  Future<ModelState> _discard(String artifactKey) async {
     final entry = _entry(artifactKey);
-    // Stop the download first, or bytes land in the directory just removed.
     _stopRequested.add(artifactKey);
-    await downloader.cancel();
-    await _deleteArtifactFiles(entry);
+    // The answer decides whether one sweep is enough. A transfer the platform
+    // could not confirm stopping may still land its staging file on the
+    // destination after the directory is gone, recreating it with weights that
+    // carry no receipt — bytes the UI then calls "not downloaded" and no user
+    // action can reach.
+    final cleared = await _cancelTransfers(entry);
+    await _deleteArtifactFiles(entry, sweepTwice: !cleared);
     return _persist(
       _withoutArtifact(
         artifactKey,
@@ -482,11 +614,27 @@ final class RealModelManagementRepository implements ModelManagementRepository {
       ? _state.copyWith(runtime: RuntimePhase.unloaded, clearFailure: true)
       : _state;
 
-  Future<void> _deleteArtifactFiles(ModelCatalogEntry entry) async {
-    final root = Directory(_rootFor(entry));
-    if (await root.exists()) {
-      await root.delete(recursive: true);
+  /// [sweepTwice] only when a transfer could not be confirmed stopped: both
+  /// platforms write the destination at completion from a staging file,
+  /// recreating the directory on the way, so a task already inside that move
+  /// can resurrect what was just deleted. A confirmed-clear delete pays no
+  /// second pass and no delay.
+  Future<void> _deleteArtifactFiles(
+    ModelCatalogEntry entry, {
+    bool sweepTwice = false,
+  }) async {
+    Future<void> sweep() async {
+      final root = Directory(_rootFor(entry));
+      if (!await root.exists()) return;
+      try {
+        await root.delete(recursive: true);
+      } catch (_) {}
     }
+
+    await sweep();
+    if (!sweepTwice) return;
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    await sweep();
   }
 
   @override

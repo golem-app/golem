@@ -161,6 +161,78 @@ final class _StaticState implements ModelManagementRepository {
   Future<ModelState> addModel(ModelCatalogEntry entry) async => state;
 }
 
+/// A repository whose [load] answer changes between calls — a stand-in for
+/// reconciliation discovering a transfer the app had not known about.
+final class _ReconcilingModels implements ModelManagementRepository {
+  _ReconcilingModels(this.answers);
+
+  final List<ModelState> answers;
+  int loads = 0;
+  final List<String> downloads = [];
+
+  ModelState get _latest => answers[(loads - 1).clamp(0, answers.length - 1)];
+
+  @override
+  Future<ModelState> load() async =>
+      answers[(loads++).clamp(0, answers.length - 1)];
+
+  @override
+  Stream<ModelState> download(String artifactKey) {
+    downloads.add(artifactKey);
+    return Stream.value(
+      _latest.withArtifact(
+        artifactKey,
+        const ArtifactStatus(phase: ArtifactPhase.installed),
+      ),
+    );
+  }
+
+  @override
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    String? failure,
+  }) async => _latest;
+  @override
+  Future<ModelState> pause(String artifactKey) async => _latest;
+  @override
+  Future<ModelState> cancel(String artifactKey) async => _latest;
+  @override
+  Future<ModelState> delete(String artifactKey) async => _latest;
+  @override
+  Future<ModelState> addModel(ModelCatalogEntry entry) async => _latest;
+}
+
+/// Loads once, then fails — a store that becomes unreadable between passes.
+final class _ThrowingOnSecondLoad implements ModelManagementRepository {
+  int _loads = 0;
+  static final _installed = const ModelState().withArtifact(
+    'gemma4-gguf',
+    const ArtifactStatus(phase: ArtifactPhase.installed),
+  );
+
+  @override
+  Future<ModelState> load() async {
+    if (_loads++ > 0) throw const FormatException('unreadable');
+    return _installed;
+  }
+
+  @override
+  Stream<ModelState> download(String artifactKey) => Stream.value(_installed);
+  @override
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    String? failure,
+  }) async => _installed;
+  @override
+  Future<ModelState> pause(String artifactKey) async => _installed;
+  @override
+  Future<ModelState> cancel(String artifactKey) async => _installed;
+  @override
+  Future<ModelState> delete(String artifactKey) async => _installed;
+  @override
+  Future<ModelState> addModel(ModelCatalogEntry entry) async => _installed;
+}
+
 void main() {
   ProviderContainer containerWith({Duration delay = Duration.zero}) {
     final directory = Directory.systemTemp.createTempSync(
@@ -255,6 +327,74 @@ void main() {
     controller.stop();
     await Future<void>.delayed(const Duration(milliseconds: 40));
     expect(container.read(benchmarkControllerProvider).result, isNull);
+  });
+
+  group('download reconciliation', () {
+    ProviderContainer withModels(ModelManagementRepository models) {
+      final container = ProviderContainer(
+        overrides: [
+          chatHistoryRepositoryProvider.overrideWithValue(
+            InMemoryChatHistoryRepository(),
+          ),
+          modelManagementRepositoryProvider.overrideWithValue(models),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    // The headline path: the app relaunches believing nothing is running, and
+    // reconciliation finds the OS still moving bytes.
+    test('a transfer found on return is re-attached, not restarted', () async {
+      final models = _ReconcilingModels([
+        const ModelState(),
+        const ModelState().withArtifact(
+          'gemma4-gguf',
+          const ArtifactStatus(phase: ArtifactPhase.downloading),
+        ),
+      ]);
+      final container = withModels(models);
+      await container.read(modelControllerProvider.future);
+      expect(models.downloads, isEmpty);
+
+      await container
+          .read(modelControllerProvider.notifier)
+          .reconcileDownloads();
+
+      // Exactly one attach, and the phase follows it through to installed.
+      expect(models.downloads, ['gemma4-gguf']);
+      final state = container.read(modelControllerProvider).value!;
+      expect(state.statusOf('gemma4-gguf').phase, ArtifactPhase.installed);
+    });
+
+    test('nothing in flight attaches to nothing', () async {
+      final models = _ReconcilingModels([const ModelState()]);
+      final container = withModels(models);
+      await container.read(modelControllerProvider.future);
+      await container
+          .read(modelControllerProvider.notifier)
+          .reconcileDownloads();
+      expect(models.downloads, isEmpty);
+    });
+
+    // Reconciliation is a repair pass; a failure in it must never replace a
+    // usable snapshot with an error screen.
+    test('a failed reconcile leaves the last good snapshot alone', () async {
+      final container = withModels(_ThrowingOnSecondLoad());
+      final first = await container.read(modelControllerProvider.future);
+      expect(first.statusOf('gemma4-gguf').phase, ArtifactPhase.installed);
+
+      await container
+          .read(modelControllerProvider.notifier)
+          .reconcileDownloads();
+
+      final after = container.read(modelControllerProvider);
+      expect(after.hasError, isFalse);
+      expect(
+        after.value!.statusOf('gemma4-gguf').phase,
+        ArtifactPhase.installed,
+      );
+    });
   });
 
   test('chat generation passes the active profile overrides', () async {

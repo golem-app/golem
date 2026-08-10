@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -74,18 +76,29 @@ class _GolemAppState extends ConsumerState<GolemApp>
     with WidgetsBindingObserver {
   late final GoRouter _router;
 
+  Timer? _reconcileDebounce;
+
   @override
   void initState() {
     super.initState();
     _router = _createRouter(widget.picker);
     WidgetsBinding.instance.addObserver(this);
+    // After the first frame, so the model controller's own launch pass has
+    // settled before anything re-attaches to a transfer it may have found.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reconcileDownloads());
   }
 
   @override
   void dispose() {
+    _reconcileDebounce?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _router.dispose();
     super.dispose();
+  }
+
+  void _reconcileDownloads() {
+    if (!mounted) return;
+    ref.read(modelControllerProvider.notifier).reconcileDownloads();
   }
 
   // No MediaQuery exists above the app widget, so brightness comes from the
@@ -106,6 +119,17 @@ class _GolemAppState extends ConsumerState<GolemApp>
     // background memory ceiling; prepare() reloads lazily on return.
     if (state == AppLifecycleState.paused) {
       ref.read(modelControllerProvider.notifier).releaseEngineWhileInactive();
+    }
+    // Returning to the foreground is the only moment the app can notice that
+    // the OS finished, paused, or discarded a download while it was away.
+    // Debounced because `resumed` also fires for a permission sheet, a share
+    // sheet, or a Control Centre pull, and each pass probes the platform.
+    if (state == AppLifecycleState.resumed) {
+      _reconcileDebounce?.cancel();
+      _reconcileDebounce = Timer(
+        const Duration(milliseconds: 500),
+        _reconcileDownloads,
+      );
     }
   }
 

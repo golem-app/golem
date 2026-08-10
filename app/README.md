@@ -68,6 +68,18 @@ preflight, and delete. Downloads install under
 backups (iOS/macOS `NSURLIsExcludedFromBackupKey`, Android
 `dataExtractionRules`).
 
+Transfers outlive the app process, so they are **reconciled** rather than
+remembered: at startup and on every return to the foreground the app asks the
+platform what it still holds for each artifact, adopts a transfer that is still
+running instead of starting a second one, resumes a partial where resume data
+survived, and turns proven silence into an actionable Paused. Two platform
+limits are real and recorded rather than papered over — Android's `force-stop`
+cancels the OS jobs until the app is launched by hand, and closing the app from
+the iOS App Switcher stops its background downloads outright. The rules are in
+`../docs/decisions/0005-download-lifecycle.md`; how they are proven, and which
+evidence no test process can produce, is in
+`../docs/notes/download-lifecycle.md`.
+
 Which artifact has actually been run on which hardware — and what is therefore
 not claimed — is recorded in `../docs/real-model-matrix.md`, together with the
 gated instruments that produced it.
@@ -164,7 +176,12 @@ repo root.
   fake simulates the same catalog; `RealModelManagementRepository` downloads
   via `background_downloader` behind the `ArtifactFileDownloader` seam, with
   free-space probing and backup exclusion on the
-  `app.golem.flutter/storage` platform channel.
+  `app.golem.flutter/storage` platform channel. The seam is identity-aware:
+  every call names an `ArtifactFileRef`, and `inspect` reports what the OS
+  still holds, so a stop issued after a relaunch reaches the transfer the
+  previous process started. Which transfer a platform task belongs to travels
+  in the task's `metaData`, never in its id — `0005-download-lifecycle.md`
+  explains why the obvious alternative is unsafe.
 - `BenchmarkRepository`: deterministic result generation and JSON export, always
   marked simulated.
 - Generated `AsyncNotifier` command controllers serialize chat/model mutations,
