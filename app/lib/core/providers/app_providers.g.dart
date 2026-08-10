@@ -529,6 +529,7 @@ String _$diskFreeSpaceProbeHash() =>
 /// discipline: dozens of widgets read it for honest "simulated" labeling, and
 /// host tests (the dev flavor) must see the fake without every container
 /// overriding it. main() always overrides it with the resolved config.
+/// KeepAlive: process-constant boot configuration.
 
 @ProviderFor(inferenceBackend)
 final inferenceBackendProvider = InferenceBackendProvider._();
@@ -538,6 +539,7 @@ final inferenceBackendProvider = InferenceBackendProvider._();
 /// discipline: dozens of widgets read it for honest "simulated" labeling, and
 /// host tests (the dev flavor) must see the fake without every container
 /// overriding it. main() always overrides it with the resolved config.
+/// KeepAlive: process-constant boot configuration.
 
 final class InferenceBackendProvider
     extends
@@ -552,6 +554,7 @@ final class InferenceBackendProvider
   /// discipline: dozens of widgets read it for honest "simulated" labeling, and
   /// host tests (the dev flavor) must see the fake without every container
   /// overriding it. main() always overrides it with the resolved config.
+  /// KeepAlive: process-constant boot configuration.
   InferenceBackendProvider._()
     : super(
         from: null,
@@ -593,6 +596,8 @@ String _$inferenceBackendHash() => r'514f250994225e1c5e3830610653488e7a69988b';
 /// back to the configured artifact, so a lazy first load does not blank the
 /// chrome. Always null under a simulated backend, without touching the
 /// repository seam: label-only containers must not need one.
+/// KeepAlive: holds the live ValueListenable subscription onto #42's
+/// residency owner; autoDispose would churn that listener per route.
 
 @ProviderFor(residentModelKey)
 final residentModelKeyProvider = ResidentModelKeyProvider._();
@@ -602,6 +607,8 @@ final residentModelKeyProvider = ResidentModelKeyProvider._();
 /// back to the configured artifact, so a lazy first load does not blank the
 /// chrome. Always null under a simulated backend, without touching the
 /// repository seam: label-only containers must not need one.
+/// KeepAlive: holds the live ValueListenable subscription onto #42's
+/// residency owner; autoDispose would churn that listener per route.
 
 final class ResidentModelKeyProvider
     extends $FunctionalProvider<String?, String?, String?>
@@ -611,6 +618,8 @@ final class ResidentModelKeyProvider
   /// back to the configured artifact, so a lazy first load does not blank the
   /// chrome. Always null under a simulated backend, without touching the
   /// repository seam: label-only containers must not need one.
+  /// KeepAlive: holds the live ValueListenable subscription onto #42's
+  /// residency owner; autoDispose would churn that listener per route.
   ResidentModelKeyProvider._()
     : super(
         from: null,
@@ -739,6 +748,11 @@ String _$documentsPathHash() => r'2642290dce766869e9b00ab9bc831b6a60672caf';
 /// or removed. ChatController reassigns state on every streaming delta, so
 /// anything as heavy as disk probing must key on this rather than the raw chat
 /// state, or it re-runs per token for the always-mounted drawer meter.
+/// KeepAlive, deliberately (#69): classified as a derived value that could
+/// autoDispose, but on the pinned riverpod 3.0.3 a widget-watched derivation
+/// over an async controller trips Flutter's element-update invariant when a
+/// provider scope is swapped mid-test ("markNeedsBuild ... inside Widget
+/// lifecycle", fixed upstream in 3.4.0). Revisit with the pin.
 
 @ProviderFor(chatStorageSignature)
 final chatStorageSignatureProvider = ChatStorageSignatureProvider._();
@@ -747,6 +761,11 @@ final chatStorageSignatureProvider = ChatStorageSignatureProvider._();
 /// or removed. ChatController reassigns state on every streaming delta, so
 /// anything as heavy as disk probing must key on this rather than the raw chat
 /// state, or it re-runs per token for the always-mounted drawer meter.
+/// KeepAlive, deliberately (#69): classified as a derived value that could
+/// autoDispose, but on the pinned riverpod 3.0.3 a widget-watched derivation
+/// over an async controller trips Flutter's element-update invariant when a
+/// provider scope is swapped mid-test ("markNeedsBuild ... inside Widget
+/// lifecycle", fixed upstream in 3.4.0). Revisit with the pin.
 
 final class ChatStorageSignatureProvider
     extends $FunctionalProvider<(int, int), (int, int), (int, int)>
@@ -755,6 +774,11 @@ final class ChatStorageSignatureProvider
   /// or removed. ChatController reassigns state on every streaming delta, so
   /// anything as heavy as disk probing must key on this rather than the raw chat
   /// state, or it re-runs per token for the always-mounted drawer meter.
+  /// KeepAlive, deliberately (#69): classified as a derived value that could
+  /// autoDispose, but on the pinned riverpod 3.0.3 a widget-watched derivation
+  /// over an async controller trips Flutter's element-update invariant when a
+  /// provider scope is swapped mid-test ("markNeedsBuild ... inside Widget
+  /// lifecycle", fixed upstream in 3.4.0). Revisit with the pin.
   ChatStorageSignatureProvider._()
     : super(
         from: null,
@@ -793,14 +817,30 @@ String _$chatStorageSignatureHash() =>
 
 /// Storage accounting for the drawer meter and the Storage screen. Free and
 /// total bytes are null whenever the platform cannot report them (or the seams
-/// are unwired) — surfaces hide those figures instead of inventing them.
+/// are unwired) — surfaces hide those figures instead of inventing them. The
+/// provider owns seam tolerance; the service owns the computation and its
+/// required-vs-optional failure policy.
+/// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it,
+/// so disposal would never fire in practice, and the pinned riverpod 3.0.3
+/// scope-swap hazard (see chatStorageSignature) rules autoDispose out for
+/// widget-watched derivations. Staleness is owned by invalidation — the
+/// storage signature upstream and `ref.invalidate` after a cache clear —
+/// never by a `KeepAliveLink` TTL (§4.4). Revisit with the pin.
 
 @ProviderFor(storageBreakdown)
 final storageBreakdownProvider = StorageBreakdownProvider._();
 
 /// Storage accounting for the drawer meter and the Storage screen. Free and
 /// total bytes are null whenever the platform cannot report them (or the seams
-/// are unwired) — surfaces hide those figures instead of inventing them.
+/// are unwired) — surfaces hide those figures instead of inventing them. The
+/// provider owns seam tolerance; the service owns the computation and its
+/// required-vs-optional failure policy.
+/// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it,
+/// so disposal would never fire in practice, and the pinned riverpod 3.0.3
+/// scope-swap hazard (see chatStorageSignature) rules autoDispose out for
+/// widget-watched derivations. Staleness is owned by invalidation — the
+/// storage signature upstream and `ref.invalidate` after a cache clear —
+/// never by a `KeepAliveLink` TTL (§4.4). Revisit with the pin.
 
 final class StorageBreakdownProvider
     extends
@@ -812,7 +852,15 @@ final class StorageBreakdownProvider
     with $FutureModifier<StorageBreakdown>, $FutureProvider<StorageBreakdown> {
   /// Storage accounting for the drawer meter and the Storage screen. Free and
   /// total bytes are null whenever the platform cannot report them (or the seams
-  /// are unwired) — surfaces hide those figures instead of inventing them.
+  /// are unwired) — surfaces hide those figures instead of inventing them. The
+  /// provider owns seam tolerance; the service owns the computation and its
+  /// required-vs-optional failure policy.
+  /// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it,
+  /// so disposal would never fire in practice, and the pinned riverpod 3.0.3
+  /// scope-swap hazard (see chatStorageSignature) rules autoDispose out for
+  /// widget-watched derivations. Staleness is owned by invalidation — the
+  /// storage signature upstream and `ref.invalidate` after a cache clear —
+  /// never by a `KeepAliveLink` TTL (§4.4). Revisit with the pin.
   StorageBreakdownProvider._()
     : super(
         from: null,
@@ -839,16 +887,26 @@ final class StorageBreakdownProvider
   }
 }
 
-String _$storageBreakdownHash() => r'efce269eb798d6f314deee2b35ee75c6310daaba';
+String _$storageBreakdownHash() => r'4ba7c85265ff7001eabf61e7b6339e0080f2a0ba';
 
 /// Pinned entries plus the user's custom repositories, derived — never stored —
 /// so the pinned manifest stays the single source of model knowledge.
+/// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
+/// (composer, drawer, recovery banner), so disposal would never fire in
+/// practice — and the pinned riverpod 3.0.3 scope-swap hazard (see
+/// chatStorageSignature) rules autoDispose out for widget-watched
+/// derivations. Revisit with the pin.
 
 @ProviderFor(effectiveModelCatalog)
 final effectiveModelCatalogProvider = EffectiveModelCatalogProvider._();
 
 /// Pinned entries plus the user's custom repositories, derived — never stored —
 /// so the pinned manifest stays the single source of model knowledge.
+/// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
+/// (composer, drawer, recovery banner), so disposal would never fire in
+/// practice — and the pinned riverpod 3.0.3 scope-swap hazard (see
+/// chatStorageSignature) rules autoDispose out for widget-watched
+/// derivations. Revisit with the pin.
 
 final class EffectiveModelCatalogProvider
     extends
@@ -860,6 +918,11 @@ final class EffectiveModelCatalogProvider
     with $Provider<List<ModelCatalogEntry>> {
   /// Pinned entries plus the user's custom repositories, derived — never stored —
   /// so the pinned manifest stays the single source of model knowledge.
+  /// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
+  /// (composer, drawer, recovery banner), so disposal would never fire in
+  /// practice — and the pinned riverpod 3.0.3 scope-swap hazard (see
+  /// chatStorageSignature) rules autoDispose out for widget-watched
+  /// derivations. Revisit with the pin.
   EffectiveModelCatalogProvider._()
     : super(
         from: null,
@@ -900,6 +963,9 @@ String _$effectiveModelCatalogHash() =>
 /// The models a per-chat selection may name: installed, and of the engine this
 /// build composed. Derived here so chat, Settings, and Storage cannot disagree
 /// about which model is live (#20).
+/// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
+/// continuously watched, and the 3.0.3 scope-swap hazard. Revisit with the
+/// pin.
 
 @ProviderFor(loadableModelKeys)
 final loadableModelKeysProvider = LoadableModelKeysProvider._();
@@ -907,6 +973,9 @@ final loadableModelKeysProvider = LoadableModelKeysProvider._();
 /// The models a per-chat selection may name: installed, and of the engine this
 /// build composed. Derived here so chat, Settings, and Storage cannot disagree
 /// about which model is live (#20).
+/// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
+/// continuously watched, and the 3.0.3 scope-swap hazard. Revisit with the
+/// pin.
 
 final class LoadableModelKeysProvider
     extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
@@ -914,6 +983,9 @@ final class LoadableModelKeysProvider
   /// The models a per-chat selection may name: installed, and of the engine this
   /// build composed. Derived here so chat, Settings, and Storage cannot disagree
   /// about which model is live (#20).
+  /// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
+  /// continuously watched, and the 3.0.3 scope-swap hazard. Revisit with the
+  /// pin.
   LoadableModelKeysProvider._()
     : super(
         from: null,
@@ -951,22 +1023,28 @@ String _$loadableModelKeysHash() => r'12e16f3f980da93856da1aa47fec36b9d9201e01';
 
 /// The raw field text stays widget-local in the search screen (debounced
 /// 350 ms); only the normalized query lands here, so results derive reactively.
+/// AutoDispose: screen-scoped — the search screen watches it for its whole
+/// life, and disposal on pop resets the query for the next visit.
 
 @ProviderFor(SearchQuery)
 final searchQueryProvider = SearchQueryProvider._();
 
 /// The raw field text stays widget-local in the search screen (debounced
 /// 350 ms); only the normalized query lands here, so results derive reactively.
+/// AutoDispose: screen-scoped — the search screen watches it for its whole
+/// life, and disposal on pop resets the query for the next visit.
 final class SearchQueryProvider extends $NotifierProvider<SearchQuery, String> {
   /// The raw field text stays widget-local in the search screen (debounced
   /// 350 ms); only the normalized query lands here, so results derive reactively.
+  /// AutoDispose: screen-scoped — the search screen watches it for its whole
+  /// life, and disposal on pop resets the query for the next visit.
   SearchQueryProvider._()
     : super(
         from: null,
         argument: null,
         retry: noRetry,
         name: r'searchQueryProvider',
-        isAutoDispose: false,
+        isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -987,10 +1065,12 @@ final class SearchQueryProvider extends $NotifierProvider<SearchQuery, String> {
   }
 }
 
-String _$searchQueryHash() => r'ac97fb52441d227b3e67648629ba76f54e633130';
+String _$searchQueryHash() => r'b66c0cf584e4aa1d4971c87c725f89c4a7cda04a';
 
 /// The raw field text stays widget-local in the search screen (debounced
 /// 350 ms); only the normalized query lands here, so results derive reactively.
+/// AutoDispose: screen-scoped — the search screen watches it for its whole
+/// life, and disposal on pop resets the query for the next visit.
 
 abstract class _$SearchQuery extends $Notifier<String> {
   String build();
@@ -1010,8 +1090,14 @@ abstract class _$SearchQuery extends $Notifier<String> {
   }
 }
 
+/// AutoDispose: derives from the query and lives exactly as long as the
+/// search screen watches it.
+
 @ProviderFor(chatSearchResults)
 final chatSearchResultsProvider = ChatSearchResultsProvider._();
+
+/// AutoDispose: derives from the query and lives exactly as long as the
+/// search screen watches it.
 
 final class ChatSearchResultsProvider
     extends
@@ -1021,13 +1107,15 @@ final class ChatSearchResultsProvider
           List<ChatSearchResult>
         >
     with $Provider<List<ChatSearchResult>> {
+  /// AutoDispose: derives from the query and lives exactly as long as the
+  /// search screen watches it.
   ChatSearchResultsProvider._()
     : super(
         from: null,
         argument: null,
         retry: noRetry,
         name: r'chatSearchResultsProvider',
-        isAutoDispose: false,
+        isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -1055,17 +1143,23 @@ final class ChatSearchResultsProvider
   }
 }
 
-String _$chatSearchResultsHash() => r'5087660e551a3820d42b49a8336e9b3cd4cfbb81';
+String _$chatSearchResultsHash() => r'728143a70700911ba5fc875b23e66f1fcee101ef';
 
 /// Only user-set values are stored; profile defaults resolve at the consumer.
+/// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
+/// owner over write-through persistence.
 
 @ProviderFor(SettingsController)
 final settingsControllerProvider = SettingsControllerProvider._();
 
 /// Only user-set values are stored; profile defaults resolve at the consumer.
+/// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
+/// owner over write-through persistence.
 final class SettingsControllerProvider
     extends $AsyncNotifierProvider<SettingsController, GenerationSettings> {
   /// Only user-set values are stored; profile defaults resolve at the consumer.
+  /// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
+  /// owner over write-through persistence.
   SettingsControllerProvider._()
     : super(
         from: null,
@@ -1086,9 +1180,11 @@ final class SettingsControllerProvider
 }
 
 String _$settingsControllerHash() =>
-    r'daaf5617505e1bed4a8db7362ff8a964d6ba2808';
+    r'1c2af52933a97a9d1a8713fd6bb2b42bca0ed384';
 
 /// Only user-set values are stored; profile defaults resolve at the consumer.
+/// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
+/// owner over write-through persistence.
 
 abstract class _$SettingsController extends $AsyncNotifier<GenerationSettings> {
   FutureOr<GenerationSettings> build();
@@ -1110,17 +1206,26 @@ abstract class _$SettingsController extends $AsyncNotifier<GenerationSettings> {
 }
 
 /// Persisted app-wide preferences. Every command follows the settings idiom —
-/// drop taps that land in the cold-start load window, publish, then save.
+/// drop taps that land in the cold-start load window, publish, then save —
+/// and returns false after rolling back a failed write, never throwing.
+/// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
+/// root on every frame.
 
 @ProviderFor(PreferencesController)
 final preferencesControllerProvider = PreferencesControllerProvider._();
 
 /// Persisted app-wide preferences. Every command follows the settings idiom —
-/// drop taps that land in the cold-start load window, publish, then save.
+/// drop taps that land in the cold-start load window, publish, then save —
+/// and returns false after rolling back a failed write, never throwing.
+/// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
+/// root on every frame.
 final class PreferencesControllerProvider
     extends $AsyncNotifierProvider<PreferencesController, AppPreferences> {
   /// Persisted app-wide preferences. Every command follows the settings idiom —
-  /// drop taps that land in the cold-start load window, publish, then save.
+  /// drop taps that land in the cold-start load window, publish, then save —
+  /// and returns false after rolling back a failed write, never throwing.
+  /// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
+  /// root on every frame.
   PreferencesControllerProvider._()
     : super(
         from: null,
@@ -1141,10 +1246,13 @@ final class PreferencesControllerProvider
 }
 
 String _$preferencesControllerHash() =>
-    r'70ebbae2e3c0c15bd5c37f7153889c11a35a0ada';
+    r'aeeb637738d76126ac2b6f0085a3c475c5e7f26d';
 
 /// Persisted app-wide preferences. Every command follows the settings idiom —
-/// drop taps that land in the cold-start load window, publish, then save.
+/// drop taps that land in the cold-start load window, publish, then save —
+/// and returns false after rolling back a failed write, never throwing.
+/// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
+/// root on every frame.
 
 abstract class _$PreferencesController extends $AsyncNotifier<AppPreferences> {
   FutureOr<AppPreferences> build();
@@ -1164,11 +1272,18 @@ abstract class _$PreferencesController extends $AsyncNotifier<AppPreferences> {
   }
 }
 
+/// KeepAlive: the chat session aggregate — in-flight generation and unsaved
+/// turns must survive every route transition.
+
 @ProviderFor(ChatController)
 final chatControllerProvider = ChatControllerProvider._();
 
+/// KeepAlive: the chat session aggregate — in-flight generation and unsaved
+/// turns must survive every route transition.
 final class ChatControllerProvider
     extends $AsyncNotifierProvider<ChatController, ChatState> {
+  /// KeepAlive: the chat session aggregate — in-flight generation and unsaved
+  /// turns must survive every route transition.
   ChatControllerProvider._()
     : super(
         from: null,
@@ -1188,7 +1303,10 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'1370b6aea3dbce39a5c8ec2ed813b4ff06aca096';
+String _$chatControllerHash() => r'2d5ea9018dcaa97c7a6c581929855441cc46c7ec';
+
+/// KeepAlive: the chat session aggregate — in-flight generation and unsaved
+/// turns must survive every route transition.
 
 abstract class _$ChatController extends $AsyncNotifier<ChatState> {
   FutureOr<ChatState> build();
@@ -1208,11 +1326,21 @@ abstract class _$ChatController extends $AsyncNotifier<ChatState> {
   }
 }
 
+/// KeepAlive: a command controller whose downloads, busy guard, and epochs
+/// must survive leaving the Models screen (§3.4 — an autoDispose command
+/// provider dies mid-flight).
+
 @ProviderFor(ModelController)
 final modelControllerProvider = ModelControllerProvider._();
 
+/// KeepAlive: a command controller whose downloads, busy guard, and epochs
+/// must survive leaving the Models screen (§3.4 — an autoDispose command
+/// provider dies mid-flight).
 final class ModelControllerProvider
     extends $AsyncNotifierProvider<ModelController, ModelState> {
+  /// KeepAlive: a command controller whose downloads, busy guard, and epochs
+  /// must survive leaving the Models screen (§3.4 — an autoDispose command
+  /// provider dies mid-flight).
   ModelControllerProvider._()
     : super(
         from: null,
@@ -1234,6 +1362,10 @@ final class ModelControllerProvider
 
 String _$modelControllerHash() => r'13feb0274a7de49f9b86157a27e042d1f66af0f8';
 
+/// KeepAlive: a command controller whose downloads, busy guard, and epochs
+/// must survive leaving the Models screen (§3.4 — an autoDispose command
+/// provider dies mid-flight).
+
 abstract class _$ModelController extends $AsyncNotifier<ModelState> {
   FutureOr<ModelState> build();
   @$mustCallSuper
@@ -1252,11 +1384,18 @@ abstract class _$ModelController extends $AsyncNotifier<ModelState> {
   }
 }
 
+/// KeepAlive: the startup outcome is process-lifetime; #66 owns any
+/// startup redesign.
+
 @ProviderFor(StartupController)
 final startupControllerProvider = StartupControllerProvider._();
 
+/// KeepAlive: the startup outcome is process-lifetime; #66 owns any
+/// startup redesign.
 final class StartupControllerProvider
     extends $AsyncNotifierProvider<StartupController, StartupState> {
+  /// KeepAlive: the startup outcome is process-lifetime; #66 owns any
+  /// startup redesign.
   StartupControllerProvider._()
     : super(
         from: null,
@@ -1278,6 +1417,9 @@ final class StartupControllerProvider
 
 String _$startupControllerHash() => r'd4a2a4151c2a95fb1f9bd58bfee3cdd02463a04d';
 
+/// KeepAlive: the startup outcome is process-lifetime; #66 owns any
+/// startup redesign.
+
 abstract class _$StartupController extends $AsyncNotifier<StartupState> {
   FutureOr<StartupState> build();
   @$mustCallSuper
@@ -1296,11 +1438,18 @@ abstract class _$StartupController extends $AsyncNotifier<StartupState> {
   }
 }
 
+/// KeepAlive — a decision, not the old blanket default: a running benchmark
+/// keeps running and its result survives leaving the screen.
+
 @ProviderFor(BenchmarkController)
 final benchmarkControllerProvider = BenchmarkControllerProvider._();
 
+/// KeepAlive — a decision, not the old blanket default: a running benchmark
+/// keeps running and its result survives leaving the screen.
 final class BenchmarkControllerProvider
     extends $NotifierProvider<BenchmarkController, BenchmarkState> {
+  /// KeepAlive — a decision, not the old blanket default: a running benchmark
+  /// keeps running and its result survives leaving the screen.
   BenchmarkControllerProvider._()
     : super(
         from: null,
@@ -1330,6 +1479,9 @@ final class BenchmarkControllerProvider
 
 String _$benchmarkControllerHash() =>
     r'712ff941abd9db2d7880ee86b9217438d356f168';
+
+/// KeepAlive — a decision, not the old blanket default: a running benchmark
+/// keeps running and its result survives leaving the screen.
 
 abstract class _$BenchmarkController extends $Notifier<BenchmarkState> {
   BenchmarkState build();

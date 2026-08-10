@@ -22,8 +22,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _controller = TextEditingController();
   Timer? _debounce;
 
-  // Captured at init because ref is unusable in dispose; the keepAlive
-  // notifier outlives this screen.
+  // Captured at init because ref is unusable in dispose. The notifier is
+  // autoDispose and lives exactly as long as this screen watches it; every
+  // publish below runs while mounted, and disposal itself now provides the
+  // fresh-visit reset the manual clears used to guarantee alone.
   late final SearchQuery _query;
 
   @override

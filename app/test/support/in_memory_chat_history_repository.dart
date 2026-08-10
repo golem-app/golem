@@ -15,11 +15,16 @@ final class InMemoryChatHistoryRepository implements ChatHistoryRepository {
   /// decrements — the storage-breakdown fault hook.
   int failingStoredBytes = 0;
 
+  /// How often the breakdown actually probed this store — the lifecycle
+  /// suite's recompute observability.
+  int storedBytesCalls = 0;
+
   @override
   Future<ChatHistorySnapshot> load() async => snapshot;
 
   @override
   Future<int> storedBytes() async {
+    storedBytesCalls++;
     if (failingStoredBytes > 0) {
       failingStoredBytes--;
       throw const PersistenceException(

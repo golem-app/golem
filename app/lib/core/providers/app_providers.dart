@@ -27,6 +27,11 @@ export '../application/storage_breakdown_service.dart'
 
 part 'app_providers.g.dart';
 
+// Lifetime policy (#69): the repository/probe seams below are keepAlive
+// because they are composition-injected process-lifetime dependencies —
+// overridden once in main.dart, never recomputed; disposing one could only
+// re-throw its seam. Providers with a narrower owner say so individually.
+
 @Riverpod(keepAlive: true, retry: noRetry)
 ChatHistoryRepository chatHistoryRepository(Ref ref) =>
     throw UnimplementedError(
@@ -85,6 +90,7 @@ DiskSpaceProbe diskFreeSpaceProbe(Ref ref) =>
 /// discipline: dozens of widgets read it for honest "simulated" labeling, and
 /// host tests (the dev flavor) must see the fake without every container
 /// overriding it. main() always overrides it with the resolved config.
+/// KeepAlive: process-constant boot configuration.
 @Riverpod(keepAlive: true, retry: noRetry)
 InferenceBackendConfig inferenceBackend(Ref ref) =>
     const InferenceBackendConfig.fake();
@@ -94,6 +100,8 @@ InferenceBackendConfig inferenceBackend(Ref ref) =>
 /// back to the configured artifact, so a lazy first load does not blank the
 /// chrome. Always null under a simulated backend, without touching the
 /// repository seam: label-only containers must not need one.
+/// KeepAlive: holds the live ValueListenable subscription onto #42's
+/// residency owner; autoDispose would churn that listener per route.
 @Riverpod(keepAlive: true, retry: noRetry)
 String? residentModelKey(Ref ref) {
   if (ref.watch(inferenceBackendProvider).simulatedInference) return null;
@@ -116,6 +124,11 @@ String documentsPath(Ref ref) =>
 /// or removed. ChatController reassigns state on every streaming delta, so
 /// anything as heavy as disk probing must key on this rather than the raw chat
 /// state, or it re-runs per token for the always-mounted drawer meter.
+/// KeepAlive, deliberately (#69): classified as a derived value that could
+/// autoDispose, but on the pinned riverpod 3.0.3 a widget-watched derivation
+/// over an async controller trips Flutter's element-update invariant when a
+/// provider scope is swapped mid-test ("markNeedsBuild ... inside Widget
+/// lifecycle", fixed upstream in 3.4.0). Revisit with the pin.
 @Riverpod(keepAlive: true, retry: noRetry)
 (int, int) chatStorageSignature(Ref ref) {
   final conversations =
@@ -133,6 +146,12 @@ String documentsPath(Ref ref) =>
 /// are unwired) — surfaces hide those figures instead of inventing them. The
 /// provider owns seam tolerance; the service owns the computation and its
 /// required-vs-optional failure policy.
+/// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it,
+/// so disposal would never fire in practice, and the pinned riverpod 3.0.3
+/// scope-swap hazard (see chatStorageSignature) rules autoDispose out for
+/// widget-watched derivations. Staleness is owned by invalidation — the
+/// storage signature upstream and `ref.invalidate` after a cache clear —
+/// never by a `KeepAliveLink` TTL (§4.4). Revisit with the pin.
 @Riverpod(keepAlive: true, retry: noRetry)
 Future<StorageBreakdown> storageBreakdown(Ref ref) async {
   // Every dependency registers before the first await: a watch first taken
@@ -172,6 +191,11 @@ Future<StorageBreakdown> storageBreakdown(Ref ref) async {
 
 /// Pinned entries plus the user's custom repositories, derived — never stored —
 /// so the pinned manifest stays the single source of model knowledge.
+/// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
+/// (composer, drawer, recovery banner), so disposal would never fire in
+/// practice — and the pinned riverpod 3.0.3 scope-swap hazard (see
+/// chatStorageSignature) rules autoDispose out for widget-watched
+/// derivations. Revisit with the pin.
 @Riverpod(keepAlive: true, retry: noRetry)
 List<ModelCatalogEntry> effectiveModelCatalog(Ref ref) {
   final pinned = ref.watch(modelCatalogEntriesProvider);
@@ -189,6 +213,9 @@ List<ModelCatalogEntry> effectiveModelCatalog(Ref ref) {
 /// The models a per-chat selection may name: installed, and of the engine this
 /// build composed. Derived here so chat, Settings, and Storage cannot disagree
 /// about which model is live (#20).
+/// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
+/// continuously watched, and the 3.0.3 scope-swap hazard. Revisit with the
+/// pin.
 @Riverpod(keepAlive: true, retry: noRetry)
 Set<String> loadableModelKeys(Ref ref) => domain.loadableModelKeys(
   backend: ref.watch(inferenceBackendProvider),
@@ -198,7 +225,9 @@ Set<String> loadableModelKeys(Ref ref) => domain.loadableModelKeys(
 
 /// The raw field text stays widget-local in the search screen (debounced
 /// 350 ms); only the normalized query lands here, so results derive reactively.
-@Riverpod(keepAlive: true, retry: noRetry)
+/// AutoDispose: screen-scoped — the search screen watches it for its whole
+/// life, and disposal on pop resets the query for the next visit.
+@Riverpod(retry: noRetry)
 class SearchQuery extends _$SearchQuery {
   @override
   String build() => '';
@@ -206,7 +235,9 @@ class SearchQuery extends _$SearchQuery {
   void publish(String raw) => state = raw.trim();
 }
 
-@Riverpod(keepAlive: true, retry: noRetry)
+/// AutoDispose: derives from the query and lives exactly as long as the
+/// search screen watches it.
+@Riverpod(retry: noRetry)
 List<ChatSearchResult> chatSearchResults(Ref ref) {
   final query = ref.watch(searchQueryProvider);
   final conversations = ref.watch(chatControllerProvider).value?.conversations;
@@ -214,6 +245,8 @@ List<ChatSearchResult> chatSearchResults(Ref ref) {
 }
 
 /// Only user-set values are stored; profile defaults resolve at the consumer.
+/// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
+/// owner over write-through persistence.
 @Riverpod(keepAlive: true, retry: noRetry)
 class SettingsController extends _$SettingsController {
   int _commitEpoch = 0;
@@ -255,6 +288,8 @@ class SettingsController extends _$SettingsController {
 /// Persisted app-wide preferences. Every command follows the settings idiom —
 /// drop taps that land in the cold-start load window, publish, then save —
 /// and returns false after rolling back a failed write, never throwing.
+/// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
+/// root on every frame.
 @Riverpod(keepAlive: true, retry: noRetry)
 class PreferencesController extends _$PreferencesController {
   int _commitEpoch = 0;
@@ -367,6 +402,8 @@ class PreferencesController extends _$PreferencesController {
   }
 }
 
+/// KeepAlive: the chat session aggregate — in-flight generation and unsaved
+/// turns must survive every route transition.
 @Riverpod(keepAlive: true, retry: noRetry)
 class ChatController extends _$ChatController {
   int _generationEpoch = 0;
@@ -1020,6 +1057,9 @@ class ChatController extends _$ChatController {
   );
 }
 
+/// KeepAlive: a command controller whose downloads, busy guard, and epochs
+/// must survive leaving the Models screen (§3.4 — an autoDispose command
+/// provider dies mid-flight).
 @Riverpod(keepAlive: true, retry: noRetry)
 class ModelController extends _$ModelController {
   int _operationEpoch = 0;
@@ -1276,6 +1316,8 @@ class ModelController extends _$ModelController {
   }
 }
 
+/// KeepAlive: the startup outcome is process-lifetime; #66 owns any
+/// startup redesign.
 @Riverpod(keepAlive: true, retry: noRetry)
 class StartupController extends _$StartupController {
   static const missingModel = bool.fromEnvironment('GOLEM_MISSING_MODEL');
@@ -1314,6 +1356,8 @@ class StartupController extends _$StartupController {
   }
 }
 
+/// KeepAlive — a decision, not the old blanket default: a running benchmark
+/// keeps running and its result survives leaving the screen.
 @Riverpod(keepAlive: true, retry: noRetry)
 class BenchmarkController extends _$BenchmarkController {
   int _epoch = 0;
