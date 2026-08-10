@@ -114,14 +114,6 @@ final class LaunchFailure {
   final String message;
 
   bool get retryable => kind != LaunchFailureKind.invalidConfiguration;
-
-  // Equal failures render the same pane, so the bootstrap can skip a rebuild.
-  @override
-  bool operator ==(Object other) =>
-      other is LaunchFailure && other.kind == kind && other.message == message;
-
-  @override
-  int get hashCode => Object.hash(kind, message);
 }
 
 final class BenchmarkState {

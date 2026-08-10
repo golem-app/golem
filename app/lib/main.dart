@@ -14,7 +14,7 @@ Future<void> main() => launch();
 /// failing compositions for the real one.
 Future<void> launch({
   AttachmentPicker picker = const AttachmentPicker(),
-  LaunchComposer compose = composeLaunch,
+  LaunchComposer compose = composeLaunchWithInjectedFailures,
 }) async {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(BootstrapApp(compose: compose, picker: picker));

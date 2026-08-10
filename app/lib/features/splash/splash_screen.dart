@@ -41,23 +41,24 @@ class SplashScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final failed = state.phase == StartupPhase.failed;
-    final missing = state.phase == StartupPhase.missingModel;
     final simulated = ref.watch(inferenceBackendProvider).simulatedInference;
     final model = simulated ? 'simulated model' : 'model';
+    final (semanticValue, caption) = switch (state.phase) {
+      StartupPhase.failed => (
+        simulated ? 'Simulated loading failed' : 'Loading failed',
+        'The $model could not be prepared',
+      ),
+      StartupPhase.missingModel => (
+        'No $model selected; preparing setup',
+        'Preparing $model setup',
+      ),
+      _ => ('Loading $model on this device', 'Loading $model on this device'),
+    };
     return SplashScaffold(
-      semanticValue: failed
-          ? (simulated ? 'Simulated loading failed' : 'Loading failed')
-          : missing
-          ? 'No $model selected; preparing setup'
-          : 'Loading $model on this device',
-      caption: failed
-          ? 'The $model could not be prepared'
-          : missing
-          ? 'Preparing $model setup'
-          : 'Loading $model on this device',
+      semanticValue: semanticValue,
+      caption: caption,
       progress: state.progress,
-      onRetry: failed ? retry : null,
+      onRetry: state.phase == StartupPhase.failed ? retry : null,
     );
   }
 }

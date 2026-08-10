@@ -35,16 +35,28 @@ failed to resolve.
 The 8 s deadline is a real deadline over real work — deliberately not
 `StartupSequence.timeout`, which is scripted scenario delay. It wraps only
 the required stages: the downloader stage runs after it under its own bound
-and can only degrade. A composition that times out has therefore never
-constructed a downloader, so a retry can never race a second instance
-against the plugin's process-wide singletons.
+and can only degrade. Because `Future.timeout` abandons rather than cancels,
+a timed-out attempt keeps running past its deadline — so each composition
+carries a generation, and a superseded attempt aborts at the stage boundary
+before downloader construction. Only the live attempt may construct the
+downloader against the plugin's process-wide singletons; a retry can never
+race a second instance. The downloader's own `start()` is bounded inside the
+wrapper too, so an initialization the launch stopped waiting for still
+resolves and clears its cached slot — the repository's next call genuinely
+retries the start.
 
 ## What this does not change
 
 The startup gate's scripted theatre — `StartupController`,
 `StartupSequence`, the `GOLEM_MISSING_MODEL` / `GOLEM_SPLASH_FAILURE` /
 `GOLEM_SPLASH_TIMEOUT` scenarios — is untouched, keeping widget tests,
-goldens, and the journey deterministic. Corrupt-store quarantine remains the
+goldens, and the journey deterministic. That leaves two owners of the splash
+frame with different retry semantics: the bootstrap pane retries the real
+composition, the theatre's failed scenario retries a script. The split is
+deliberate — the theatre exists for deterministic demos and tests, and
+folding real work into it would sacrifice exactly that — but it means splash
+failure copy lives in two places, and a device tap on `splash-retry` proves
+whichever layer is showing, not both. Corrupt-store quarantine remains the
 repositories' business and never throws at launch. Release-mode evidence
 uses `GOLEM_LAUNCH_FAILURES=<n>`: the first n real compositions throw, so a
 single process demonstrates failure, Try again, and recovery on a device.

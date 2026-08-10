@@ -104,12 +104,26 @@ LaunchFailure classifyLaunchFailure(Object error) => switch (error) {
   ),
 };
 
-/// Release-mode evidence seam: the first N compositions throw, then the real
-/// one proceeds, so one process can demonstrate failure, Try again, and
-/// recovery on a device.
+/// Release-mode evidence seam (`GOLEM_LAUNCH_FAILURES=<n>`): fails the first
+/// n compositions so one process can demonstrate the failure pane, Try
+/// again, and recovery on a device. A decorator, so [composeLaunch] itself
+/// stays deterministic.
 int _injectedFailuresRemaining = const int.fromEnvironment(
   'GOLEM_LAUNCH_FAILURES',
 );
+
+Future<LaunchDependencies> composeLaunchWithInjectedFailures() async {
+  if (_injectedFailuresRemaining > 0) {
+    _injectedFailuresRemaining--;
+    throw Exception('Injected launch failure (GOLEM_LAUNCH_FAILURES).');
+  }
+  return composeLaunch();
+}
+
+/// Monotonic composition generation: an attempt superseded by a retry aborts
+/// at the stage boundary before downloader construction, because
+/// `Future.timeout` abandons rather than cancels the underlying work.
+int _compositionGeneration = 0;
 
 /// Composes the production repository graph. Every fallible launch dependency
 /// lives here; the bootstrap gate renders this future's outcome.
@@ -117,13 +131,10 @@ Future<LaunchDependencies> composeLaunch({
   Duration requiredDeadline = launchDeadline,
   Duration downloaderDeadline = downloaderStartDeadline,
 }) async {
-  if (_injectedFailuresRemaining > 0) {
-    _injectedFailuresRemaining--;
-    throw Exception('Injected launch failure (GOLEM_LAUNCH_FAILURES).');
-  }
-  final (:dependencies, :downloader) = await _composeRequired().timeout(
-    requiredDeadline,
-  );
+  final generation = ++_compositionGeneration;
+  final (:dependencies, :downloader) = await _composeRequired(
+    superseded: () => generation != _compositionGeneration,
+  ).timeout(requiredDeadline);
   // Before the first chat or settings surface can ask for a download: the
   // plugin discards updates that arrive with no listener attached, and startup
   // replays every status delivered while this process did not exist. Bounded
@@ -144,7 +155,7 @@ Future<LaunchDependencies> composeLaunch({
 Future<
   ({LaunchDependencies dependencies, BackgroundArtifactDownloader? downloader})
 >
-_composeRequired() async {
+_composeRequired({required bool Function() superseded}) async {
   const streamDelayMilliseconds = int.fromEnvironment(
     'GOLEM_STREAM_DELAY_MS',
     defaultValue: 34,
@@ -204,11 +215,20 @@ _composeRequired() async {
     Directory('${support.path}/attachments'),
   );
 
+  // A timed-out attempt keeps running past its deadline (Future.timeout does
+  // not cancel), so the abandoned run must stop here: only the live attempt
+  // may construct the downloader against the plugin's process-wide singletons.
+  // The throw lands in the timeout wrapper's already-completed future, where
+  // it is dropped, never classified.
+  if (superseded()) {
+    throw StateError('Launch composition superseded by a retry.');
+  }
   // The real repository's catalog grows in place as repositories are added, so
   // holding the concrete instance is what lets the engine resolve an entry that
   // did not exist at launch (#20).
-  // Held rather than constructed inline: it has to be started before the first
-  // frame, and only the real path may touch the plugin at all.
+  // Held rather than constructed inline: it has to be started before the
+  // composed app can ask for a download, and only the real path may touch the
+  // plugin at all.
   final artifactDownloader = useFakeModels
       ? null
       : BackgroundArtifactDownloader(

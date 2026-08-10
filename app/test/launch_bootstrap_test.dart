@@ -9,43 +9,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/app/bootstrap.dart';
 import 'package:golem_flutter/app/launch_composition.dart';
-import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
-import 'package:golem_flutter/core/domain/inference_backend.dart';
-import 'package:golem_flutter/core/domain/models.dart';
-import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
-import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
-import 'package:golem_flutter/core/services/cache_probe.dart';
-import 'package:golem_flutter/core/services/custom_repository_resolver.dart';
 
 import 'support/harness.dart';
-import 'support/in_memory_attachment_repository.dart';
-import 'support/in_memory_chat_history_repository.dart';
-import 'support/in_memory_preferences_repository.dart';
-import 'support/in_memory_settings_repository.dart';
-
-LaunchDependencies testDependencies(Directory directory) => LaunchDependencies(
-  backendConfig: const InferenceBackendConfig.fake(),
-  chatHistoryRepository: InMemoryChatHistoryRepository(
-    const ChatHistorySnapshot(conversations: []),
-  ),
-  settingsRepository: InMemorySettingsRepository(),
-  preferencesRepository: InMemoryPreferencesRepository(),
-  attachmentRepository: InMemoryAttachmentRepository(),
-  cacheProbe: FakeCacheProbe(),
-  diskFreeSpaceProbe: const FakeDiskSpace(),
-  inferenceRepository: FakeInferenceRepository(eventDelay: Duration.zero),
-  modelCatalogEntries: modelCatalog,
-  customRepositoryResolver: const DeterministicRepositoryResolver(),
-  modelManagementRepository: const StaticModels(ModelState()),
-  deviceCapacityProbe: const FakeDiskCapacity(),
-  documentsPath: directory.path,
-  benchmarkRepository: FakeBenchmarkRepository(
-    directory,
-    readAsset: fixtureAsset,
-    delay: Duration.zero,
-  ),
-);
 
 /// Pumps the gate theatre to completion with explicit durations — never
 /// pumpAndSettle across the startup providers.
@@ -71,7 +37,7 @@ void main() {
     Future<LaunchDependencies> compose() async {
       calls++;
       if (calls == 1) throw Exception('first composition fails');
-      return testDependencies(directory);
+      return launchDependenciesWith(directory: directory);
     }
 
     await tester.pumpWidget(BootstrapApp(compose: compose));
@@ -99,7 +65,7 @@ void main() {
       BootstrapApp(
         compose: () async {
           calls++;
-          return testDependencies(directory);
+          return launchDependenciesWith(directory: directory);
         },
       ),
     );
@@ -107,6 +73,38 @@ void main() {
     await pumpThroughTheatre(tester);
     expect(calls, 1);
     expect(find.byKey(const Key('empty-chat')), findsOneWidget);
+  });
+
+  testWidgets('a double-tap on Try again runs a single retry', (tester) async {
+    setViewport(tester);
+    var calls = 0;
+    final gates = <Completer<void>>[];
+    Future<LaunchDependencies> compose() async {
+      calls++;
+      final gate = Completer<void>();
+      gates.add(gate);
+      await gate.future;
+      throw Exception('still failing');
+    }
+
+    await tester.pumpWidget(BootstrapApp(compose: compose));
+    gates.single.complete();
+    await tester.pump();
+    expect(tester.takeException(), isA<Exception>());
+
+    // Two tap-ups can land before the rebuild removes the button; while the
+    // first retry's composition is still in flight, the guard must collapse
+    // the second tap into it.
+    await tester.tap(find.byKey(const Key('splash-retry')));
+    await tester.tap(
+      find.byKey(const Key('splash-retry')),
+      warnIfMissed: false,
+    );
+    expect(calls, 2);
+    gates.last.complete();
+    await tester.pump();
+    expect(tester.takeException(), isA<Exception>());
+    expect(calls, 2);
   });
 
   testWidgets('a timed out composition offers retry', (tester) async {

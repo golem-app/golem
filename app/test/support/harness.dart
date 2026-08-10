@@ -5,12 +5,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:golem_flutter/app/launch_composition.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
-import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
@@ -84,7 +84,10 @@ final class FakeDiskSpace implements DiskSpaceProbe {
   Future<int?> freeBytes(String path) async => bytes;
 }
 
-ProviderContainer buildContainer({
+/// One fake launch composition, shared by [buildContainer] and the bootstrap
+/// suite so there is a single canonical test wiring of the fourteen seams.
+LaunchDependencies launchDependenciesWith({
+  Directory? directory,
   ChatHistorySnapshot? history,
   ModelState model = const ModelState(),
   List<ModelCatalogEntry>? catalog,
@@ -96,49 +99,62 @@ ProviderContainer buildContainer({
   ChatHistoryRepository? chatHistory,
   ModelManagementRepository? models,
 }) {
-  final directory = Directory.systemTemp.createTempSync('golem-widget-test-');
-  return ProviderContainer(
-    overrides: [
-      if (backend != null) inferenceBackendProvider.overrideWithValue(backend),
-      deviceCapacityProbeProvider.overrideWithValue(const FakeDiskCapacity()),
-      diskFreeSpaceProbeProvider.overrideWithValue(const FakeDiskSpace()),
-      cacheProbeProvider.overrideWithValue(FakeCacheProbe()),
-      attachmentRepositoryProvider.overrideWithValue(
-        attachments ?? InMemoryAttachmentRepository(),
-      ),
-      documentsPathProvider.overrideWithValue(directory.path),
-      preferencesRepositoryProvider.overrideWithValue(
-        preferences ?? InMemoryPreferencesRepository(),
-      ),
-      chatHistoryRepositoryProvider.overrideWithValue(
+  final scratch =
+      directory ?? Directory.systemTemp.createTempSync('golem-widget-test-');
+  return LaunchDependencies(
+    backendConfig: backend ?? const InferenceBackendConfig.fake(),
+    chatHistoryRepository:
         chatHistory ??
-            InMemoryChatHistoryRepository(
-              history ?? const ChatHistorySnapshot(conversations: []),
-            ),
-      ),
-      inferenceRepositoryProvider.overrideWithValue(
-        FakeInferenceRepository(eventDelay: Duration.zero),
-      ),
-      settingsRepositoryProvider.overrideWithValue(
-        settings ?? InMemorySettingsRepository(),
-      ),
-      modelCatalogEntriesProvider.overrideWithValue(catalog ?? modelCatalog),
-      customRepositoryResolverProvider.overrideWithValue(
-        resolver ?? const DeterministicRepositoryResolver(),
-      ),
-      modelManagementRepositoryProvider.overrideWithValue(
-        models ?? StaticModels(model),
-      ),
-      benchmarkRepositoryProvider.overrideWithValue(
-        FakeBenchmarkRepository(
-          directory,
-          readAsset: fixtureAsset,
-          delay: Duration.zero,
+        InMemoryChatHistoryRepository(
+          history ?? const ChatHistorySnapshot(conversations: []),
         ),
-      ),
-    ],
+    settingsRepository: settings ?? InMemorySettingsRepository(),
+    preferencesRepository: preferences ?? InMemoryPreferencesRepository(),
+    attachmentRepository: attachments ?? InMemoryAttachmentRepository(),
+    cacheProbe: FakeCacheProbe(),
+    diskFreeSpaceProbe: const FakeDiskSpace(),
+    inferenceRepository: FakeInferenceRepository(eventDelay: Duration.zero),
+    modelCatalogEntries: catalog ?? modelCatalog,
+    customRepositoryResolver:
+        resolver ?? const DeterministicRepositoryResolver(),
+    modelManagementRepository: models ?? StaticModels(model),
+    deviceCapacityProbe: const FakeDiskCapacity(),
+    documentsPath: scratch.path,
+    benchmarkRepository: FakeBenchmarkRepository(
+      scratch,
+      readAsset: fixtureAsset,
+      delay: Duration.zero,
+    ),
   );
 }
+
+ProviderContainer buildContainer({
+  ChatHistorySnapshot? history,
+  ModelState model = const ModelState(),
+  List<ModelCatalogEntry>? catalog,
+  InferenceBackendConfig? backend,
+  SettingsRepository? settings,
+  PreferencesRepository? preferences,
+  AttachmentRepository? attachments,
+  CustomRepositoryResolver? resolver,
+  ChatHistoryRepository? chatHistory,
+  ModelManagementRepository? models,
+}) => ProviderContainer(
+  overrides: launchOverrides(
+    launchDependenciesWith(
+      history: history,
+      model: model,
+      catalog: catalog,
+      backend: backend,
+      settings: settings,
+      preferences: preferences,
+      attachments: attachments,
+      resolver: resolver,
+      chatHistory: chatHistory,
+      models: models,
+    ),
+  ),
+);
 
 Future<void> pumpWithRepositories(
   WidgetTester tester, {

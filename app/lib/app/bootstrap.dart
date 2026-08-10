@@ -27,17 +27,36 @@ class BootstrapApp extends StatefulWidget {
   State<BootstrapApp> createState() => _BootstrapAppState();
 }
 
-class _BootstrapAppState extends State<BootstrapApp> {
+class _BootstrapAppState extends State<BootstrapApp>
+    with WidgetsBindingObserver {
   LaunchDependencies? _dependencies;
   LaunchFailure? _failure;
+  bool _composing = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _run();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // The pre-scope frames read the platform brightness directly, so they must
+  // rebuild when it changes — mirroring GolemApp's observer for the same
+  // reason.
+  @override
+  void didChangePlatformBrightness() => setState(() {});
+
   Future<void> _run() async {
+    // One composition at a time: a double-tap on Try again must not race two
+    // compositions and swap the mounted app's repository graph.
+    if (_composing || _dependencies != null) return;
+    _composing = true;
     if (_failure != null) {
       setState(() => _failure = null);
     }
@@ -58,6 +77,8 @@ class _BootstrapAppState extends State<BootstrapApp> {
       );
       if (!mounted) return;
       setState(() => _failure = classifyLaunchFailure(error));
+    } finally {
+      _composing = false;
     }
   }
 
@@ -74,23 +95,18 @@ class _BootstrapAppState extends State<BootstrapApp> {
     // The backend is not resolved yet, so this layer claims nothing about a
     // model: its copy is about starting Golem. The gate's SplashScreen takes
     // over the same scaffold once the scope exists.
+    final message = failure?.message ?? 'Starting up';
     return CupertinoApp(
       debugShowCheckedModeBanner: false,
       theme: GolemTheme.theme(
         WidgetsBinding.instance.platformDispatcher.platformBrightness,
       ),
-      home: failure == null
-          ? const SplashScaffold(
-              semanticValue: 'Starting up',
-              caption: 'Starting up',
-              progress: 0,
-            )
-          : SplashScaffold(
-              semanticValue: failure.message,
-              caption: failure.message,
-              progress: 0,
-              onRetry: failure.retryable ? _run : null,
-            ),
+      home: SplashScaffold(
+        semanticValue: message,
+        caption: message,
+        progress: 0,
+        onRetry: (failure?.retryable ?? false) ? _run : null,
+      ),
     );
   }
 }
