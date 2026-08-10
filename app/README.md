@@ -171,9 +171,12 @@ repo root.
   cancel work at lifecycle boundaries, and reject stale completions with epochs.
   Focus, text, scroll, disclosure, and drawer animation remain widget-local state.
 
-Riverpod 3.0.3 is pinned because it is the newest stable runtime/generator set that
-resolves with Flutter 3.44.8's pinned analyzer/test packages. Exact transitive
-versions are committed in the workspace lockfile at `../pubspec.lock`.
+The Riverpod runtime, annotation, and generator are pinned exactly, and move
+only as one set, because each release exact-pins the next. The set sits at the
+ceiling the pinned SDK allows. Exact versions live in the workspace lockfile
+at `../pubspec.lock`; the constraint chain that sets the ceiling, and the
+blocker holding every other package back from its latest release, are recorded
+once in `../docs/notes/dependencies.md`.
 
 ## Screens and identifiers
 
@@ -440,6 +443,20 @@ what used to make every run pay a full multi-gigabyte provisioning pass. With
 the flag the app and its documents survive, so provisioning is once per device
 and every later run installs from bytes already present. Desktop targets are
 unaffected either way — a macOS "uninstall" is a no-op.
+
+**`flutter install` wipes the container too, and has no such flag.** It
+uninstalls the old version before installing, so it destroys provisioned
+models even when the install then fails — the app comes back empty. Use it on
+a provisioned phone only if you intend to re-provision. To replace the binary
+and keep `Documents/`, build and install without uninstalling:
+
+```sh
+flutter build ios --release --flavor qa            # or: build apk --flavor qa
+xcrun devicectl device install app --device <UUID> \
+  build/ios/iphoneos/Runner.app                    # Android: adb install -r
+```
+
+`devicectl device install app` and `adb install -r` both upgrade in place.
 
 Provisioning is therefore a separate, deliberate step, and the offline path is
 the default: an unprovisioned artifact fails fast and names the directory to
