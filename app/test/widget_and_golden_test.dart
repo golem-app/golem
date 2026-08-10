@@ -44,7 +44,6 @@ void main() {
               phase: StartupPhase.preloading,
               progress: 0.72,
             ),
-            isLoading: true,
             retry: () {},
           ),
         ),
@@ -60,6 +59,45 @@ void main() {
       matchesGoldenFile('goldens/splash.png'),
     );
   }, variant: iosChrome);
+
+  testWidgets('splash scaffold failure renders its copy and retry', (
+    tester,
+  ) async {
+    setViewport(tester);
+    var retried = 0;
+    await tester.pumpWidget(
+      wrapApp(
+        brightness: Brightness.light,
+        child: SplashScaffold(
+          semanticValue: 'Loading failed',
+          caption: 'Golem could not finish starting.',
+          progress: 0.4,
+          onRetry: () => retried++,
+        ),
+      ),
+    );
+    expect(find.text('Golem could not finish starting.'), findsOneWidget);
+    expect(find.byKey(const Key('launch-splash')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('splash-retry')));
+    expect(retried, 1);
+  });
+
+  testWidgets('splash scaffold without a retry offers no button', (
+    tester,
+  ) async {
+    setViewport(tester);
+    await tester.pumpWidget(
+      wrapApp(
+        brightness: Brightness.light,
+        child: const SplashScaffold(
+          semanticValue: 'Loading model on this device',
+          caption: 'Loading model on this device',
+          progress: 0.2,
+        ),
+      ),
+    );
+    expect(find.byKey(const Key('splash-retry')), findsNothing);
+  });
 
   for (final brightness in Brightness.values) {
     testWidgets('empty chat ${brightness.name} golden', (tester) async {
@@ -698,7 +736,6 @@ void main() {
           phase: StartupPhase.preloading,
           progress: 0.72,
         ),
-        isLoading: true,
         retry: () {},
       ),
     );

@@ -23,7 +23,6 @@ class StartupGate extends ConsumerWidget {
           Positioned.fill(
             child: SplashScreen(
               state: value ?? const StartupState(),
-              isLoading: startup.isLoading,
               retry: () => ref.read(startupControllerProvider.notifier).retry(),
             ),
           ),
@@ -32,33 +31,60 @@ class StartupGate extends ConsumerWidget {
   }
 }
 
+/// Maps the startup theatre's [StartupState] onto the splash visuals, with
+/// copy that is honest in both directions: only a simulated backend may claim
+/// to be one, and a real-engine build must never say "simulated".
 class SplashScreen extends ConsumerWidget {
-  const SplashScreen({
-    required this.state,
-    required this.isLoading,
-    required this.retry,
-    super.key,
-  });
+  const SplashScreen({required this.state, required this.retry, super.key});
   final StartupState state;
-  final bool isLoading;
   final VoidCallback retry;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final failed = state.phase == StartupPhase.failed;
     final missing = state.phase == StartupPhase.missingModel;
-    // Honest in both directions: only a simulated backend may claim to be
-    // one, and a real-engine build must never say "simulated".
     final simulated = ref.watch(inferenceBackendProvider).simulatedInference;
     final model = simulated ? 'simulated model' : 'model';
-    return Semantics(
-      key: const Key('launch-splash'),
-      label: 'Golem',
-      value: failed
+    return SplashScaffold(
+      semanticValue: failed
           ? (simulated ? 'Simulated loading failed' : 'Loading failed')
           : missing
           ? 'No $model selected; preparing setup'
           : 'Loading $model on this device',
+      caption: failed
+          ? 'The $model could not be prepared'
+          : missing
+          ? 'Preparing $model setup'
+          : 'Loading $model on this device',
+      progress: state.progress,
+      onRetry: failed ? retry : null,
+    );
+  }
+}
+
+/// The splash visuals, free of providers so the pre-scope bootstrap can paint
+/// the identical frame. Owns the `launch-splash` and `splash-retry` keys; the
+/// Try again button exists exactly when [onRetry] is non-null.
+class SplashScaffold extends StatelessWidget {
+  const SplashScaffold({
+    required this.semanticValue,
+    required this.caption,
+    required this.progress,
+    this.onRetry,
+    super.key,
+  });
+  final String semanticValue;
+  final String caption;
+  final double progress;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final retry = onRetry;
+    return Semantics(
+      key: const Key('launch-splash'),
+      label: 'Golem',
+      value: semanticValue,
       liveRegion: true,
       child: ColoredBox(
         color: GolemTheme.splash,
@@ -109,24 +135,20 @@ class SplashScreen extends ConsumerWidget {
                 child: Column(
                   children: [
                     ProgressTrack(
-                      value: state.progress,
+                      value: progress,
                       height: 4,
                       trackColor: CupertinoColors.white.withValues(alpha: 0.12),
                       fillColor: GolemTheme.accent.darkColor,
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      failed
-                          ? 'The $model could not be prepared'
-                          : missing
-                          ? 'Preparing $model setup'
-                          : 'Loading $model on this device',
+                      caption,
                       textAlign: TextAlign.center,
                       style: GolemText.caption.copyWith(
                         color: GolemTheme.mutedOnDark,
                       ),
                     ),
-                    if (failed) ...[
+                    if (retry != null) ...[
                       const SizedBox(height: 14),
                       GolemButton.filled(
                         key: const Key('splash-retry'),
