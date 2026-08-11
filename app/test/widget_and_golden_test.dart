@@ -34,6 +34,7 @@ import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
 
 import 'support/harness.dart';
+import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
 
 Future<List<OpenSourceLicense>> _goldenLicenses() async => [
@@ -169,6 +170,44 @@ void main() {
         find.byType(ChatScreen),
         matchesGoldenFile(
           'goldens/empty-chat-${brightness.name}${chromeSuffix()}.png',
+        ),
+      );
+    }, variant: bothChromes);
+
+    testWidgets('dual recovery ${brightness.name} golden', (tester) async {
+      if (chromeSuffix().isNotEmpty && brightness == Brightness.dark) return;
+      setViewport(tester);
+      final history = InMemoryChatHistoryRepository(seedHistory())
+        ..failingSaves = 1;
+      final container = buildContainer(chatHistory: history);
+      addTearDown(container.dispose);
+      await container.read(chatControllerProvider.future);
+      // The fake backend uses zero-duration timers. Let those timers run on
+      // the real async queue before installing the already-failed state.
+      await tester.runAsync(
+        () => container.read(chatControllerProvider.notifier).send('[fail]'),
+      );
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: wrapApp(brightness: brightness, child: const ChatScreen()),
+        ),
+      );
+      final context = tester.element(find.byType(ChatScreen));
+      await tester.runAsync(() async {
+        await precacheImage(
+          const AssetImage('assets/images/golem_mascot.png'),
+          context,
+        );
+        await precacheImage(AssetImage(AppIdentity.current.iconAsset), context);
+      });
+      // Advance one deterministic frame after asset decoding and record the
+      // static failed state.
+      await tester.pump(const Duration(milliseconds: 100));
+      await expectLater(
+        find.byType(ChatScreen),
+        matchesGoldenFile(
+          'goldens/chat-dual-recovery-${brightness.name}${chromeSuffix()}.png',
         ),
       );
     }, variant: bothChromes);

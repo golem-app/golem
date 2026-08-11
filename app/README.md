@@ -184,8 +184,10 @@ contracts, and generated Riverpod providers live under `lib/core/`. The
 design source of truth is the handoff under `references/ui_redesign/` at the
 repo root.
 
-- `ChatHistoryRepository`: versioned, atomic JSON persistence plus an in-memory
-  test implementation. It is the source of truth for chats and active selection.
+- `ChatController`: authoritative chats and active selection for the live
+  session, with an orthogonal recovery notice when durability falls behind.
+  `ChatHistoryRepository` commits its versioned, atomic JSON snapshots; a failed
+  write never rolls back or blocks the live conversation.
 - `InferenceRepository`: prepare, unload, cancel, and cancellable streamed
   events with optional per-model sampling overrides.
   `FakeInferenceRepository` backs qa/test builds; the broker's

@@ -429,12 +429,12 @@ class PreferencesController extends _$PreferencesController {
         (value) => value.copyWith(saveHistory: true),
       );
       if (!committed) return false;
-      // Re-persisting the session is best-effort: the preference is saved, and
-      // the next chat mutation persists the same conversations again.
+      // The preference commit owns this command's success. Chat persistence
+      // reports its own failure through the standing chat notice.
       try {
         await ref.read(chatControllerProvider.notifier).persistCurrent();
       } on Exception {
-        // The toggle itself succeeded; history lands on the next mutation.
+        // A non-contract failure must not roll back a preference that landed.
       }
       return true;
     }
@@ -448,7 +448,16 @@ class PreferencesController extends _$PreferencesController {
     final committed = await _commit(
       (value) => value.copyWith(saveHistory: false),
     );
-    if (committed) return true;
+    if (committed) {
+      // This reaches the history-off branch: no second write, but any standing
+      // warning is cleared and attachment ownership follows the live session.
+      try {
+        await ref.read(chatControllerProvider.notifier).persistCurrent();
+      } on Exception {
+        // The disk wipe and preference both landed; the toggle stays off.
+      }
+      return true;
+    }
     // The wipe landed but the preference did not: the toggle stays on, so
     // put the chats back on disk to match what the UI now claims.
     try {
@@ -477,10 +486,14 @@ class PreferencesController extends _$PreferencesController {
 @Riverpod(keepAlive: true, retry: noRetry)
 class ChatController extends _$ChatController {
   int _generationEpoch = 0;
+  int _persistenceEpoch = 0;
 
   @override
   Future<ChatState> build() async {
-    ref.onDispose(() => _generationEpoch++);
+    ref.onDispose(() {
+      _generationEpoch++;
+      _persistenceEpoch++;
+    });
     final snapshot = await ref.read(chatHistoryRepositoryProvider).load();
     await _retainReferenced(_attachments, snapshot.conversations);
     return ChatState(
@@ -489,7 +502,11 @@ class ChatController extends _$ChatController {
     );
   }
 
-  Future<void> _persist(ChatState value) async {
+  Future<void> _persist(
+    ChatState value, {
+    bool showRetryProgress = false,
+  }) async {
+    final epoch = ++_persistenceEpoch;
     // Every seam is read before the first await: this method outlives its
     // provider on a fast dispose, and Ref is unusable past that point. Privacy
     // gate: with history off, chats live in memory only; a cold start saves.
@@ -497,16 +514,69 @@ class ChatController extends _$ChatController {
     final history = ref.read(chatHistoryRepositoryProvider);
     final attachments = _attachments;
 
-    // Attachment bytes follow the live conversations, not the disk snapshot:
-    // with history off the pictures must stay readable for the session.
-    await _retainReferenced(attachments, value.conversations);
-    if (preferences != null && !preferences.saveHistory) return;
-    await history.save(
-      ChatHistorySnapshot(
+    if (showRetryProgress && ref.mounted && epoch == _persistenceEpoch) {
+      _setPersistencePhase(ChatPersistencePhase.retrying);
+    }
+
+    if (preferences != null && !preferences.saveHistory) {
+      // With history off, attachment bytes follow the live session instead of
+      // a durable snapshot. No history write or retry is permitted here.
+      await _retainReferenced(attachments, value.conversations);
+      if (ref.mounted && epoch == _persistenceEpoch) {
+        _setPersistencePhase(ChatPersistencePhase.idle);
+      }
+      return;
+    }
+
+    final snapshot = _persistenceSnapshot(value);
+    try {
+      await history.save(snapshot);
+    } on PersistenceException catch (error) {
+      if (error.kind != PersistenceFailureKind.write) rethrow;
+      if (ref.mounted && epoch == _persistenceEpoch) {
+        _setPersistencePhase(ChatPersistencePhase.failed);
+      }
+      return;
+    }
+
+    // A later attempt owns both the warning and attachment collection. A
+    // stale success may leave extra bytes behind, but can never delete bytes a
+    // newer durable snapshot still references.
+    if (epoch != _persistenceEpoch) return;
+    if (ref.mounted) _setPersistencePhase(ChatPersistencePhase.idle);
+    await _retainReferenced(attachments, snapshot.conversations);
+  }
+
+  /// The newest complete, persistence-eligible view of the live session. A
+  /// streaming or failed assistant draft is intentionally absent until Stop
+  /// or finalization marks it durable; the user turn and every completed turn
+  /// remain included.
+  static ChatHistorySnapshot _persistenceSnapshot(ChatState value) {
+    final active = value.active;
+    if (!value.hasUnsavedAssistant ||
+        active == null ||
+        active.messages.lastOrNull?.role != MessageRole.assistant) {
+      return ChatHistorySnapshot(
         conversations: value.conversations,
         activeId: value.activeId,
-      ),
+      );
+    }
+    final messages = [...active.messages]..removeLast();
+    return ChatHistorySnapshot(
+      conversations: [
+        for (final conversation in value.conversations)
+          if (conversation.id == active.id)
+            active.copyWith(messages: messages)
+          else
+            conversation,
+      ],
+      activeId: value.activeId,
     );
+  }
+
+  void _setPersistencePhase(ChatPersistencePhase phase) {
+    if (!state.hasValue || _value.persistencePhase == phase) return;
+    state = AsyncData(_value.copyWith(persistencePhase: phase));
   }
 
   /// Null when the seam is unwired, which label-only test containers rely on.
@@ -556,6 +626,16 @@ class ChatController extends _$ChatController {
     await _persist(_value);
   }
 
+  /// User-triggered recovery for the standing persistence notice. The latest
+  /// live snapshot is captured at the tap, never the originally failed value.
+  Future<void> retryPersistence() async {
+    if (!state.hasValue ||
+        _value.persistencePhase != ChatPersistencePhase.failed) {
+      return;
+    }
+    await _persist(_value, showRetryProgress: true);
+  }
+
   /// The confirmation alert lives at the widget layer; this is past consent.
   /// The disk wipe runs first and gates the in-memory clear: a failed wipe
   /// returns false with the chats still shown, because "deleted" must never
@@ -572,6 +652,9 @@ class ChatController extends _$ChatController {
     } on Exception {
       return false;
     }
+    // Only a committed wipe supersedes an earlier save or retry. If the wipe
+    // fails, that attempt must still be allowed to settle the recovery notice.
+    _persistenceEpoch++;
     if (ref.mounted) state = AsyncData(ChatState(conversations: const []));
     await _retainReferenced(attachments, const []);
     return true;
@@ -620,6 +703,7 @@ class ChatController extends _$ChatController {
     final next = ChatState(
       conversations: [conversation, ..._value.conversations],
       activeId: conversation.id,
+      persistencePhase: _value.persistencePhase,
     );
     state = AsyncData(next);
     await _persist(next);
@@ -653,7 +737,11 @@ class ChatController extends _$ChatController {
     final requested = _value.activeId == id
         ? remaining.firstOrNull?.id
         : _value.activeId;
-    final next = ChatState(conversations: remaining, activeId: requested);
+    final next = ChatState(
+      conversations: remaining,
+      activeId: requested,
+      persistencePhase: _value.persistencePhase,
+    );
     state = AsyncData(next);
     await _persist(next);
   }
@@ -750,6 +838,7 @@ class ChatController extends _$ChatController {
     final next = ChatState(
       conversations: [branched, ..._value.conversations],
       activeId: branched.id,
+      persistencePhase: _value.persistencePhase,
     );
     state = AsyncData(next);
     await _persist(next);
