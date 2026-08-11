@@ -69,12 +69,13 @@ final class LaunchDependencies {
   final ModelManagementRepository modelManagementRepository;
   final DiskCapacityProbe deviceCapacityProbe;
   final String documentsPath;
-  final BenchmarkRepository benchmarkRepository;
+  final BenchmarkRepository? benchmarkRepository;
 }
 
 /// The fallible launch composition, injectable so the bootstrap gate and its
 /// tests can substitute failure for the real thing.
-typedef LaunchComposer = Future<LaunchDependencies> Function();
+typedef LaunchComposer =
+    Future<LaunchDependencies> Function(AppIdentity identity);
 
 /// Deadline over the required launch stages: backend resolution, the
 /// application-directory lookups, the preferences read, and repository
@@ -118,12 +119,17 @@ int _injectedFailuresRemaining = const int.fromEnvironment(
   'GOLEM_LAUNCH_FAILURES',
 );
 
-Future<LaunchDependencies> composeLaunchWithInjectedFailures() async {
-  if (_injectedFailuresRemaining > 0) {
+bool shouldInjectLaunchFailure(AppIdentity identity, int remaining) =>
+    identity.internalToolsEnabled && remaining > 0;
+
+Future<LaunchDependencies> composeLaunchWithInjectedFailures(
+  AppIdentity identity,
+) async {
+  if (shouldInjectLaunchFailure(identity, _injectedFailuresRemaining)) {
     _injectedFailuresRemaining--;
     throw Exception('Injected launch failure (GOLEM_LAUNCH_FAILURES).');
   }
-  return composeLaunch();
+  return composeLaunch(identity: identity);
 }
 
 /// Monotonic composition generation: an attempt superseded by a retry aborts
@@ -134,11 +140,13 @@ int _compositionGeneration = 0;
 /// Composes the production repository graph. Every fallible launch dependency
 /// lives here; the bootstrap gate renders this future's outcome.
 Future<LaunchDependencies> composeLaunch({
+  required AppIdentity identity,
   Duration requiredDeadline = launchDeadline,
   Duration downloaderDeadline = downloaderStartDeadline,
 }) async {
   final generation = ++_compositionGeneration;
   final (:dependencies, :downloader) = await _composeRequired(
+    identity: identity,
     superseded: () => generation != _compositionGeneration,
   ).timeout(requiredDeadline);
   // Before the first chat or settings surface can ask for a download: the
@@ -161,7 +169,10 @@ Future<LaunchDependencies> composeLaunch({
 Future<
   ({LaunchDependencies dependencies, BackgroundArtifactDownloader? downloader})
 >
-_composeRequired({required bool Function() superseded}) async {
+_composeRequired({
+  required AppIdentity identity,
+  required bool Function() superseded,
+}) async {
   const streamDelayMilliseconds = int.fromEnvironment(
     'GOLEM_STREAM_DELAY_MS',
     defaultValue: 34,
@@ -173,13 +184,13 @@ _composeRequired({required bool Function() superseded}) async {
   // dart-defines override the flavor default, and an override to real
   // inference drags model management along with it: a real engine fed by a
   // download simulation would "install" files that do not exist.
-  final (config: backendConfig, :eligibility) =
-      await resolveConfiguredBackend();
+  final (config: backendConfig, :eligibility) = await resolveConfiguredBackend(
+    identity: identity,
+  );
   final support = await getApplicationSupportDirectory();
   final documents = await getApplicationDocumentsDirectory();
   final temporary = await getTemporaryDirectory();
   final stateFile = File('${support.path}/flutter-model-v2.json');
-  final identity = AppIdentity.current;
   final useFakeModels =
       (identity == AppIdentity.qa || identity == AppIdentity.flutter) &&
       backendConfig.simulatedInference;
@@ -280,6 +291,7 @@ _composeRequired({required bool Function() superseded}) async {
         : DirectoryCacheProbe(temporary.path),
     diskFreeSpaceProbe: const DeviceStorageChannel(),
     inferenceRepository: createConfiguredInferenceRepository(
+      identity: identity,
       config: backendConfig,
       fakeStreamDelay: const Duration(milliseconds: streamDelayMilliseconds),
       documentsDirectory: documents.path,
@@ -302,10 +314,12 @@ _composeRequired({required bool Function() superseded}) async {
     modelManagementRepository: modelManagement,
     deviceCapacityProbe: const DeviceStorageChannel(),
     documentsPath: documents.path,
-    benchmarkRepository: FakeBenchmarkRepository(
-      Directory('${documents.path}/SimulatedBenchmarks'),
-      readAsset: rootBundle.loadString,
-    ),
+    benchmarkRepository: identity.internalToolsEnabled
+        ? FakeBenchmarkRepository(
+            Directory('${documents.path}/SimulatedBenchmarks'),
+            readAsset: rootBundle.loadString,
+          )
+        : null,
   );
   return (dependencies: dependencies, downloader: artifactDownloader);
 }
@@ -343,7 +357,6 @@ List<Override> launchOverrides(LaunchDependencies dependencies) => [
     dependencies.deviceCapacityProbe,
   ),
   documentsPathProvider.overrideWithValue(dependencies.documentsPath),
-  benchmarkRepositoryProvider.overrideWithValue(
-    dependencies.benchmarkRepository,
-  ),
+  if (dependencies.benchmarkRepository case final benchmarkRepository?)
+    benchmarkRepositoryProvider.overrideWithValue(benchmarkRepository),
 ];

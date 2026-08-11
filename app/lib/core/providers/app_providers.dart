@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../app_identity.dart';
 import '../application/storage_breakdown_service.dart';
 import '../domain/app_preferences.dart';
 import '../domain/app_state.dart';
@@ -1527,18 +1528,17 @@ class StartupController extends _$StartupController {
     state = const AsyncData(
       StartupState(phase: StartupPhase.preloading, progress: 0.72),
     );
-    if (missingModel) {
+    final scenario = startupScenarioFor(
+      identity: AppIdentity.current,
+      missingModel: missingModel,
+      injectedFailure: injectedFailure,
+      injectedTimeout: injectedTimeout,
+    );
+    if (scenario == StartupScenario.missingModel) {
       state = const AsyncData(
         StartupState(phase: StartupPhase.missingModel, progress: 0.86),
       );
     }
-    final scenario = injectedFailure
-        ? StartupScenario.failure
-        : injectedTimeout
-        ? StartupScenario.timeout
-        : missingModel
-        ? StartupScenario.missingModel
-        : StartupScenario.ready;
     return const StartupSequence().run(scenario);
   }
 

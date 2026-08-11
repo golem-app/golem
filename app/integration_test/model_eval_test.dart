@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/configured_inference_repository.dart';
 import 'package:golem_flutter/broker/runtime.dart';
+import 'package:golem_flutter/core/app_identity.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -133,6 +134,7 @@ void main() {
       // listener can be disposed once the combo is finished.
       final adapter = InfernoRuntimeAdapter.native();
       final repository = selectInferenceRepository(
+        identity: AppIdentity.current,
         backend: switch (combo.engine) {
           BrokerEngine.llamaCpp => 'llama',
           BrokerEngine.mlx => 'mlx',
@@ -143,6 +145,7 @@ void main() {
         documentsDirectory: '',
         createRuntime: () => adapter,
         samplingSeed: uniformEvalSeed(defaultEvalPrompts),
+        diagnosticSink: debugPrint,
       );
       EvalComboResult result;
       try {

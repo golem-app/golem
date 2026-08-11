@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import 'app/bootstrap.dart';
 import 'app/launch_composition.dart';
+import 'core/app_identity.dart';
 import 'features/chat/widgets/attach_sheet.dart';
 
 Future<void> main() => launch();
@@ -17,5 +18,6 @@ Future<void> launch({
   LaunchComposer compose = composeLaunchWithInjectedFailures,
 }) async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(BootstrapApp(compose: compose, picker: picker));
+  final identity = AppIdentity.current;
+  runApp(BootstrapApp(identity: identity, compose: compose, picker: picker));
 }

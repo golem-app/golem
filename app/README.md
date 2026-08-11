@@ -78,9 +78,10 @@ memory that cannot be read classifies as supported, never as refused. The
 App Store enforces its half through `UIRequiredDeviceCapabilities`
 (`iphone-ipad-minimum-performance-a12`); Play's RAM floor is a console-side
 device-catalog exclusion rule, recorded in `../docs/device_floor.md` because
-no manifest can express it. `GOLEM_DEVICE_MEMORY_BYTES` and
-`GOLEM_DEVICE_ENGINE_UNSUPPORTED` are test-only overrides for exercising the
-tiers and both refusals on hardware.
+no manifest can express it. In `qa` and `dev`,
+`GOLEM_DEVICE_MEMORY_BYTES` and `GOLEM_DEVICE_ENGINE_UNSUPPORTED` are
+test-only overrides for exercising the tiers and both refusals on hardware;
+production ignores both defines.
 
 Model **downloads** are real in the `dev` and `production` flavors:
 Settings lists the pinned catalog (`lib/broker/model_catalog.dart`,
@@ -335,14 +336,17 @@ buttons; the sampling card edits the active profile),
 `runtime-toggle-button`,
 `open-benchmark`, `benchmark-case-picker`, `benchmark-phase-picker`,
 `benchmark-run-button`, `benchmark-stop-button`, and `benchmark-export-button`.
+The benchmark keys, route, repository, and prompt assets exist only in `qa`
+and `dev`; production and the legacy flavorless identity do not register or
+bundle that internal surface.
 
 Startup failure modes are injectable at compile time:
 
 ```sh
-flutter run --dart-define=GOLEM_MISSING_MODEL=true
-flutter run --dart-define=GOLEM_SPLASH_FAILURE=true
-flutter run --dart-define=GOLEM_SPLASH_TIMEOUT=true
-flutter run --dart-define=GOLEM_LAUNCH_FAILURES=1
+flutter run --flavor qa --dart-define=GOLEM_MISSING_MODEL=true
+flutter run --flavor qa --dart-define=GOLEM_SPLASH_FAILURE=true
+flutter run --flavor qa --dart-define=GOLEM_SPLASH_TIMEOUT=true
+flutter run --flavor qa --dart-define=GOLEM_LAUNCH_FAILURES=1
 ```
 
 The first three drive the startup gate's scripted scenarios; their failure
@@ -352,6 +356,9 @@ the bootstrap failure pane, Try again, and recovery
 (`../docs/decisions/0006-launch-bootstrap.md`). The production-style splash
 always holds for at least 1.4 seconds; the missing-model scenario adds a
 three-second setup hold.
+All four fault injectors are identity-gated: `qa` and `dev` retain them in
+debug and release builds, while production and the legacy flavorless identity
+ignore the defines.
 
 ## Generate and verify
 
@@ -496,9 +503,12 @@ flutter run -d macos --flavor qa \
 
 Both engines run GPU-accelerated on Apple silicon: llama.cpp with Metal
 (enabled for every Apple target by Inferno's build hook) and MLX exactly as
-on iOS. `INFERNO_METRICS` lines appear on the `flutter run` console, or on
-stdout when launching the built binary directly
+on iOS. In `qa` and `dev`, `INFERNO_METRICS` lines appear on the `flutter run`
+console, or on stdout when launching the built binary directly
 (`build/macos/Build/Products/Release-qa/golem_flutter.app/Contents/MacOS/golem_flutter`).
+The same identity gate controls `INFERNO_FAILURE` and `INFERNO_PROBE`;
+production emits none of the three Dart diagnostic prefixes, regardless of
+build mode. Native engine error transport remains unchanged.
 
 For cross-device determinism probes, build with
 `--dart-define=GOLEM_SAMPLING_SEED=<n>`: every completed generation then
@@ -580,7 +590,7 @@ iPhone) turns on iOS accessibility, and the semantics handle that opens fails
 the run at teardown with "A SemanticsHandle was active at the end of the test"
 after every assertion has already passed.
 
-One more operational fact: a release build's `debugPrint` is
+One more operational fact: a qa/dev release build's `debugPrint` is
 os_log-privacy-redacted in an `ios syslog` capture, so read `GOLEM_CELL` and
 `INFERNO_METRICS` from the test harness console instead. Results live in
 `../docs/real-model-matrix.md`.

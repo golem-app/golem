@@ -93,7 +93,10 @@ flutter:
     - assets/images/golem_app_icon_production.png
     - assets/images/golem_app_icon_qa.png
     - assets/images/golem_app_icon_dev.png
-    - assets/benchmark_prompts/
+    - path: assets/benchmark_prompts/
+      flavors:
+        - qa
+        - dev
 
 # iOS generation is disabled on purpose: the iOS 26 simulator's launch-snapshot
 # renderer draws storyboard launch images at the wrong scale and flattens their

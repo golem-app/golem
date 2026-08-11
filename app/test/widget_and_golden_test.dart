@@ -386,7 +386,7 @@ void main() {
         tester,
         brightness: brightness,
         model: settingsModelSeed,
-        child: const SettingsScreen(),
+        child: const SettingsScreen(identity: AppIdentity.dev),
       );
       await expectLater(
         find.byType(SettingsScreen),
@@ -510,6 +510,19 @@ void main() {
     }, variant: iosChrome);
   }
 
+  testWidgets('production settings root golden', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      model: settingsModelSeed,
+      child: const SettingsScreen(identity: AppIdentity.production),
+    );
+    expect(find.byKey(const Key('open-benchmark')), findsNothing);
+    await expectLater(
+      find.byType(SettingsScreen),
+      matchesGoldenFile('goldens/settings-production-light.png'),
+    );
+  }, variant: iosChrome);
+
   testWidgets('settings advanced root and custom repository golden', (
     tester,
   ) async {
@@ -519,7 +532,7 @@ void main() {
       preferences: InMemoryPreferencesRepository(
         const AppPreferences(advancedMode: true),
       ),
-      child: const SettingsScreen(),
+      child: const SettingsScreen(identity: AppIdentity.dev),
     );
     // Advanced on: the root grows the System prompt row.
     expect(find.byKey(const Key('settings-system-prompt-row')), findsOneWidget);
@@ -636,7 +649,7 @@ void main() {
 
     // The redesigned settings surfaces enroll in the same guidelines.
     for (final screen in const <Widget>[
-      SettingsScreen(),
+      SettingsScreen(identity: AppIdentity.dev),
       AppearanceScreen(),
       PrivacyScreen(),
     ]) {
@@ -647,7 +660,7 @@ void main() {
     }
 
     for (final screen in const <Widget>[
-      SettingsScreen(),
+      SettingsScreen(identity: AppIdentity.dev),
       AppearanceScreen(),
       PrivacyScreen(),
       StorageScreen(),
@@ -805,7 +818,7 @@ void main() {
       tester,
       backend: backend,
       model: const ModelState(simulated: true),
-      child: const SettingsScreen(),
+      child: const SettingsScreen(identity: AppIdentity.dev),
     );
     expect(find.byKey(const Key('simulation-banner')), findsNothing);
     expect(find.textContaining('SIMULATED'), findsNothing);

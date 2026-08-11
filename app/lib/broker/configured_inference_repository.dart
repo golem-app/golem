@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import '../core/app_identity.dart';
 import '../core/domain/device_eligibility.dart';
 import '../core/domain/inference_backend.dart';
@@ -21,23 +23,28 @@ import 'runtime.dart';
 /// the build selects and the eligibility its surfaces report come from the same
 /// classification, so they cannot disagree.
 Future<({InferenceBackendConfig config, DeviceEligibility eligibility})>
-resolveConfiguredBackend() async {
+resolveConfiguredBackend({required AppIdentity identity}) async {
   const backendDefine = String.fromEnvironment('GOLEM_INFERENCE_BACKEND');
   final backendName = resolveBackendName(
     backendDefine: backendDefine,
-    identity: AppIdentity.current,
+    identity: identity,
+  );
+  final overrides = deviceCapabilityOverridesFor(
+    identity: identity,
+    memoryOverrideBytes: const int.fromEnvironment('GOLEM_DEVICE_MEMORY_BYTES'),
+    forceEngineUnsupported: const bool.fromEnvironment(
+      'GOLEM_DEVICE_ENGINE_UNSUPPORTED',
+    ),
   );
   final capabilities = await probeDeviceCapabilities(
     backendName: backendName,
     physicalMemoryBytes: const DeviceStorageChannel().physicalMemoryBytes,
     // Test-only: both test phones report over 8 GB, so neither the Qwen branch
     // nor the floor is otherwise reachable on hardware. 0 = unset.
-    memoryOverrideBytes: const int.fromEnvironment('GOLEM_DEVICE_MEMORY_BYTES'),
+    memoryOverrideBytes: overrides.memoryOverrideBytes,
     // Test-only counterpart for the instruction-set refusal, which no device
     // here can produce: every one of them carries the extension.
-    forceEngineUnsupported: const bool.fromEnvironment(
-      'GOLEM_DEVICE_ENGINE_UNSUPPORTED',
-    ),
+    forceEngineUnsupported: overrides.forceEngineUnsupported,
   );
   final eligibility = classifyDevice(
     capabilities: capabilities,
@@ -57,7 +64,20 @@ resolveConfiguredBackend() async {
   );
 }
 
+({int memoryOverrideBytes, bool forceEngineUnsupported})
+deviceCapabilityOverridesFor({
+  required AppIdentity identity,
+  required int memoryOverrideBytes,
+  required bool forceEngineUnsupported,
+}) => identity.internalToolsEnabled
+    ? (
+        memoryOverrideBytes: memoryOverrideBytes,
+        forceEngineUnsupported: forceEngineUnsupported,
+      )
+    : (memoryOverrideBytes: 0, forceEngineUnsupported: false);
+
 InferenceRepository createConfiguredInferenceRepository({
+  required AppIdentity identity,
   required InferenceBackendConfig config,
   required Duration fakeStreamDelay,
   required String documentsDirectory,
@@ -71,6 +91,7 @@ InferenceRepository createConfiguredInferenceRepository({
       ? resolveModelRuntimeConfig(config.artifactKey!)
       : null;
   return selectInferenceRepository(
+    identity: identity,
     backend: config.kind.name,
     modelPath: config.modelPath ?? '',
     modelProfile: config.profileKey,
@@ -85,6 +106,7 @@ InferenceRepository createConfiguredInferenceRepository({
     documentsDirectory: documentsDirectory,
     createRuntime: InfernoRuntimeAdapter.native,
     readAttachment: readAttachment,
+    diagnosticSink: identity.internalToolsEnabled ? debugPrint : null,
     // Measurement and triage hatches: dart-defines, no UI — evidence decides
     // defaults before a knob earns a settings row.
     loadOptions: const BrokerLoadOptions(
@@ -101,6 +123,7 @@ InferenceRepository createConfiguredInferenceRepository({
 /// Takes the dart-defines as parameters — they are compile-time constants — so
 /// tests and the eval harness can construct the app's own repository (#42).
 InferenceRepository selectInferenceRepository({
+  required AppIdentity identity,
   required String backend,
   required String modelPath,
   required String modelProfile,
@@ -122,6 +145,7 @@ InferenceRepository selectInferenceRepository({
   Future<List<int>?> Function(String attachmentId)? readAttachment,
   required int samplingSeed,
   BrokerLoadOptions loadOptions = const BrokerLoadOptions(),
+  InferenceDiagnosticSink? diagnosticSink,
 }) {
   if (backend == 'fake') {
     return FakeInferenceRepository(eventDelay: fakeStreamDelay);
@@ -170,5 +194,6 @@ InferenceRepository selectInferenceRepository({
     loadOptions: loadOptions,
     seed: samplingSeed == 0 ? null : samplingSeed,
     readAttachment: readAttachment,
+    diagnosticSink: identity.internalToolsEnabled ? diagnosticSink : null,
   );
 }

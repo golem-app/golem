@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/domain/app_state.dart';
+import '../core/app_identity.dart';
 import '../core/theme/golem_theme.dart';
 import '../features/chat/widgets/attach_sheet.dart';
 import '../features/splash/splash_screen.dart';
@@ -16,10 +17,12 @@ import 'launch_composition.dart';
 /// composition succeeds.
 class BootstrapApp extends StatefulWidget {
   const BootstrapApp({
+    required this.identity,
     required this.compose,
     this.picker = const AttachmentPicker(),
     super.key,
   });
+  final AppIdentity identity;
   final LaunchComposer compose;
   final AttachmentPicker picker;
 
@@ -61,7 +64,7 @@ class _BootstrapAppState extends State<BootstrapApp>
       setState(() => _failure = null);
     }
     try {
-      final dependencies = await widget.compose();
+      final dependencies = await widget.compose(widget.identity);
       if (!mounted) return;
       setState(() => _dependencies = dependencies);
     } catch (error, stackTrace) {
@@ -88,7 +91,7 @@ class _BootstrapAppState extends State<BootstrapApp>
     if (dependencies != null) {
       return ProviderScope(
         overrides: launchOverrides(dependencies),
-        child: GolemApp(picker: widget.picker),
+        child: GolemApp(identity: widget.identity, picker: widget.picker),
       );
     }
     final failure = _failure;

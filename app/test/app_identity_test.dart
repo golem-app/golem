@@ -38,4 +38,11 @@ void main() {
     // Host-side flutter test runs inherit the pubspec default flavor.
     expect(AppIdentity.current, AppIdentity.dev);
   });
+
+  test('only dev and qa identities enable internal tools', () {
+    expect(AppIdentity.dev.internalToolsEnabled, isTrue);
+    expect(AppIdentity.qa.internalToolsEnabled, isTrue);
+    expect(AppIdentity.production.internalToolsEnabled, isFalse);
+    expect(AppIdentity.flutter.internalToolsEnabled, isFalse);
+  });
 }

@@ -108,6 +108,10 @@ void main() {
         documentsDirectory: documents,
         resolveConfig: (key) =>
             resolveModelRuntimeConfig(key, catalog: catalog),
+        diagnosticSink: (message) {
+          if (message.startsWith('INFERNO_METRICS')) metrics.add(message);
+          original(message);
+        },
       );
       addTearDown(repository.unload);
 

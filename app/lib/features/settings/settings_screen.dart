@@ -17,7 +17,9 @@ import 'widgets/settings_rows.dart';
 /// The minimal settings root: model and app rows, the Advanced mode
 /// switch, and About. Everything heavier lives one screen deeper.
 class SettingsScreen extends ConsumerWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({required this.identity, super.key});
+
+  final AppIdentity identity;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -97,11 +99,12 @@ class SettingsScreen extends ConsumerWidget {
                       : '${(storage.usedBytes / 1e9).toStringAsFixed(1)} GB',
                   onTap: () => context.push('/settings/storage'),
                 ),
-                SettingsNavRow(
-                  key: const Key('open-benchmark'),
-                  label: 'Benchmark',
-                  onTap: () => context.push('/benchmark'),
-                ),
+                if (identity.internalToolsEnabled)
+                  SettingsNavRow(
+                    key: const Key('open-benchmark'),
+                    label: 'Benchmark',
+                    onTap: () => context.push('/benchmark'),
+                  ),
               ],
             ),
             const SizedBox(height: 24),
@@ -202,8 +205,7 @@ class SettingsScreen extends ConsumerWidget {
             Text('About Golem', style: GolemText.cardTitle),
             const SizedBox(height: 14),
             Text(
-              '${AppIdentity.current.displayName} $appVersion · '
-              '${AppIdentity.current.applicationId}',
+              '${identity.displayName} $appVersion · ${identity.applicationId}',
               style: GolemText.footnote.copyWith(
                 color: CupertinoDynamicColor.resolve(
                   GolemTheme.mutedInk,
