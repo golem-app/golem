@@ -1,7 +1,11 @@
-import '../../../core/domain/models.dart';
+import 'models.dart';
 
 /// The most recent decode speed evidenced for [modelKey] in the chat
 /// history, or null when no generation has measured it.
+///
+/// In core rather than a feature since #79: Settings quotes it on the model
+/// card and chat quotes it on the picker row, and two readers of one rule mean
+/// neither owns it.
 ///
 /// Attribution rides the conversation's effective model: a conversation
 /// with no per-chat choice ran [defaultModelKey] (the backend's active

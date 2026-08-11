@@ -7,10 +7,11 @@ import '../../core/chrome/golem_button.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_toast.dart';
 import '../../core/domain/app_preferences.dart';
+import '../../core/domain/byte_format.dart';
 import '../../core/domain/inference_backend.dart';
 import '../../core/domain/model_activation.dart';
 import '../../core/domain/model_catalog.dart';
-import 'domain/model_speed.dart';
+import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
 import '../../core/services/repository_resolver.dart';
 import '../../core/providers/app_providers.dart';
@@ -593,7 +594,7 @@ class _CustomRepositoryCard extends ConsumerWidget {
               ),
               const SizedBox(width: 12),
               Text(
-                _gigabytes(candidate.bytes),
+                gigabytes(candidate.bytes),
                 style: GolemText.footnote.copyWith(color: muted),
               ),
             ],
@@ -618,7 +619,7 @@ class _CustomRepositoryCard extends ConsumerWidget {
           const SizedBox(height: 8),
           LabeledRow(
             label: 'Size',
-            value: _gigabytes(outcome.resolved.totalBytes),
+            value: gigabytes(outcome.resolved.totalBytes),
           ),
           const SizedBox(height: 8),
           LabeledRow(
@@ -640,7 +641,7 @@ class _CustomRepositoryCard extends ConsumerWidget {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    _gigabytes(file.bytes),
+                    gigabytes(file.bytes),
                     style: GolemText.footnote.copyWith(color: muted),
                   ),
                 ],
@@ -902,7 +903,7 @@ class _ModelCard extends ConsumerWidget {
           LabeledRow(
             label: 'Size',
             value:
-                '${_gigabytes(entry.totalBytes)} · '
+                '${gigabytes(entry.totalBytes)} · '
                 '${entry.files.length} ${entry.files.length == 1 ? 'file' : 'files'}',
           ),
           if (measured != null) ...[
@@ -934,7 +935,7 @@ class _ModelCard extends ConsumerWidget {
             label: switch (status.phase) {
               ArtifactPhase.paused => 'Resume Download',
               ArtifactPhase.failed => 'Retry Download',
-              _ => 'Download · ${_gigabytes(entry.totalBytes)}',
+              _ => 'Download · ${gigabytes(entry.totalBytes)}',
             },
             onPressed: otherDownloadActive || !downloadable
                 ? null
@@ -1012,7 +1013,7 @@ class _ModelCard extends ConsumerWidget {
     dialogKey: const Key('model-delete-dialog'),
     title: 'Delete ${entry.displayName}?',
     message:
-        'Removes ${_gigabytes(entry.totalBytes)} from this device. '
+        'Removes ${gigabytes(entry.totalBytes)} from this device. '
         'The model can be downloaded again later.',
     actions: [
       GolemAlertAction(label: 'Keep', onPressed: () => Navigator.pop(context)),
@@ -1031,10 +1032,10 @@ class _ModelCard extends ConsumerWidget {
   String _statusLabel(String suffix) => switch (status.phase) {
     ArtifactPhase.notDownloaded => 'Not downloaded',
     ArtifactPhase.downloading =>
-      'Downloading ${_gigabytes(status.downloadedBytes)} of '
-          '${_gigabytes(entry.totalBytes)}$suffix',
+      'Downloading ${gigabytes(status.downloadedBytes)} of '
+          '${gigabytes(entry.totalBytes)}$suffix',
     ArtifactPhase.paused =>
-      'Paused at ${_gigabytes(status.downloadedBytes)}$suffix',
+      'Paused at ${gigabytes(status.downloadedBytes)}$suffix',
     ArtifactPhase.verifying => 'Verifying$suffix',
     ArtifactPhase.installed => 'Installed and verified$suffix',
     ArtifactPhase.failed => 'Download failed',
@@ -1103,8 +1104,6 @@ String _engineLabel(ModelEngine engine) => switch (engine) {
   ModelEngine.mlx => 'MLX',
   ModelEngine.gguf => 'GGUF · llama.cpp',
 };
-
-String _gigabytes(int bytes) => '${(bytes / 1000000000).toStringAsFixed(2)} GB';
 
 String _runtimeLabel(RuntimePhase phase, bool simulated) => switch (phase) {
   RuntimePhase.unloaded => 'Unloaded',

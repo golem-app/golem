@@ -21,11 +21,19 @@ and the lighter Qwen 3.5 2B below it (ADR 0003). The MLX engine is validated and
 one dart-define away, but no shipping build selects it.
 
 So a shipping build's chat model picker lists the three GGUF entries, and a user
-switches among *those*. The MLX rows exist for builds that ask for MLX.
+switches among *those*. The MLX rows exist for builds that ask for MLX — and
+since #79 an MLX artifact that is already *installed* appears there too: last,
+unselectable, with copy naming the engine this build runs, because a model
+installed in Settings and then missing from chat explains nothing. What is
+neither installed nor loadable here is still left out, but counted.
+
+The rows lead with plain language and keep the engine and quantization behind
+Advanced mode (`decisions/0008-model-presentation.md`), which is why the family
+column below no longer carries a quantization in a display name.
 
 | Catalog key | Family | Engine | Quant | Installed size | Image input |
 | --- | --- | --- | --- | ---: | --- |
-| `gemma4-gguf` | Gemma 4 E2B QAT | llama.cpp | Q4_K_XL | 3.18 GB | yes — pinned `mmproj` |
+| `gemma4-gguf` | Gemma 4 E2B | llama.cpp | Q4_K_XL | 3.18 GB | yes — pinned `mmproj` |
 | `qwen35-2b-gguf` | Qwen 3.5 2B | llama.cpp | Q4_0 | 1.58 GB | yes — pinned `mmproj` |
 | `qwen35-gguf` | Qwen 3.5 4B | llama.cpp | Q4_0 | 2.91 GB | yes — pinned `mmproj` |
 | `gemma4-mlx` | Gemma 4 E2B | MLX | 4-bit | 3.58 GB | yes |

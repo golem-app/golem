@@ -245,14 +245,38 @@ chrome layer's `showGolemToast` (iOS pill / Android bar, no actions).
 The per-chat model selection persists on the conversation (`modelKey`) and a
 real engine honors it: the next send unloads and loads the chosen artifact
 through the residency owner. Because the **engine** is a build-time composition
-(`auto` composes llama.cpp/GGUF), the picker offers only artifacts that engine
-can load *and* that are installed — so every label may name the choice
-immediately without promising weights the next send would refuse. A model that
-is not downloaded stays disabled and points at Settings ▸ Models; under an
-operator `GOLEM_MODEL_PATH` the sheet refuses entirely and names the file the
-build pins, because a sideload has no catalog key to switch back to. Sampling,
+(`auto` composes llama.cpp/GGUF), only artifacts that engine can load *and*
+that are installed may be chosen — so every label may name the choice
+immediately without promising weights the next send would refuse. Sampling,
 response style, and capability all follow the chosen model's profile, not the
 build's boot profile.
+
+What the sheet *says* about that choice is decided in
+`features/chat/model_choice.dart`, a pure policy the widget only paints
+(#79, `../docs/decisions/0008-model-presentation.md`). A row leads with the
+model's name, its size on disk, whether it reads pictures, and a decode rate
+**only where a generation measured one** — labelled `simulated` under the fake,
+never "on this phone" — over one sentence on what the model is for
+(`ModelCatalogEntry.summary`, declared beside the pins in
+`lib/broker/model_catalog.dart`). The exact artifact — `GGUF · Q4_0 ·
+<repository>` — appears only under **Advanced mode**, which is why display
+names no longer carry a quantization and two entries of one family may share
+one; the format token is appended only when two rows on screen share a name.
+
+One row carries a `RECOMMENDED` badge and the reason, read from the artifact
+`resolveBackendPolicy` already resolved rather than from a second reading of
+the device rule, so the badge and the model that loads cannot disagree. A
+refused device is recommended nothing.
+
+A row that is not installed is not inert: it offers `Download · <size>`, then
+progress with Pause, then Resume or Retry, through the same `ModelController`
+methods Settings drives — cancel and delete stay in Settings. An artifact that
+is installed but built for the other engine is listed last with copy naming the
+engine this build runs, rather than vanishing; what is neither installed nor
+loadable stays out but is counted. A whole-sheet refusal — an unsupported
+device, or an operator `GOLEM_MODEL_PATH`, which names the file the build pins
+because a sideload has no catalog key to switch back to — is stated once in the
+footnote while each row says only that it is refused.
 
 Stable keys/semantics preserve the native automation vocabulary. The most useful
 identifiers are `launch-splash`, `chat-composer`, `send-button`, `stop-button`,
@@ -263,7 +287,12 @@ identifiers are `launch-splash`, `chat-composer`, `send-button`, `stop-button`,
 `code-block`/`code-copy`, `attach-sheet` plus
 `attach-{photo-library,take-photo,files}`, `composer-attachments` plus
 `composer-attachment-remove-<index>`, `model-picker-sheet`,
-`model-picker-<catalogKey>`, `model-picker-manage`, `golem-toast`,
+`model-picker-<catalogKey>` (the selection target — the row's card is not
+itself a button, so a download inside it cannot swallow the tap),
+`model-picker-download-<catalogKey>` (Download / Resume / Retry),
+`model-picker-pause-<catalogKey>`,
+`model-picker-artifact-<catalogKey>` (Advanced mode only),
+`model-picker-manage`, `golem-toast`,
 `open-drawer`, `drawer-search-button`, `new-chat-drawer`,
 `conversation-<id>`, `conversation-menu-<id>` plus
 `menu-{pin-toggle,rename,share-transcript,delete}`, `storage-meter`,
@@ -275,8 +304,8 @@ identifiers are `launch-splash`, `chat-composer`, `send-button`, `stop-button`,
 `models-tab-{all,installed}`, `model-card-<key>`, `model-status-<key>`,
 `model-download-<key>`, `model-pause-<key>`, `model-cancel-<key>`,
 `model-delete-<key>`, `confirm-model-delete` (catalog keys: `gemma4-mlx`,
-`gemma4-gguf`, `qwen35-mlx`, `qwen35-gguf`, plus derived
-`custom-<repository-slug>` entries),
+`gemma4-gguf`, `qwen35-2b-mlx`, `qwen35-2b-gguf`, `qwen35-mlx`, `qwen35-gguf`,
+plus derived `custom-<repository-slug>` entries),
 `custom-repo-{engine-mlx,engine-gguf,field,revision,resolve,add,error,detail}`
 (`resolve` reads the repository, `add` commits what it found, and `add` only
 exists once a resolution is on screen), `download-active-model`
@@ -387,7 +416,13 @@ drawer, rename overlay, every settings surface (root, models, response
 style, appearance, privacy, storage, system prompt — with iOS-only
 Advanced variants for the root, custom repository, and sampling states),
 Benchmark, and both unsupported-device surfaces (chat and models, iOS-only
-in light and dark). The widget suite also runs Flutter's iOS 44-point target,
+in light and dark). The model picker records twice: the simulated catalog
+under both chromes (recommended-and-selected, mid-download, and offered
+downloads in one seed), and `model-picker-real-<brightness>` under a real
+llama build with Advanced on, which is the only way to record the states an
+engine composition produces — the recommendation's device-tier reason, an
+installed artifact of the other engine explaining itself, the count of what
+is not listed, and the artifact line. The widget suite also runs Flutter's iOS 44-point target,
 semantic-label, contrast, and enlarged-text checks; the settings root,
 appearance, and privacy screens are enrolled alongside chat, which is
 why segments and switches carry full 44-point targets and footnotes use

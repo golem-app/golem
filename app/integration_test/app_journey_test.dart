@@ -105,6 +105,12 @@ void main() {
     await tester.tap(find.byKey(const Key('composer-model-chip')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('model-picker-sheet')), findsOneWidget);
+    // The simulated catalog is the whole six, so the sheet scrolls (#79) and
+    // reaching the last row is part of the flow rather than an aside.
+    await tester.ensureVisible(
+      find.byKey(const Key('model-picker-qwen35-gguf')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('model-picker-qwen35-gguf')));
     await tester.pumpAndSettle();
     expect(

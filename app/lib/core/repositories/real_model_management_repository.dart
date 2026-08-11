@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 
+import '../domain/byte_format.dart';
 import '../domain/model_catalog.dart';
 import '../domain/models.dart';
 import '../services/artifact_downloader.dart';
@@ -276,8 +277,8 @@ final class RealModelManagementRepository implements ModelManagementRepository {
             phase: ArtifactPhase.failed,
             downloadedBytes: verifiedBytes,
             failure:
-                'Needs ${_gigabytes(remaining + diskSpaceMargin)} free; '
-                '${_gigabytes(free)} available.',
+                'Needs ${gigabytes(remaining + diskSpaceMargin)} free; '
+                '${gigabytes(free)} available.',
           ),
         ),
       );
@@ -676,5 +677,3 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     return _persist(_state.withArtifact(entry.key, const ArtifactStatus()));
   }
 }
-
-String _gigabytes(int bytes) => '${(bytes / 1000000000).toStringAsFixed(2)} GB';

@@ -174,6 +174,21 @@ void main() {
     }, variant: iosChrome);
   }
 
+  // One seed, four of the picker's row states (#79): the recommended artifact
+  // installed and selected, a second mid-download, a third offering its
+  // download, and the rest not downloaded.
+  const pickerSeed = ModelState(
+    artifacts: {
+      'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+      'gemma4-gguf': ArtifactStatus(
+        phase: ArtifactPhase.downloading,
+        downloadedBytes: 1200000000,
+      ),
+    },
+    activeArtifactKey: 'gemma4-mlx',
+    simulated: true,
+  );
+
   for (final brightness in Brightness.values) {
     testWidgets('composer sheet ${brightness.name} goldens', (tester) async {
       // Like the rename sheet, these record android in BOTH appearances:
@@ -182,6 +197,7 @@ void main() {
         tester,
         brightness: brightness,
         history: markdownHistory(),
+        model: pickerSeed,
         child: const ChatScreen(),
       );
       await tester.tap(find.byKey(const Key('composer-model-chip')));
@@ -203,6 +219,54 @@ void main() {
         ),
       );
     }, variant: bothChromes);
+  }
+
+  for (final brightness in Brightness.values) {
+    testWidgets(
+      'model picker on a real backend ${brightness.name} golden',
+      (tester) async {
+        // The states only a real engine can produce (#79): the recommendation
+        // and its device-tier reason, an installed artifact of the *other*
+        // engine explaining why it cannot be chosen, the count of what is not
+        // listed, and — with Advanced on — the exact artifact behind each name.
+        // Geometry is chrome-independent here, so iOS records it.
+        await pumpWithRepositories(
+          tester,
+          brightness: brightness,
+          history: markdownHistory(),
+          backend: const InferenceBackendConfig(
+            kind: InferenceBackendKind.llama,
+            profileKey: 'gemma4',
+            artifactKey: 'gemma4-gguf',
+            modelPath: 'documents:models/gemma4-gguf/weights.gguf',
+            modelPathFromCatalog: true,
+          ),
+          eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+          preferences: InMemoryPreferencesRepository(
+            const AppPreferences(advancedMode: true),
+          ),
+          model: const ModelState(
+            artifacts: {
+              'gemma4-gguf': ArtifactStatus(phase: ArtifactPhase.installed),
+              'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+              'qwen35-2b-gguf': ArtifactStatus(
+                phase: ArtifactPhase.paused,
+                downloadedBytes: 620000000,
+              ),
+            },
+            activeArtifactKey: 'gemma4-gguf',
+          ),
+          child: const ChatScreen(),
+        );
+        await tester.tap(find.byKey(const Key('composer-model-chip')));
+        await tester.pumpAndSettle();
+        await expectLater(
+          find.byKey(const Key('model-picker-sheet')),
+          matchesGoldenFile('goldens/model-picker-real-${brightness.name}.png'),
+        );
+      },
+      variant: iosChrome,
+    );
   }
 
   for (final brightness in Brightness.values) {
@@ -693,7 +757,7 @@ void main() {
     // model while it is unloaded is the point — "active" is which model, and
     // "state" is whether the engine holds it (#20).
     expect(find.text('Unloaded'), findsOneWidget);
-    expect(find.text('Gemma 4 E2B QAT'), findsWidgets);
+    expect(find.text('Gemma 4 E2B'), findsWidgets);
     expect(find.textContaining('· simulated'), findsNothing);
 
     await pumpWithRepositories(
