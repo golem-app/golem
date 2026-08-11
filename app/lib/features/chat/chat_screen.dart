@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/chrome/golem_nav_bar.dart';
@@ -101,6 +102,35 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (direction == ScrollDirection.forward) _follow = false;
   }
 
+  /// Streaming is a purely visual event — a caret, a growing bubble, a pill —
+  /// so without this a screen-reader user gets no signal that a turn started or
+  /// ended. Only the two edges are spoken: the listener behind this fires on
+  /// every delta, and narrating each one would talk over the answer itself. A
+  /// failure stays silent here because the recovery banner is a live region and
+  /// carries the actual reason.
+  static bool _busy(GenerationPhase? phase) =>
+      phase == GenerationPhase.preparing || phase == GenerationPhase.streaming;
+
+  void _announceGeneration(
+    BuildContext context,
+    GenerationPhase? before,
+    GenerationPhase? after,
+  ) {
+    if (before == null || after == null) return;
+    if (_busy(before) == _busy(after)) return;
+    final message = _busy(after)
+        ? 'Golem is responding'
+        : after == GenerationPhase.idle
+        ? 'Response finished'
+        : null;
+    if (message == null) return;
+    SemanticsService.sendAnnouncement(
+      View.of(context),
+      message,
+      Directionality.of(context),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen(chatControllerProvider, (previous, next) {
@@ -110,6 +140,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final nextValue = next.hasValue ? next.requireValue : null;
       final priorLength = priorValue?.active?.messages.length ?? 0;
       final nextLength = nextValue?.active?.messages.length ?? 0;
+      _announceGeneration(
+        context,
+        priorValue?.generation,
+        nextValue?.generation,
+      );
       if (nextLength != priorLength) {
         _scrollToLatest();
       } else if (!_follow) {

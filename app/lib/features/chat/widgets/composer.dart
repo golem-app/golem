@@ -55,6 +55,14 @@ class _ComposerState extends ConsumerState<Composer> {
         _pending.isNotEmpty) {
       setState(_pending.clear);
     }
+    // A disabled field used to drop focus on its own, taking the keyboard with
+    // it; a read-only one keeps both, leaving the answer streaming behind a
+    // keyboard nobody can type on. The dismissal was the behaviour, not a side
+    // effect of how the field was blocked.
+    final wasIdle = oldWidget.generation == GenerationPhase.idle;
+    if (wasIdle && widget.generation != GenerationPhase.idle) {
+      widget.focus.unfocus();
+    }
   }
 
   /// Rejections surface as a toast rather than a banner: nothing was sent, and
@@ -242,11 +250,11 @@ class _ComposerState extends ConsumerState<Composer> {
                 key: const Key('chat-composer'),
                 controller: controller,
                 focusNode: focus,
-                enabled: !generating,
-                // Left null, a borderless field paints Flutter's built-in
-                // disabled fill (near-black in dark mode) over the card while
-                // generating; an empty decoration keeps it transparent.
-                decoration: const BoxDecoration(),
+                // Read-only rather than disabled: a disabled field announces
+                // itself as such to a screen reader, which overstates a state
+                // that lasts one turn, and it takes the in-flight prompt out of
+                // reach for selection and copying.
+                readOnly: generating,
                 minLines: 1,
                 maxLines: 6,
                 placeholder: 'Message Golem…',

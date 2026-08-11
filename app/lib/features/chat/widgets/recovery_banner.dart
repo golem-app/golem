@@ -52,12 +52,21 @@ class RecoveryBanner extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Icon(
-                CupertinoIcons.exclamationmark_triangle_fill,
-                color: GolemTheme.destructive,
+              const ExcludeSemantics(
+                child: Icon(
+                  CupertinoIcons.exclamationmark_triangle_fill,
+                  color: GolemTheme.destructive,
+                ),
               ),
               const SizedBox(width: 10),
-              Expanded(child: Text(failure.message, style: GolemText.footnote)),
+              // A turn that failed is the one thing a screen-reader user must
+              // be told without going looking for it.
+              Expanded(
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text(failure.message, style: GolemText.footnote),
+                ),
+              ),
               ?recovery,
               CupertinoButton(
                 key: const Key('discard-generation'),
