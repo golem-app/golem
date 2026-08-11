@@ -126,54 +126,54 @@ class SettingsToggleRow extends StatelessWidget {
   final Key? toggleKey;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 10),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(child: Text(label, style: GolemText.body)),
-            const SizedBox(width: 12),
-            // Merged into a 44pt box so the switch clears the tap-target
-            // guideline (its own chrome is 39pt tall).
-            MergeSemantics(
-              child: Semantics(
-                label: label,
-                child: SizedBox(
-                  height: GolemSize.hitTarget,
-                  child: Center(
-                    child: CupertinoSwitch(
-                      key: toggleKey,
-                      value: value,
-                      onChanged: onChanged,
-                      activeTrackColor: CupertinoDynamicColor.resolve(
-                        GolemTheme.accent,
-                        context,
-                      ),
+  // Label, switch, and footnote are one control, not three fragments: split
+  // up, the label was read twice (once as prose, once as the switch) and the
+  // footnote landed on the card's node, which neither screen reader stops on.
+  Widget build(BuildContext context) => MergeSemantics(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text(label, style: GolemText.body)),
+              const SizedBox(width: 12),
+              // A 44pt box so the switch clears the tap-target guideline (its
+              // own chrome is 39pt tall).
+              SizedBox(
+                height: GolemSize.hitTarget,
+                child: Center(
+                  child: CupertinoSwitch(
+                    key: toggleKey,
+                    value: value,
+                    onChanged: onChanged,
+                    activeTrackColor: CupertinoDynamicColor.resolve(
+                      GolemTheme.accent,
+                      context,
                     ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (footnote != null) ...[
+            const SizedBox(height: 2),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                footnote!,
+                style: GolemText.footnote.copyWith(
+                  color: CupertinoDynamicColor.resolve(
+                    GolemTheme.mutedInk,
+                    context,
                   ),
                 ),
               ),
             ),
           ],
-        ),
-        if (footnote != null) ...[
-          const SizedBox(height: 2),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text(
-              footnote!,
-              style: GolemText.footnote.copyWith(
-                color: CupertinoDynamicColor.resolve(
-                  GolemTheme.mutedInk,
-                  context,
-                ),
-              ),
-            ),
-          ),
         ],
-      ],
+      ),
     ),
   );
 }

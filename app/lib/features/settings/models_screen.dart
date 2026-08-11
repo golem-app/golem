@@ -840,6 +840,7 @@ class _ModelCard extends ConsumerWidget {
               status.phase == ArtifactPhase.paused) ...[
             const SizedBox(height: 14),
             _Progress(
+              progressKey: Key('model-progress-${entry.key}'),
               value: entry.totalBytes == 0
                   ? 0
                   : (status.downloadedBytes / entry.totalBytes).clamp(0, 1),
@@ -1085,30 +1086,45 @@ class _Status extends StatelessWidget {
 }
 
 class _Progress extends StatelessWidget {
-  const _Progress({required this.value, required this.label});
+  const _Progress({required this.value, required this.label, this.progressKey});
   final double value;
   final String label;
+  final Key? progressKey;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
+  // The bar carries no semantics of its own, and split across three nodes the
+  // caption and the number read as unrelated fragments. Deliberately not a
+  // live region: re-announcing every tick of a multi-gigabyte download would
+  // talk over everything else on the screen.
+  Widget build(BuildContext context) => Semantics(
+    key: progressKey,
+    container: true,
+    label: label,
+    value: '${(value * 100).round()} percent',
+    child: ExcludeSemantics(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
-          Text(
-            '${(value * 100).round()}%',
-            style: const TextStyle(fontSize: 13),
+          Row(
+            children: [
+              Expanded(
+                child: Text(label, style: const TextStyle(fontSize: 13)),
+              ),
+              Text(
+                '${(value * 100).round()}%',
+                style: const TextStyle(fontSize: 13),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          ProgressTrack(
+            value: value,
+            trackColor: GolemTheme.divider,
+            fillColor: GolemTheme.accent,
           ),
         ],
       ),
-      const SizedBox(height: 7),
-      ProgressTrack(
-        value: value,
-        trackColor: GolemTheme.divider,
-        fillColor: GolemTheme.accent,
-      ),
-    ],
+    ),
   );
 }
 
