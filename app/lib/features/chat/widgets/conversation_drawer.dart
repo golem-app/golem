@@ -15,6 +15,7 @@ import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../model_label.dart';
+import '../../../core/domain/byte_format.dart';
 
 class ConversationDrawer extends ConsumerStatefulWidget {
   const ConversationDrawer({
@@ -32,9 +33,6 @@ class ConversationDrawer extends ConsumerStatefulWidget {
 }
 
 class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
-  static String _gigabytes(int bytes) =>
-      '${(bytes / 1000000000).toStringAsFixed(2)} GB';
-
   @override
   Widget build(BuildContext context) {
     final sections = groupConversations(
@@ -207,7 +205,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
               ),
             ),
           ),
-          _StorageMeter(gigabytes: _gigabytes),
+          _StorageMeter(),
           CupertinoButton(
             key: const Key('open-settings'),
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -393,13 +391,9 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
     await showGolemSheet<void>(
       context: context,
       sheetKey: const Key('rename-sheet'),
+      // The keyboard inset is the sheet chrome's job now (golem_sheet.dart).
       builder: (context) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          18,
-          20,
-          20 + MediaQuery.viewInsetsOf(context).bottom,
-        ),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
         child: SafeArea(
           top: false,
           child: Column(
@@ -488,8 +482,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
 /// cache) over the volume's capacity. Hidden entirely when the capacity
 /// is unknown.
 final class _StorageMeter extends ConsumerWidget {
-  const _StorageMeter({required this.gigabytes});
-  final String Function(int) gigabytes;
+  const _StorageMeter();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

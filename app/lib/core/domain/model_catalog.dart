@@ -14,6 +14,17 @@ export 'model_profile_spec.dart'
 
 enum ModelEngine { mlx, gguf }
 
+/// The engine as a user would name it, for copy that has to say which runtime
+/// a build composed. Distinct from the artifact's *format* token (`GGUF`,
+/// `MLX`), which names a file layout rather than the thing executing it.
+String engineName(ModelEngine engine) => switch (engine) {
+  ModelEngine.mlx => 'MLX',
+  ModelEngine.gguf => 'llama.cpp',
+};
+
+/// The artifact-format token: what the files on disk are, not what runs them.
+String engineFormat(ModelEngine engine) => engine.name.toUpperCase();
+
 /// [ModelCatalogEntry.profileKey] for an entry not yet resolved to a supported
 /// broker profile: it lists and deletes normally but refuses activation.
 const unresolvedProfileKey = 'unresolved';
@@ -89,6 +100,7 @@ final class ModelCatalogEntry {
     required this.revision,
     required this._files,
     required this.profileKey,
+    this.summary,
     this.contextLength = defaultModelContextLength,
     this._inputModalities = const {ModelInputModality.text},
   });
@@ -108,6 +120,13 @@ final class ModelCatalogEntry {
   /// The broker profile to render and sample with. Explicit, never inferred: a
   /// slug, file name or engine is no proof of a chat template (#43).
   final String profileKey;
+
+  /// One sentence on what this artifact is *for*, in a user's words. Declared
+  /// per entry beside the pins in `broker/model_catalog.dart` rather than
+  /// derived from a family or a size: a name is no more proof of behaviour than
+  /// it is of a chat template. Null for a hand-added repository, which nobody
+  /// has characterized (#79).
+  final String? summary;
 
   /// The context window this app actually configures for the artifact, rather
   /// than the much larger trained maximum a model card may advertise.
@@ -151,6 +170,7 @@ final class ModelCatalogEntry {
       other.repository == repository &&
       other.revision == revision &&
       other.profileKey == profileKey &&
+      other.summary == summary &&
       other.contextLength == contextLength &&
       listEquals(other._files, _files) &&
       setEquals(other._inputModalities, _inputModalities);
@@ -164,6 +184,7 @@ final class ModelCatalogEntry {
     repository,
     revision,
     profileKey,
+    summary,
     contextLength,
     listHash(_files),
     setHash(_inputModalities),

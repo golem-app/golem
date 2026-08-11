@@ -62,26 +62,37 @@ final class DeviceCapabilities {
 /// A classified device: the tier, why it was refused when it was, and the copy
 /// that refusal presents. Value-equal so widgets can select on it.
 final class DeviceEligibility {
-  const DeviceEligibility({required this.tier, this.reason, this.message})
-    : assert(
-        (tier == DeviceTier.unsupported) == (reason != null),
-        'an unsupported device carries its reason, a supported one has none',
-      ),
-      assert(
-        (tier == DeviceTier.unsupported) == (message != null),
-        'an unsupported device carries its copy, a supported one has none',
-      );
+  const DeviceEligibility({
+    required this.tier,
+    this.reason,
+    this.message,
+    this.memoryKnown = true,
+  }) : assert(
+         (tier == DeviceTier.unsupported) == (reason != null),
+         'an unsupported device carries its reason, a supported one has none',
+       ),
+       assert(
+         (tier == DeviceTier.unsupported) == (message != null),
+         'an unsupported device carries its copy, a supported one has none',
+       );
 
   /// What an unclassified process assumes: supported, nothing refused. The
   /// simulated backend and host tests never reach a real probe, and absence of
   /// evidence must not gate anything.
-  const DeviceEligibility.unclassified() : this(tier: DeviceTier.light);
+  const DeviceEligibility.unclassified()
+    : this(tier: DeviceTier.light, memoryKnown: false);
 
   final DeviceTier tier;
   final DeviceIneligibilityReason? reason;
 
   /// User-presentable copy for the refusal; null while the device is supported.
   final String? message;
+
+  /// Whether the memory reading behind [tier] actually happened. The light tier
+  /// is reached two ways — a small phone, and a probe that answered nothing —
+  /// and copy that explains the tier must not describe the second as if it were
+  /// the first. Absence of evidence is not a low reading (#79).
+  final bool memoryKnown;
 
   bool get runsModels => tier != DeviceTier.unsupported;
 
@@ -97,10 +108,11 @@ final class DeviceEligibility {
       other is DeviceEligibility &&
       other.tier == tier &&
       other.reason == reason &&
-      other.message == message;
+      other.message == message &&
+      other.memoryKnown == memoryKnown;
 
   @override
-  int get hashCode => Object.hash(tier, reason, message);
+  int get hashCode => Object.hash(tier, reason, message, memoryKnown);
 }
 
 /// The whole admission policy, pure. Instruction set decides first: a CPU that
@@ -125,7 +137,9 @@ DeviceEligibility classifyDevice({
     );
   }
   final memory = capabilities.physicalMemoryBytes;
-  if (memory == null) return const DeviceEligibility(tier: DeviceTier.light);
+  if (memory == null) {
+    return const DeviceEligibility(tier: DeviceTier.light, memoryKnown: false);
+  }
   if (memory < memoryFloorBytes) {
     return const DeviceEligibility(
       tier: DeviceTier.unsupported,

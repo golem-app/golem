@@ -2,9 +2,12 @@ import 'package:flutter/cupertino.dart';
 
 import '../../core/chrome/golem_alert.dart';
 import '../../core/domain/model_catalog.dart';
+import '../../core/domain/byte_format.dart';
 
-String formatModelBytes(int bytes) =>
-    '${(bytes / 1000000000).toStringAsFixed(2)} GB';
+/// Kept as a name the onboarding copy reads well with; the formatting itself
+/// has one owner, so the size in this dialog and the size on the button that
+/// opened it cannot round differently.
+String formatModelBytes(int bytes) => gigabytes(bytes);
 
 /// Consent shared by onboarding, Settings, and the chat recovery path. It is
 /// intentionally static: Golem requests no connectivity permission and makes

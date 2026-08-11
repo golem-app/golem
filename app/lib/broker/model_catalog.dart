@@ -4,6 +4,19 @@ import 'runtime.dart';
 /// The pinned Inferno manifest artifacts as app-domain entries. Keys follow
 /// `<profile>-<engine>`, so the active artifact derives from the
 /// GOLEM_MODEL_PROFILE and GOLEM_INFERENCE_BACKEND dart-defines.
+///
+/// Display names are the family and its parameter size and nothing else. The
+/// quantization one name used to carry ("Gemma 4 E2B QAT") is an artifact fact,
+/// and artifact facts belong behind Advanced mode (#79,
+/// `docs/decisions/0008-model-presentation.md`). Two entries of one family may
+/// therefore share a name; the picker disambiguates by engine when both are on
+/// screen at once.
+///
+/// [ModelCatalogEntry.summary] describes shape and speed, never quality: the
+/// only comparative evidence this project holds is decode rates and the records
+/// under `docs/evals/`, and Qwen 3.5 2B's accuracy caveats in
+/// `docs/real-model-matrix.md` are exactly why no entry claims to be the better
+/// answerer.
 final List<ModelCatalogEntry> modelCatalog = [
   _entry(
     key: 'gemma4-mlx',
@@ -12,15 +25,17 @@ final List<ModelCatalogEntry> modelCatalog = [
     quantization: '4-bit',
     artifact: gemma4E2BMlx4Bit,
     profileKey: 'gemma4',
+    summary: _gemma4Summary,
     inputModalities: const {ModelInputModality.text, ModelInputModality.image},
   ),
   _entry(
     key: 'gemma4-gguf',
-    displayName: 'Gemma 4 E2B QAT',
+    displayName: 'Gemma 4 E2B',
     engine: ModelEngine.gguf,
     quantization: 'Q4_K_XL',
     artifact: gemma4E2BGgufQ4,
     profileKey: 'gemma4',
+    summary: _gemma4Summary,
     // llama.cpp/libmtmd with the pinned projector passed the #18 bake-off.
     // Capability belongs to this exact artifact, not the whole family.
     inputModalities: const {ModelInputModality.text, ModelInputModality.image},
@@ -32,6 +47,7 @@ final List<ModelCatalogEntry> modelCatalog = [
     quantization: '4-bit',
     artifact: qwen35TwoBMlx4Bit,
     profileKey: 'qwen35',
+    summary: _qwen35TwoBSummary,
     inputModalities: const {ModelInputModality.text, ModelInputModality.image},
   ),
   _entry(
@@ -41,6 +57,7 @@ final List<ModelCatalogEntry> modelCatalog = [
     quantization: 'Q4_0',
     artifact: qwen35TwoBGgufQ4,
     profileKey: 'qwen35',
+    summary: _qwen35TwoBSummary,
     inputModalities: const {ModelInputModality.text, ModelInputModality.image},
   ),
   _entry(
@@ -50,6 +67,7 @@ final List<ModelCatalogEntry> modelCatalog = [
     quantization: '4-bit',
     artifact: qwen35Mlx4Bit,
     profileKey: 'qwen35',
+    summary: _qwen35FourBSummary,
     inputModalities: const {ModelInputModality.text, ModelInputModality.image},
   ),
   _entry(
@@ -59,9 +77,21 @@ final List<ModelCatalogEntry> modelCatalog = [
     quantization: 'Q4_0',
     artifact: qwen35GgufQ4,
     profileKey: 'qwen35',
+    summary: _qwen35FourBSummary,
     inputModalities: const {ModelInputModality.text, ModelInputModality.image},
   ),
 ];
+
+const _gemma4Summary =
+    'A balanced all-rounder for everyday writing, summarising and light code.';
+
+const _qwen35TwoBSummary =
+    'The smallest and quickest to answer. Best for short questions, and for '
+    'phones with less memory to spare.';
+
+const _qwen35FourBSummary =
+    'Leans towards code and maths, and can think a problem through before it '
+    'answers.';
 
 /// The download surface and the inference configuration are independent axes;
 /// this is the only bridge between them.
@@ -131,6 +161,7 @@ ModelCatalogEntry _entry({
   required String quantization,
   required InfernoModelArtifact artifact,
   required String profileKey,
+  required String summary,
   Set<ModelInputModality> inputModalities = const {ModelInputModality.text},
 }) => ModelCatalogEntry(
   key: key,
@@ -140,6 +171,7 @@ ModelCatalogEntry _entry({
   repository: artifact.repository,
   revision: artifact.revision,
   profileKey: profileKey,
+  summary: summary,
   inputModalities: inputModalities,
   files: [
     for (final file in artifact.files)

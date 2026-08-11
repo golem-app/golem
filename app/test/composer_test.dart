@@ -41,6 +41,11 @@ void main() {
     expect(find.byKey(const Key('model-picker-sheet')), findsOneWidget);
     expect(find.byKey(const Key('model-picker-manage')), findsOneWidget);
 
+    // Six simulated rows do not fit a sheet, so the last is scrolled to.
+    await tester.ensureVisible(
+      find.byKey(const Key('model-picker-qwen35-gguf')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('model-picker-qwen35-gguf')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('model-picker-sheet')), findsNothing);
@@ -154,10 +159,198 @@ void main() {
           'to switch back to',
     );
     expect(
-      find.textContaining('my-own-build'),
-      findsWidgets,
+      find.descendant(
+        of: find.byKey(const Key('model-picker-sheet')),
+        matching: find.textContaining('my-own-build'),
+      ),
+      findsOneWidget,
       reason: 'the sheet names the file the build pins, not a pinned artifact',
     );
+  });
+
+  testWidgets('a model that is not downloaded is fetched from the sheet', (
+    tester,
+  ) async {
+    // #79's central move: the row that used to be inert and pointed at
+    // Settings now carries the download that fixes it, through the same
+    // controller Settings drives. The seam is scripted rather than the real
+    // simulation because that one persists to disk, and file I/O never
+    // completes inside a widget test's fake clock.
+    final models = _ScriptedModels();
+    await pumpWithRepositories(
+      tester,
+      history: markdownHistory(),
+      backend: const InferenceBackendConfig(
+        kind: InferenceBackendKind.llama,
+        profileKey: 'gemma4',
+        artifactKey: 'gemma4-gguf',
+        modelPath: 'documents:models/gemma4-gguf/weights.gguf',
+        modelPathFromCatalog: true,
+      ),
+      models: models,
+      child: const ChatScreen(),
+    );
+    await tester.tap(find.byKey(const Key('composer-model-chip')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Download it to use it in this chat.'),
+      findsWidgets,
+      reason: 'a row that cannot be picked says what would make it pickable',
+    );
+    final download = find.byKey(
+      const Key('model-picker-download-qwen35-2b-gguf'),
+    );
+    await tester.ensureVisible(download);
+    await tester.pumpAndSettle();
+    expect(find.text('Download · 1.58 GB'), findsOneWidget);
+    await tester.tap(download);
+    await tester.pumpAndSettle();
+    // The sheet is the most casual of the five download entrances and offers
+    // no Cancel, so it asks before it spends gigabytes, exactly as Settings,
+    // first run and both banners do (#26).
+    expect(find.byKey(const Key('model-download-consent')), findsOneWidget);
+    expect(models.calls, isEmpty, reason: 'nothing starts before consent');
+    await tester.tap(find.byKey(const Key('model-download-confirm')));
+    await tester.pumpAndSettle();
+    expect(models.calls, ['download:qwen35-2b-gguf']);
+    // And the sheet redraws around the transfer it started.
+    expect(find.text('Downloading'), findsOneWidget);
+    expect(
+      find.byKey(const Key('model-picker-sheet')),
+      findsOneWidget,
+      reason: 'the sheet stays open — watching progress is the point',
+    );
+
+    final pause = find.byKey(const Key('model-picker-pause-qwen35-2b-gguf'));
+    await tester.ensureVisible(pause);
+    await tester.pumpAndSettle();
+    await tester.tap(pause);
+    await tester.pumpAndSettle();
+    expect(models.calls.last, 'pause:qwen35-2b-gguf');
+    expect(find.text('Resume'), findsOneWidget);
+    expect(find.text('Downloading'), findsNothing);
+  });
+
+  testWidgets('a transfer in the sheet reports progress and blocks the rest', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      history: markdownHistory(),
+      backend: const InferenceBackendConfig(
+        kind: InferenceBackendKind.llama,
+        profileKey: 'gemma4',
+        artifactKey: 'gemma4-gguf',
+        modelPath: 'documents:models/gemma4-gguf/weights.gguf',
+        modelPathFromCatalog: true,
+      ),
+      model: const ModelState(
+        artifacts: {
+          'qwen35-2b-gguf': ArtifactStatus(
+            phase: ArtifactPhase.downloading,
+            downloadedBytes: 790000000,
+          ),
+        },
+      ),
+      child: const ChatScreen(),
+    );
+    await tester.tap(find.byKey(const Key('composer-model-chip')));
+    await tester.pumpAndSettle();
+    expect(find.text('Downloading'), findsOneWidget);
+    expect(find.text('50%'), findsOneWidget);
+    // The one transfer slot is Settings' rule too: the others say why they
+    // cannot start rather than failing when tapped.
+    expect(find.text('Another model is downloading.'), findsWidgets);
+    // Withheld, not dimmed: GolemButton looks identical whether or not it
+    // does anything, so the blocked row loses the button and keeps the note.
+    expect(
+      find.byKey(const Key('model-picker-download-qwen35-gguf')),
+      findsNothing,
+    );
+    expect(
+      tester
+          .widget<CupertinoButton>(
+            find.byKey(const Key('model-picker-pause-qwen35-2b-gguf')),
+          )
+          .onPressed,
+      isNotNull,
+      reason: 'a download started here can be stopped here',
+    );
+  });
+
+  testWidgets('an installed model of the other engine explains itself', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      history: markdownHistory(),
+      backend: const InferenceBackendConfig(
+        kind: InferenceBackendKind.llama,
+        profileKey: 'gemma4',
+        artifactKey: 'gemma4-gguf',
+        modelPath: 'documents:models/gemma4-gguf/weights.gguf',
+        modelPathFromCatalog: true,
+      ),
+      model: const ModelState(
+        artifacts: {
+          'gemma4-gguf': ArtifactStatus(phase: ArtifactPhase.installed),
+          'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+        },
+      ),
+      child: const ChatScreen(),
+    );
+    await tester.tap(find.byKey(const Key('composer-model-chip')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('model-picker-gemma4-mlx')),
+      findsOneWidget,
+      reason:
+          'a model installed in Settings and then missing from chat is the '
+          'absence #79 exists to explain',
+    );
+    expect(
+      find.text(
+        'Installed, but this build runs llama.cpp and cannot load MLX models.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('are not listed'),
+      findsOneWidget,
+      reason: 'what stays out is still counted',
+    );
+  });
+
+  testWidgets('Advanced mode reveals the exact artifact, and only then', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      history: markdownHistory(),
+      child: const ChatScreen(),
+    );
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ChatScreen)),
+    );
+    await tester.tap(find.byKey(const Key('composer-model-chip')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('model-picker-artifact-gemma4-gguf')),
+      findsNothing,
+    );
+    Navigator.of(tester.element(find.byType(ChatScreen))).pop();
+    await tester.pumpAndSettle();
+    await container
+        .read(preferencesControllerProvider.notifier)
+        .setAdvancedMode(true);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('composer-model-chip')));
+    await tester.pumpAndSettle();
+    final artifact = find.byKey(const Key('model-picker-artifact-gemma4-gguf'));
+    await tester.ensureVisible(artifact);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(artifact).data, startsWith('GGUF · Q4_K_XL · '));
   });
 
   testWidgets('starter chips prefill and focus the composer', (tester) async {
@@ -675,4 +868,63 @@ final class _CountingAttachmentRepository implements AttachmentRepository {
 
   @override
   Future<int> storedBytes() => _delegate.storedBytes();
+}
+
+/// A model-management seam that records what the picker asked for and answers
+/// synchronously. The shipped fake persists every snapshot to disk, and real
+/// file I/O never completes inside a widget test's fake clock.
+final class _ScriptedModels implements ModelManagementRepository {
+  ModelState _state = const ModelState(
+    activeArtifactKey: 'gemma4-gguf',
+    artifacts: {'gemma4-gguf': ArtifactStatus(phase: ArtifactPhase.installed)},
+  );
+
+  final List<String> calls = [];
+
+  @override
+  Future<ModelState> load() async => _state;
+
+  @override
+  Stream<ModelState> download(String artifactKey) {
+    calls.add('download:$artifactKey');
+    _state = _state.withArtifact(
+      artifactKey,
+      const ArtifactStatus(
+        phase: ArtifactPhase.downloading,
+        downloadedBytes: 400000000,
+      ),
+    );
+    return Stream.value(_state);
+  }
+
+  @override
+  Future<ModelState> pause(String artifactKey) async {
+    calls.add('pause:$artifactKey');
+    _state = _state.withArtifact(
+      artifactKey,
+      _state.statusOf(artifactKey).copyWith(phase: ArtifactPhase.paused),
+    );
+    return _state;
+  }
+
+  @override
+  Future<ModelState> cancel(String artifactKey) async {
+    calls.add('cancel:$artifactKey');
+    return _state;
+  }
+
+  @override
+  Future<ModelState> delete(String artifactKey) async {
+    calls.add('delete:$artifactKey');
+    return _state;
+  }
+
+  @override
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    String? failure,
+  }) async => _state;
+
+  @override
+  Future<ModelState> addModel(ModelCatalogEntry entry) async => _state;
 }

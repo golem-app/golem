@@ -7,6 +7,7 @@ import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/onboarding/domain/onboarding_policy.dart';
+import 'package:golem_flutter/core/domain/model_admission.dart';
 
 void main() {
   group('first-run decision', () {
@@ -89,7 +90,7 @@ void main() {
     );
 
     test('QA shows and enables the full catalog deterministically', () {
-      final options = onboardingModelOptions(
+      final options = modelAdmissionOptions(
         catalog: modelCatalog,
         backend: fake,
         eligibility: const DeviceEligibility(tier: DeviceTier.light),
@@ -97,7 +98,7 @@ void main() {
       expect(options, hasLength(modelCatalog.length));
       expect(options.every((option) => option.enabled), isTrue);
       expect(
-        recommendedOnboardingModelKey(
+        recommendedAdmittedModelKey(
           catalog: modelCatalog,
           backend: fake,
           eligibility: const DeviceEligibility(tier: DeviceTier.light),
@@ -114,7 +115,7 @@ void main() {
         modelPath: 'documents:models/qwen35-2b-gguf/model.gguf',
         modelPathFromCatalog: true,
       );
-      final options = onboardingModelOptions(
+      final options = modelAdmissionOptions(
         catalog: modelCatalog,
         backend: lightLlama,
         eligibility: const DeviceEligibility(tier: DeviceTier.light),
@@ -126,7 +127,7 @@ void main() {
         {'qwen35-2b-gguf'},
       );
       expect(
-        recommendedOnboardingModelKey(
+        recommendedAdmittedModelKey(
           catalog: modelCatalog,
           backend: lightLlama,
           eligibility: const DeviceEligibility(tier: DeviceTier.light),
@@ -136,7 +137,7 @@ void main() {
     });
 
     test('a configured larger artifact wins on a light device', () {
-      final options = onboardingModelOptions(
+      final options = modelAdmissionOptions(
         catalog: modelCatalog,
         backend: llama,
         eligibility: const DeviceEligibility(tier: DeviceTier.light),
@@ -154,7 +155,7 @@ void main() {
     });
 
     test('preferred llama tier enables its engine and marks Gemma default', () {
-      final options = onboardingModelOptions(
+      final options = modelAdmissionOptions(
         catalog: modelCatalog,
         backend: llama,
         eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
@@ -172,9 +173,7 @@ void main() {
       expect(
         options
             .where((option) => option.entry.engine == ModelEngine.mlx)
-            .every(
-              (option) => option.block == OnboardingModelBlock.otherEngine,
-            ),
+            .every((option) => option.block == ModelAdmissionBlock.otherEngine),
         isTrue,
       );
     });
@@ -183,7 +182,7 @@ void main() {
       'a valid persisted choice wins without relabelling it recommended',
       () {
         expect(
-          recommendedOnboardingModelKey(
+          recommendedAdmittedModelKey(
             catalog: modelCatalog,
             backend: llama,
             eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
@@ -192,7 +191,7 @@ void main() {
           'qwen35-gguf',
         );
         expect(
-          onboardingModelOptions(
+          modelAdmissionOptions(
             catalog: modelCatalog,
             backend: llama,
             eligibility: const DeviceEligibility(tier: DeviceTier.preferred),

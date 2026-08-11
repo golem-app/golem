@@ -7,10 +7,12 @@ import '../../core/chrome/golem_button.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_toast.dart';
 import '../../core/domain/app_preferences.dart';
+import '../../core/domain/byte_format.dart';
 import '../../core/domain/inference_backend.dart';
 import '../../core/domain/model_activation.dart';
+import '../../core/domain/model_admission.dart';
 import '../../core/domain/model_catalog.dart';
-import 'domain/model_speed.dart';
+import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
 import '../../core/services/repository_resolver.dart';
 import '../../core/providers/app_providers.dart';
@@ -77,18 +79,7 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
 
   Widget _body(BuildContext context, ModelState model) {
     final catalog = ref.watch(effectiveModelCatalogProvider);
-    final pinnedKeys = {
-      for (final entry in ref.watch(modelCatalogEntriesProvider)) entry.key,
-    };
-    // A hand-added repository can be fetched once it has resolved: its file
-    // list is then real. An unresolved one still cannot, because its files are
-    // synthesized and nothing would be on the other end of the request.
-    final resolvedKeys = {
-      for (final spec
-          in ref.watch(preferencesControllerProvider).value?.customModels ??
-              const <CustomModelSpec>[])
-        if (spec.resolved != null) spec.key,
-    };
+    final downloadableKeys = ref.watch(downloadableModelKeysProvider);
     final advanced =
         ref.watch(preferencesControllerProvider).value?.advancedMode ?? false;
     final simulatedInference = ref
@@ -97,8 +88,16 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
     // A device outside every supported tier may not start a transfer or a load
     // (#27); the cards say why instead of offering buttons that would refuse.
     final deviceRefusal = ref.watch(deviceRefusalProvider);
+    // Verification holds the slot as surely as the transfer does — it runs
+    // inside the same download() stream, behind the same busy guard — so a
+    // button offered during it would do nothing when tapped. The chat picker
+    // counts it; these cards must agree.
     final downloadingKey = model.artifacts.entries
-        .where((entry) => entry.value.phase == ArtifactPhase.downloading)
+        .where(
+          (entry) =>
+              entry.value.phase == ArtifactPhase.downloading ||
+              entry.value.phase == ArtifactPhase.verifying,
+        )
         .map((entry) => entry.key)
         .firstOrNull;
     // Real builds hide artifacts their composed engine can never load —
@@ -173,11 +172,9 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
             active: entry.key == activeKey,
             otherDownloadActive:
                 downloadingKey != null && downloadingKey != entry.key,
-            downloadable:
-                model.simulated ||
-                pinnedKeys.contains(entry.key) ||
-                resolvedKeys.contains(entry.key),
+            downloadable: downloadableKeys.contains(entry.key),
             deviceRefusal: deviceRefusal,
+            defaultMeasuredKey: defaultMeasuredModelKey(backend, model),
           ),
           const SizedBox(height: 12),
         ],
@@ -594,7 +591,7 @@ class _CustomRepositoryCard extends ConsumerWidget {
               ),
               const SizedBox(width: 12),
               Text(
-                _gigabytes(candidate.bytes),
+                gigabytes(candidate.bytes),
                 style: GolemText.footnote.copyWith(color: muted),
               ),
             ],
@@ -619,7 +616,7 @@ class _CustomRepositoryCard extends ConsumerWidget {
           const SizedBox(height: 8),
           LabeledRow(
             label: 'Size',
-            value: _gigabytes(outcome.resolved.totalBytes),
+            value: gigabytes(outcome.resolved.totalBytes),
           ),
           const SizedBox(height: 8),
           LabeledRow(
@@ -641,7 +638,7 @@ class _CustomRepositoryCard extends ConsumerWidget {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    _gigabytes(file.bytes),
+                    gigabytes(file.bytes),
                     style: GolemText.footnote.copyWith(color: muted),
                   ),
                 ],
@@ -748,6 +745,7 @@ class _ModelCard extends ConsumerWidget {
     required this.active,
     required this.otherDownloadActive,
     required this.downloadable,
+    required this.defaultMeasuredKey,
     this.deviceRefusal,
   });
 
@@ -764,19 +762,25 @@ class _ModelCard extends ConsumerWidget {
   /// Why this device may not fetch any weights at all, or null when it may.
   final String? deviceRefusal;
 
+  /// What an unattributed metric belongs to, resolved once by the list rather
+  /// than re-derived — and re-subscribed — per card.
+  final String? defaultMeasuredKey;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(modelControllerProvider.notifier);
     final suffix = simulated ? ' · simulated' : '';
     final statusLabel = _statusLabel(suffix);
     final chats = ref.watch(chatControllerProvider).value?.conversations;
-    final backend = ref.watch(inferenceBackendProvider);
+    // Attribution comes from the shared helper, not a local fallback: the
+    // picker quotes the same numbers, and a different default had one surface
+    // showing a rate the other did not (#79).
     final measured = chats == null
         ? null
         : measuredTokensPerSecond(
             chats,
             modelKey: entry.key,
-            defaultModelKey: backend.artifactKey ?? 'gemma4-mlx',
+            defaultModelKey: defaultMeasuredKey,
           );
     return GolemCard(
       child: Column(
@@ -903,7 +907,7 @@ class _ModelCard extends ConsumerWidget {
           LabeledRow(
             label: 'Size',
             value:
-                '${_gigabytes(entry.totalBytes)} · '
+                '${gigabytes(entry.totalBytes)} · '
                 '${entry.files.length} ${entry.files.length == 1 ? 'file' : 'files'}',
           ),
           if (measured != null) ...[
@@ -935,7 +939,7 @@ class _ModelCard extends ConsumerWidget {
             label: switch (status.phase) {
               ArtifactPhase.paused => 'Resume Download',
               ArtifactPhase.failed => 'Retry Download',
-              _ => 'Download · ${_gigabytes(entry.totalBytes)}',
+              _ => 'Download · ${gigabytes(entry.totalBytes)}',
             },
             onPressed: otherDownloadActive || !downloadable
                 ? null
@@ -962,11 +966,7 @@ class _ModelCard extends ConsumerWidget {
               key: downloadable
                   ? Key('model-device-refusal-${entry.key}')
                   : null,
-              downloadable
-                  ? deviceRefusal!
-                  : 'This repository has not been resolved against Hugging '
-                        'Face, so its files are unknown. Add it again to '
-                        'resolve it.',
+              downloadable ? deviceRefusal! : unresolvedRepositoryReason,
               style: GolemText.footnote.copyWith(
                 color: CupertinoDynamicColor.resolve(
                   GolemTheme.mutedInk,
@@ -1021,9 +1021,11 @@ class _ModelCard extends ConsumerWidget {
   ) => showGolemAlert(
     context: context,
     dialogKey: const Key('model-delete-dialog'),
-    title: 'Delete ${entry.displayName}?',
+    // Display names no longer carry a quantization, so two artifacts of one
+    // family share one (#79). A destructive dialog must still say which.
+    title: 'Delete ${entry.displayName} · ${engineFormat(entry.engine)}?',
     message:
-        'Removes ${_gigabytes(entry.totalBytes)} from this device. '
+        'Removes ${gigabytes(entry.totalBytes)} from this device. '
         'The model can be downloaded again later.',
     actions: [
       GolemAlertAction(label: 'Keep', onPressed: () => Navigator.pop(context)),
@@ -1042,10 +1044,10 @@ class _ModelCard extends ConsumerWidget {
   String _statusLabel(String suffix) => switch (status.phase) {
     ArtifactPhase.notDownloaded => 'Not downloaded',
     ArtifactPhase.downloading =>
-      'Downloading ${_gigabytes(status.downloadedBytes)} of '
-          '${_gigabytes(entry.totalBytes)}$suffix',
+      'Downloading ${gigabytes(status.downloadedBytes)} of '
+          '${gigabytes(entry.totalBytes)}$suffix',
     ArtifactPhase.paused =>
-      'Paused at ${_gigabytes(status.downloadedBytes)}$suffix',
+      'Paused at ${gigabytes(status.downloadedBytes)}$suffix',
     ArtifactPhase.verifying => 'Verifying$suffix',
     ArtifactPhase.installed => 'Installed and verified$suffix',
     ArtifactPhase.failed => 'Download failed',
@@ -1114,8 +1116,6 @@ String _engineLabel(ModelEngine engine) => switch (engine) {
   ModelEngine.mlx => 'MLX',
   ModelEngine.gguf => 'GGUF · llama.cpp',
 };
-
-String _gigabytes(int bytes) => '${(bytes / 1000000000).toStringAsFixed(2)} GB';
 
 String _runtimeLabel(RuntimePhase phase, bool simulated) => switch (phase) {
   RuntimePhase.unloaded => 'Unloaded',

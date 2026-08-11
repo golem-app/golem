@@ -12,6 +12,7 @@ import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
 import 'widgets/settings_rows.dart';
+import '../../core/domain/byte_format.dart';
 
 class StorageScreen extends ConsumerWidget {
   const StorageScreen({super.key});
@@ -130,11 +131,11 @@ class _UsageCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
-                    child: Text(_gigabytes(used), style: GolemText.display),
+                    child: Text(gigabytes(used), style: GolemText.display),
                   ),
                   if (free != null)
                     Text(
-                      '${_gigabytes(free)} free',
+                      '${gigabytes(free)} free',
                       style: GolemText.footnote.copyWith(color: muted),
                     ),
                 ],
@@ -169,7 +170,7 @@ class _UsageCard extends StatelessWidget {
                 children: [
                   _Legend(
                     color: accent,
-                    label: 'Models ${_gigabytes(breakdown.modelsBytes)}',
+                    label: 'Models ${gigabytes(breakdown.modelsBytes)}',
                   ),
                   _Legend(
                     color: chatsColor,
@@ -291,7 +292,7 @@ class _DownloadedModels extends ConsumerWidget {
                   ),
                 ),
                 Text(
-                  _gigabytes(model.statusOf(entry.key).downloadedBytes),
+                  gigabytes(model.statusOf(entry.key).downloadedBytes),
                   style: GolemText.body.copyWith(color: muted),
                 ),
                 const SizedBox(width: 4),
@@ -320,9 +321,11 @@ class _DownloadedModels extends ConsumerWidget {
   ) => showGolemAlert(
     context: context,
     dialogKey: const Key('model-delete-dialog'),
-    title: 'Delete ${entry.displayName}?',
+    // Display names no longer carry a quantization, so two artifacts of one
+    // family share one (#79). A destructive dialog must still say which.
+    title: 'Delete ${entry.displayName} · ${engineFormat(entry.engine)}?',
     message:
-        'Removes ${_gigabytes(model.statusOf(entry.key).downloadedBytes)} '
+        'Removes ${gigabytes(model.statusOf(entry.key).downloadedBytes)} '
         'from this device. The model can be downloaded again later.',
     actions: [
       GolemAlertAction(label: 'Keep', onPressed: () => Navigator.pop(context)),
@@ -339,7 +342,5 @@ class _DownloadedModels extends ConsumerWidget {
   );
 }
 
-String _gigabytes(int bytes) => '${(bytes / 1e9).toStringAsFixed(2)} GB';
-
 String _megabytes(int bytes) =>
-    bytes >= 1e9 ? _gigabytes(bytes) : '${(bytes / 1e6).round()} MB';
+    bytes >= 1e9 ? gigabytes(bytes) : '${(bytes / 1e6).round()} MB';

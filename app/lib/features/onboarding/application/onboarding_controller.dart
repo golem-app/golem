@@ -2,7 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/retry.dart';
-import '../domain/onboarding_policy.dart';
+import '../../../core/domain/model_admission.dart';
 
 part 'onboarding_controller.g.dart';
 
@@ -48,7 +48,7 @@ class FirstRunController extends _$FirstRunController {
       state = state.copyWith(step: FirstRunStep.download, clearFailure: true);
 
   Future<bool> selectModel(String key) async {
-    final options = onboardingModelOptions(
+    final options = modelAdmissionOptions(
       catalog: ref.read(modelCatalogEntriesProvider),
       backend: ref.read(inferenceBackendProvider),
       eligibility: ref.read(deviceEligibilityProvider),

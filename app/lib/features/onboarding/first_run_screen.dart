@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_identity.dart';
+import '../../core/chrome/golem_badge.dart';
 import '../../core/chrome/golem_button.dart';
 import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
@@ -13,8 +14,8 @@ import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/progress_track.dart';
 import 'application/onboarding_controller.dart';
-import 'domain/onboarding_policy.dart';
 import 'model_download_consent.dart';
+import '../../core/domain/model_admission.dart';
 
 class FirstRunScreen extends ConsumerWidget {
   const FirstRunScreen({super.key});
@@ -31,12 +32,12 @@ class FirstRunScreen extends ConsumerWidget {
         ?.onboardingModelKey;
     final selectedKey =
         storedKey ??
-        recommendedOnboardingModelKey(
+        recommendedAdmittedModelKey(
           catalog: catalog,
           backend: backend,
           eligibility: eligibility,
         );
-    final selectedOption = onboardingModelOptions(
+    final selectedOption = modelAdmissionOptions(
       catalog: catalog,
       backend: backend,
       eligibility: eligibility,
@@ -252,7 +253,7 @@ class _FeaturedModelCard extends StatelessWidget {
             Expanded(
               child: Text(entry.displayName, style: GolemText.cardTitle),
             ),
-            if (recommended) const _Badge(label: 'RECOMMENDED'),
+            if (recommended) const GolemBadge(label: 'RECOMMENDED'),
           ],
         ),
         const SizedBox(height: GolemSpace.s1),
@@ -340,7 +341,7 @@ class _CatalogScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final options = onboardingModelOptions(
+    final options = modelAdmissionOptions(
       catalog: ref.watch(modelCatalogEntriesProvider),
       backend: ref.watch(inferenceBackendProvider),
       eligibility: ref.watch(deviceEligibilityProvider),
@@ -428,7 +429,7 @@ class _CatalogModelRow extends StatelessWidget {
     required this.onTap,
   });
 
-  final OnboardingModelOption option;
+  final ModelAdmissionOption option;
   final bool selected;
   final VoidCallback? onTap;
 
@@ -460,7 +461,7 @@ class _CatalogModelRow extends StatelessWidget {
                         ),
                         if (option.recommended) ...[
                           const SizedBox(width: 8),
-                          const _Badge(label: 'RECOMMENDED'),
+                          const GolemBadge(label: 'RECOMMENDED'),
                         ],
                       ],
                     ),
@@ -694,27 +695,6 @@ class _UnsupportedScreen extends ConsumerWidget {
       onPressed: () => ref
           .read(firstRunControllerProvider.notifier)
           .complete(keepSelection: false),
-    ),
-  );
-}
-
-class _Badge extends StatelessWidget {
-  const _Badge({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-    decoration: BoxDecoration(
-      color: CupertinoDynamicColor.resolve(GolemTheme.accentSoft, context),
-      borderRadius: BorderRadius.circular(GolemRadius.badge),
-    ),
-    child: Text(
-      label,
-      style: GolemText.badge.copyWith(
-        color: CupertinoDynamicColor.resolve(GolemTheme.accent, context),
-      ),
     ),
   );
 }

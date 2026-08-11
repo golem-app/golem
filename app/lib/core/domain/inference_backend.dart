@@ -28,12 +28,14 @@ final class InferenceBackendConfig {
     this.artifactKey,
     this.modelPath,
     this.modelPathFromCatalog = false,
+    this.artifactFromDevicePolicy = false,
   });
 
   const InferenceBackendConfig.fake()
     : kind = InferenceBackendKind.fake,
       profileKey = 'gemma4',
       artifactKey = null,
+      artifactFromDevicePolicy = false,
       modelPath = null,
       modelPathFromCatalog = false;
 
@@ -57,6 +59,12 @@ final class InferenceBackendConfig {
   /// the determinism probe) is the operator's responsibility: the
   /// missing-model download gate must not stand in front of it.
   final bool modelPathFromCatalog;
+
+  /// Whether [artifactKey] came from the launch device classification rather
+  /// than an operator define. Only the `auto` branch with no explicit artifact
+  /// or profile consults the tier, so only then may copy credit it for the
+  /// choice (#79).
+  final bool artifactFromDevicePolicy;
 
   bool get simulatedInference => kind == InferenceBackendKind.fake;
 
