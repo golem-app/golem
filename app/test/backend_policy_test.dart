@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/backend_policy.dart';
+import 'package:golem_flutter/broker/configured_inference_repository.dart';
 import 'package:golem_flutter/broker/device_capability.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/app_identity.dart';
@@ -166,6 +167,24 @@ void main() {
       engineProbe: (name) async => fail('the override must bypass the probe'),
     );
     expect(engine.engineSupported, isFalse);
+  });
+
+  test('device override defines are disabled for production identities', () {
+    final production = deviceCapabilityOverridesFor(
+      identity: AppIdentity.production,
+      memoryOverrideBytes: 4 * _gib,
+      forceEngineUnsupported: true,
+    );
+    expect(production.memoryOverrideBytes, 0);
+    expect(production.forceEngineUnsupported, isFalse);
+
+    final qa = deviceCapabilityOverridesFor(
+      identity: AppIdentity.qa,
+      memoryOverrideBytes: 4 * _gib,
+      forceEngineUnsupported: true,
+    );
+    expect(qa.memoryOverrideBytes, 4 * _gib);
+    expect(qa.forceEngineUnsupported, isTrue);
   });
 
   test('explicit defines override the flavor default in any build', () async {

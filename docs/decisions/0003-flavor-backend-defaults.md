@@ -7,9 +7,11 @@ documented in `../device_floor.md` (added with epic #61).
 
 ## The composition rule, stated once
 
-- The `qa` flavor and the flavorless test identity wire **all fakes** —
-  inference, model management, and benchmark — so goldens, journeys, and CI
-  stay deterministic and offline.
+- The `qa` flavor and the flavorless test identity wire fake inference and
+  model management so goldens, journeys, and CI stay deterministic and
+  offline. Benchmark is a separate internal-tool capability: `qa` and `dev`
+  wire its deterministic fake, while production and flavorless builds omit
+  its route, settings affordance, repository override, and prompt assets.
 - `production` and `dev` wire the **real implementations**: the real
   Hugging Face downloader (since #37) and, with this decision, real local
   inference by default.
@@ -38,6 +40,14 @@ only in `main()`; the widget-visible backend signal
 (`inferenceBackendProvider`) defaults to the fake and is pinned by a
 regression test.
 
+Internal tooling is keyed from `AppIdentity`, never `kDebugMode`: `qa` and
+`dev` retain the benchmark, scripted launch/startup failures, device-capability
+overrides, and `INFERNO_METRICS` / `INFERNO_FAILURE` / `INFERNO_PROBE` sinks
+even in release builds. Production and the legacy flavorless identity suppress
+all of them even in debug builds. Operator model/backend and performance
+tuning defines remain available in every identity, and native engine error
+transport is not part of this Dart logging policy.
+
 ## `auto`: engine and model
 
 `auto` composes the **llama.cpp/GGUF** artifact of the device-policy model
@@ -61,8 +71,8 @@ the lighter **Qwen 3.5 2B** (`qwen35-2b-gguf`, 1.21 GB).
   small devices out of trouble, so absence of evidence lands on the light
   side. The probe (a `physicalMemoryBytes` method on the existing storage
   platform channel) runs only on the `auto` path, capped at one second.
-- `GOLEM_DEVICE_MEMORY_BYTES` is a test-only override to exercise both
-  branches on hardware (both team devices report over 8 GB).
+- `GOLEM_DEVICE_MEMORY_BYTES` is an internal-identity-only test override to
+  exercise both branches on hardware (both team devices report over 8 GB).
 - Since #27 the reading itself belongs to the device classification: one probe
   at launch produces a tier, the tier picks the model here, and the same
   verdict decides whether this device is admitted to running one at all
@@ -104,10 +114,13 @@ penalty stay off everywhere else, so every non-thinking baseline and the
 determinism probes stay bit-identical; the qwen35 reasoning baselines are
 recorded under the full recipe.
 
-## Benchmark copy stays simulated
+## Benchmark copy stays simulated and internal
 
-The only benchmark implementation is the deterministic fake, so the
+The only benchmark implementation is the deterministic fake, available in
+`qa` and `dev` only, so the
 benchmark screen and its exported JSON keep their "simulated / not
 hardware validated" labeling even in real-engine builds. Sweeping that
 copy onto the backend signal would make it dishonest; it changes only
-when a real benchmark implementation exists.
+when a real benchmark implementation exists. Production omits the route,
+settings row, repository wiring, and prompt assets instead of hiding a still
+reachable surface.

@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/app/bootstrap.dart';
 import 'package:golem_flutter/app/launch_composition.dart';
+import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
 
 import 'support/harness.dart';
@@ -30,17 +31,27 @@ void main() {
     return directory;
   }
 
+  test('launch fault injection is internal-identity only', () {
+    expect(shouldInjectLaunchFailure(AppIdentity.dev, 1), isTrue);
+    expect(shouldInjectLaunchFailure(AppIdentity.qa, 1), isTrue);
+    expect(shouldInjectLaunchFailure(AppIdentity.production, 1), isFalse);
+    expect(shouldInjectLaunchFailure(AppIdentity.flutter, 1), isFalse);
+    expect(shouldInjectLaunchFailure(AppIdentity.dev, 0), isFalse);
+  });
+
   testWidgets('a failed composition retries into the app', (tester) async {
     setViewport(tester);
     final directory = scratch();
     var calls = 0;
-    Future<LaunchDependencies> compose() async {
+    Future<LaunchDependencies> compose(AppIdentity identity) async {
       calls++;
       if (calls == 1) throw Exception('first composition fails');
       return launchDependenciesWith(directory: directory);
     }
 
-    await tester.pumpWidget(BootstrapApp(compose: compose));
+    await tester.pumpWidget(
+      BootstrapApp(identity: AppIdentity.dev, compose: compose),
+    );
     await tester.pump();
     // The cause is reported to diagnostics once, at the boundary.
     expect(tester.takeException(), isA<Exception>());
@@ -63,7 +74,8 @@ void main() {
     var calls = 0;
     await tester.pumpWidget(
       BootstrapApp(
-        compose: () async {
+        identity: AppIdentity.dev,
+        compose: (identity) async {
           calls++;
           return launchDependenciesWith(directory: directory);
         },
@@ -79,7 +91,7 @@ void main() {
     setViewport(tester);
     var calls = 0;
     final gates = <Completer<void>>[];
-    Future<LaunchDependencies> compose() async {
+    Future<LaunchDependencies> compose(AppIdentity identity) async {
       calls++;
       final gate = Completer<void>();
       gates.add(gate);
@@ -87,7 +99,9 @@ void main() {
       throw Exception('still failing');
     }
 
-    await tester.pumpWidget(BootstrapApp(compose: compose));
+    await tester.pumpWidget(
+      BootstrapApp(identity: AppIdentity.dev, compose: compose),
+    );
     gates.single.complete();
     await tester.pump();
     expect(tester.takeException(), isA<Exception>());
@@ -111,7 +125,8 @@ void main() {
     setViewport(tester);
     await tester.pumpWidget(
       BootstrapApp(
-        compose: () async =>
+        identity: AppIdentity.dev,
+        compose: (identity) async =>
             throw TimeoutException('launch', const Duration(seconds: 8)),
       ),
     );
@@ -127,7 +142,10 @@ void main() {
   testWidgets('an invalid configuration is terminal', (tester) async {
     setViewport(tester);
     await tester.pumpWidget(
-      BootstrapApp(compose: () async => throw StateError('bad dart-define')),
+      BootstrapApp(
+        identity: AppIdentity.dev,
+        compose: (identity) async => throw StateError('bad dart-define'),
+      ),
     );
     await tester.pump();
     expect(tester.takeException(), isA<StateError>());
@@ -151,7 +169,10 @@ void main() {
     );
     addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
     await expectLater(
-      composeLaunch(requiredDeadline: const Duration(milliseconds: 100)),
+      composeLaunch(
+        identity: AppIdentity.dev,
+        requiredDeadline: const Duration(milliseconds: 100),
+      ),
       throwsA(isA<TimeoutException>()),
     );
   });

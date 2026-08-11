@@ -3,6 +3,7 @@ import 'package:golem_flutter/broker/configured_inference_repository.dart';
 import 'package:golem_flutter/broker/inferno_inference_repository.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/broker/runtime.dart';
+import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
@@ -43,7 +44,10 @@ InferenceRepository _select({
   bool sideloaded = false,
   List<ModelCatalogEntry> Function()? activationCatalog,
   _StubRuntime? runtime,
+  AppIdentity identity = AppIdentity.qa,
+  InferenceDiagnosticSink? diagnosticSink,
 }) => selectInferenceRepository(
+  identity: identity,
   backend: backend,
   modelPath: modelPath,
   modelProfile: modelProfile,
@@ -55,6 +59,7 @@ InferenceRepository _select({
   fakeStreamDelay: Duration.zero,
   documentsDirectory: '/documents',
   createRuntime: () => runtime ?? _StubRuntime(),
+  diagnosticSink: diagnosticSink,
 );
 
 void main() {
@@ -70,6 +75,24 @@ void main() {
         reason: backend,
       );
     }
+  });
+
+  test('production suppresses an explicitly supplied diagnostic sink', () {
+    final sink = <String>[].add;
+    final production =
+        _select(
+              backend: 'llama',
+              modelPath: '/models/m',
+              identity: AppIdentity.production,
+              diagnosticSink: sink,
+            )
+            as InfernoInferenceRepository;
+    final qa =
+        _select(backend: 'llama', modelPath: '/models/m', diagnosticSink: sink)
+            as InfernoInferenceRepository;
+
+    expect(production.diagnosticSink, isNull);
+    expect(qa.diagnosticSink, same(sink));
   });
 
   test('the documents prefix resolves against the documents directory', () {

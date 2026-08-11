@@ -46,6 +46,17 @@ void _expectDominantChannel(image.Pixel pixel, String channel) {
 }
 
 void main() {
+  test('benchmark prompts are bundled only for internal flavors', () async {
+    final pubspec = await File('pubspec.yaml').readAsString();
+    expect(pubspec, contains('- path: assets/benchmark_prompts/'));
+    expect(
+      pubspec,
+      contains(
+        'assets/benchmark_prompts/\n      flavors:\n        - qa\n        - dev',
+      ),
+    );
+  });
+
   test('every shipped flavor identity is covered by these assertions', () {
     // AppIdentity also carries the flavorless legacy identity, which owns no
     // flavor resources — hence its exclusion. A new enum member must either

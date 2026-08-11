@@ -100,6 +100,7 @@ LaunchDependencies launchDependenciesWith({
   CustomRepositoryResolver? resolver,
   ChatHistoryRepository? chatHistory,
   ModelManagementRepository? models,
+  bool includeBenchmark = true,
 }) {
   final scratch =
       directory ?? Directory.systemTemp.createTempSync('golem-widget-test-');
@@ -123,11 +124,13 @@ LaunchDependencies launchDependenciesWith({
     modelManagementRepository: models ?? StaticModels(model),
     deviceCapacityProbe: const FakeDiskCapacity(),
     documentsPath: scratch.path,
-    benchmarkRepository: FakeBenchmarkRepository(
-      scratch,
-      readAsset: fixtureAsset,
-      delay: Duration.zero,
-    ),
+    benchmarkRepository: includeBenchmark
+        ? FakeBenchmarkRepository(
+            scratch,
+            readAsset: fixtureAsset,
+            delay: Duration.zero,
+          )
+        : null,
   );
 }
 

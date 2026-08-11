@@ -11,6 +11,8 @@ import 'model_profile.dart';
 import 'model_runtime_config.dart';
 import 'runtime.dart';
 
+typedef InferenceDiagnosticSink = void Function(String message);
+
 /// The single owner of engine residency (#42): exactly one model is loaded at
 /// a time, keyed by catalog entry, and every load or unload goes through here.
 final class InfernoInferenceRepository implements InferenceRepository {
@@ -29,6 +31,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
     this.loadOptions = const BrokerLoadOptions(),
     this.seed,
     this.readAttachment,
+    this.diagnosticSink,
   }) : _initial = _Target(
          catalogKey: initialCatalogKey,
          engine: engine,
@@ -40,6 +43,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
 
   final BrokerRuntime _runtime;
   final int? seed;
+  final InferenceDiagnosticSink? diagnosticSink;
 
   /// Null in builds with no attachment store — which is every build that
   /// declares no image capability, so an image cannot reach an engine.
@@ -439,7 +443,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
     bool overridesApplied,
   ) {
     if (metrics == null) return;
-    debugPrint(
+    diagnosticSink?.call(
       'INFERNO_METRICS engine=${engine.name}'
       ' stopReason=${reason.name}'
       ' decodeTokensPerSecond=${metrics.decodeTokensPerSecond.toStringAsFixed(2)}'
@@ -471,7 +475,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
     int? windowedMessages,
   }) {
     final code = error is InferenceException ? error.kind.name : 'unknown';
-    debugPrint(
+    diagnosticSink?.call(
       'INFERNO_FAILURE engine=${engine.name}'
       ' phase=$phase'
       ' code=$code'
@@ -486,7 +490,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
   /// Hashes the raw pre-parser text so two devices can be compared for
   /// token-identical output without shipping transcripts through logs.
   void _logProbe(BrokerEngine engine, String rawText) {
-    debugPrint(
+    diagnosticSink?.call(
       'INFERNO_PROBE engine=${engine.name}'
       ' seed=$seed'
       ' chars=${rawText.length}'
