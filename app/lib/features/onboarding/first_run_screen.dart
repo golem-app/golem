@@ -13,6 +13,7 @@ import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/progress_track.dart';
+import '../legal/ai_disclaimer.dart';
 import 'application/onboarding_controller.dart';
 import 'model_download_consent.dart';
 import '../../core/domain/model_admission.dart';
@@ -98,6 +99,8 @@ class _WelcomeScreen extends ConsumerWidget {
             color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
           ),
         ),
+        const SizedBox(height: GolemSpace.s4),
+        const AiDisclaimer(key: Key('first-run-ai-disclaimer')),
         const SizedBox(height: GolemSpace.s8),
         const _Promise(
           icon: CupertinoIcons.lock,
