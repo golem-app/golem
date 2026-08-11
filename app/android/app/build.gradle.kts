@@ -7,7 +7,22 @@ plugins {
 android {
     namespace = "app.golem.flutter"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // Pinned rather than inherited from flutter.ndkVersion. The Inferno build
+    // hook compiles libinferno.so with whichever NDK it is handed, and Flutter
+    // hands it the newest one installed on the machine — not this value. The
+    // hook asserts the two agree (packages/inferno/hook/build.dart), which
+    // only means anything if this side names an exact revision.
+    ndkVersion = "29.0.14206865"
+
+    packaging {
+        jniLibs {
+            // 16 KB devices need shared libraries stored uncompressed on a
+            // page boundary. AGP 9 already packages them this way; saying so
+            // stops a future default from reverting it silently. The real
+            // guard reads the artifact: tool/check_android_packaging.dart.
+            useLegacyPackaging = false
+        }
+    }
 
     buildFeatures {
         // AGP 9 ships generated resource values disabled; the per-flavor
@@ -28,6 +43,30 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // Play has required API 36 or higher of new apps and updates since
+        // 2026-08-31. targetSdk follows the Flutter SDK, so an older toolchain
+        // would drop below the floor without anything saying so.
+        require(flutter.targetSdkVersion >= 36) {
+            "Play requires targetSdk 36 or higher; this Flutter SDK supplies " +
+                "${flutter.targetSdkVersion}."
+        }
+
+        ndk {
+            // Golem is arm64-only on Android: nothing below that tier can run
+            // a multi-gigabyte model, and shipping an ABI whose Flutter engine
+            // is absent makes Play offer the app to devices that install it
+            // and crash. Plugin AARs carry prebuilt libraries for every ABI,
+            // so the filter — not --target-platform — is what decides.
+            //
+            // Flutter's plugin writes armeabi-v7a/arm64-v8a/x86_64 here before
+            // this block runs; clearing and re-setting in defaultConfig is the
+            // override Flutter documents, and the only one it promises to
+            // preserve:
+            // docs.flutter.dev/release/breaking-changes/default-abi-filters-android
+            abiFilters.clear()
+            abiFilters.add("arm64-v8a")
+        }
     }
 
     // The three coexisting app identities. Launcher artwork lives in the
@@ -58,6 +97,19 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+
+            // Both are AGP defaults today, and tool/check_android_packaging.dart
+            // fails a release that arrives without their output — the R8
+            // mapping and the per-ABI symbols Play needs to symbolicate
+            // crashes. Stated so an AGP default flipping cannot drop
+            // symbolication from the store artifact silently.
+            isMinifyEnabled = true
+            ndk {
+                // SYMBOL_TABLE is AGP's default and what is stated here.
+                // FULL adds DWARF and takes the bundle from 28 MB to 68 MB for
+                // line numbers Play's crash reports do not need.
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
         }
     }
 }

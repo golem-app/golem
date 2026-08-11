@@ -382,7 +382,33 @@ Building or running with a real inference backend executes the Inferno build
 hooks and requires `flutter config --enable-native-assets` once per machine.
 That now includes plain `flutter run`/`flutter build` (the `dev` flavor
 defaults to `auto`); only qa-flavor builds and host `flutter test` stay on
-the hook-free fake path.
+the hook-free fake path. Android builds additionally need NDK
+`29.0.14206865` (`sdkmanager "ndk;29.0.14206865"`) — the hook refuses any
+other revision, because Flutter otherwise picks whichever NDK is newest on
+the machine and the compiler behind every shipped kernel changes with it.
+
+### The Play release artifact
+
+```sh
+flutter build appbundle --release --flavor production
+flutter build apk --release --flavor production   # sideload/emulator copy
+(cd .. && dart run tool/check_android_packaging.dart)
+```
+
+`--flavor production` is not optional; `default-flavor` is `dev`. Every Android
+build carries `arm64-v8a` alone (`defaultConfig.ndk.abiFilters`), so
+`--target-platform android-arm64` changes nothing about what ships and only
+saves two llama.cpp cross-compiles — and no Android emulator below arm64 will
+install any flavor.
+
+`check_android_packaging.dart` is the release-time gate for Play's
+native-library rules: 16 KB page alignment on every 64-bit library, the
+uncompressed page-aligned packaging behind it, the ABI set, the
+crash-symbolication uploads Play warns about when they are missing, and the
+absence of packaged model weights. It reads the built artifact rather than the
+build files, which is the only way to catch a toolchain default changing
+underneath. Run it after any llama.cpp or NDK pin bump; the reasoning is in
+[ADR 0010](../docs/decisions/0010-android-native-packaging.md).
 
 `dart run tool/prepare_launcher.dart` derives every flavor's Android
 launcher inputs from the tracked native artwork in `assets/source/`

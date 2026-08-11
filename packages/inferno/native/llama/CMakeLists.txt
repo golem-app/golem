@@ -62,6 +62,19 @@ target_include_directories(inferno PRIVATE
 # mtmd exports its own include directory as PUBLIC, so the shim sees mtmd.h
 # and mtmd-helper.h through the link alone.
 target_link_libraries(inferno PRIVATE llama mtmd)
+# Play requires 16 KB page support from every 64-bit native library. NDK r28+
+# links that way by default, but the hook compiles with whichever NDK the
+# machine exposes, and r27 without these flags emits 2**12 segments Play
+# rejects. The NDK's own ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES is no substitute:
+# a no-op on r28, opt-in on r27, absent before. Applied to every Android ABI —
+# the rule binds on 64-bit only, but a uniform link line costs 32-bit nothing
+# beyond a page of padding.
+if(ANDROID)
+  target_link_options(inferno PRIVATE
+    "-Wl,-z,max-page-size=16384"
+    "-Wl,-z,common-page-size=16384"
+  )
+endif()
 set_target_properties(inferno PROPERTIES
   OUTPUT_NAME inferno
   PREFIX "lib"

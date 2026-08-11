@@ -52,9 +52,9 @@ reservations; ADR 0007 carries the derivation. Unknown never refuses.
   classifies the device before offering a download; the same predicate
   refuses the first load with `unsupported_device` if anything reaches it
   anyway. Without either, a device below the floor would install cleanly and
-  then take `SIGILL` inside the first matmul — `minSdk` is 24, the APK
-  carries no `abiFilters` and no CPU `<uses-feature>` (none exists for ISA
-  extensions), so the store offers it to every arm64 device.
+  then take `SIGILL` inside the first matmul — `minSdk` is 24 and there is no
+  CPU `<uses-feature>` (none exists for ISA extensions), so the store offers
+  the app to every arm64 device the bundle covers.
 - **Store gate: a console rule, not the manifest.** Play Console's device
   catalog can exclude by RAM (Monitor and improve ▸ Reach and devices ▸
   Device catalog ▸ Manage exclusion rules); that rule is the Android memory
@@ -75,9 +75,15 @@ reservations; ADR 0007 carries the derivation. Unknown never refuses.
   Recovering i8mm needs runtime dispatch — `GGML_CPU_ALL_VARIANTS` with
   `GGML_BACKEND_DL`, i.e. several shared libraries instead of one code
   asset — which is a separate piece of work, not a compile flag.
-- The `armeabi-v7a` and `x86_64` targets build at their toolchain
-  baselines and exist for emulators and compatibility, not for the
-  supported real-inference tier.
+- **Android is `arm64-v8a` alone** (`defaultConfig.ndk.abiFilters` in
+  `app/android/app/build.gradle.kts`, ADR 0010) — every flavor, not just the
+  store bundle, so an x86_64 or 32-bit emulator no longer installs any of
+  them. Shipping the other ABIs advertised a tier that does not exist:
+  `cpu_meets_floor()` is guarded by
+  `#if defined(__linux__) && defined(__aarch64__)` and falls through to
+  `return true` otherwise, so the dot-product refusal above never fired on
+  `armeabi-v7a` or the Android `x86_64` slice. The Inferno hook still knows
+  how to cross-compile both; nothing packages them.
 
 ## Both platforms
 

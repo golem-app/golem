@@ -63,6 +63,14 @@ dart run tool/check_inferno_imports.dart
 cd packages/inferno && dart test
 ```
 
+Before a Play upload, and after any llama.cpp or NDK pin bump, also check the
+built Android artifact against Play's native-library rules — see
+[`app/README.md`](app/README.md#the-play-release-artifact):
+
+```sh
+dart run tool/check_android_packaging.dart
+```
+
 See [`app/README.md`](app/README.md) for the app architecture, the asset
 and splash pipeline, screen/automation identifiers, and the iPhone 17
 simulator verification workflow.

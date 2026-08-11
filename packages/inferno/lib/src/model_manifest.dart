@@ -402,3 +402,11 @@ const mlxSwiftLmRevision = '60bd0d7880c82980f9481f8be78862e9b63c58a3';
 const mlxSwiftLmVersion = '3.31.4+31.g60bd0d78';
 const mlxSwiftRevision = '0bb916c67f4b9e5c682cbe02a42c701c93ab5021';
 const mlxSwiftVersion = '0.31.6';
+
+/// The Android NDK the shipped `libinferno.so` is compiled with.
+///
+/// Flutter hands the build hook whichever NDK is newest on the machine, so
+/// without a pin the compiler on the inference hot path changes by accident.
+/// The hook refuses any other revision; `app/android/app/build.gradle.kts`
+/// repeats it so AGP strips with the same toolchain.
+const androidNdkVersion = '29.0.14206865';

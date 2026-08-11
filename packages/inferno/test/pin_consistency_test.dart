@@ -13,6 +13,10 @@ void main() {
     expect(read('hook/build.dart'), contains(llamaCppRevision));
   });
 
+  test('the build hook requires the manifest Android NDK revision', () {
+    expect(read('hook/build.dart'), contains(androidNdkVersion));
+  });
+
   test('the llama shim probe reports the manifest release', () {
     expect(
       read('native/src/llama_shim.cpp'),
