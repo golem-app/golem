@@ -68,16 +68,21 @@ class GolemNavBar extends CupertinoNavigationBar {
 /// Android chrome's always-visible back affordance. Renders nothing when
 /// the route has nowhere to pop to.
 class GolemBackButton extends StatelessWidget {
-  const GolemBackButton({super.key});
+  const GolemBackButton({this.onPressed, super.key});
+
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     final route = ModalRoute.of(context);
-    if (route == null || !route.canPop) return const SizedBox.shrink();
+    if (onPressed == null && (route == null || !route.canPop)) {
+      return const SizedBox.shrink();
+    }
+    final target = GolemChrome.current.minimumTapTarget;
     return CupertinoButton(
       padding: EdgeInsets.zero,
-      minimumSize: const Size(44, 44),
-      onPressed: () => Navigator.of(context).maybePop(),
+      minimumSize: Size(target, target),
+      onPressed: onPressed ?? () => Navigator.of(context).maybePop(),
       child: const Icon(
         CupertinoIcons.arrow_left,
         semanticLabel: 'Back',

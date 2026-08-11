@@ -12,6 +12,10 @@ import 'resolved_repository.dart';
 
 enum ThemeSetting { system, light, dark }
 
+/// Increment only when an existing install must see a materially new first-run
+/// contract. Older preference files omit it and therefore read as zero.
+const currentOnboardingVersion = 1;
+
 /// Consumers clamp [AppPreferences.textScale] into this range: the store's
 /// leaves stay tolerant, so a hand-edited file must never reach
 /// TextScaler.linear with a negative or absurd factor.
@@ -69,6 +73,9 @@ final class CustomModelSpec {
         revision: resolution.commitSha,
         files: resolution.files,
         profileKey: profile?.key ?? unresolvedProfileKey,
+        contextLength:
+            profile?.samplingFor(reasoningEnabled: false).contextLength ??
+            defaultModelContextLength,
         // No image capability: that needs a proven #18 path for this exact
         // artifact on this exact engine, which no custom entry has yet.
       );
@@ -89,6 +96,9 @@ final class CustomModelSpec {
       // No hash: nothing was fetched, and '' would claim a published one.
       files: [ModelArtifactFile(path: 'weights.bin', bytes: bytes)],
       profileKey: profile?.key ?? unresolvedProfileKey,
+      contextLength:
+          profile?.samplingFor(reasoningEnabled: false).contextLength ??
+          defaultModelContextLength,
     );
   }
 
@@ -160,6 +170,8 @@ final class AppPreferences {
     this.hapticsOnSend = true,
     this.saveHistory = true,
     this.advancedMode = false,
+    this.onboardingVersion = 0,
+    this.onboardingModelKey,
     this.systemPrompt,
     this._responseStyles = const {},
     this._customModels = const [],
@@ -172,6 +184,15 @@ final class AppPreferences {
   final bool hapticsOnSend;
   final bool saveHistory;
   final bool advancedMode;
+
+  /// The latest first-run experience this install has completed or skipped.
+  /// Zero is intentionally the sparse/default value for pre-onboarding stores.
+  final int onboardingVersion;
+
+  /// The pinned catalog entry chosen during first run. It remains useful after
+  /// onboarding: new chats inherit it and the chat setup banner can recover a
+  /// deferred download without guessing which model the user saw.
+  final String? onboardingModelKey;
 
   /// Null means the model's default behavior.
   final String? systemPrompt;
@@ -197,6 +218,8 @@ final class AppPreferences {
     bool? hapticsOnSend,
     bool? saveHistory,
     bool? advancedMode,
+    int? onboardingVersion,
+    String? Function()? onboardingModelKey,
     String? Function()? systemPrompt,
     Map<String, ResponseStyle>? responseStyles,
     List<CustomModelSpec>? customModels,
@@ -208,6 +231,10 @@ final class AppPreferences {
     hapticsOnSend: hapticsOnSend ?? this.hapticsOnSend,
     saveHistory: saveHistory ?? this.saveHistory,
     advancedMode: advancedMode ?? this.advancedMode,
+    onboardingVersion: onboardingVersion ?? this.onboardingVersion,
+    onboardingModelKey: onboardingModelKey == null
+        ? this.onboardingModelKey
+        : onboardingModelKey(),
     systemPrompt: systemPrompt == null ? this.systemPrompt : systemPrompt(),
     responseStyles: responseStyles ?? this.responseStyles,
     customModels: customModels ?? this.customModels,
@@ -232,8 +259,9 @@ final class AppPreferences {
   );
 
   /// v2 added each custom repository's proven profile (#43), v3 its resolved
-  /// commit and files (#52); both additive, so a v1 or v2 file loads as-is.
-  static const schemaVersion = 3;
+  /// commit and files (#52), and v4 the first-run version and model choice
+  /// (#26). Every change is additive, so older files load directly.
+  static const schemaVersion = 4;
 
   Map<String, Object?> toJson() => {
     'schemaVersion': schemaVersion,
@@ -244,6 +272,8 @@ final class AppPreferences {
     if (!hapticsOnSend) 'hapticsOnSend': hapticsOnSend,
     if (!saveHistory) 'saveHistory': saveHistory,
     if (advancedMode) 'advancedMode': advancedMode,
+    if (onboardingVersion != 0) 'onboardingVersion': onboardingVersion,
+    if (onboardingModelKey != null) 'onboardingModelKey': onboardingModelKey,
     if (systemPrompt != null) 'systemPrompt': systemPrompt,
     if (_responseStyles.isNotEmpty)
       'responseStyles': {
@@ -265,6 +295,8 @@ final class AppPreferences {
       other.hapticsOnSend == hapticsOnSend &&
       other.saveHistory == saveHistory &&
       other.advancedMode == advancedMode &&
+      other.onboardingVersion == onboardingVersion &&
+      other.onboardingModelKey == onboardingModelKey &&
       other.systemPrompt == systemPrompt &&
       mapEquals(other._responseStyles, _responseStyles) &&
       listEquals(other._customModels, _customModels);
@@ -278,6 +310,8 @@ final class AppPreferences {
     hapticsOnSend,
     saveHistory,
     advancedMode,
+    onboardingVersion,
+    onboardingModelKey,
     systemPrompt,
     mapHash(_responseStyles),
     listHash(_customModels),
@@ -285,9 +319,12 @@ final class AppPreferences {
 
   factory AppPreferences.fromJson(Map<String, Object?> json) {
     final version = json['schemaVersion'];
-    // v1 and v2 are read directly: every version since has only added an
-    // optional key inside a custom repository, so an older entry is unresolved.
-    if (version != 1 && version != 2 && version != schemaVersion) {
+    // Every version is additive; absent first-run fields retain their sparse
+    // defaults and an older custom repository remains unresolved.
+    if (version != 1 &&
+        version != 2 &&
+        version != 3 &&
+        version != schemaVersion) {
       throw const FormatException('Unsupported app preferences schema');
     }
     final rawStyles = json['responseStyles'];
@@ -302,6 +339,8 @@ final class AppPreferences {
       hapticsOnSend: json['hapticsOnSend'] as bool? ?? true,
       saveHistory: json['saveHistory'] as bool? ?? true,
       advancedMode: json['advancedMode'] as bool? ?? false,
+      onboardingVersion: json['onboardingVersion'] as int? ?? 0,
+      onboardingModelKey: json['onboardingModelKey'] as String?,
       systemPrompt: json['systemPrompt'] as String?,
       responseStyles: {
         if (rawStyles is Map)

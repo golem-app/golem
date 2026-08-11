@@ -20,6 +20,7 @@ import '../../core/widgets/labeled_row.dart';
 import '../../core/widgets/progress_track.dart';
 import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
+import '../onboarding/model_download_consent.dart';
 import 'application/custom_repository_workflow.dart';
 import 'widgets/settings_rows.dart';
 
@@ -939,7 +940,17 @@ class _ModelCard extends ConsumerWidget {
             },
             onPressed: otherDownloadActive || !downloadable
                 ? null
-                : () => controller.download(entry.key),
+                : () async {
+                    if (status.phase == ArtifactPhase.notDownloaded) {
+                      final approved = await confirmModelDownload(
+                        context: context,
+                        entry: entry,
+                        simulated: simulated,
+                      );
+                      if (!approved || !context.mounted) return;
+                    }
+                    controller.download(entry.key);
+                  },
           ),
         if (!downloadable || deviceRefusal != null)
           Padding(

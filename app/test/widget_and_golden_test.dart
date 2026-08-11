@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
+import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/core/chrome/golem_button.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
@@ -25,6 +26,7 @@ import 'package:golem_flutter/features/settings/settings_screen.dart';
 import 'package:golem_flutter/features/settings/storage_screen.dart';
 import 'package:golem_flutter/features/settings/system_prompt_screen.dart';
 import 'package:golem_flutter/features/splash/splash_screen.dart';
+import 'package:golem_flutter/features/onboarding/first_run_screen.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
 
@@ -101,6 +103,40 @@ void main() {
     );
     expect(find.byKey(const Key('splash-retry')), findsNothing);
   });
+
+  testWidgets('first run welcome light golden', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+      model: const ModelState(simulated: true),
+      child: const FirstRunScreen(),
+    );
+    final context = tester.element(find.byType(FirstRunScreen));
+    await tester.runAsync(
+      () => precacheImage(AssetImage(AppIdentity.current.iconAsset), context),
+    );
+    await tester.pumpAndSettle();
+    await expectLater(
+      find.byType(FirstRunScreen),
+      matchesGoldenFile('goldens/first-run-welcome-light${chromeSuffix()}.png'),
+    );
+  }, variant: bothChromes);
+
+  testWidgets('first run model dark golden', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      brightness: Brightness.dark,
+      eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+      model: const ModelState(simulated: true),
+      child: const FirstRunScreen(),
+    );
+    await tester.tap(find.byKey(const Key('first-run-get-started')));
+    await tester.pumpAndSettle();
+    await expectLater(
+      find.byType(FirstRunScreen),
+      matchesGoldenFile('goldens/first-run-model-dark${chromeSuffix()}.png'),
+    );
+  }, variant: bothChromes);
 
   for (final brightness in Brightness.values) {
     testWidgets('empty chat ${brightness.name} golden', (tester) async {
@@ -806,7 +842,7 @@ void main() {
         retry: () {},
       ),
     );
-    expect(find.text('Loading model on this device'), findsOneWidget);
+    expect(find.text('Getting things ready'), findsOneWidget);
     expect(find.textContaining('simulated'), findsNothing);
   }, variant: iosChrome);
 

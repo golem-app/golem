@@ -200,6 +200,19 @@ class _ComposerState extends ConsumerState<Composer> {
       residentModelKey: resident,
       loadableKeys: loadable,
     );
+    final setupModelKey = ref
+        .watch(preferencesControllerProvider)
+        .value
+        ?.onboardingModelKey;
+    final models = ref.watch(modelControllerProvider).value;
+    final conversationTarget = modelKey ?? backend.artifactKey;
+    final setupModelReady =
+        setupModelKey == null ||
+        (backend.simulatedInference
+            ? models?.statusOf(setupModelKey).phase == ArtifactPhase.installed
+            : conversationTarget != null &&
+                  models?.statusOf(conversationTarget).phase ==
+                      ArtifactPhase.installed);
     return Padding(
       padding: EdgeInsets.fromLTRB(
         GolemSpace.gutter,
@@ -417,7 +430,8 @@ class _ComposerState extends ConsumerState<Composer> {
                       // with its remove button, so the way out is visible.
                       final canSend =
                           (hasText || _pending.isNotEmpty) &&
-                          (_pending.isEmpty || supportsImages);
+                          (_pending.isEmpty || supportsImages) &&
+                          setupModelReady;
                       return CupertinoButton(
                         key: Key(generating ? 'stop-button' : 'send-button'),
                         padding: EdgeInsets.zero,
