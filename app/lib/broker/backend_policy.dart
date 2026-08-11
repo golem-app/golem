@@ -25,22 +25,21 @@ String resolveBackendName({
 /// only route on the physical iPhone, where production/dev bundle ids are
 /// off-limits.
 ///
+/// [backendName] is [resolveBackendName]'s answer, passed in rather than
+/// re-derived: the engine that was probed and the engine that is composed must
+/// be the same one by construction, for the same reason [tier] is.
+///
 /// [tier] comes from the one device classification the launch made, so the
 /// model this build selects and the eligibility its surfaces report can never
 /// disagree. An unsupported device still resolves the lighter model: nothing
 /// will load it, but every label stays addressable.
 InferenceBackendConfig resolveBackendPolicy({
-  required String backendDefine,
+  required String backendName,
   required String profileDefine,
   required String artifactDefine,
   required String modelPathDefine,
-  required AppIdentity identity,
   required DeviceTier tier,
 }) {
-  final backend = resolveBackendName(
-    backendDefine: backendDefine,
-    identity: identity,
-  );
   final explicitProfile = profileDefine.isEmpty ? null : profileDefine;
   final explicitArtifact = artifactDefine.isEmpty ? null : artifactDefine;
   if (explicitArtifact != null && modelPathDefine.isNotEmpty) {
@@ -48,7 +47,7 @@ InferenceBackendConfig resolveBackendPolicy({
       'GOLEM_MODEL_ARTIFACT and GOLEM_MODEL_PATH are mutually exclusive.',
     );
   }
-  switch (backend) {
+  switch (backendName) {
     case 'fake':
       if (explicitArtifact != null) {
         throw StateError(
@@ -60,7 +59,7 @@ InferenceBackendConfig resolveBackendPolicy({
         profileKey: explicitProfile ?? 'gemma4',
       );
     case 'llama' || 'mlx':
-      final expectedEngine = backend == 'llama'
+      final expectedEngine = backendName == 'llama'
           ? ModelEngine.gguf
           : ModelEngine.mlx;
       final selected = explicitArtifact == null
@@ -70,9 +69,9 @@ InferenceBackendConfig resolveBackendPolicy({
       _requireMatchingProfile(selected, profileKey);
       final artifactKey =
           selected?.key ??
-          activeArtifactKeyFor(backend: backend, modelProfile: profileKey)!;
+          activeArtifactKeyFor(backend: backendName, modelProfile: profileKey)!;
       return InferenceBackendConfig(
-        kind: backend == 'llama'
+        kind: backendName == 'llama'
             ? InferenceBackendKind.llama
             : InferenceBackendKind.mlx,
         profileKey: profileKey,

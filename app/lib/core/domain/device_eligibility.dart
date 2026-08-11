@@ -31,10 +31,11 @@ const int appleMemoryFloorBytes = 4 * 1024 * 1024 * 1024;
 /// numbers, for the same reason [deviceMemoryThresholdBytes] is not 8 GiB.
 const int androidMemoryFloorBytes = 3 * 1024 * 1024 * 1024;
 
-/// The floor for the platform this process runs on; the caller supplies the
-/// platform so the policy itself stays free of `dart:io`.
-int deviceMemoryFloorBytes({required bool apple}) =>
-    apple ? appleMemoryFloorBytes : androidMemoryFloorBytes;
+/// The floor for the reporting convention this platform uses, which is what
+/// the two constants actually differ over — the caller supplies it so the
+/// policy itself stays free of `dart:io`.
+int deviceMemoryFloorBytes({required bool reportsInstalledMemory}) =>
+    reportsInstalledMemory ? appleMemoryFloorBytes : androidMemoryFloorBytes;
 
 /// The stable device facts the policy reads. A null field is genuinely unknown
 /// — a probe the platform refused — and must never be read as a low value.
@@ -65,6 +66,10 @@ final class DeviceEligibility {
     : assert(
         (tier == DeviceTier.unsupported) == (reason != null),
         'an unsupported device carries its reason, a supported one has none',
+      ),
+      assert(
+        (tier == DeviceTier.unsupported) == (message != null),
+        'an unsupported device carries its copy, a supported one has none',
       );
 
   /// What an unclassified process assumes: supported, nothing refused. The
@@ -79,6 +84,13 @@ final class DeviceEligibility {
   final String? message;
 
   bool get runsModels => tier != DeviceTier.unsupported;
+
+  /// The copy a refused device must present — non-null exactly when the device
+  /// is refused. Every gate keys on this rather than on [message] directly: a
+  /// verdict built without copy would otherwise open all three of them, and
+  /// the constructor's assert is compiled out of the builds that matter.
+  String? get refusal =>
+      runsModels ? null : message ?? 'Golem cannot run models on this device.';
 
   @override
   bool operator ==(Object other) =>

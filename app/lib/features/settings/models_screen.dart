@@ -95,10 +95,7 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
         .simulatedInference;
     // A device outside every supported tier may not start a transfer or a load
     // (#27); the cards say why instead of offering buttons that would refuse.
-    final eligibility = ref.watch(deviceEligibilityProvider);
-    final deviceRefusal = simulatedInference || eligibility.runsModels
-        ? null
-        : eligibility.message;
+    final deviceRefusal = ref.watch(deviceRefusalProvider);
     final downloadingKey = model.artifacts.entries
         .where((entry) => entry.value.phase == ArtifactPhase.downloading)
         .map((entry) => entry.key)
@@ -282,7 +279,10 @@ class _RuntimeCard extends ConsumerWidget {
                 ),
               ],
               const SizedBox(height: 14),
-              if (deviceRefusal == null)
+              // Withheld for loading only: a runtime phase persisted as loaded
+              // by an earlier build must stay correctable, and toggleRuntime
+              // permits that direction for the same reason.
+              if (deviceRefusal == null || model.runtime == RuntimePhase.loaded)
                 GolemButton.tinted(
                   key: const Key('runtime-toggle-button'),
                   label: model.runtime == RuntimePhase.loaded
@@ -944,11 +944,13 @@ class _ModelCard extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(top: 10),
             child: Text(
-              key: deviceRefusal == null
-                  ? null
-                  : Key('model-device-refusal-${entry.key}'),
               // An unresolved repository is the more specific problem: it can
-              // be fixed here, while the device verdict cannot.
+              // be fixed here, while the device verdict cannot. One predicate
+              // decides the copy and the key together, or a card ends up
+              // labelled as one refusal while reading as the other.
+              key: downloadable
+                  ? Key('model-device-refusal-${entry.key}')
+                  : null,
               downloadable
                   ? deviceRefusal!
                   : 'This repository has not been resolved against Hugging '

@@ -658,6 +658,67 @@ final class DeviceEligibilityProvider
 
 String _$deviceEligibilityHash() => r'd623c80a62b116f77443a56cb163d7cd2d4b904b';
 
+/// The refusal an unsupported device must present before any download or load,
+/// or null when this device may run models. Derived once and watched by every
+/// surface that gates on it, so the rule — including that a simulated backend
+/// is never gated, since it loads no weights and gating it would only make QA
+/// depend on hardware — exists in exactly one place.
+/// KeepAlive: derived from two process-constant boot values.
+
+@ProviderFor(deviceRefusal)
+final deviceRefusalProvider = DeviceRefusalProvider._();
+
+/// The refusal an unsupported device must present before any download or load,
+/// or null when this device may run models. Derived once and watched by every
+/// surface that gates on it, so the rule — including that a simulated backend
+/// is never gated, since it loads no weights and gating it would only make QA
+/// depend on hardware — exists in exactly one place.
+/// KeepAlive: derived from two process-constant boot values.
+
+final class DeviceRefusalProvider
+    extends $FunctionalProvider<String?, String?, String?>
+    with $Provider<String?> {
+  /// The refusal an unsupported device must present before any download or load,
+  /// or null when this device may run models. Derived once and watched by every
+  /// surface that gates on it, so the rule — including that a simulated backend
+  /// is never gated, since it loads no weights and gating it would only make QA
+  /// depend on hardware — exists in exactly one place.
+  /// KeepAlive: derived from two process-constant boot values.
+  DeviceRefusalProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: noRetry,
+        name: r'deviceRefusalProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$deviceRefusalHash();
+
+  @$internal
+  @override
+  $ProviderElement<String?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String? create(Ref ref) {
+    return deviceRefusal(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String?>(value),
+    );
+  }
+}
+
+String _$deviceRefusalHash() => r'468361a06ea6560745860b6503ccdea28219b622';
+
 /// The catalog key of the model resident in the engine, straight from the
 /// residency owner (#42). Null while the engine is empty — label helpers fall
 /// back to the configured artifact, so a lazy first load does not blank the
@@ -1246,7 +1307,7 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'2d5ea9018dcaa97c7a6c581929855441cc46c7ec';
+String _$chatControllerHash() => r'cc56e6a1049567e4a16d0dcde84c13406f2345c6';
 
 /// KeepAlive: the chat session aggregate — in-flight generation and unsaved
 /// turns must survive every route transition.
@@ -1303,7 +1364,7 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'749ed8fffe78d7bf521ed379c2bbc14b70daa81a';
+String _$modelControllerHash() => r'c762b14f89332a86f58f0ab6f7ef900a870c592a';
 
 /// KeepAlive: a command controller whose downloads, busy guard, and epochs
 /// must survive leaving the Models screen (§3.4 — an autoDispose command

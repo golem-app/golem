@@ -42,16 +42,15 @@ resolveConfiguredBackend() async {
   final eligibility = classifyDevice(
     capabilities: capabilities,
     memoryFloorBytes: deviceMemoryFloorBytes(
-      apple: Platform.isIOS || Platform.isMacOS,
+      reportsInstalledMemory: Platform.isIOS || Platform.isMacOS,
     ),
   );
   return (
     config: resolveBackendPolicy(
-      backendDefine: backendDefine,
+      backendName: backendName,
       profileDefine: const String.fromEnvironment('GOLEM_MODEL_PROFILE'),
       artifactDefine: const String.fromEnvironment('GOLEM_MODEL_ARTIFACT'),
       modelPathDefine: const String.fromEnvironment('GOLEM_MODEL_PATH'),
-      identity: AppIdentity.current,
       tier: eligibility.tier,
     ),
     eligibility: eligibility,

@@ -916,6 +916,48 @@ void main() {
       expect(find.byKey(const Key('discard-generation')), findsOneWidget);
     }, variant: iosChrome);
 
+    testWidgets('the explanation survives a populated transcript', (
+      tester,
+    ) async {
+      // Discard trims a trailing assistant message, so a refused send leaves
+      // the user's turn behind and the empty state — which carried the only
+      // explanation — never renders again.
+      await pumpWithRepositories(
+        tester,
+        backend: backend,
+        eligibility: refused,
+        history: seedHistory(),
+        child: const ChatScreen(),
+      );
+      expect(find.byKey(const Key('empty-chat')), findsNothing);
+      expect(
+        find.byKey(const Key('device-unsupported-notice')),
+        findsOneWidget,
+      );
+    }, variant: iosChrome);
+
+    testWidgets('a runtime left loaded can still be unloaded', (tester) async {
+      // An earlier build could have persisted `loaded` on a device this one
+      // refuses; withholding both directions would strand it there forever.
+      await pumpWithRepositories(
+        tester,
+        backend: backend,
+        eligibility: refused,
+        model: const ModelState(runtime: RuntimePhase.loaded),
+        child: const ModelsScreen(),
+      );
+      await revealIn(
+        tester,
+        const Key('models-list'),
+        const Key('runtime-toggle-button'),
+      );
+      final toggle = tester.widget<GolemButton>(
+        find.byKey(const Key('runtime-toggle-button')),
+      );
+      expect(toggle.label, startsWith('Unload'));
+      expect(toggle.onPressed, isNotNull);
+    }, variant: iosChrome);
+
     testWidgets('a supported device keeps every affordance', (tester) async {
       await pumpWithRepositories(
         tester,

@@ -234,6 +234,46 @@ final class _ThrowingOnSecondLoad implements ModelManagementRepository {
   Future<ModelState> addModel(ModelCatalogEntry entry) async => _installed;
 }
 
+/// Records which transfer commands reach the repository, for the refusal path.
+final class _TransferRecorder implements ModelManagementRepository {
+  _TransferRecorder(this._state);
+
+  ModelState _state;
+  final List<String> downloads = [];
+  final List<String> cancels = [];
+
+  @override
+  Future<ModelState> load() async => _state;
+
+  @override
+  Stream<ModelState> download(String artifactKey) {
+    downloads.add(artifactKey);
+    return Stream.value(_state);
+  }
+
+  @override
+  Future<ModelState> cancel(String artifactKey) async {
+    cancels.add(artifactKey);
+    _state = _state.withArtifact(
+      artifactKey,
+      const ArtifactStatus(phase: ArtifactPhase.notDownloaded),
+    );
+    return _state;
+  }
+
+  @override
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    String? failure,
+  }) async => _state;
+  @override
+  Future<ModelState> pause(String artifactKey) async => _state;
+  @override
+  Future<ModelState> delete(String artifactKey) async => _state;
+  @override
+  Future<ModelState> addModel(ModelCatalogEntry entry) async => _state;
+}
+
 void main() {
   ProviderContainer containerWith({Duration delay = Duration.zero}) {
     final directory = Directory.systemTemp.createTempSync(
@@ -1435,6 +1475,7 @@ void main() {
       InferenceBackendConfig backend = realBackend,
       ChatHistoryRepository? history,
       SettingsRepository? settings,
+      ModelManagementRepository? models,
     }) => ProviderContainer(
       overrides: [
         chatHistoryRepositoryProvider.overrideWithValue(
@@ -1447,7 +1488,7 @@ void main() {
         inferenceBackendProvider.overrideWithValue(backend),
         deviceEligibilityProvider.overrideWithValue(eligibility),
         modelManagementRepositoryProvider.overrideWithValue(
-          fakeModels(directory),
+          models ?? fakeModels(directory),
         ),
         modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
       ],
@@ -1493,7 +1534,7 @@ void main() {
       );
     });
 
-    test('download refuses and the card says why', () async {
+    test('download starts nothing at all', () async {
       final directory = Directory.systemTemp.createTempSync('golem-floor-');
       addTearDown(() => directory.deleteSync(recursive: true));
       final container = containerFor(
@@ -1506,14 +1547,48 @@ void main() {
           .read(modelControllerProvider.notifier)
           .download('test-mlx');
 
+      // Not a failed phase either: the card already carries the reason, and a
+      // second copy of it in destructive red would read as something breaking.
       final status = container
           .read(modelControllerProvider)
           .requireValue
           .statusOf('test-mlx');
-      expect(status.phase, ArtifactPhase.failed);
-      expect(status.failure, refusal.message);
+      expect(status.phase, ArtifactPhase.notDownloaded);
+      expect(status.failure, isNull);
       expect(status.downloadedBytes, 0);
     });
+
+    test(
+      'a transfer the platform still holds is stopped, not adopted',
+      () async {
+        final directory = Directory.systemTemp.createTempSync('golem-floor-');
+        addTearDown(() => directory.deleteSync(recursive: true));
+        // The one path that still reaches download() on a refused device: an
+        // upgrade onto this build with a transfer already in flight.
+        final models = _TransferRecorder(
+          const ModelState().withArtifact(
+            'test-mlx',
+            const ArtifactStatus(
+              phase: ArtifactPhase.downloading,
+              downloadedBytes: 4096,
+            ),
+          ),
+        );
+        final container = containerFor(
+          directory,
+          _RecordingInferenceRepository(),
+          models: models,
+        );
+        addTearDown(container.dispose);
+        await container.read(modelControllerProvider.future);
+        await container
+            .read(modelControllerProvider.notifier)
+            .reconcileDownloads();
+
+        expect(models.downloads, isEmpty);
+        expect(models.cancels, ['test-mlx']);
+      },
+    );
 
     test('the runtime toggle refuses without touching the engine', () async {
       final directory = Directory.systemTemp.createTempSync('golem-floor-');

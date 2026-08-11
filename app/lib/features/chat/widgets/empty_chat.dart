@@ -46,19 +46,22 @@ class EmptyChat extends ConsumerWidget {
     // A device outside every supported tier says so here rather than letting a
     // user write a prompt that could only fail (#27). The simulated backend
     // loads nothing, so it is never refused.
-    final eligibility = ref.watch(deviceEligibilityProvider);
-    final refusal = backend.simulatedInference || eligibility.runsModels
+    final refusal = ref.watch(deviceRefusalProvider);
+    // Only the supported copy names a model, so only it pays for the label —
+    // and only it subscribes this widget to residency and the catalog.
+    final label = refusal != null
         ? null
-        : eligibility.message;
-    final label = chatModelLabel(
-      backend: backend,
-      catalog: ref.watch(effectiveModelCatalogProvider),
-      modelKey: ref.watch(
-        chatControllerProvider.select((state) => state.value?.active?.modelKey),
-      ),
-      residentModelKey: ref.watch(residentModelKeyProvider),
-      loadableKeys: ref.watch(loadableModelKeysProvider),
-    );
+        : chatModelLabel(
+            backend: backend,
+            catalog: ref.watch(effectiveModelCatalogProvider),
+            modelKey: ref.watch(
+              chatControllerProvider.select(
+                (state) => state.value?.active?.modelKey,
+              ),
+            ),
+            residentModelKey: ref.watch(residentModelKeyProvider),
+            loadableKeys: ref.watch(loadableModelKeysProvider),
+          );
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(32),
@@ -108,10 +111,10 @@ class EmptyChat extends ConsumerWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
               // Starter chips would only prefill a prompt this device cannot
-              // answer, so a refused device gets none.
-              if (refusal == null)
+              // answer, so a refused device gets neither them nor their space.
+              if (refusal == null) ...[
+                const SizedBox(height: 24),
                 Wrap(
                   alignment: WrapAlignment.center,
                   spacing: 8,
@@ -172,6 +175,7 @@ class EmptyChat extends ConsumerWidget {
                       ),
                   ],
                 ),
+              ],
             ],
           ),
         ),

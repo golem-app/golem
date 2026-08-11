@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/domain/app_state.dart';
 import '../../../core/domain/models.dart';
+import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
 import 'attach_sheet.dart';
 import 'composer.dart';
@@ -38,6 +39,7 @@ class ChatCanvas extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final active = chat.active;
     final hasMessages = active != null && active.messages.isNotEmpty;
+    final refusal = ref.watch(deviceRefusalProvider);
     return Column(
       children: [
         Expanded(
@@ -121,7 +123,14 @@ class ChatCanvas extends ConsumerWidget {
             ],
           ),
         ),
-        if (chat.failure != null) RecoveryBanner(failure: chat.failure!),
+        if (chat.failure != null)
+          RecoveryBanner(failure: chat.failure!)
+        // The empty state carries this copy until the first message; once a
+        // refused turn is on screen it would otherwise vanish behind a
+        // dismissed banner, leaving an unanswered message and no explanation
+        // (#27). Exactly one of the three is ever on screen.
+        else if (hasMessages && refusal != null)
+          _DeviceRefusalNotice(message: refusal),
         Composer(
           picker: picker,
           controller: composer,
@@ -134,4 +143,34 @@ class ChatCanvas extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// The standing explanation on a device that can never run a model: the same
+/// sentence the empty state shows, in the one place a populated transcript
+/// leaves for it. Deliberately not an error surface — nothing failed here, the
+/// hardware simply is what it is.
+class _DeviceRefusalNotice extends StatelessWidget {
+  const _DeviceRefusalNotice({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('device-unsupported-notice'),
+    margin: const EdgeInsets.fromLTRB(12, 4, 12, 6),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: CupertinoDynamicColor.resolve(GolemTheme.surface, context),
+      borderRadius: BorderRadius.circular(GolemRadius.notice),
+      border: Border.all(
+        color: CupertinoDynamicColor.resolve(GolemTheme.divider, context),
+      ),
+    ),
+    child: Text(
+      message,
+      style: GolemText.footnote.copyWith(
+        color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
+      ),
+    ),
+  );
 }

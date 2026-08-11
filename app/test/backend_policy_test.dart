@@ -20,11 +20,10 @@ InferenceBackendConfig _resolve({
   AppIdentity identity = AppIdentity.production,
   DeviceTier tier = DeviceTier.preferred,
 }) => resolveBackendPolicy(
-  backendDefine: backend,
+  backendName: resolveBackendName(backendDefine: backend, identity: identity),
   profileDefine: profile,
   artifactDefine: artifact,
   modelPathDefine: modelPath,
-  identity: identity,
   tier: tier,
 );
 

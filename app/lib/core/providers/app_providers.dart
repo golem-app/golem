@@ -106,13 +106,16 @@ DeviceEligibility deviceEligibility(Ref ref) =>
     const DeviceEligibility.unclassified();
 
 /// The refusal an unsupported device must present before any download or load,
-/// or null when this device may run models. A simulated backend is never gated:
-/// it loads no weights, so gating it would only make QA depend on hardware.
-String? _deviceRefusal(Ref ref) {
-  if (ref.read(inferenceBackendProvider).simulatedInference) return null;
-  final eligibility = ref.read(deviceEligibilityProvider);
-  return eligibility.runsModels ? null : eligibility.message;
-}
+/// or null when this device may run models. Derived once and watched by every
+/// surface that gates on it, so the rule — including that a simulated backend
+/// is never gated, since it loads no weights and gating it would only make QA
+/// depend on hardware — exists in exactly one place.
+/// KeepAlive: derived from two process-constant boot values.
+@Riverpod(keepAlive: true, retry: noRetry)
+String? deviceRefusal(Ref ref) =>
+    ref.watch(inferenceBackendProvider).simulatedInference
+    ? null
+    : ref.watch(deviceEligibilityProvider).refusal;
 
 /// The catalog key of the model resident in the engine, straight from the
 /// residency owner (#42). Null while the engine is empty — label helpers fall
@@ -799,7 +802,7 @@ class ChatController extends _$ChatController {
     // multi-gigabyte download whose weights this device can never load. The
     // sideload exemption does not apply — an operator's own file needs the
     // same memory and the same instruction set.
-    final refusal = _deviceRefusal(ref);
+    final refusal = ref.read(deviceRefusalProvider);
     if (refusal != null) {
       state = AsyncData(
         _value.copyWith(
@@ -1153,12 +1156,17 @@ class ModelController extends _$ModelController {
 
   Future<void> download(String artifactKey) async {
     if (_busy) return;
-    // Defence in depth behind the disabled card button and the chat banner's
-    // withheld CTA (#27): a device that can never load these weights must
-    // never spend gigabytes fetching them, whichever path asked.
-    final refusal = _deviceRefusal(ref);
-    if (refusal != null) {
-      _publishFailure(artifactKey, refusal);
+    // Defence in depth behind the withheld card button and the chat banner's
+    // absent CTA (#27): a device that can never load these weights must never
+    // spend gigabytes fetching them, whichever path asked. Reconciliation is
+    // the path that still can — it re-adopts a transfer the platform is still
+    // running — so that one is stopped rather than relabelled. Nothing is
+    // published over it: the card already carries the reason.
+    if (ref.read(deviceRefusalProvider) != null) {
+      final phase = state.value?.statusOf(artifactKey).phase;
+      if (phase == ArtifactPhase.downloading || phase == ArtifactPhase.paused) {
+        await cancel(artifactKey);
+      }
       return;
     }
     _busy = true;
@@ -1322,7 +1330,9 @@ class ModelController extends _$ModelController {
         );
         // An unsupported device refuses ahead of every other condition (#27):
         // installed weights change nothing about what this hardware can run.
-        final refusal = _deviceRefusal(ref);
+        // Only this branch — unloading stays reachable, so a phase persisted
+        // by an earlier build can always be corrected.
+        final refusal = ref.read(deviceRefusalProvider);
         if (refusal != null) {
           final value = await repository.recordRuntime(
             RuntimePhase.failed,

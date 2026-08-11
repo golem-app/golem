@@ -12,13 +12,19 @@ DeviceEligibility _classify({
     physicalMemoryBytes: memory,
     engineSupported: engineSupported,
   ),
-  memoryFloorBytes: deviceMemoryFloorBytes(apple: apple),
+  memoryFloorBytes: deviceMemoryFloorBytes(reportsInstalledMemory: apple),
 );
 
 void main() {
   test('the floor is one nominal rule spelled per platform', () {
-    expect(deviceMemoryFloorBytes(apple: true), appleMemoryFloorBytes);
-    expect(deviceMemoryFloorBytes(apple: false), androidMemoryFloorBytes);
+    expect(
+      deviceMemoryFloorBytes(reportsInstalledMemory: true),
+      appleMemoryFloorBytes,
+    );
+    expect(
+      deviceMemoryFloorBytes(reportsInstalledMemory: false),
+      androidMemoryFloorBytes,
+    );
     expect(appleMemoryFloorBytes, 4 * _gib);
     expect(androidMemoryFloorBytes, 3 * _gib);
     expect(deviceMemoryThresholdBytes, 7 * _gib);
