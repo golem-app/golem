@@ -7,6 +7,7 @@ import 'package:hooks/hooks.dart';
 const _llamaRevision = '9bd4c09ea571a9020f30eeef169b552625b5b5a4';
 const _llamaArchiveSha256 =
     '1833544741959404b16b4f9cc407be5bbf3abbebb6b97e6fff516fe3dc2513d5';
+const _androidNdkVersion = '29.0.14206865';
 
 Future<void> main(List<String> arguments) async {
   await build(arguments, (input, output) async {
@@ -19,10 +20,14 @@ Future<void> main(List<String> arguments) async {
     }
 
     final source = await _llamaSource(input.outputDirectoryShared);
+    // CMake keeps the compiler it first cached and will not swap it inside an
+    // existing build directory, so the toolchain has to be part of the key or
+    // an NDK bump silently relinks the previous compiler's objects.
     final targetKey = [
       config.targetOS,
       config.targetArchitecture,
       if (config.targetOS == OS.iOS) config.iOS.targetSdk,
+      if (config.targetOS == OS.android) 'ndk$_androidNdkVersion',
     ].join('-');
     final buildDirectory = Directory.fromUri(
       input.outputDirectoryShared.resolve('llama-build-$targetKey/'),
@@ -244,6 +249,29 @@ Future<Directory> _llamaSource(Uri sharedOutput) async {
   }
 }
 
+/// Flutter resolves the Android NDK by taking the newest one installed, so
+/// without a pin the compiler behind every shipped ggml kernel changes with
+/// whatever the machine happens to have — and before r28 the shipped library
+/// silently loses the 16 KB page alignment Play requires. Refuse rather than
+/// build something unverified.
+void _requirePinnedNdk(String ndk) {
+  final properties = File('$ndk/source.properties');
+  if (!properties.existsSync()) {
+    throw StateError('The Android NDK at $ndk has no source.properties.');
+  }
+  final revision = RegExp(
+    r'^Pkg\.Revision\s*=\s*(.+)$',
+    multiLine: true,
+  ).firstMatch(properties.readAsStringSync())?.group(1)?.trim();
+  if (revision == _androidNdkVersion) return;
+  throw StateError(
+    'Inferno pins Android NDK $_androidNdkVersion, but Flutter selected '
+    '$revision at $ndk. Install the pinned revision with '
+    '`sdkmanager "ndk;$_androidNdkVersion"`, or select it explicitly with '
+    'ANDROID_NDK_HOME.',
+  );
+}
+
 Future<List<String>> _targetCmakeArguments(CodeConfig config) async {
   final architecture = switch (config.targetArchitecture) {
     Architecture.arm64 => 'arm64',
@@ -259,6 +287,7 @@ Future<List<String>> _targetCmakeArguments(CodeConfig config) async {
       throw StateError('The Android NDK compiler configuration is missing.');
     }
     final ndk = compiler.substring(0, compiler.indexOf('/toolchains/'));
+    _requirePinnedNdk(ndk);
     final abi = switch (config.targetArchitecture) {
       Architecture.arm64 => 'arm64-v8a',
       Architecture.x64 => 'x86_64',

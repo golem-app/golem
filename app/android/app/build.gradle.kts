@@ -7,7 +7,22 @@ plugins {
 android {
     namespace = "app.golem.flutter"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // Pinned rather than inherited from flutter.ndkVersion. The Inferno build
+    // hook compiles libinferno.so with whichever NDK it is handed, and Flutter
+    // hands it the newest one installed on the machine — not this value. The
+    // hook asserts the two agree (packages/inferno/hook/build.dart), which
+    // only means anything if this side names an exact revision.
+    ndkVersion = "29.0.14206865"
+
+    packaging {
+        jniLibs {
+            // 16 KB devices need shared libraries stored uncompressed on a
+            // page boundary. AGP 9 already packages them this way; saying so
+            // stops a future default from reverting it silently. The real
+            // guard reads the artifact: tool/check_android_packaging.dart.
+            useLegacyPackaging = false
+        }
+    }
 
     buildFeatures {
         // AGP 9 ships generated resource values disabled; the per-flavor
@@ -28,6 +43,24 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // Play has required API 36 or higher of new apps and updates since
+        // 2026-08-31. targetSdk follows the Flutter SDK, so an older toolchain
+        // would drop below the floor without anything saying so.
+        require(flutter.targetSdkVersion >= 36) {
+            "Play requires targetSdk 36 or higher; this Flutter SDK supplies " +
+                "${flutter.targetSdkVersion}."
+        }
+
+        // The store artifact carries arm64-v8a alone. Plugin AARs ship
+        // prebuilt libraries for every ABI, so without this the bundle
+        // advertises armeabi-v7a and x86_64 while carrying no Flutter engine
+        // for them, and Play offers the app to devices that cannot start it.
+        // Load-bearing only alongside disable-abi-filtering in
+        // gradle.properties, which stops Flutter's plugin clearing this set.
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
     }
 
     // The three coexisting app identities. Launcher artwork lives in the
