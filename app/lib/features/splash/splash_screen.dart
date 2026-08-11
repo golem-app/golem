@@ -41,18 +41,16 @@ class SplashScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final simulated = ref.watch(inferenceBackendProvider).simulatedInference;
-    final model = simulated ? 'simulated model' : 'model';
     final (semanticValue, caption) = switch (state.phase) {
       StartupPhase.failed => (
-        simulated ? 'Simulated loading failed' : 'Loading failed',
-        'The $model could not be prepared',
+        'Starting failed',
+        'Golem could not finish starting',
       ),
       StartupPhase.missingModel => (
-        'No $model selected; preparing setup',
-        'Preparing $model setup',
+        'Preparing first-run setup',
+        'Preparing setup',
       ),
-      _ => ('Loading $model on this device', 'Loading $model on this device'),
+      _ => ('Starting Golem on this device', 'Getting things ready'),
     };
     return SplashScaffold(
       semanticValue: semanticValue,

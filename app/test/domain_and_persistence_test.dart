@@ -400,6 +400,8 @@ void main() {
         showMetrics: false,
         expandReasoning: true,
         advancedMode: true,
+        onboardingVersion: currentOnboardingVersion,
+        onboardingModelKey: 'gemma4-mlx',
         systemPrompt: 'Answer like a pirate.',
         customModels: [
           CustomModelSpec(
@@ -416,6 +418,8 @@ void main() {
     expect(loaded.expandReasoning, isTrue);
     expect(loaded.hapticsOnSend, isTrue);
     expect(loaded.advancedMode, isTrue);
+    expect(loaded.onboardingVersion, currentOnboardingVersion);
+    expect(loaded.onboardingModelKey, 'gemma4-mlx');
     expect(loaded.systemPrompt, 'Answer like a pirate.');
     expect(loaded.styleFor('gemma4'), ResponseStyle.precise);
     expect(loaded.styleFor('qwen35'), ResponseStyle.balanced);
@@ -427,7 +431,7 @@ void main() {
     // Only non-default values reach disk, so future default changes reach
     // users who never touched a control.
     final raw = jsonDecode(await file.readAsString()) as Map<String, Object?>;
-    expect(raw['schemaVersion'], 3);
+    expect(raw['schemaVersion'], 4);
     expect(raw.containsKey('hapticsOnSend'), isFalse);
     expect(raw.containsKey('saveHistory'), isFalse);
     expect((raw['responseStyles'] as Map).keys, ['gemma4']);
@@ -470,7 +474,9 @@ void main() {
 
       await repository.save(loaded);
       final raw = jsonDecode(await file.readAsString()) as Map<String, Object?>;
-      expect(raw['schemaVersion'], 3);
+      expect(raw['schemaVersion'], 4);
+      expect(loaded.onboardingVersion, 0);
+      expect(loaded.onboardingModelKey, isNull);
       expect((raw['customModels']! as List).single, {
         'repository': 'mlx-community/awesome-model',
         'engine': 'mlx',
@@ -587,7 +593,7 @@ void main() {
       expect(stored.files.first.sha256, resolution.files.first.sha256);
       expect(stored.files.last.sha256, isNull);
       final raw = jsonDecode(await file.readAsString()) as Map<String, Object?>;
-      expect(raw['schemaVersion'], 3);
+      expect(raw['schemaVersion'], 4);
     });
 
     test('a v1 or v2 entry loads as unresolved rather than failing', () async {

@@ -12,6 +12,7 @@ import '../features/benchmark/benchmark_screen.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/chat/widgets/attach_sheet.dart';
 import '../features/chat/search_screen.dart';
+import '../features/onboarding/first_run_gate.dart';
 import '../features/settings/appearance_screen.dart';
 import '../features/settings/models_screen.dart';
 import '../features/settings/privacy_screen.dart';
@@ -25,7 +26,8 @@ GoRouter _createRouter(AttachmentPicker picker) => GoRouter(
   routes: [
     GoRoute(
       path: '/',
-      builder: (context, state) => ChatScreen(picker: picker),
+      builder: (context, state) =>
+          FirstRunGate(child: ChatScreen(picker: picker)),
     ),
     GoRoute(path: '/search', builder: (context, state) => const SearchScreen()),
     GoRoute(

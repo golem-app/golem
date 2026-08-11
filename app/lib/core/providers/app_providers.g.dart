@@ -1250,7 +1250,7 @@ final class PreferencesControllerProvider
 }
 
 String _$preferencesControllerHash() =>
-    r'd43fa0e0138513c21ce3a509f155afac7a18cfa0';
+    r'8ee5e0844427c186848f2e691283dccc502263d9';
 
 /// Persisted app-wide preferences. Every command follows the settings idiom —
 /// drop taps that land in the cold-start load window, publish, then save —
@@ -1307,7 +1307,7 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'cc56e6a1049567e4a16d0dcde84c13406f2345c6';
+String _$chatControllerHash() => r'e27f0def29ce0562da3716be17043cd808d8bdce';
 
 /// KeepAlive: the chat session aggregate — in-flight generation and unsaved
 /// turns must survive every route transition.

@@ -54,7 +54,7 @@ void main() {
 
     expect(calls, 2);
     expect(find.byKey(const Key('launch-splash')), findsNothing);
-    expect(find.byKey(const Key('empty-chat')), findsOneWidget);
+    expect(find.byKey(const Key('first-run-welcome')), findsOneWidget);
   });
 
   testWidgets('a successful launch composes exactly once', (tester) async {
@@ -72,7 +72,7 @@ void main() {
     await tester.pump();
     await pumpThroughTheatre(tester);
     expect(calls, 1);
-    expect(find.byKey(const Key('empty-chat')), findsOneWidget);
+    expect(find.byKey(const Key('first-run-welcome')), findsOneWidget);
   });
 
   testWidgets('a double-tap on Try again runs a single retry', (tester) async {

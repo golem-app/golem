@@ -15,4 +15,11 @@ enum GolemChrome {
     TargetPlatform.android || TargetPlatform.fuchsia => GolemChrome.android,
     _ => GolemChrome.cupertino,
   };
+
+  /// Platform accessibility minimum for every interactive target. Visuals may
+  /// remain smaller inside this hit box.
+  double get minimumTapTarget => switch (this) {
+    GolemChrome.cupertino => 44,
+    GolemChrome.android => 48,
+  };
 }

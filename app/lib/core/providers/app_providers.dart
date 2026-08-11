@@ -355,6 +355,24 @@ class PreferencesController extends _$PreferencesController {
   Future<bool> setAdvancedMode(bool value) =>
       _commit((current) => current.copyWith(advancedMode: value));
 
+  Future<bool> setOnboardingModel(String modelKey) => _commit(
+    (current) => current.copyWith(onboardingModelKey: () => modelKey),
+  );
+
+  Future<bool> completeOnboarding({
+    String? modelKey,
+    bool clearModel = false,
+  }) => _commit(
+    (current) => current.copyWith(
+      onboardingVersion: currentOnboardingVersion,
+      onboardingModelKey: clearModel
+          ? () => null
+          : modelKey == null
+          ? null
+          : () => modelKey,
+    ),
+  );
+
   /// Null or blank clears the prompt back to the model default.
   Future<bool> setSystemPrompt(String? prompt) {
     final trimmed = prompt?.trim();
@@ -542,11 +560,31 @@ class ChatController extends _$ChatController {
   Future<void> newChat() async {
     stop();
     final now = DateTime.now();
+    final onboardingModelKey = ref
+        .read(preferencesControllerProvider)
+        .value
+        ?.onboardingModelKey;
+    final backend = ref.read(inferenceBackendProvider);
+    final selectedEntry = onboardingModelKey == null
+        ? null
+        : _catalog()
+              .where((entry) => entry.key == onboardingModelKey)
+              .firstOrNull;
     final conversation = ChatConversation(
       id: newId(),
       title: 'New chat',
       messages: const [],
       updatedAt: now,
+      // First run is allowed to name a compatible model before its weights
+      // finish downloading. Sending remains gated in the composer and again in
+      // _startGeneration; after installation the existing loadable-key rule
+      // makes every model label follow this persisted choice.
+      modelKey:
+          selectedEntry != null &&
+              (backend.simulatedInference ||
+                  backend.kind.loads(selectedEntry.engine))
+          ? selectedEntry.key
+          : null,
     );
     final next = ChatState(
       conversations: [conversation, ..._value.conversations],

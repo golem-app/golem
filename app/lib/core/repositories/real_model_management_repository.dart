@@ -27,7 +27,7 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     required this.diskSpace,
     required this.backupExclusion,
     this.activeArtifactKey,
-    this.diskSpaceMargin = 500 * 1024 * 1024,
+    this.diskSpaceMargin = modelDownloadFreeSpaceMargin,
   }) : catalog = [...catalog] {
     _state = ModelState(activeArtifactKey: activeArtifactKey);
   }

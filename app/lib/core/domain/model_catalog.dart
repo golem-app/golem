@@ -6,15 +6,21 @@ library;
 import 'dart:collection';
 
 import 'equality.dart';
-import 'model_profile_spec.dart' show ModelInputModality;
+import 'model_profile_spec.dart'
+    show ModelInputModality, defaultModelContextLength;
 
-export 'model_profile_spec.dart' show ModelInputModality;
+export 'model_profile_spec.dart'
+    show ModelInputModality, defaultModelContextLength;
 
 enum ModelEngine { mlx, gguf }
 
 /// [ModelCatalogEntry.profileKey] for an entry not yet resolved to a supported
 /// broker profile: it lists and deletes normally but refuses activation.
 const unresolvedProfileKey = 'unresolved';
+
+/// Space the real downloader requires to remain after the outstanding bytes
+/// land. Consent copy and the preflight share this one value (#26).
+const modelDownloadFreeSpaceMargin = 500 * 1024 * 1024;
 
 /// A GGUF artifact names exactly one [weights] file and at most one
 /// [projector]; an MLX artifact is a directory of [snapshot] files.
@@ -83,6 +89,7 @@ final class ModelCatalogEntry {
     required this.revision,
     required this._files,
     required this.profileKey,
+    this.contextLength = defaultModelContextLength,
     this._inputModalities = const {ModelInputModality.text},
   });
 
@@ -101,6 +108,10 @@ final class ModelCatalogEntry {
   /// The broker profile to render and sample with. Explicit, never inferred: a
   /// slug, file name or engine is no proof of a chat template (#43).
   final String profileKey;
+
+  /// The context window this app actually configures for the artifact, rather
+  /// than the much larger trained maximum a model card may advertise.
+  final int contextLength;
 
   final Set<ModelInputModality> _inputModalities;
 
@@ -140,6 +151,7 @@ final class ModelCatalogEntry {
       other.repository == repository &&
       other.revision == revision &&
       other.profileKey == profileKey &&
+      other.contextLength == contextLength &&
       listEquals(other._files, _files) &&
       setEquals(other._inputModalities, _inputModalities);
 
@@ -152,6 +164,7 @@ final class ModelCatalogEntry {
     repository,
     revision,
     profileKey,
+    contextLength,
     listHash(_files),
     setHash(_inputModalities),
   );

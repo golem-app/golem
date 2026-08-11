@@ -6,6 +6,7 @@ import '../../../core/domain/app_state.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
+import '../../onboarding/model_setup_banner.dart';
 import 'attach_sheet.dart';
 import 'composer.dart';
 import 'empty_chat.dart';
@@ -131,6 +132,7 @@ class ChatCanvas extends ConsumerWidget {
         // (#27). Exactly one of the three is ever on screen.
         else if (hasMessages && refusal != null)
           _DeviceRefusalNotice(message: refusal),
+        if (chat.failure == null && refusal == null) const ModelSetupBanner(),
         Composer(
           picker: picker,
           controller: composer,
