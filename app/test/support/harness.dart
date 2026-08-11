@@ -168,6 +168,7 @@ Future<void> pumpWithRepositories(
   WidgetTester tester, {
   required Widget child,
   Brightness brightness = Brightness.light,
+  double textScale = 1,
   ChatHistorySnapshot? history,
   ModelState model = const ModelState(),
   List<ModelCatalogEntry>? catalog,
@@ -195,11 +196,19 @@ Future<void> pumpWithRepositories(
     models: models,
   );
   addTearDown(container.dispose);
+  final app = UncontrolledProviderScope(
+    container: container,
+    child: wrapApp(brightness: brightness, child: child),
+  );
   await tester.pumpWidget(
-    UncontrolledProviderScope(
-      container: container,
-      child: wrapApp(brightness: brightness, child: child),
-    ),
+    // The app's own MediaQuery takes its scaler from the ancestor it finds,
+    // so wrapping here is how a surface is judged at an accessibility size.
+    textScale == 1
+        ? app
+        : MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
+            child: app,
+          ),
   );
   if (find.byType(ChatScreen).evaluate().isNotEmpty) {
     final context = tester.element(find.byType(ChatScreen));

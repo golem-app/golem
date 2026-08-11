@@ -250,7 +250,7 @@ void main() {
         child: const Directionality(
           textDirection: TextDirection.rtl,
           child: MediaQuery(
-            data: MediaQueryData(textScaler: TextScaler.linear(1.3)),
+            data: MediaQueryData(textScaler: TextScaler.linear(1.6)),
             child: FirstRunScreen(),
           ),
         ),

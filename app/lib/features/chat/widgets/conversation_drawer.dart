@@ -145,7 +145,10 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                       context.push('/search');
                     },
               child: Container(
-                height: 46,
+                // A minimum rather than a fixed height: at an accessibility
+                // text size the placeholder is taller than 46pt and needs the
+                // room to wrap instead of being cropped.
+                constraints: const BoxConstraints(minHeight: 46),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
                   color: CupertinoDynamicColor.resolve(
@@ -158,9 +161,11 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                   children: [
                     Icon(CupertinoIcons.search, size: 19, color: faint),
                     const SizedBox(width: 10),
-                    Text(
-                      'Search chats',
-                      style: TextStyle(color: faint, fontSize: 17),
+                    Expanded(
+                      child: Text(
+                        'Search chats',
+                        style: TextStyle(color: faint, fontSize: 17),
+                      ),
                     ),
                   ],
                 ),
