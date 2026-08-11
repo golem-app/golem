@@ -199,6 +199,12 @@ ModelPickerView buildModelPickerView({
   required bool simulatedTransfers,
   String? selectedKey,
 }) {
+  assert(
+    pinnedCatalog.every((e) => catalog.any((c) => c.key == e.key)),
+    'the pinned catalog is a subset of the rows; admission decides the '
+    'recommendation, and one naming an entry that is not on screen would '
+    'badge nothing',
+  );
   final simulated = backend.simulatedInference;
 
   // Installed artifacts stay visible even when this build cannot load them,
@@ -274,7 +280,10 @@ ModelPickerView buildModelPickerView({
   // Over the visible rows, not the catalog: a transfer on a row this sheet
   // does not list would otherwise withhold every Download button on screen and
   // blame a model the user cannot see.
-  final transferring = models == null ? null : _keyInFlight(models, visible);
+  // Over the whole catalog, not just the listed rows: the single-transfer rule
+  // belongs to the repository, and a download this sheet happens not to show
+  // still holds the slot. Offering a second would start a competing writer.
+  final transferring = models == null ? null : _keyInFlight(models, catalog);
 
   final choices = [
     for (final entry in visible)
@@ -376,8 +385,7 @@ ModelChoice _choiceFor({
     // must not tell the user to download it. Settings says the same.
     false when !installed && !downloadable => (
       ModelBlock.unresolvedRepository,
-      'This repository has not been resolved against Hugging Face, so its '
-          'files are unknown. Add it again in Settings to resolve it.',
+      unresolvedRepositoryReason,
     ),
     false when installed && !loadsHere => (
       ModelBlock.otherEngine,
@@ -469,16 +477,27 @@ ModelTransfer? _transferFor({
   required bool admitted,
 }) {
   if (deviceRefusal != null || sideloaded) return null;
-  // Nothing is offered for an artifact this device is not admitted to: the
-  // shared policy already refused it on the first-run screen.
-  if (!admitted) return null;
-  // A hand-added repository that never resolved has synthesized files and no
-  // real byte count, so the request could not succeed; Settings withholds its
-  // button for the same reason rather than failing on the tap.
-  if (!downloadable) return null;
-  // Nothing is offered for an artifact this build could never run, even when a
-  // previous build installed it. Its row explains itself and stops there.
-  if (!loadsHere && !simulated) return null;
+  // A transfer already under way is shown whatever the row's verdict. Settings
+  // has no tier gate, so it can start one this device is not admitted to; a
+  // picker that hid it would disable every other row with "Another model is
+  // downloading" while refusing to show the download it means, and offer no
+  // way to stop it.
+  final running =
+      status.phase == ArtifactPhase.downloading ||
+      status.phase == ArtifactPhase.verifying;
+  if (!running) {
+    // Nothing is *offered* for an artifact this device is not admitted to:
+    // the shared policy refused it on the first-run screen, and the row
+    // carries that sentence.
+    if (!admitted) return null;
+    // Nor for a hand-added repository that never resolved: it has synthesized
+    // files and no real byte count, so the request could not succeed, and
+    // Settings withholds its button for the same reason.
+    if (!downloadable) return null;
+    // Nor for an artifact this build could never run, even when a previous
+    // build installed it. That row explains itself and stops there.
+    if (!loadsHere && !simulated) return null;
+  }
   final busyElsewhere = transferringKey != null && transferringKey != entry.key;
   // The same qualifier Settings appends to every transfer phase: a simulated
   // download must never read like a real one, and the two surfaces describe one
@@ -568,6 +587,11 @@ String _recommendationReason({
   };
 }
 
+/// What choosing does, or the one reason nothing here can be chosen.
+///
+/// The sideload sentence names the file the build pins — never the path around
+/// it, which is a developer's machine and not the user's business
+/// (`sideloadedModelLabel`).
 String? _footnote({
   required InferenceBackendConfig backend,
   required String? deviceRefusal,

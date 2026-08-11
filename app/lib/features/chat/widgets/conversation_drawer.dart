@@ -391,13 +391,9 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
     await showGolemSheet<void>(
       context: context,
       sheetKey: const Key('rename-sheet'),
+      // The keyboard inset is the sheet chrome's job now (golem_sheet.dart).
       builder: (context) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          18,
-          20,
-          20 + MediaQuery.viewInsetsOf(context).bottom,
-        ),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
         child: SafeArea(
           top: false,
           child: Column(

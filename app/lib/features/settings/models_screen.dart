@@ -10,6 +10,7 @@ import '../../core/domain/app_preferences.dart';
 import '../../core/domain/byte_format.dart';
 import '../../core/domain/inference_backend.dart';
 import '../../core/domain/model_activation.dart';
+import '../../core/domain/model_admission.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
@@ -87,8 +88,16 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
     // A device outside every supported tier may not start a transfer or a load
     // (#27); the cards say why instead of offering buttons that would refuse.
     final deviceRefusal = ref.watch(deviceRefusalProvider);
+    // Verification holds the slot as surely as the transfer does — it runs
+    // inside the same download() stream, behind the same busy guard — so a
+    // button offered during it would do nothing when tapped. The chat picker
+    // counts it; these cards must agree.
     final downloadingKey = model.artifacts.entries
-        .where((entry) => entry.value.phase == ArtifactPhase.downloading)
+        .where(
+          (entry) =>
+              entry.value.phase == ArtifactPhase.downloading ||
+              entry.value.phase == ArtifactPhase.verifying,
+        )
         .map((entry) => entry.key)
         .firstOrNull;
     // Real builds hide artifacts their composed engine can never load —
@@ -957,11 +966,7 @@ class _ModelCard extends ConsumerWidget {
               key: downloadable
                   ? Key('model-device-refusal-${entry.key}')
                   : null,
-              downloadable
-                  ? deviceRefusal!
-                  : 'This repository has not been resolved against Hugging '
-                        'Face, so its files are unknown. Add it again to '
-                        'resolve it.',
+              downloadable ? deviceRefusal! : unresolvedRepositoryReason,
               style: GolemText.footnote.copyWith(
                 color: CupertinoDynamicColor.resolve(
                   GolemTheme.mutedInk,

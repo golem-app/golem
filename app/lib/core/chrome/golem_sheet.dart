@@ -65,7 +65,16 @@ Future<T?> showGolemSheet<T>({
             // Flexible so the ceiling above actually reaches the content: a
             // Column hands its children unbounded main-axis space otherwise,
             // and a body that scrolls internally would never learn its bound.
-            Flexible(child: builder(context)),
+            // The keyboard inset is applied here rather than by each body:
+            // the ceiling already reserves room for it, and four of the five
+            // sheets never padded for it at all, so their last row sat behind
+            // the keyboard whenever one was up.
+            Flexible(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: _keyboard(context)),
+                child: builder(context),
+              ),
+            ),
           ],
         ),
       ),

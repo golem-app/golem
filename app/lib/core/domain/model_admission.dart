@@ -12,6 +12,13 @@ import 'device_eligibility.dart';
 import 'inference_backend.dart';
 import 'model_catalog.dart';
 
+/// Why a hand-added repository cannot be fetched. One sentence, because the
+/// Settings card and the chat picker both refuse it and had already drifted
+/// apart by a clause on the day they were written.
+const unresolvedRepositoryReason =
+    'This repository has not been resolved against Hugging Face, so its files '
+    'are unknown. Add it again to resolve it.';
+
 enum ModelAdmissionBlock { otherEngine, needsPreferredTier, unsupportedDevice }
 
 final class ModelAdmissionOption {
@@ -19,8 +26,8 @@ final class ModelAdmissionOption {
     required this.entry,
     required this.enabled,
     required this.recommended,
+    required this.memoryKnown,
     this.block,
-    this.memoryKnown = true,
   });
 
   final ModelCatalogEntry entry;

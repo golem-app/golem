@@ -3,6 +3,7 @@ import 'package:golem_flutter/broker/backend_policy.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
+import 'package:golem_flutter/core/domain/model_admission.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/chat/model_choice.dart';
@@ -65,6 +66,8 @@ void main() {
     ),
     String? deviceRefusal,
     bool advanced = false,
+    bool? simulatedTransfers,
+    Set<String>? downloadableKeys,
     String? selectedKey,
   }) {
     backend ??= llama;
@@ -74,8 +77,9 @@ void main() {
     return buildModelPickerView(
       catalog: catalog ?? modelCatalog,
       pinnedCatalog: modelCatalog,
-      simulatedTransfers: backend.simulatedInference,
-      downloadableKeys: {for (final e in catalog ?? modelCatalog) e.key},
+      simulatedTransfers: simulatedTransfers ?? backend.simulatedInference,
+      downloadableKeys:
+          downloadableKeys ?? {for (final e in catalog ?? modelCatalog) e.key},
       backend: backend,
       models: state,
       loadableKeys: loadable(backend, state, catalog: catalog),
@@ -323,6 +327,24 @@ void main() {
   });
 
   group('simulated transfers', () {
+    test('a simulated download is labelled even on a real inference build', () {
+      // The two axes are separate values, and the window before model state
+      // resolves is exactly where they diverged into a real fetch behind a
+      // dialog promising a simulation.
+      final built = view(
+        simulatedTransfers: true,
+        models: stateWith({
+          'qwen35-2b-gguf': const ArtifactStatus(
+            phase: ArtifactPhase.downloading,
+            downloadedBytes: 400000000,
+          ),
+        }),
+      );
+      final progress =
+          rowFor(built, 'qwen35-2b-gguf').transfer! as ModelTransferProgress;
+      expect(progress.label, 'Downloading · simulated');
+    });
+
     test('a simulated download says so, exactly as Settings does', () {
       var state = const ModelState(
         activeArtifactKey: 'gemma4-mlx',
@@ -356,6 +378,88 @@ void main() {
       final progress =
           rowFor(built, 'qwen35-2b-gguf').transfer! as ModelTransferProgress;
       expect(progress.label, 'Downloading');
+    });
+  });
+
+  group('refusals that owe a sentence', () {
+    test('a repository that never resolved is not told to download', () {
+      // Its files are synthesized, so the request could not succeed. Settings
+      // withholds the button and says so; the picker must not say the
+      // opposite of what it offers.
+      final unresolved = ModelCatalogEntry(
+        key: 'custom-unresolved',
+        displayName: 'Something',
+        engine: ModelEngine.gguf,
+        quantization: 'custom',
+        repository: 'someone/something',
+        revision: 'main',
+        profileKey: unresolvedProfileKey,
+        files: const [ModelArtifactFile(path: 'weights.bin', bytes: 1000)],
+      );
+      final catalog = [...modelCatalog, unresolved];
+      final built = view(
+        catalog: catalog,
+        downloadableKeys: {for (final e in modelCatalog) e.key},
+      );
+      final row = rowFor(built, 'custom-unresolved');
+      expect(row.block, ModelBlock.unresolvedRepository);
+      expect(row.blockReason, unresolvedRepositoryReason);
+      expect(row.transfer, isNull);
+    });
+
+    test('an unadmitted artifact is refused in first run’s words', () {
+      final light = auto(DeviceTier.light);
+      final built = view(
+        backend: light,
+        eligibility: const DeviceEligibility(tier: DeviceTier.light),
+      );
+      final row = rowFor(built, 'gemma4-gguf');
+      expect(row.block, ModelBlock.needsMoreMemory);
+      expect(row.blockReason, 'Needs more memory than this phone reports.');
+      expect(row.transfer, isNull, reason: 'nor is it offered');
+    });
+
+    test('an unread probe does not claim the phone reported a figure', () {
+      final light = auto(DeviceTier.light);
+      final built = view(
+        backend: light,
+        eligibility: classifyDevice(
+          capabilities: const DeviceCapabilities(),
+          memoryFloorBytes: appleMemoryFloorBytes,
+        ),
+      );
+      expect(
+        rowFor(built, 'gemma4-gguf').blockReason,
+        'Golem could not read this phone’s memory, so it ships the lighter '
+        'model here.',
+      );
+    });
+
+    test('a transfer already running is shown whatever the verdict', () {
+      // Settings has no tier gate and can start one; hiding it would disable
+      // every other row while refusing to show the download it blames.
+      final light = auto(DeviceTier.light);
+      final built = view(
+        backend: light,
+        eligibility: const DeviceEligibility(tier: DeviceTier.light),
+        models: stateWith({
+          'gemma4-gguf': const ArtifactStatus(
+            phase: ArtifactPhase.downloading,
+            downloadedBytes: 1000000000,
+          ),
+        }),
+      );
+      final row = rowFor(built, 'gemma4-gguf');
+      final progress = row.transfer! as ModelTransferProgress;
+      expect(progress.pausable, isTrue, reason: 'and it can be stopped here');
+      // qwen35-2b-gguf is the one this tier is admitted to, so it is the one
+      // with an offer to disable; the slot gemma4-gguf holds still counts.
+      expect(
+        (rowFor(built, 'qwen35-2b-gguf').transfer! as ModelTransferOffer)
+            .enabled,
+        isFalse,
+        reason: 'the slot it holds is still counted',
+      );
     });
   });
 

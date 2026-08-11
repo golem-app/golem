@@ -17,12 +17,34 @@ import 'models.dart';
 Map<String, double> measuredTokensPerSecondByModel(
   List<ChatConversation> conversations, {
   required String? defaultModelKey,
+}) => _scan(conversations, defaultModelKey: defaultModelKey, only: null);
+
+/// One key, without building the whole map: a caller asking per row would
+/// otherwise walk the entire history once per row and throw the rest away.
+double? measuredTokensPerSecond(
+  List<ChatConversation> conversations, {
+  required String modelKey,
+  required String? defaultModelKey,
+}) => _scan(
+  conversations,
+  defaultModelKey: defaultModelKey,
+  only: modelKey,
+)[modelKey];
+
+/// The attribution rule itself, stated once. [only] narrows the walk without
+/// changing what it decides — a second copy of this loop is how the two
+/// surfaces would come to quote different numbers for one artifact.
+Map<String, double> _scan(
+  List<ChatConversation> conversations, {
+  required String? defaultModelKey,
+  required String? only,
 }) {
   final best = <String, double>{};
   final bestAt = <String, DateTime>{};
   for (final conversation in conversations) {
     final effective = conversation.modelKey ?? defaultModelKey;
     if (effective == null) continue;
+    if (only != null && effective != only) continue;
     for (final message in conversation.messages) {
       final metrics = message.metrics;
       if (message.role != MessageRole.assistant ||
@@ -34,33 +56,6 @@ Map<String, double> measuredTokensPerSecondByModel(
       if (seen == null || message.createdAt.isAfter(seen)) {
         bestAt[effective] = message.createdAt;
         best[effective] = metrics.decodeTokensPerSecond;
-      }
-    }
-  }
-  return best;
-}
-
-/// One key, without building the whole map: a caller asking per row would
-/// otherwise walk the entire history once per row and throw the rest away.
-double? measuredTokensPerSecond(
-  List<ChatConversation> conversations, {
-  required String modelKey,
-  required String? defaultModelKey,
-}) {
-  double? best;
-  DateTime? bestAt;
-  for (final conversation in conversations) {
-    if ((conversation.modelKey ?? defaultModelKey) != modelKey) continue;
-    for (final message in conversation.messages) {
-      final metrics = message.metrics;
-      if (message.role != MessageRole.assistant ||
-          message.isStreaming ||
-          metrics == null) {
-        continue;
-      }
-      if (bestAt == null || message.createdAt.isAfter(bestAt)) {
-        bestAt = message.createdAt;
-        best = metrics.decodeTokensPerSecond;
       }
     }
   }

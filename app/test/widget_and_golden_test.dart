@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/broker/backend_policy.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
@@ -270,12 +271,16 @@ void main() {
           tester,
           brightness: brightness,
           history: markdownHistory(),
-          backend: const InferenceBackendConfig(
-            kind: InferenceBackendKind.llama,
-            profileKey: 'gemma4',
-            artifactKey: 'gemma4-gguf',
-            modelPath: 'documents:models/gemma4-gguf/weights.gguf',
-            modelPathFromCatalog: true,
+          // Resolved by the real policy, not hand-built: a literal config
+          // leaves artifactFromDevicePolicy false, and the device-tier
+          // sentence this golden exists to record would quietly degrade to
+          // the generic fallback without a test noticing.
+          backend: resolveBackendPolicy(
+            backendName: 'auto',
+            profileDefine: '',
+            artifactDefine: '',
+            modelPathDefine: '',
+            tier: DeviceTier.preferred,
           ),
           eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
           preferences: InMemoryPreferencesRepository(
