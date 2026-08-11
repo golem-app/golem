@@ -70,6 +70,7 @@ void main() {
     final state = models ?? stateWith(const {});
     return buildModelPickerView(
       catalog: catalog ?? modelCatalog,
+      downloadableKeys: {for (final e in catalog ?? modelCatalog) e.key},
       backend: backend,
       models: state,
       loadableKeys: loadable(backend, state, catalog: catalog),
@@ -617,6 +618,7 @@ void main() {
           });
           final built = buildModelPickerView(
             catalog: modelCatalog,
+            downloadableKeys: {for (final e in modelCatalog) e.key},
             backend: backend,
             models: models,
             loadableKeys: loadable(backend, models),

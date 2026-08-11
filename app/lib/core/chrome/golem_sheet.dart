@@ -23,33 +23,45 @@ Future<T?> showGolemSheet<T>({
             }
           }
         : null,
-    child: Container(
-      key: sheetKey,
-      decoration: BoxDecoration(
-        color: CupertinoDynamicColor.resolve(GolemTheme.surface, context),
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(GolemRadius.card),
-        ),
-        boxShadow: GolemShadow.sheet,
+    child: ConstrainedBox(
+      // Every sheet here is bottom-anchored and grown by its content, and the
+      // enclosing Column offers no bound — so the ceiling belongs to the one
+      // place that knows what a sheet is, rather than to each caller that
+      // outgrows the screen. Content past this scrolls inside its own body.
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.8,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (GolemChrome.current == GolemChrome.android)
-            Container(
-              width: 32,
-              height: 4,
-              margin: const EdgeInsets.only(top: GolemSpace.s3),
-              decoration: BoxDecoration(
-                color: CupertinoDynamicColor.resolve(
-                  GolemTheme.tertiaryInk,
-                  context,
-                ).withValues(alpha: 0.45),
-                borderRadius: BorderRadius.circular(2),
+      child: Container(
+        key: sheetKey,
+        decoration: BoxDecoration(
+          color: CupertinoDynamicColor.resolve(GolemTheme.surface, context),
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(GolemRadius.card),
+          ),
+          boxShadow: GolemShadow.sheet,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (GolemChrome.current == GolemChrome.android)
+              Container(
+                width: 32,
+                height: 4,
+                margin: const EdgeInsets.only(top: GolemSpace.s3),
+                decoration: BoxDecoration(
+                  color: CupertinoDynamicColor.resolve(
+                    GolemTheme.tertiaryInk,
+                    context,
+                  ).withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-          builder(context),
-        ],
+            // Flexible so the ceiling above actually reaches the content: a
+            // Column hands its children unbounded main-axis space otherwise,
+            // and a body that scrolls internally would never learn its bound.
+            Flexible(child: builder(context)),
+          ],
+        ),
       ),
     ),
   ),

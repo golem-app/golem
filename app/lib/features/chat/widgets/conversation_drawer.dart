@@ -15,6 +15,7 @@ import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../model_label.dart';
+import '../../../core/domain/byte_format.dart';
 
 class ConversationDrawer extends ConsumerStatefulWidget {
   const ConversationDrawer({
@@ -32,9 +33,6 @@ class ConversationDrawer extends ConsumerStatefulWidget {
 }
 
 class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
-  static String _gigabytes(int bytes) =>
-      '${(bytes / 1000000000).toStringAsFixed(2)} GB';
-
   @override
   Widget build(BuildContext context) {
     final sections = groupConversations(
@@ -207,7 +205,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
               ),
             ),
           ),
-          _StorageMeter(gigabytes: _gigabytes),
+          _StorageMeter(gigabytes: gigabytes),
           CupertinoButton(
             key: const Key('open-settings'),
             padding: const EdgeInsets.symmetric(horizontal: 20),

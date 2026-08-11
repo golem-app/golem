@@ -19,6 +19,11 @@ class ProgressTrack extends StatelessWidget {
   Widget build(BuildContext context) => ClipRRect(
     borderRadius: BorderRadius.circular(height / 2),
     child: SizedBox(
+      // The groove spans whatever it is given. Without an explicit width the
+      // track shrink-wraps the fill, so in a centre-aligned parent — the
+      // splash, the setup banner — the *whole bar* was value-wide and centred,
+      // growing outward from the middle in both directions as it progressed.
+      width: double.infinity,
       height: height,
       child: Stack(
         children: [

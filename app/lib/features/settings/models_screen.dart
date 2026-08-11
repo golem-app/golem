@@ -772,12 +772,18 @@ class _ModelCard extends ConsumerWidget {
     final statusLabel = _statusLabel(suffix);
     final chats = ref.watch(chatControllerProvider).value?.conversations;
     final backend = ref.watch(inferenceBackendProvider);
+    // Attribution comes from the shared helper, not a local fallback: the
+    // picker quotes the same numbers, and a different default had one surface
+    // showing a rate the other did not (#79).
     final measured = chats == null
         ? null
         : measuredTokensPerSecond(
             chats,
             modelKey: entry.key,
-            defaultModelKey: backend.artifactKey ?? 'gemma4-mlx',
+            defaultModelKey: defaultMeasuredModelKey(
+              backend,
+              ref.watch(modelControllerProvider).value,
+            ),
           );
     return GolemCard(
       child: Column(
@@ -1022,7 +1028,9 @@ class _ModelCard extends ConsumerWidget {
   ) => showGolemAlert(
     context: context,
     dialogKey: const Key('model-delete-dialog'),
-    title: 'Delete ${entry.displayName}?',
+    // Display names no longer carry a quantization, so two artifacts of one
+    // family share one (#79). A destructive dialog must still say which.
+    title: 'Delete ${entry.displayName} · ${engineFormat(entry.engine)}?',
     message:
         'Removes ${gigabytes(entry.totalBytes)} from this device. '
         'The model can be downloaded again later.',

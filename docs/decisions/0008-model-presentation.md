@@ -56,9 +56,24 @@ The reason is the user-facing half of that classification:
 | Situation | Sentence |
 | --- | --- |
 | preferred tier | This phone has the memory for the larger model. |
-| light tier | Sized to fit this phone's memory. |
+| light tier, memory read | Sized to fit this phone's memory. |
+| light tier, memory unreadable | The lighter model, picked because this phone's memory could not be read. |
+| artifact fixed by a dart-define | This build's default model. |
 | simulated backend | This build's default model. |
-| refused device | *no badge at all* |
+| refused device, or an operator sideload | *no badge at all* |
+
+The light tier is reached two ways — a small phone, and a probe that answered
+nothing (ADR 0007: unknown is not a refusal) — so `DeviceEligibility` carries
+`memoryKnown` and the second case says so rather than claiming a measurement.
+An explicit `GOLEM_MODEL_ARTIFACT` or `GOLEM_MODEL_PROFILE` bypasses the device
+policy entirely, so no memory sentence is offered there either: the tier
+explains the choice only when the choice is the one the tier makes.
+
+Which artifacts a device may have at all is not decided here. That is
+`core/domain/model_admission.dart`, the policy first run already consulted
+(#26) — asked rather than restated, because when the two surfaces each answered
+for themselves they disagreed, and the picker offered a light-tier phone the
+larger model that onboarding had just refused it.
 
 A simulated build never probed a phone, so it claims nothing about one; it
 falls back to the state's active artifact and says only that this is the

@@ -38,6 +38,39 @@ void main() {
     expect(fill.height, 6, reason: 'a zero-height fill is an invisible one');
   });
 
+  testWidgets('the groove spans its parent even when the parent centres', (
+    tester,
+  ) async {
+    // The splash and the setup banner put the track in a centre-aligned
+    // Column. With no width of its own it shrink-wrapped the fill, so the bar
+    // itself was value-wide and centred and appeared to grow outward from the
+    // middle in both directions.
+    await tester.pumpWidget(
+      CupertinoApp(
+        home: Center(
+          child: SizedBox(
+            width: 200,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                ProgressTrack(
+                  value: 0.25,
+                  trackColor: GolemTheme.divider,
+                  fillColor: GolemTheme.accent,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    final track = tester.getRect(find.byType(ClipRRect));
+    expect(track.width, 200);
+    final fill = tester.getRect(find.byType(FractionallySizedBox));
+    expect(fill.left, track.left);
+    expect(fill.width, closeTo(50, 0.01));
+  });
+
   testWidgets('the fill grows from the leading edge, not the middle', (
     tester,
   ) async {

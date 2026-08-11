@@ -20,6 +20,7 @@ import '../../core/domain/byte_format.dart';
 import '../../core/domain/device_eligibility.dart';
 import '../../core/domain/inference_backend.dart';
 import '../../core/domain/model_activation.dart';
+import '../../core/domain/model_admission.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
@@ -81,6 +82,10 @@ enum ModelBlock {
   /// This device is admitted to no model at all (#27).
   deviceRefused,
 
+  /// Admitted, but not to this artifact: the launch classification sized this
+  /// build for a lighter one, and first run refuses it for the same reason.
+  needsMoreMemory,
+
   /// The build pins an operator-supplied file, so there is nothing to switch to.
   sideload,
 }
@@ -93,6 +98,7 @@ final class ModelChoice {
     required this.detail,
     required this.selected,
     required this.selectable,
+    this.needsConsent = false,
     this.summary,
     this.artifactLine,
     this.recommendation,
@@ -129,6 +135,11 @@ final class ModelChoice {
   /// Why this is the model the build would pick. Non-null on exactly one row,
   /// and only where something actually picked it.
   final String? recommendation;
+
+  /// Whether starting this row's transfer is a *fresh* multi-gigabyte fetch,
+  /// which every entrance in the app gates behind explicit consent (#26). A
+  /// resume or a retry continues one the user already approved.
+  final bool needsConsent;
 
   final bool selected;
   final bool selectable;
@@ -168,6 +179,7 @@ final class ModelPickerView {
 /// read only for the tier that explains the recommendation.
 ModelPickerView buildModelPickerView({
   required List<ModelCatalogEntry> catalog,
+  required Set<String> downloadableKeys,
   required InferenceBackendConfig backend,
   required ModelState? models,
   required Set<String> loadableKeys,
@@ -203,30 +215,54 @@ ModelPickerView buildModelPickerView({
   // first thing a user reads.
   final visible = [...usable, ...foreign];
 
+  // One pass over the history for the whole sheet rather than one per row:
+  // measuredTokensPerSecond walks every conversation and every message, and
+  // this widget rebuilds on each download-progress snapshot.
+  final speeds = measuredTokensPerSecondByModel(
+    conversations,
+    defaultModelKey: defaultMeasuredModelKey(backend, models),
+  );
+
   final duplicated = <String>{};
   final seen = <String>{};
   for (final entry in visible) {
     if (!seen.add(entry.displayName)) duplicated.add(entry.displayName);
   }
 
-  // The build's own resolved artifact, never a second reading of the 7 GiB
-  // rule: the badge and the model that actually loads must agree by
-  // construction (broker/backend_policy.dart). Two builds recommend nothing —
-  // a refused device, which has no model to be recommended, and a sideload,
-  // which still carries an artifactKey the policy derived but will load a
-  // pinned file instead. Badging that row would name a catalog artifact the
-  // build never touches, which `InferenceBackendConfig.sideloaded` exists to
-  // prevent.
+  // Admission is asked, not restated: the same policy first run consults
+  // decides which artifacts this device may have and which one it recommends,
+  // so the two surfaces cannot reach opposite verdicts on one phone (#26/#79).
+  final admission = {
+    for (final option in modelAdmissionOptions(
+      catalog: catalog,
+      backend: backend,
+      eligibility: eligibility,
+    ))
+      option.entry.key: option,
+  };
+
+  // A sideload recommends nothing: the policy still derives an artifactKey,
+  // but the build loads a pinned file instead, and badging a catalog row would
+  // name an artifact it never touches.
   final recommendedKey = deviceRefusal != null || backend.sideloaded
       ? null
-      : backend.artifactKey ?? models?.activeArtifactKey;
+      : admission.values
+                .where((option) => option.recommended)
+                .firstOrNull
+                ?.entry
+                .key ??
+            models?.activeArtifactKey;
   final recommendation = _recommendationReason(
     simulated: simulated,
     tier: eligibility.tier,
     memoryKnown: eligibility.memoryKnown,
+    recommendedKey: recommendedKey,
   );
 
-  final transferring = models == null ? null : _keyInFlight(models, catalog);
+  // Over the visible rows, not the catalog: a transfer on a row this sheet
+  // does not list would otherwise withhold every Download button on screen and
+  // blame a model the user cannot see.
+  final transferring = models == null ? null : _keyInFlight(models, visible);
 
   final choices = [
     for (final entry in visible)
@@ -235,7 +271,7 @@ ModelPickerView buildModelPickerView({
         backend: backend,
         models: models,
         loadableKeys: loadableKeys,
-        conversations: conversations,
+        speeds: speeds,
         deviceRefusal: deviceRefusal,
         advanced: advanced,
         selectedKey: selectedKey,
@@ -243,6 +279,8 @@ ModelPickerView buildModelPickerView({
         recommendation: entry.key == recommendedKey ? recommendation : null,
         transferringKey: transferring,
         simulatedTransfers: models?.simulated ?? simulated,
+        admission: admission[entry.key],
+        downloadable: downloadableKeys.contains(entry.key),
       ),
   ];
 
@@ -251,9 +289,10 @@ ModelPickerView buildModelPickerView({
     hiddenCount: hidden,
     hiddenNote: hidden == 0
         ? null
-        : '$hidden ${hidden == 1 ? 'other model is' : 'other models are'} '
-              'built for a different engine and are not listed. This build '
-              'runs ${engineName(_composedEngine(backend))}.',
+        : '$hidden other '
+              '${hidden == 1 ? 'model is' : 'models are'} built for a '
+              'different engine and ${hidden == 1 ? 'is' : 'are'} not listed. '
+              'This build runs ${engineName(_composedEngine(backend))}.',
     footnote: _footnote(backend: backend, deviceRefusal: deviceRefusal),
   );
 }
@@ -263,7 +302,6 @@ ModelChoice _choiceFor({
   required InferenceBackendConfig backend,
   required ModelState? models,
   required Set<String> loadableKeys,
-  required List<ChatConversation> conversations,
   required String? deviceRefusal,
   required bool advanced,
   required String? selectedKey,
@@ -271,6 +309,9 @@ ModelChoice _choiceFor({
   required String? recommendation,
   required String? transferringKey,
   required bool simulatedTransfers,
+  required ModelAdmissionOption? admission,
+  required Map<String, double> speeds,
+  required bool downloadable,
 }) {
   final simulated = backend.simulatedInference;
   final status = models?.statusOf(entry.key) ?? const ArtifactStatus();
@@ -287,6 +328,11 @@ ModelChoice _choiceFor({
   // release tightens the floor under models a user already downloaded. Without
   // this, such a row stayed selectable and unexplained beside a footnote saying
   // the device cannot run models (#27, #79).
+  // Admission gates *acquiring* a model, not choosing one already on disk. A
+  // light-tier device is not invited to download the larger artifact — first
+  // run refuses it for the same reason — but an artifact already installed
+  // stays selectable, because stranding weights a user already has helps
+  // nobody and the #62 load preflight is the guard at the moment of load.
   final selectable =
       deviceRefusal == null &&
       (simulated || (!backend.sideloaded && loadableKeys.contains(entry.key)));
@@ -308,6 +354,12 @@ ModelChoice _choiceFor({
       ModelBlock.sideload,
       'Pinned by this build.',
     ),
+    // Not installed, and this device was sized against it: first run refuses
+    // the same artifact for the same reason, in the same words.
+    false
+        when !installed &&
+            admission?.block == ModelAdmissionBlock.needsPreferredTier =>
+      (ModelBlock.needsMoreMemory, admission!.disabledReason!),
     false when installed && !loadsHere => (
       ModelBlock.otherEngine,
       // Plural deliberately: "a MLX" and "an MLX" are both wrong depending on
@@ -343,8 +395,7 @@ ModelChoice _choiceFor({
         : entry.displayName,
     detail: _detailLine(
       entry: entry,
-      backend: backend,
-      conversations: conversations,
+      measured: speeds[entry.key],
       simulated: simulated,
     ),
     // Every pinned entry carries copy by construction, so a missing summary
@@ -361,6 +412,7 @@ ModelChoice _choiceFor({
     // which on a fresh install is not downloaded — ticking that row while it
     // reads "Download it to use it in this chat" is the kind of contradiction
     // this ticket exists to remove. The RECOMMENDED badge still points at it.
+    needsConsent: status.phase == ArtifactPhase.notDownloaded,
     selected: selectable && entry.key == selectedKey,
     selectable: selectable,
     block: blocked.$1,
@@ -374,6 +426,8 @@ ModelChoice _choiceFor({
       sideloaded: backend.sideloaded,
       transferringKey: transferringKey,
       simulatedTransfers: simulatedTransfers,
+      downloadable: downloadable,
+      admitted: admission?.enabled ?? true,
     ),
   );
 }
@@ -392,8 +446,17 @@ ModelTransfer? _transferFor({
   required bool sideloaded,
   required String? transferringKey,
   required bool simulatedTransfers,
+  required bool downloadable,
+  required bool admitted,
 }) {
   if (deviceRefusal != null || sideloaded) return null;
+  // Nothing is offered for an artifact this device is not admitted to: the
+  // shared policy already refused it on the first-run screen.
+  if (!admitted) return null;
+  // A hand-added repository that never resolved has synthesized files and no
+  // real byte count, so the request could not succeed; Settings withholds its
+  // button for the same reason rather than failing on the tap.
+  if (!downloadable) return null;
   // Nothing is offered for an artifact this build could never run, even when a
   // previous build installed it. Its row explains itself and stops there.
   if (!loadsHere && !simulated) return null;
@@ -442,15 +505,9 @@ const _busyNote = 'Another model is downloading.';
 /// canned rate is labeled as such and never claimed of a phone.
 String _detailLine({
   required ModelCatalogEntry entry,
-  required InferenceBackendConfig backend,
-  required List<ChatConversation> conversations,
+  required double? measured,
   required bool simulated,
 }) {
-  final measured = measuredTokensPerSecond(
-    conversations,
-    modelKey: entry.key,
-    defaultModelKey: backend.artifactKey,
-  );
   return [
     gigabytes(entry.totalBytes),
     if (entry.supportsImages) 'reads pictures',
@@ -469,8 +526,18 @@ String _recommendationReason({
   required bool simulated,
   required DeviceTier tier,
   required bool memoryKnown,
+  required String? recommendedKey,
 }) {
   if (simulated) return 'This build’s default model.';
+  // An explicit GOLEM_MODEL_ARTIFACT or GOLEM_MODEL_PROFILE bypasses the
+  // device policy entirely (backend_policy.dart's llama/mlx branches never
+  // read the tier), so a memory sentence there would credit a classification
+  // that played no part. The tier explains the choice only when the choice is
+  // the one the tier makes.
+  final tierFamily = tier == DeviceTier.light ? 'qwen35-2b-' : 'gemma4-';
+  if (recommendedKey == null || !recommendedKey.startsWith(tierFamily)) {
+    return 'This build’s default model.';
+  }
   // The light tier is also where an unreadable memory probe lands (ADR 0007:
   // unknown is not a refusal). Saying it was "sized to fit this phone" there
   // would describe a measurement nothing performed.

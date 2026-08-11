@@ -2,13 +2,16 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/chrome/golem_badge.dart';
 import '../../../core/chrome/golem_button.dart';
 import '../../../core/chrome/golem_sheet.dart';
+import '../../../core/domain/app_preferences.dart';
 import '../../../core/domain/model_activation.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../../../core/widgets/progress_track.dart';
+import '../../onboarding/model_download_consent.dart';
 import '../model_choice.dart';
 
 /// The per-chat model sheet. What each row says, why it is offered or refused,
@@ -38,16 +41,32 @@ final class _ModelPickerContent extends ConsumerWidget {
         .where((item) => item.id == conversationId)
         .firstOrNull
         ?.modelKey;
+    // The same predicate Settings uses: pinned entries and resolved custom
+    // repositories can be fetched, an unresolved one cannot.
+    final pinnedKeys = {
+      for (final entry in ref.watch(modelCatalogEntriesProvider)) entry.key,
+    };
+    final preferences = ref.watch(preferencesControllerProvider).value;
+    final resolvedKeys = {
+      for (final spec in preferences?.customModels ?? const <CustomModelSpec>[])
+        if (spec.resolved != null) spec.key,
+    };
     final view = buildModelPickerView(
       catalog: catalog,
+      downloadableKeys: {
+        for (final entry in catalog)
+          if ((models?.simulated ?? true) ||
+              pinnedKeys.contains(entry.key) ||
+              resolvedKeys.contains(entry.key))
+            entry.key,
+      },
       backend: backend,
       models: models,
       loadableKeys: loadable,
       conversations: chats?.conversations ?? const <ChatConversation>[],
       eligibility: ref.watch(deviceEligibilityProvider),
       deviceRefusal: ref.watch(deviceRefusalProvider),
-      advanced:
-          ref.watch(preferencesControllerProvider).value?.advancedMode ?? false,
+      advanced: preferences?.advancedMode ?? false,
       selectedKey: effectiveModelKey(
         backend: backend,
         catalog: catalog,
@@ -58,83 +77,80 @@ final class _ModelPickerContent extends ConsumerWidget {
     );
 
     final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
-    // The sheet is grown by its content and the enclosing Column offers no
-    // bound of its own, so the ceiling is stated here: past this the list
-    // scrolls instead of running off the screen.
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.8,
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            GolemSpace.gutter,
-            GolemSpace.s4,
-            GolemSpace.gutter,
-            GolemSpace.s3,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Model for this chat',
-                textAlign: TextAlign.center,
-                style: GolemText.cardTitle,
-              ),
-              const SizedBox(height: GolemSpace.s4),
-              // Rows carry four lines and a button now, so the list scrolls
-              // inside the sheet rather than growing it past the screen.
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (final choice in view.choices) ...[
-                        _ModelRow(
-                          choice: choice,
-                          onSelect: choice.selectable
-                              ? () => _select(context, ref, choice.entry.key)
-                              : null,
-                          onTransfer: _transferAction(ref, choice),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          GolemSpace.gutter,
+          GolemSpace.s4,
+          GolemSpace.gutter,
+          GolemSpace.s3,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Model for this chat',
+              textAlign: TextAlign.center,
+              style: GolemText.cardTitle,
+            ),
+            const SizedBox(height: GolemSpace.s4),
+            // Rows carry four lines and a button now, so the list scrolls
+            // inside the sheet rather than growing it past the screen.
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final choice in view.choices) ...[
+                      _ModelRow(
+                        choice: choice,
+                        onSelect: choice.selectable
+                            ? () => _select(context, ref, choice.entry.key)
+                            : null,
+                        onTransfer: _transferAction(
+                          context,
+                          ref,
+                          choice,
+                          models?.simulated ?? true,
                         ),
-                        const SizedBox(height: GolemSpace.s2),
-                      ],
+                      ),
+                      const SizedBox(height: GolemSpace.s2),
                     ],
+                  ],
+                ),
+              ),
+            ),
+            for (final note in [view.hiddenNote, view.footnote])
+              if (note != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: GolemSpace.s1),
+                  child: Text(
+                    note,
+                    style: GolemText.caption.copyWith(color: muted),
+                  ),
+                ),
+            CupertinoButton(
+              key: const Key('model-picker-manage'),
+              padding: EdgeInsets.zero,
+              minimumSize: const Size.fromHeight(GolemSize.hitTarget),
+              alignment: Alignment.centerLeft,
+              onPressed: () {
+                Navigator.pop(context);
+                context.push('/settings');
+              },
+              child: Text(
+                'Manage models',
+                style: GolemText.footnoteStrong.copyWith(
+                  color: CupertinoDynamicColor.resolve(
+                    GolemTheme.accent,
+                    context,
                   ),
                 ),
               ),
-              for (final note in [view.hiddenNote, view.footnote])
-                if (note != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: GolemSpace.s1),
-                    child: Text(
-                      note,
-                      style: GolemText.caption.copyWith(color: muted),
-                    ),
-                  ),
-              CupertinoButton(
-                key: const Key('model-picker-manage'),
-                padding: EdgeInsets.zero,
-                minimumSize: const Size.fromHeight(GolemSize.hitTarget),
-                alignment: Alignment.centerLeft,
-                onPressed: () {
-                  Navigator.pop(context);
-                  context.push('/settings');
-                },
-                child: Text(
-                  'Manage models',
-                  style: GolemText.footnoteStrong.copyWith(
-                    color: CupertinoDynamicColor.resolve(
-                      GolemTheme.accent,
-                      context,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -152,12 +168,34 @@ final class _ModelPickerContent extends ConsumerWidget {
   /// started here reconciles, verifies and resumes exactly as one started there
   /// (#79 adds a second entrance, not a second implementation). The sheet stays
   /// open: progress is the point of starting it from here.
-  VoidCallback? _transferAction(WidgetRef ref, ModelChoice choice) {
+  ///
+  /// A first transfer asks for consent, exactly as Settings, first run, the
+  /// setup banner and the recovery banner do (#26). This sheet is the most
+  /// casual entrance of the five and offers no Cancel, so it is the last place
+  /// that should start gigabytes on a stray tap.
+  VoidCallback? _transferAction(
+    BuildContext context,
+    WidgetRef ref,
+    ModelChoice choice,
+    bool simulated,
+  ) {
     final controller = ref.read(modelControllerProvider.notifier);
+    Future<void> start() async {
+      if (choice.needsConsent) {
+        final approved = await confirmModelDownload(
+          context: context,
+          entry: choice.entry,
+          simulated: simulated,
+        );
+        if (!approved) return;
+      }
+      await controller.download(choice.entry.key);
+    }
+
     return switch (choice.transfer) {
       null => null,
       ModelTransferOffer(:final enabled) when !enabled => null,
-      ModelTransferOffer() => () => controller.download(choice.entry.key),
+      ModelTransferOffer() => start,
       ModelTransferProgress(:final pausable) when pausable =>
         () => controller.pause(choice.entry.key),
       ModelTransferProgress() => null,
@@ -226,7 +264,7 @@ final class _ModelRow extends StatelessWidget {
                             // sharing the line squeezes a long model name into
                             // three wrapped ones.
                             if (choice.recommendation != null) ...[
-                              _Badge(label: 'RECOMMENDED', color: accent),
+                              const GolemBadge(label: 'RECOMMENDED'),
                               const SizedBox(height: 5),
                             ],
                             Text(
@@ -283,14 +321,14 @@ final class _ModelRow extends StatelessWidget {
                 ],
               ),
             ),
-            ..._transfer(context, muted, accent),
+            ..._transfer(muted, accent),
           ],
         ),
       ),
     );
   }
 
-  List<Widget> _transfer(BuildContext context, Color muted, Color accent) =>
+  List<Widget> _transfer(Color muted, Color accent) =>
       switch (choice.transfer) {
         null => const [],
         final ModelTransferProgress progress => [
@@ -351,20 +389,4 @@ final class _ModelRow extends StatelessWidget {
           const SizedBox(height: GolemSpace.s3),
         ],
       };
-}
-
-final class _Badge extends StatelessWidget {
-  const _Badge({required this.label, required this.color});
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    decoration: BoxDecoration(
-      color: CupertinoDynamicColor.resolve(GolemTheme.accentSoft, context),
-      borderRadius: BorderRadius.circular(GolemRadius.badge),
-    ),
-    child: Text(label, style: GolemText.badge.copyWith(color: color)),
-  );
 }

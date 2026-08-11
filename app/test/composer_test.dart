@@ -206,6 +206,13 @@ void main() {
     expect(find.text('Download · 1.58 GB'), findsOneWidget);
     await tester.tap(download);
     await tester.pumpAndSettle();
+    // The sheet is the most casual of the five download entrances and offers
+    // no Cancel, so it asks before it spends gigabytes, exactly as Settings,
+    // first run and both banners do (#26).
+    expect(find.byKey(const Key('model-download-consent')), findsOneWidget);
+    expect(models.calls, isEmpty, reason: 'nothing starts before consent');
+    await tester.tap(find.byKey(const Key('model-download-confirm')));
+    await tester.pumpAndSettle();
     expect(models.calls, ['download:qwen35-2b-gguf']);
     // And the sheet redraws around the transfer it started.
     expect(find.text('Downloading'), findsOneWidget);
