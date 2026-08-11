@@ -71,10 +71,17 @@ class ModelSetupBanner extends ConsumerWidget {
           if (status.phase == ArtifactPhase.downloading ||
               status.phase == ArtifactPhase.paused) ...[
             const SizedBox(height: 10),
-            ProgressTrack(
-              value: progress,
-              trackColor: GolemTheme.divider,
-              fillColor: GolemTheme.accent,
+            // The headline and detail above say what is happening; the bar is
+            // the only thing carrying how far along it is.
+            Semantics(
+              container: true,
+              label: 'Download',
+              value: '${(progress * 100).round()} percent',
+              child: ProgressTrack(
+                value: progress,
+                trackColor: GolemTheme.divider,
+                fillColor: GolemTheme.accent,
+              ),
             ),
           ],
           const SizedBox(height: 10),

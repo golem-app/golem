@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/semantics.dart';
 
 import '../theme/golem_theme.dart';
 import 'golem_chrome.dart';
@@ -20,6 +21,16 @@ void showGolemToast(BuildContext context, String message) {
 
   _dismissTimer?.cancel();
   _currentToast?.remove();
+
+  // The pill is a non-interactive overlay that removes itself after 1.5 s, so
+  // a screen reader would never reach it by exploration. Every confirmation
+  // this carries — copied, deleted, pinned, and the save failures — is only
+  // ever said once, here.
+  SemanticsService.sendAnnouncement(
+    View.of(context),
+    message,
+    Directionality.of(context),
+  );
 
   final entry = OverlayEntry(
     builder: (context) => _GolemToast(message: message),

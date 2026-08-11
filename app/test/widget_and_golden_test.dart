@@ -748,27 +748,77 @@ void main() {
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       await expectLater(tester, meetsGuideline(textContrastGuideline));
     }
+  }, variant: iosChrome);
 
+  // A phone at an accessibility text size is a supported configuration, not an
+  // edge case: the app's own slider reaches 1.3x and the platform's factor
+  // multiplies on top of it. An overflow throws in debug, so a clean pump is
+  // the assertion.
+  testWidgets('every surface survives a 1.6x text scale', (tester) async {
     for (final screen in const <Widget>[
       SettingsScreen(identity: AppIdentity.dev),
       AppearanceScreen(),
       PrivacyScreen(),
       StorageScreen(),
+      ModelsScreen(),
+      SystemPromptScreen(),
+      ResponseStyleScreen(),
+      BenchmarkScreen(),
     ]) {
-      await tester.pumpWidget(
-        MediaQuery(
-          data: const MediaQueryData(
-            size: viewport,
-            textScaler: TextScaler.linear(1.6),
-          ),
-          child: UncontrolledProviderScope(
-            container: buildContainer(),
-            child: wrapApp(child: screen),
-          ),
-        ),
+      await pumpWithRepositories(tester, textScale: 1.6, child: screen);
+      expect(tester.takeException(), isNull, reason: '${screen.runtimeType}');
+    }
+
+    // Chat carries the densest rows in the app — the composer's power strip,
+    // the metrics pills, and a code card that cannot wrap.
+    for (final (name, history) in <(String, ChatHistorySnapshot?)>[
+      ('empty', null),
+      ('seeded', seedHistory()),
+      ('markdown', markdownHistory()),
+    ]) {
+      await pumpWithRepositories(
+        tester,
+        textScale: 1.6,
+        history: history,
+        child: const ChatScreen(),
       );
+      expect(tester.takeException(), isNull, reason: 'chat: $name');
+    }
+
+    await pumpWithRepositories(
+      tester,
+      textScale: 1.6,
+      history: seedHistory(),
+      child: const ChatScreen(),
+    );
+    await tester.tap(find.byKey(const Key('open-drawer')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull, reason: 'drawer');
+
+    // The sheets size themselves to their content, so they are the surfaces
+    // most likely to run out of room; each is opened rather than pumped.
+    // pumpWidget reuses the element tree, so both halves of the state have to
+    // be reset by hand: the key gives each pass a chat with the drawer shut,
+    // and the pop clears the route a standing sheet would otherwise leave over
+    // the next iteration's tap. Each sheet is found by key so a pass that
+    // opened nothing fails instead of asserting nothing.
+    const sheets = <(Key, Key)>[
+      (Key('composer-model-chip'), Key('model-picker-sheet')),
+      (Key('composer-attach'), Key('attach-sheet')),
+    ];
+    for (final (opener, sheet) in sheets) {
+      await pumpWithRepositories(
+        tester,
+        textScale: 1.6,
+        history: seedHistory(),
+        child: ChatScreen(key: ValueKey(opener)),
+      );
+      await tester.tap(find.byKey(opener));
       await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
+      expect(find.byKey(sheet), findsOneWidget, reason: '$opener opened');
+      expect(tester.takeException(), isNull, reason: '$opener');
+      Navigator.of(tester.element(find.byKey(sheet))).pop();
+      await tester.pumpAndSettle();
     }
   }, variant: iosChrome);
 
@@ -955,16 +1005,15 @@ void main() {
     expect(find.textContaining('simulated'), findsNothing);
   }, variant: iosChrome);
 
-  testWidgets('the disabled composer keeps a transparent field', (
-    tester,
-  ) async {
+  testWidgets('a busy composer is read-only, never disabled', (tester) async {
     final controller = TextEditingController();
     final focus = FocusNode();
     addTearDown(controller.dispose);
     addTearDown(focus.dispose);
-    // Every non-idle phase disables the field, so each one would repaint
-    // Flutter's built-in near-black fill over the Glass pill without the
-    // explicit empty decoration (issue #34).
+    // A disabled borderless field repaints Flutter's built-in near-black fill
+    // over the card (issue #34) and announces itself as disabled to a screen
+    // reader (issue #28). Read-only blocks input without doing either, so
+    // every non-idle phase must reach for it instead.
     for (final phase in GenerationPhase.values) {
       if (phase == GenerationPhase.idle) continue;
       await tester.pumpWidget(
@@ -988,9 +1037,8 @@ void main() {
       final field = tester.widget<CupertinoTextField>(
         find.byKey(const Key('chat-composer')),
       );
-      expect(field.enabled, isFalse, reason: phase.name);
-      expect(field.decoration, isNotNull, reason: phase.name);
-      expect(field.decoration!.color, isNull, reason: phase.name);
+      expect(field.enabled, isTrue, reason: phase.name);
+      expect(field.readOnly, isTrue, reason: phase.name);
     }
   }, variant: iosChrome);
 

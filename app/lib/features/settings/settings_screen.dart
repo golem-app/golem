@@ -113,58 +113,61 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 24),
             SettingsCard(
               children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text('Advanced mode', style: GolemText.body),
-                          ),
-                          MergeSemantics(
-                            child: Semantics(
-                              label: 'Advanced mode',
-                              child: SizedBox(
-                                height: GolemSize.hitTarget,
-                                child: Center(
-                                  child: CupertinoSwitch(
-                                    key: const Key('advanced-mode-switch'),
-                                    value: preferences.advancedMode,
-                                    activeTrackColor:
-                                        CupertinoDynamicColor.resolve(
-                                          GolemTheme.accent,
-                                          context,
-                                        ),
-                                    onChanged: (value) => announceFailedSave(
-                                      context,
-                                      ref
-                                          .read(
-                                            preferencesControllerProvider
-                                                .notifier,
-                                          )
-                                          .setAdvancedMode(value),
-                                    ),
+                // One control, like every SettingsToggleRow: split up, the
+                // label reads twice and the footnote lands on the card's
+                // node, which neither screen reader stops on.
+                MergeSemantics(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Advanced mode',
+                                style: GolemText.body,
+                              ),
+                            ),
+                            SizedBox(
+                              height: GolemSize.hitTarget,
+                              child: Center(
+                                child: CupertinoSwitch(
+                                  key: const Key('advanced-mode-switch'),
+                                  value: preferences.advancedMode,
+                                  activeTrackColor:
+                                      CupertinoDynamicColor.resolve(
+                                        GolemTheme.accent,
+                                        context,
+                                      ),
+                                  onChanged: (value) => announceFailedSave(
+                                    context,
+                                    ref
+                                        .read(
+                                          preferencesControllerProvider
+                                              .notifier,
+                                        )
+                                        .setAdvancedMode(value),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Sampling controls, a custom system prompt, and '
-                        'loading any Hugging Face repository by hand.',
-                        style: GolemText.footnote.copyWith(
-                          color: CupertinoDynamicColor.resolve(
-                            GolemTheme.mutedInk,
-                            context,
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Sampling controls, a custom system prompt, and '
+                          'loading any Hugging Face repository by hand.',
+                          style: GolemText.footnote.copyWith(
+                            color: CupertinoDynamicColor.resolve(
+                              GolemTheme.mutedInk,
+                              context,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],

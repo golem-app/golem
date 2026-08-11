@@ -420,64 +420,83 @@ class _ReasoningCardState extends State<_ReasoningCard> {
   }
 
   @override
-  Widget build(BuildContext context) => Container(
-    key: const Key('reasoning-card'),
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: CupertinoDynamicColor.resolve(
-        GolemTheme.reasoningSurface,
-        context,
-      ),
-      borderRadius: BorderRadius.circular(GolemRadius.notice),
-      border: Border.all(
+  Widget build(BuildContext context) => Semantics(
+    // Its own node, or the whole card — header, thoughts, and the answer
+    // below it — collapses into the bubble's long-press node as one
+    // unreadable run.
+    container: true,
+    child: Container(
+      key: const Key('reasoning-card'),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
         color: CupertinoDynamicColor.resolve(
-          GolemTheme.reasoningBorder,
+          GolemTheme.reasoningSurface,
           context,
         ),
-      ),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => setState(() => _userToggle = !_expanded),
-          child: Row(
-            children: [
-              const Icon(
-                CupertinoIcons.lightbulb_fill,
-                color: GolemTheme.amber,
-                size: 16,
-              ),
-              const SizedBox(width: 7),
-              Expanded(
-                child: Text(
-                  widget.streaming ? 'Reasoning · LIVE' : 'Reasoning',
-                  style: GolemText.footnoteStrong,
-                ),
-              ),
-              Icon(
-                _expanded
-                    ? CupertinoIcons.chevron_up
-                    : CupertinoIcons.chevron_down,
-                size: 14,
-                semanticLabel: _expanded
-                    ? 'Collapse reasoning'
-                    : 'Expand reasoning',
-                color: CupertinoDynamicColor.resolve(
-                  GolemTheme.mutedInk,
-                  context,
-                ),
-              ),
-            ],
+        borderRadius: BorderRadius.circular(GolemRadius.notice),
+        border: Border.all(
+          color: CupertinoDynamicColor.resolve(
+            GolemTheme.reasoningBorder,
+            context,
           ),
         ),
-        if (_expanded) ...[
-          const SizedBox(height: 8),
-          Text(widget.text, style: GolemText.footnote),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // The disclosure is the row, not the chevron: labelling the glyph
+          // alone left the control itself nameless, and its state readable
+          // only as whichever arrow happened to be drawn.
+          Semantics(
+            key: const Key('reasoning-card-header'),
+            container: true,
+            button: true,
+            label: widget.streaming ? 'Reasoning, live' : 'Reasoning',
+            value: _expanded ? 'Expanded' : 'Collapsed',
+            onTap: () => setState(() => _userToggle = !_expanded),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              // The wrapper above owns the tap action; left in, this detector
+              // adds a second, nameless tappable node over the same row.
+              excludeFromSemantics: true,
+              onTap: () => setState(() => _userToggle = !_expanded),
+              child: ExcludeSemantics(
+                child: Row(
+                  children: [
+                    const Icon(
+                      CupertinoIcons.lightbulb_fill,
+                      color: GolemTheme.amber,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: Text(
+                        widget.streaming ? 'Reasoning · LIVE' : 'Reasoning',
+                        style: GolemText.footnoteStrong,
+                      ),
+                    ),
+                    Icon(
+                      _expanded
+                          ? CupertinoIcons.chevron_up
+                          : CupertinoIcons.chevron_down,
+                      size: 14,
+                      color: CupertinoDynamicColor.resolve(
+                        GolemTheme.mutedInk,
+                        context,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (_expanded) ...[
+            const SizedBox(height: 8),
+            Text(widget.text, style: GolemText.footnote),
+          ],
         ],
-      ],
+      ),
     ),
   );
 }
@@ -572,17 +591,19 @@ class _MetricsPill extends StatelessWidget {
   );
 }
 
-/// Images are announced by count so a screen reader says a picture is present
-/// instead of skipping it.
+/// Who is speaking, and whether a picture is present — prefixed onto the
+/// bubble's own rendered text rather than restating it. Repeating the message
+/// here read every answer twice, once from this label and once from the
+/// Text below it.
 String _semanticLabel(ChatMessage message, {required bool isUser}) {
   final speaker = isUser ? 'You' : 'Golem';
   final images = message.images.length;
   final picture = switch (images) {
     0 => '',
-    1 => '1 image. ',
-    _ => '$images images. ',
+    1 => ' 1 image.',
+    _ => ' $images images.',
   };
-  return '$speaker: $picture${message.text}';
+  return '$speaker:$picture';
 }
 
 /// A message can outlive its bytes if the OS trims the container, so a missing

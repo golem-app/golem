@@ -158,14 +158,19 @@ class EmptyChat extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              Text(
-                                starter.label,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  height: 1.3,
-                                  color: CupertinoDynamicColor.resolve(
-                                    GolemTheme.ink,
-                                    context,
+                              // At an accessibility text size a chip's label
+                              // outgrows the row it sits in; wrapping inside
+                              // the pill beats spilling out of it.
+                              Flexible(
+                                child: Text(
+                                  starter.label,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    height: 1.3,
+                                    color: CupertinoDynamicColor.resolve(
+                                      GolemTheme.ink,
+                                      context,
+                                    ),
                                   ),
                                 ),
                               ),
