@@ -7,6 +7,11 @@ import '../domain/models.dart';
 
 abstract interface class ChatHistoryRepository {
   Future<ChatHistorySnapshot> load();
+
+  /// Completes only after [snapshot] has been committed. Operational write
+  /// failures surface as [PersistenceException] with
+  /// [PersistenceFailureKind.write]; the session owner decides whether its
+  /// live state rolls back or remains authoritative.
   Future<void> save(ChatHistorySnapshot snapshot);
 
   /// Bytes on disk (0 when nothing is stored), for the Storage breakdown.
@@ -14,8 +19,9 @@ abstract interface class ChatHistoryRepository {
 }
 
 /// Which side of a store operation failed, deciding the recovery affordance:
-/// a [read] failure invalidates what a screen shows, a [write] failure means
-/// the presented state was rolled back and the change can simply be retried.
+/// a [read] failure invalidates what a screen shows, while a [write] failure
+/// means the durable snapshot did not advance. The owning controller decides
+/// whether presentation rolls back or keeps recoverable live state.
 enum PersistenceFailureKind { read, write }
 
 /// An unexpected I/O failure at a persistence boundary — permissions, a full

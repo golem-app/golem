@@ -48,6 +48,12 @@ final class ChatFailure {
   int get hashCode => Object.hash(kind, message, artifactKey);
 }
 
+/// Whether the live chat session has a known durability problem. This state is
+/// deliberately orthogonal to [ChatFailure]: retrying a history write must not
+/// modify an inference turn, and inference recovery must not hide an unsaved
+/// session.
+enum ChatPersistencePhase { idle, failed, retrying }
+
 // Deliberately identity-equal: the controller reassigns this state on every
 // streaming token, so a deep compare in updateShouldNotify would cost
 // O(messages × text) per token and suppress nothing — consecutive token
@@ -58,6 +64,7 @@ final class ChatState {
     this.activeId,
     this.generation = GenerationPhase.idle,
     this.failure,
+    this.persistencePhase = ChatPersistencePhase.idle,
     this.hasUnsavedAssistant = false,
   });
 
@@ -65,6 +72,7 @@ final class ChatState {
   final String? activeId;
   final GenerationPhase generation;
   final ChatFailure? failure;
+  final ChatPersistencePhase persistencePhase;
 
   final bool hasUnsavedAssistant;
 
@@ -82,12 +90,14 @@ final class ChatState {
     GenerationPhase? generation,
     ChatFailure? failure,
     bool clearFailure = false,
+    ChatPersistencePhase? persistencePhase,
     bool? hasUnsavedAssistant,
   }) => ChatState(
     conversations: conversations ?? _conversations,
     activeId: activeId ?? this.activeId,
     generation: generation ?? this.generation,
     failure: clearFailure ? null : failure ?? this.failure,
+    persistencePhase: persistencePhase ?? this.persistencePhase,
     hasUnsavedAssistant: hasUnsavedAssistant ?? this.hasUnsavedAssistant,
   );
 }

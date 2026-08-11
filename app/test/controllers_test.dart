@@ -22,6 +22,7 @@ import 'package:golem_flutter/core/services/cache_probe.dart';
 import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
 import 'support/in_memory_settings_repository.dart';
+import 'support/scripted_chat_history_repository.dart';
 
 Future<String> _fixtureAsset(String key) async =>
     '[{"role": "user", "content": "${'x' * 400}"}]';
@@ -357,6 +358,250 @@ void main() {
     unawaited(controller.send('dispose while streaming'));
     container.dispose();
     await Future<void>.delayed(const Duration(milliseconds: 20));
+  });
+
+  group('chat persistence recovery', () {
+    ProviderContainer persistenceContainer(
+      ChatHistoryRepository history, {
+      InMemoryPreferencesRepository? preferences,
+      Duration inferenceDelay = Duration.zero,
+    }) {
+      final container = ProviderContainer(
+        overrides: [
+          chatHistoryRepositoryProvider.overrideWithValue(history),
+          preferencesRepositoryProvider.overrideWithValue(
+            preferences ?? InMemoryPreferencesRepository(),
+          ),
+          inferenceRepositoryProvider.overrideWithValue(
+            FakeInferenceRepository(eventDelay: inferenceDelay),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    test('save failures keep the turn and do not block generation', () async {
+      final history = InMemoryChatHistoryRepository()..failingSaves = 3;
+      final container = persistenceContainer(history);
+      await container.read(chatControllerProvider.future);
+
+      await container.read(chatControllerProvider.notifier).send('Keep me');
+
+      final chat = container.read(chatControllerProvider).requireValue;
+      expect(chat.active!.messages.map((message) => message.role), [
+        MessageRole.user,
+        MessageRole.assistant,
+      ]);
+      expect(chat.generation, GenerationPhase.idle);
+      expect(chat.persistencePhase, ChatPersistencePhase.failed);
+      expect(history.saveCalls, 3);
+      expect(history.snapshot.conversations, isEmpty);
+    });
+
+    test('only the latest overlapping completion changes status', () async {
+      final newerSuccess = ScriptedChatHistoryRepository();
+      final firstContainer = persistenceContainer(newerSuccess);
+      await firstContainer.read(chatControllerProvider.future);
+      final firstController = firstContainer.read(
+        chatControllerProvider.notifier,
+      );
+
+      final oldFailure = firstController.newChat();
+      final id = firstContainer
+          .read(chatControllerProvider)
+          .requireValue
+          .active!
+          .id;
+      final latestSuccess = firstController.renameConversation(id, 'Latest');
+      expect(newerSuccess.saves, hasLength(2));
+
+      newerSuccess.saves[1].succeed();
+      await latestSuccess;
+      newerSuccess.saves[0].fail();
+      await oldFailure;
+      expect(
+        firstContainer
+            .read(chatControllerProvider)
+            .requireValue
+            .persistencePhase,
+        ChatPersistencePhase.idle,
+      );
+
+      final newerFailure = ScriptedChatHistoryRepository();
+      final secondContainer = persistenceContainer(newerFailure);
+      await secondContainer.read(chatControllerProvider.future);
+      final secondController = secondContainer.read(
+        chatControllerProvider.notifier,
+      );
+      final oldSuccess = secondController.newChat();
+      final secondId = secondContainer
+          .read(chatControllerProvider)
+          .requireValue
+          .active!
+          .id;
+      final latestFailure = secondController.renameConversation(
+        secondId,
+        'Newest',
+      );
+      expect(newerFailure.saves, hasLength(2));
+
+      newerFailure.saves[1].fail();
+      await latestFailure;
+      newerFailure.saves[0].succeed();
+      await oldSuccess;
+      expect(
+        secondContainer
+            .read(chatControllerProvider)
+            .requireValue
+            .persistencePhase,
+        ChatPersistencePhase.failed,
+      );
+    });
+
+    test('retry commits the latest live snapshot and clears status', () async {
+      final history = InMemoryChatHistoryRepository()..failingSaves = 2;
+      final container = persistenceContainer(history);
+      await container.read(chatControllerProvider.future);
+      final controller = container.read(chatControllerProvider.notifier);
+
+      await controller.newChat();
+      final id = container.read(chatControllerProvider).requireValue.active!.id;
+      await controller.renameConversation(id, 'Latest title');
+      expect(
+        container.read(chatControllerProvider).requireValue.persistencePhase,
+        ChatPersistencePhase.failed,
+      );
+
+      await controller.retryPersistence();
+
+      expect(history.snapshot.conversations.single.title, 'Latest title');
+      expect(
+        container.read(chatControllerProvider).requireValue.persistencePhase,
+        ChatPersistencePhase.idle,
+      );
+    });
+
+    test('history off stays silent and re-enable failure is visible', () async {
+      final history = InMemoryChatHistoryRepository();
+      final preferences = InMemoryPreferencesRepository(
+        const AppPreferences(saveHistory: false),
+      );
+      final container = persistenceContainer(history, preferences: preferences);
+      await container.read(chatControllerProvider.future);
+      await container.read(preferencesControllerProvider.future);
+
+      await container.read(chatControllerProvider.notifier).send('Memory only');
+      expect(history.saveCalls, 0);
+      expect(
+        container.read(chatControllerProvider).requireValue.persistencePhase,
+        ChatPersistencePhase.idle,
+      );
+
+      history.failingSaves = 1;
+      expect(
+        await container
+            .read(preferencesControllerProvider.notifier)
+            .setSaveHistory(true),
+        isTrue,
+      );
+      expect(history.saveCalls, 1);
+      expect(
+        container.read(chatControllerProvider).requireValue.persistencePhase,
+        ChatPersistencePhase.failed,
+      );
+    });
+
+    test('fire-and-forget Stop contains a typed write failure', () async {
+      final uncaught = <Object>[];
+      await runZonedGuarded(() async {
+        final history = InMemoryChatHistoryRepository();
+        final container = persistenceContainer(
+          history,
+          inferenceDelay: const Duration(milliseconds: 20),
+        );
+        await container.read(chatControllerProvider.future);
+        final controller = container.read(chatControllerProvider.notifier);
+        final send = controller.send('Stop this');
+
+        while (container.read(chatControllerProvider).requireValue.generation ==
+            GenerationPhase.idle) {
+          await Future<void>.delayed(const Duration(milliseconds: 1));
+        }
+        history.failingSaves = 1;
+        controller.stop();
+        await send;
+        await Future<void>.delayed(Duration.zero);
+
+        expect(
+          container.read(chatControllerProvider).requireValue.persistencePhase,
+          ChatPersistencePhase.failed,
+        );
+      }, (error, stackTrace) => uncaught.add(error));
+      expect(uncaught, isEmpty);
+    });
+
+    test('failed delete-all lets an in-flight retry settle status', () async {
+      final history = ScriptedChatHistoryRepository();
+      final container = persistenceContainer(history);
+      await container.read(chatControllerProvider.future);
+      final controller = container.read(chatControllerProvider.notifier);
+
+      final initialSave = controller.newChat();
+      history.saves.single.fail();
+      await initialSave;
+      expect(
+        container.read(chatControllerProvider).requireValue.persistencePhase,
+        ChatPersistencePhase.failed,
+      );
+
+      final retry = controller.retryPersistence();
+      expect(history.saves, hasLength(2));
+      expect(
+        container.read(chatControllerProvider).requireValue.persistencePhase,
+        ChatPersistencePhase.retrying,
+      );
+      final delete = controller.deleteAllChats();
+      expect(history.saves, hasLength(3));
+      history.saves[2].fail();
+      expect(await delete, isFalse);
+
+      history.saves[1].fail();
+      await retry;
+      expect(
+        container.read(chatControllerProvider).requireValue.persistencePhase,
+        ChatPersistencePhase.failed,
+      );
+      expect(
+        container.read(chatControllerProvider).requireValue.conversations,
+        isNotEmpty,
+      );
+    });
+
+    test('failed delete-all does not hide an in-flight save failure', () async {
+      final history = ScriptedChatHistoryRepository();
+      final container = persistenceContainer(history);
+      await container.read(chatControllerProvider.future);
+      final controller = container.read(chatControllerProvider.notifier);
+
+      final save = controller.newChat();
+      expect(history.saves, hasLength(1));
+      final delete = controller.deleteAllChats();
+      expect(history.saves, hasLength(2));
+      history.saves[1].fail();
+      expect(await delete, isFalse);
+
+      history.saves[0].fail();
+      await save;
+      expect(
+        container.read(chatControllerProvider).requireValue.persistencePhase,
+        ChatPersistencePhase.failed,
+      );
+      expect(
+        container.read(chatControllerProvider).requireValue.conversations,
+        isNotEmpty,
+      );
+    });
   });
 
   test('benchmark controller cancellation prevents stale result', () async {

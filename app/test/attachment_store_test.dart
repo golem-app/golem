@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
+import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
@@ -185,6 +186,53 @@ void main() {
       expect(await attachments.read(kept.id), isNotNull);
       expect(await attachments.read(dropped.id), isNull);
     });
+
+    test(
+      'failed conversation save keeps bytes until retry commits deletion',
+      () async {
+        final attachments = InMemoryAttachmentRepository();
+        final stored = await attachments.store(const [
+          1,
+          2,
+          3,
+        ], mimeType: 'image/jpeg');
+        final history = InMemoryChatHistoryRepository(historyWith([stored.id]))
+          ..failingSaves = 1;
+        final container = ProviderContainer(
+          overrides: [
+            chatHistoryRepositoryProvider.overrideWithValue(history),
+            attachmentRepositoryProvider.overrideWithValue(attachments),
+            preferencesRepositoryProvider.overrideWithValue(
+              InMemoryPreferencesRepository(),
+            ),
+            inferenceRepositoryProvider.overrideWithValue(
+              FakeInferenceRepository(eventDelay: Duration.zero),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+        await container.read(chatControllerProvider.future);
+
+        final controller = container.read(chatControllerProvider.notifier);
+        await controller.deleteConversation('chat');
+
+        expect(
+          container.read(chatControllerProvider).requireValue.conversations,
+          isEmpty,
+        );
+        expect(history.snapshot.conversations, isNotEmpty);
+        expect(await attachments.read(stored.id), isNotNull);
+        expect(
+          container.read(chatControllerProvider).requireValue.persistencePhase,
+          ChatPersistencePhase.failed,
+        );
+
+        await controller.retryPersistence();
+
+        expect(history.snapshot.conversations, isEmpty);
+        expect(await attachments.read(stored.id), isNull);
+      },
+    );
 
     test('editing a message keeps its pictures', () async {
       final attachments = InMemoryAttachmentRepository();

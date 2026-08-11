@@ -11,6 +11,7 @@ import 'attach_sheet.dart';
 import 'composer.dart';
 import 'empty_chat.dart';
 import 'message_bubble.dart';
+import 'persistence_recovery_banner.dart';
 import 'recovery_banner.dart';
 
 class ChatCanvas extends ConsumerWidget {
@@ -124,6 +125,8 @@ class ChatCanvas extends ConsumerWidget {
             ],
           ),
         ),
+        if (chat.persistencePhase != ChatPersistencePhase.idle)
+          PersistenceRecoveryBanner(phase: chat.persistencePhase),
         if (chat.failure != null)
           RecoveryBanner(failure: chat.failure!)
         // The empty state carries this copy until the first message; once a
