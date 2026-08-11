@@ -454,11 +454,30 @@ final class NativeInfernoBackend implements InfernoBackend {
   int _nextOperationId = 1;
 
   @override
-  Future<InfernoDeviceProbe> probe() async {
+  Future<InfernoDeviceProbe> probe() async => _describe(_llamaApi);
+
+  /// Engine availability without a backend instance. The native probe is a
+  /// free function, while constructing a [NativeInfernoBackend] registers an
+  /// event listener that keeps the isolate alive until it is disposed — too
+  /// much machinery for a caller that only wants to know what this device can
+  /// run. Callers that already hold a backend use [probe] instead.
+  static Future<InfernoDeviceProbe> probeDevice() {
+    final llama = _LlamaNativeApi();
+    final version = llama.abiVersion();
+    if (version != infernoAbiVersion) {
+      throw InfernoException(
+        InfernoErrorCode.nativeUnavailable,
+        'Unsupported native ABI $version (expected $infernoAbiVersion).',
+      );
+    }
+    return _describe(llama);
+  }
+
+  static Future<InfernoDeviceProbe> _describe(_NativeApi llama) async {
     final results = <InfernoEngineProbe>[];
     String? operatingSystem;
     for (final api in [
-      _llamaApi,
+      llama,
       if (Platform.isIOS || Platform.isMacOS) _MlxNativeApi(),
     ]) {
       final decoded = _probe(api);
@@ -471,7 +490,7 @@ final class NativeInfernoBackend implements InfernoBackend {
     );
   }
 
-  (String, List<InfernoEngineProbe>) _probe(_NativeApi api) {
+  static (String, List<InfernoEngineProbe>) _probe(_NativeApi api) {
     final pointer = api.probe();
     if (pointer == nullptr) {
       throw const InfernoException(

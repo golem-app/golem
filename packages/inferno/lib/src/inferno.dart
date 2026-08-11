@@ -21,6 +21,14 @@ final class Inferno {
 
   Future<InfernoDeviceProbe> probe() => _backend.probe();
 
+  /// What this device can run, answered without constructing a runtime — the
+  /// question a caller asks *before* deciding whether to fetch weights at all.
+  /// An engine reports unavailable where its compiled kernels cannot execute,
+  /// so this is the same verdict the first load would reach, minus the
+  /// gigabytes.
+  static Future<InfernoDeviceProbe> probeDevice() =>
+      NativeInfernoBackend.probeDevice();
+
   Future<void> load({
     required InfernoEngineKind engine,
     required String modelPath,
