@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_profile.dart';
+import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/app_version.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
@@ -500,7 +501,7 @@ void main() {
           systemPrompt: 'Short answers.',
         ).withStyle('gemma4', ResponseStyle.precise),
       ),
-      child: const SettingsScreen(),
+      child: const SettingsScreen(identity: AppIdentity.dev),
     );
     expect(find.text('Precise'), findsOneWidget);
     expect(find.text('Custom'), findsOneWidget);

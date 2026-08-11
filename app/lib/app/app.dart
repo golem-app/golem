@@ -22,7 +22,12 @@ import '../features/settings/storage_screen.dart';
 import '../features/settings/system_prompt_screen.dart';
 import '../features/splash/splash_screen.dart';
 
-GoRouter _createRouter(AttachmentPicker picker) => GoRouter(
+/// Creates the route table for one app identity. Production omits internal
+/// routes entirely rather than relying on a hidden navigation affordance.
+GoRouter createAppRouter({
+  required AttachmentPicker picker,
+  required AppIdentity identity,
+}) => GoRouter(
   routes: [
     GoRoute(
       path: '/',
@@ -32,7 +37,7 @@ GoRouter _createRouter(AttachmentPicker picker) => GoRouter(
     GoRoute(path: '/search', builder: (context, state) => const SearchScreen()),
     GoRoute(
       path: '/settings',
-      builder: (context, state) => const SettingsScreen(),
+      builder: (context, state) => SettingsScreen(identity: identity),
     ),
     GoRoute(
       path: '/settings/models',
@@ -58,16 +63,22 @@ GoRouter _createRouter(AttachmentPicker picker) => GoRouter(
       path: '/settings/storage',
       builder: (context, state) => const StorageScreen(),
     ),
-    GoRoute(
-      path: '/benchmark',
-      builder: (context, state) => const BenchmarkScreen(),
-    ),
+    if (identity.internalToolsEnabled)
+      GoRoute(
+        path: '/benchmark',
+        builder: (context, state) => const BenchmarkScreen(),
+      ),
   ],
 );
 
 class GolemApp extends ConsumerStatefulWidget {
-  const GolemApp({this.picker = const AttachmentPicker(), super.key});
+  const GolemApp({
+    required this.identity,
+    this.picker = const AttachmentPicker(),
+    super.key,
+  });
 
+  final AppIdentity identity;
   final AttachmentPicker picker;
 
   @override
@@ -83,7 +94,7 @@ class _GolemAppState extends ConsumerState<GolemApp>
   @override
   void initState() {
     super.initState();
-    _router = _createRouter(widget.picker);
+    _router = createAppRouter(picker: widget.picker, identity: widget.identity);
     WidgetsBinding.instance.addObserver(this);
     // After the first frame, so the model controller's own launch pass has
     // settled before anything re-attaches to a transfer it may have found.
@@ -155,7 +166,7 @@ class _GolemAppState extends ConsumerState<GolemApp>
       maxTextScale,
     );
     return CupertinoApp.router(
-      title: AppIdentity.current.displayName,
+      title: widget.identity.displayName,
       debugShowCheckedModeBanner: false,
       routerConfig: _router,
       theme: GolemTheme.theme(brightness),

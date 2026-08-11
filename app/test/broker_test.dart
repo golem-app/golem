@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 // The broker test is the one app test allowed to import Inferno: the ticket's
 // mock engine exists exactly to verify broker behavior without native
@@ -225,11 +224,6 @@ void main() {
 
   test('a configured seed emits one reproducible INFERNO_PROBE line', () async {
     final lines = <String>[];
-    final original = debugPrint;
-    debugPrint = (String? message, {int? wrapWidth}) {
-      if (message != null) lines.add(message);
-    };
-    addTearDown(() => debugPrint = original);
 
     Future<List<String>> probeLines({required int? seed}) async {
       lines.clear();
@@ -239,6 +233,7 @@ void main() {
         profile: const Gemma4Profile(),
         modelPath: '/local/model',
         seed: seed,
+        diagnosticSink: lines.add,
       );
       await repository.prepare();
       await repository
@@ -382,11 +377,6 @@ void main() {
 
   test('the metrics line records the effective sampling', () async {
     final lines = <String>[];
-    final original = debugPrint;
-    debugPrint = (String? message, {int? wrapWidth}) {
-      if (message != null) lines.add(message);
-    };
-    addTearDown(() => debugPrint = original);
 
     Future<String> metricsLine({SamplingOverrides? overrides}) async {
       lines.clear();
@@ -395,6 +385,7 @@ void main() {
         engine: BrokerEngine.llamaCpp,
         profile: const Gemma4Profile(),
         modelPath: '/local/model',
+        diagnosticSink: lines.add,
       );
       await repository.prepare();
       await repository
@@ -949,17 +940,13 @@ void main() {
 
   test('failures leave an INFERNO_FAILURE line', () async {
     final lines = <String>[];
-    final original = debugPrint;
-    debugPrint = (String? message, {int? wrapWidth}) {
-      if (message != null) lines.add(message);
-    };
-    addTearDown(() => debugPrint = original);
 
     final repository = InfernoInferenceRepository(
       _RecordingRuntime(),
       engine: BrokerEngine.llamaCpp,
       profile: const Gemma4Profile(),
       modelPath: '/local/model.gguf',
+      diagnosticSink: lines.add,
     );
     await repository.prepare();
     await expectLater(

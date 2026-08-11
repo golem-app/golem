@@ -1,6 +1,23 @@
+import '../app_identity.dart';
 import '../domain/app_state.dart';
 
 enum StartupScenario { ready, failure, timeout, missingModel }
+
+StartupScenario startupScenarioFor({
+  required AppIdentity identity,
+  required bool missingModel,
+  required bool injectedFailure,
+  required bool injectedTimeout,
+}) {
+  if (!identity.internalToolsEnabled) return StartupScenario.ready;
+  return injectedFailure
+      ? StartupScenario.failure
+      : injectedTimeout
+      ? StartupScenario.timeout
+      : missingModel
+      ? StartupScenario.missingModel
+      : StartupScenario.ready;
+}
 
 final class StartupSequence {
   const StartupSequence({

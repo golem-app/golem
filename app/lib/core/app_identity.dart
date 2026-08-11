@@ -20,6 +20,16 @@ enum AppIdentity {
   /// The Android application ID / iOS bundle identifier for this flavor.
   final String applicationId;
 
+  /// Whether this identity may expose internal tools and diagnostic seams.
+  ///
+  /// This is deliberately flavor policy, not build-mode policy: qa release
+  /// builds retain their evidence surfaces, while production and the legacy
+  /// flavorless identity stay clean in debug as well as release.
+  bool get internalToolsEnabled => switch (this) {
+    qa || dev => true,
+    production || flutter => false,
+  };
+
   /// The bundled app-icon tile for in-app surfaces (the drawer header).
   /// The flavorless legacy identity shows the production artwork, matching
   /// the flavorless macOS catalog written by tool/prepare_launcher.dart.
