@@ -136,8 +136,9 @@ class _TextSizeCardState extends State<_TextSizeCard> {
   static const _min = minTextScale;
   static const _max = maxTextScale;
 
-  /// The adjust step a screen reader moves the slider by. Nine stops across
-  /// the 0.85–1.3 range, so every one of them is reachable by gesture.
+  /// The adjust step a screen reader moves the slider by. Ten stops across the
+  /// 0.85–1.3 range, and 1.0 lands on one of them exactly, so the default stays
+  /// reachable by gesture from either end.
   static const _step = 0.05;
   double? _drag;
 

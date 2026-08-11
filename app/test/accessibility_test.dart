@@ -92,7 +92,20 @@ void main() {
         isFalse,
       );
 
+      // Read-only is what lets the user tap in mid-turn to copy the prompt
+      // they sent — and it is why the field must be released again when the
+      // turn ends: EditableText reopens the input connection the moment
+      // readOnly clears on a focused field.
+      await tester.tap(composer);
+      await tester.pump();
+      expect(tester.testTextInput.isVisible, isFalse, reason: 'while busy');
+
       await tester.pumpAndSettle();
+      expect(
+        tester.testTextInput.isVisible,
+        isFalse,
+        reason: 'the keyboard sprang up over the finished answer',
+      );
       handle.dispose();
     },
   );
@@ -150,9 +163,16 @@ void main() {
     );
 
     final header = find.byKey(const Key('reasoning-card-header'));
+    // hasTapAction is the assistive-tech activation path, which is a separate
+    // wiring from the GestureDetector the tap below exercises.
     expect(
       tester.getSemantics(header),
-      isSemantics(label: 'Reasoning', value: 'Collapsed', isButton: true),
+      isSemantics(
+        label: 'Reasoning',
+        value: 'Collapsed',
+        isButton: true,
+        hasTapAction: true,
+      ),
     );
 
     await tester.tap(header);

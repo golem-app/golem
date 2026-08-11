@@ -179,7 +179,12 @@ class _AttachRow extends StatelessWidget {
             children: [
               Icon(icon, size: 20, color: accent),
               const SizedBox(width: GolemSpace.s3),
-              Text(label, style: GolemText.body.copyWith(color: ink)),
+              // The disabled rows name the model that cannot read pictures, so
+              // these labels are long enough to leave the row at an
+              // accessibility text size unless they may wrap.
+              Expanded(
+                child: Text(label, style: GolemText.body.copyWith(color: ink)),
+              ),
             ],
           ),
         ),

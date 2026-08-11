@@ -55,14 +55,15 @@ class _ComposerState extends ConsumerState<Composer> {
         _pending.isNotEmpty) {
       setState(_pending.clear);
     }
-    // A disabled field used to drop focus on its own, taking the keyboard with
-    // it; a read-only one keeps both, leaving the answer streaming behind a
-    // keyboard nobody can type on. The dismissal was the behaviour, not a side
-    // effect of how the field was blocked.
+    // Focus is dropped on both edges of a turn, because a disabled field could
+    // not hold it and a read-only one can. Entering: the keyboard would sit
+    // over the answer as it streams. Leaving: the user may have tapped in to
+    // copy their prompt, and `EditableText.didUpdateWidget` reopens the input
+    // connection when readOnly clears on a focused field — so the keyboard
+    // springs up over the answer the moment it lands.
     final wasIdle = oldWidget.generation == GenerationPhase.idle;
-    if (wasIdle && widget.generation != GenerationPhase.idle) {
-      widget.focus.unfocus();
-    }
+    final isIdle = widget.generation == GenerationPhase.idle;
+    if (wasIdle != isIdle) widget.focus.unfocus();
   }
 
   /// Rejections surface as a toast rather than a banner: nothing was sent, and

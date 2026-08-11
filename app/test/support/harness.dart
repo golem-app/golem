@@ -201,12 +201,17 @@ Future<void> pumpWithRepositories(
     child: wrapApp(brightness: brightness, child: child),
   );
   await tester.pumpWidget(
-    // The app's own MediaQuery takes its scaler from the ancestor it finds,
-    // so wrapping here is how a surface is judged at an accessibility size.
+    // The app's own MediaQuery takes its scaler from the ancestor it finds, so
+    // wrapping here is how a surface is judged at an accessibility size. Built
+    // from the view rather than from scratch: a bare MediaQueryData carries
+    // Size.zero, which silently lays the whole tree out in a zero-size box —
+    // bubbles compute a zero max width and sheets a zero max height.
     textScale == 1
         ? app
         : MediaQuery(
-            data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
+            data: MediaQueryData.fromView(
+              tester.view,
+            ).copyWith(textScaler: TextScaler.linear(textScale)),
             child: app,
           ),
   );

@@ -771,10 +771,10 @@ void main() {
 
     // Chat carries the densest rows in the app — the composer's power strip,
     // the metrics pills, and a code card that cannot wrap.
-    for (final history in <ChatHistorySnapshot?>[
-      null,
-      seedHistory(),
-      markdownHistory(),
+    for (final (name, history) in <(String, ChatHistorySnapshot?)>[
+      ('empty', null),
+      ('seeded', seedHistory()),
+      ('markdown', markdownHistory()),
     ]) {
       await pumpWithRepositories(
         tester,
@@ -782,7 +782,7 @@ void main() {
         history: history,
         child: const ChatScreen(),
       );
-      expect(tester.takeException(), isNull, reason: 'chat: $history');
+      expect(tester.takeException(), isNull, reason: 'chat: $name');
     }
 
     await pumpWithRepositories(
@@ -797,10 +797,16 @@ void main() {
 
     // The sheets size themselves to their content, so they are the surfaces
     // most likely to run out of room; each is opened rather than pumped.
-    for (final opener in const <Key>[
-      Key('composer-model-chip'),
-      Key('composer-attach'),
-    ]) {
+    // pumpWidget reuses the element tree, so both halves of the state have to
+    // be reset by hand: the key gives each pass a chat with the drawer shut,
+    // and the pop clears the route a standing sheet would otherwise leave over
+    // the next iteration's tap. Each sheet is found by key so a pass that
+    // opened nothing fails instead of asserting nothing.
+    const sheets = <(Key, Key)>[
+      (Key('composer-model-chip'), Key('model-picker-sheet')),
+      (Key('composer-attach'), Key('attach-sheet')),
+    ];
+    for (final (opener, sheet) in sheets) {
       await pumpWithRepositories(
         tester,
         textScale: 1.6,
@@ -809,7 +815,10 @@ void main() {
       );
       await tester.tap(find.byKey(opener));
       await tester.pumpAndSettle();
+      expect(find.byKey(sheet), findsOneWidget, reason: '$opener opened');
       expect(tester.takeException(), isNull, reason: '$opener');
+      Navigator.of(tester.element(find.byKey(sheet))).pop();
+      await tester.pumpAndSettle();
     }
   }, variant: iosChrome);
 
