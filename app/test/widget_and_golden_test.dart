@@ -19,6 +19,8 @@ import 'package:golem_flutter/features/chat/widgets/composer.dart';
 import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
 import 'package:golem_flutter/features/chat/widgets/recovery_banner.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
+import 'package:golem_flutter/features/legal/model_attribution_screen.dart';
+import 'package:golem_flutter/features/legal/open_source_licenses_screen.dart';
 import 'package:golem_flutter/features/settings/appearance_screen.dart';
 import 'package:golem_flutter/features/settings/models_screen.dart';
 import 'package:golem_flutter/features/settings/privacy_screen.dart';
@@ -33,6 +35,21 @@ import 'package:golem_flutter/features/benchmark/application/benchmark_providers
 
 import 'support/harness.dart';
 import 'support/in_memory_preferences_repository.dart';
+
+Future<List<OpenSourceLicense>> _goldenLicenses() async => [
+  OpenSourceLicense(
+    packages: const ['llama.cpp'],
+    text: 'MIT License\n\nCopyright the ggml authors',
+  ),
+  OpenSourceLicense(
+    packages: const ['mlx-swift'],
+    text: 'MIT License\n\nCopyright ml-explore',
+  ),
+  OpenSourceLicense(
+    packages: const ['Qwen 3.5 models'],
+    text: 'Apache License\n\nVersion 2.0, January 2004',
+  ),
+];
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -477,6 +494,40 @@ void main() {
       );
     }, variant: iosChrome);
 
+    testWidgets('model attribution ${brightness.name} golden', (tester) async {
+      if (chromeSuffix().isNotEmpty && brightness == Brightness.dark) return;
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        child: const ModelAttributionScreen(),
+      );
+      await expectLater(
+        find.byType(ModelAttributionScreen),
+        matchesGoldenFile(
+          'goldens/settings-model-attribution-${brightness.name}'
+          '${chromeSuffix()}.png',
+        ),
+      );
+    }, variant: bothChromes);
+
+    testWidgets('open-source licenses ${brightness.name} golden', (
+      tester,
+    ) async {
+      if (chromeSuffix().isNotEmpty && brightness == Brightness.dark) return;
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        child: OpenSourceLicensesScreen(loadLicenses: _goldenLicenses),
+      );
+      await expectLater(
+        find.byType(OpenSourceLicensesScreen),
+        matchesGoldenFile(
+          'goldens/settings-licenses-${brightness.name}'
+          '${chromeSuffix()}.png',
+        ),
+      );
+    }, variant: bothChromes);
+
     testWidgets('settings storage ${brightness.name} golden', (tester) async {
       await pumpWithRepositories(
         tester,
@@ -826,6 +877,7 @@ void main() {
     // to the simulated-downloads sentence. Ordered after the models
     // scroll on purpose: an opened sheet leaves later re-pumped trees
     // un-hit-testable, so no segment past this one taps or scrolls.
+    await revealIn(tester, const Key('settings-list'), const Key('about-row'));
     await tester.tap(find.byKey(const Key('about-row')));
     await tester.pumpAndSettle();
     expect(

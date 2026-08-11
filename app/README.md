@@ -452,7 +452,8 @@ the drag handle is the android-only painted element whose tint differs.
 They cover splash, empty/populated chat, reasoning, the markdown
 transcript, search, the composer sheets, the sectioned conversation
 drawer, rename overlay, every settings surface (root, models, response
-style, appearance, privacy, storage, system prompt — with iOS-only
+style, appearance, privacy, storage, system prompt, model attribution, and
+open-source licenses — with iOS-only
 Advanced variants for the root, custom repository, and sampling states),
 Benchmark, and both unsupported-device surfaces (chat and models, iOS-only
 in light and dark). The model picker records twice: the simulated catalog
@@ -463,7 +464,7 @@ engine composition produces — the recommendation's device-tier reason, an
 installed artifact of the other engine explaining itself, the count of what
 is not listed, and the artifact line. The widget suite also runs Flutter's iOS 44-point target,
 semantic-label, contrast, and enlarged-text checks; the settings root,
-appearance, and privacy screens are enrolled alongside chat, which is
+appearance, privacy, and legal screens are enrolled alongside chat, which is
 why segments and switches carry full 44-point targets and footnotes use
 muted rather than tertiary ink.
 
