@@ -93,6 +93,7 @@ flutter:
     - assets/images/golem_app_icon_production.png
     - assets/images/golem_app_icon_qa.png
     - assets/images/golem_app_icon_dev.png
+    - assets/licenses/
     - path: assets/benchmark_prompts/
       flavors:
         - qa

@@ -35,6 +35,7 @@ void main() {
     // device runs may already carry the marker, so the journey remains useful
     // without weakening the fresh-install assertions when the screen exists.
     if (find.byKey(const Key('first-run-welcome')).evaluate().isNotEmpty) {
+      expect(find.byKey(const Key('first-run-ai-disclaimer')), findsOneWidget);
       await tester.tap(find.byKey(const Key('first-run-get-started')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('first-run-model')), findsOneWidget);
@@ -318,6 +319,10 @@ void main() {
     );
     await _pageBack(tester);
     await tester.pumpAndSettle();
+    final settingsScrollable = find.descendant(
+      of: find.byKey(const Key('settings-list')),
+      matching: find.byType(Scrollable),
+    );
 
     // Advanced mode reveals the system-prompt row; response style commits
     // a per-profile preset the sampling layer picks up. The preference
@@ -330,16 +335,20 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const Key('advanced-mode-switch')),
       240,
-      scrollable: find.descendant(
-        of: find.byKey(const Key('settings-list')),
-        matching: find.byType(Scrollable),
-      ),
+      scrollable: settingsScrollable,
     );
     await tester.ensureVisible(find.byKey(const Key('advanced-mode-switch')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('advanced-mode-switch')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('settings-system-prompt-row')), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('settings-style-row')),
+      -240,
+      scrollable: settingsScrollable,
+    );
+    await tester.ensureVisible(find.byKey(const Key('settings-style-row')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('settings-style-row')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('style-precise')));
@@ -356,6 +365,11 @@ void main() {
     await tester.pumpAndSettle();
 
     // Storage: the breakdown renders and the cache clears with a toast.
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('settings-storage-row')),
+      240,
+      scrollable: settingsScrollable,
+    );
     await tester.tap(find.byKey(const Key('settings-storage-row')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('storage-bar')), findsOneWidget);
@@ -371,6 +385,50 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('golem-toast')), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 1600));
+    await _pageBack(tester);
+    await tester.pumpAndSettle();
+
+    // Legal information remains reachable and complete without a network.
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('model-attribution-row')),
+      260,
+      scrollable: settingsScrollable,
+    );
+    await tester.tap(find.byKey(const Key('model-attribution-row')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('model-attribution-screen')), findsOneWidget);
+    expect(find.text('GEMMA 4 E2B'), findsOneWidget);
+    await _pageBack(tester);
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('open-source-licenses-row')),
+      260,
+      scrollable: settingsScrollable,
+    );
+    await tester.tap(find.byKey(const Key('open-source-licenses-row')));
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const Key('licenses-list')),
+      timeout: const Duration(seconds: 10),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('open-source-licenses-screen')),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('license-llama.cpp')),
+      260,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('licenses-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('llama.cpp'), findsOneWidget);
     await _pageBack(tester);
     await tester.pumpAndSettle();
 

@@ -12,6 +12,8 @@ import '../features/benchmark/benchmark_screen.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/chat/widgets/attach_sheet.dart';
 import '../features/chat/search_screen.dart';
+import '../features/legal/model_attribution_screen.dart';
+import '../features/legal/open_source_licenses_screen.dart';
 import '../features/onboarding/first_run_gate.dart';
 import '../features/settings/appearance_screen.dart';
 import '../features/settings/models_screen.dart';
@@ -62,6 +64,14 @@ GoRouter createAppRouter({
     GoRoute(
       path: '/settings/storage',
       builder: (context, state) => const StorageScreen(),
+    ),
+    GoRoute(
+      path: '/settings/model-attribution',
+      builder: (context, state) => const ModelAttributionScreen(),
+    ),
+    GoRoute(
+      path: '/settings/licenses',
+      builder: (context, state) => const OpenSourceLicensesScreen(),
     ),
     if (identity.internalToolsEnabled)
       GoRoute(

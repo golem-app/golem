@@ -11,6 +11,7 @@ import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
 import '../chat/model_label.dart';
+import '../legal/ai_disclaimer.dart';
 import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
 
@@ -75,6 +76,8 @@ class SettingsScreen extends ConsumerWidget {
                   ),
               ],
             ),
+            const SizedBox(height: 10),
+            const AiDisclaimer(key: Key('settings-ai-disclaimer')),
             const SizedBox(height: 24),
             const SectionHeader('App'),
             const SizedBox(height: 8),
@@ -167,8 +170,20 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 24),
+            const SectionHeader('About & legal'),
+            const SizedBox(height: 8),
             SettingsCard(
               children: [
+                SettingsNavRow(
+                  key: const Key('model-attribution-row'),
+                  label: 'Model attribution',
+                  onTap: () => context.push('/settings/model-attribution'),
+                ),
+                SettingsNavRow(
+                  key: const Key('open-source-licenses-row'),
+                  label: 'Open-source licenses',
+                  onTap: () => context.push('/settings/licenses'),
+                ),
                 SettingsNavRow(
                   key: const Key('about-row'),
                   label: 'About Golem',
