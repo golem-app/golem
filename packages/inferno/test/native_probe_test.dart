@@ -25,4 +25,21 @@ void main() {
       expect(mlx.detail, contains(mlxSwiftLmVersion));
     }
   });
+
+  test('the device probe answers without constructing a runtime', () async {
+    // What the app asks before deciding to fetch weights. It must agree with
+    // the instance probe engine for engine: they read the same native payload.
+    final device = await Inferno.probeDevice();
+    final instance = await Inferno.native().probe();
+    expect(device.operatingSystem, instance.operatingSystem);
+    expect(
+      device.engines.map((engine) => (engine.engine, engine.available)),
+      instance.engines.map((engine) => (engine.engine, engine.available)),
+    );
+    // llama.cpp reports unavailable only on an arm64 Linux/Android CPU without
+    // FEAT_DotProd, which the shipped kernels require and no machine here has
+    // ever lacked; every other target compiles at its toolchain baseline and
+    // passes. The refusal itself stays covered by the load-time guard.
+    expect(device.supports(InfernoEngineKind.llamaCpp), isTrue);
+  });
 }

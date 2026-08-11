@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:golem_flutter/app/launch_composition.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/app_identity.dart';
+import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
@@ -85,13 +86,14 @@ final class FakeDiskSpace implements DiskSpaceProbe {
 }
 
 /// One fake launch composition, shared by [buildContainer] and the bootstrap
-/// suite so there is a single canonical test wiring of the fourteen seams.
+/// suite so there is a single canonical test wiring of the fifteen seams.
 LaunchDependencies launchDependenciesWith({
   Directory? directory,
   ChatHistorySnapshot? history,
   ModelState model = const ModelState(),
   List<ModelCatalogEntry>? catalog,
   InferenceBackendConfig? backend,
+  DeviceEligibility? eligibility,
   SettingsRepository? settings,
   PreferencesRepository? preferences,
   AttachmentRepository? attachments,
@@ -103,6 +105,7 @@ LaunchDependencies launchDependenciesWith({
       directory ?? Directory.systemTemp.createTempSync('golem-widget-test-');
   return LaunchDependencies(
     backendConfig: backend ?? const InferenceBackendConfig.fake(),
+    deviceEligibility: eligibility ?? const DeviceEligibility.unclassified(),
     chatHistoryRepository:
         chatHistory ??
         InMemoryChatHistoryRepository(
@@ -133,6 +136,7 @@ ProviderContainer buildContainer({
   ModelState model = const ModelState(),
   List<ModelCatalogEntry>? catalog,
   InferenceBackendConfig? backend,
+  DeviceEligibility? eligibility,
   SettingsRepository? settings,
   PreferencesRepository? preferences,
   AttachmentRepository? attachments,
@@ -146,6 +150,7 @@ ProviderContainer buildContainer({
       model: model,
       catalog: catalog,
       backend: backend,
+      eligibility: eligibility,
       settings: settings,
       preferences: preferences,
       attachments: attachments,
@@ -164,6 +169,7 @@ Future<void> pumpWithRepositories(
   ModelState model = const ModelState(),
   List<ModelCatalogEntry>? catalog,
   InferenceBackendConfig? backend,
+  DeviceEligibility? eligibility,
   SettingsRepository? settings,
   PreferencesRepository? preferences,
   AttachmentRepository? attachments,
@@ -177,6 +183,7 @@ Future<void> pumpWithRepositories(
     model: model,
     catalog: catalog,
     backend: backend,
+    eligibility: eligibility,
     settings: settings,
     preferences: preferences,
     attachments: attachments,

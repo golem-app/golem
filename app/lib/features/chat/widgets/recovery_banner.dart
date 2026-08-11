@@ -16,8 +16,27 @@ class RecoveryBanner extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Retry re-runs the identical request, so it is only offered where
     // that can succeed. A conversation that no longer fits the context
-    // window gets a new chat instead — the one recovery that works.
-    final offersRetry = failure.kind != ChatFailureKind.contextExhausted;
+    // window gets a new chat instead — the one recovery that works — and a
+    // device outside every supported tier gets neither: no action taken here
+    // changes what this hardware can run, so offering one would be a lie.
+    final recovery = switch (failure.kind) {
+      ChatFailureKind.unsupportedDevice => null,
+      ChatFailureKind.contextExhausted => CupertinoButton(
+        key: const Key('start-new-chat'),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        onPressed: () => ref
+            .read(chatControllerProvider.notifier)
+            .startFreshChatFromFailure(),
+        child: const Text('New chat'),
+      ),
+      _ => CupertinoButton(
+        key: const Key('retry-generation'),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        onPressed: () =>
+            ref.read(chatControllerProvider.notifier).retryFailure(),
+        child: const Text('Retry'),
+      ),
+    };
     return Container(
       key: const Key('recovery-banner'),
       margin: const EdgeInsets.fromLTRB(12, 4, 12, 6),
@@ -38,23 +57,7 @@ class RecoveryBanner extends ConsumerWidget {
               ),
               const SizedBox(width: 10),
               Expanded(child: Text(failure.message, style: GolemText.footnote)),
-              if (offersRetry)
-                CupertinoButton(
-                  key: const Key('retry-generation'),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  onPressed: () =>
-                      ref.read(chatControllerProvider.notifier).retryFailure(),
-                  child: const Text('Retry'),
-                )
-              else
-                CupertinoButton(
-                  key: const Key('start-new-chat'),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  onPressed: () => ref
-                      .read(chatControllerProvider.notifier)
-                      .startFreshChatFromFailure(),
-                  child: const Text('New chat'),
-                ),
+              ?recovery,
               CupertinoButton(
                 key: const Key('discard-generation'),
                 padding: const EdgeInsets.symmetric(horizontal: 8),

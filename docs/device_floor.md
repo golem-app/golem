@@ -1,8 +1,23 @@
 # Device floor
 
-What Golem's real-inference builds require of a device, and why. Decided
-with epic #61 (tickets #62/#63); the store-side gating that advertises
-this floor is #27.
+What Golem's real-inference builds require of a device, and why. The install
+and engine floors were decided with epic #61 (tickets #62/#63); the admission
+policy that classifies every install against them, and the store gating that
+advertises them, are #27 (ADR `decisions/0007-supported-device-policy.md`).
+
+## The supported tiers
+
+| Reported physical memory | Tier | Model |
+| --- | --- | --- |
+| ≥ 7 GiB | preferred | `gemma4-gguf` |
+| ≥ floor, < 7 GiB | light | `qwen35-2b-gguf` |
+| < floor (Apple 4 GiB / Android 3 GiB) | unsupported | none |
+| unknown | light | `qwen35-2b-gguf` |
+
+An arm64 Android CPU without `FEAT_DotProd` is unsupported at any memory
+size. The floor is one nominal rule — 4 GB, the iPhone 12 — spelled per
+platform because Apple reports installed DRAM while Android reports net of
+reservations; ADR 0007 carries the derivation. Unknown never refuses.
 
 ## iOS
 
@@ -11,12 +26,16 @@ this floor is #27.
   `com.apple.developer.kernel.increased-memory-limit`, which the app
   ships (added with #62) so multi-gigabyte weights plus an 8192-token KV
   cache fit under the jetsam ceiling on supported devices.
+- **Store gate: A12.** `UIRequiredDeviceCapabilities` names `arm64` and
+  `iphone-ipad-minimum-performance-a12`, so the App Store offers the app only
+  to iPhone XS/XR and later. It is the closest mechanism iOS has to the
+  memory floor — every A12-or-later iPhone has at least 3 GB — but it is not
+  the floor: the 3 GB parts it admits are classified unsupported in the app.
+  The key needs a deployment target of iOS 14 or later, and Apple permits
+  only expanding device requirements in an update.
 - **MLX engine floor: iOS 17** (the `InfernoMLXCarrier` SwiftPM platform
   declaration). Shipping builds compose llama.cpp-Metal (ADR 0002), so
   this floor only binds when MLX is enabled by dart-define.
-- Practical memory floor: the device-model policy (ADR 0003) selects the
-  lighter Qwen GGUF below 7 GiB reported physical memory; the app's
-  supported tier is nominal 8 GB phones.
 
 ## Android
 
@@ -28,14 +47,23 @@ this floor is #27.
   time and Inferno ships as one statically linked asset, so whatever
   the flag names is a hard requirement of the binary — not a fast path
   it can fall back from. Hence exactly one extension over the baseline.
-- **Enforced at load, not assumed**: the llama shim checks `AT_HWCAP`
-  for `ASIMDDP` before the first model load and fails with
-  `unsupported_device` ("this device's processor is missing an
-  instruction set the local engine needs"). Without it, a device below
-  the floor would install cleanly and then take `SIGILL` inside the
-  first matmul — `minSdk` is 24, the APK carries no `abiFilters` and no
-  CPU `<uses-feature>` (none exists for ISA extensions), so the store
-  offers it to every arm64 device. Store-side gating is #27.
+- **Answered twice, from one predicate**: `inferno_probe_json()` reports the
+  llama engine unavailable where `cpu_meets_floor()` is false, so the app
+  classifies the device before offering a download; the same predicate
+  refuses the first load with `unsupported_device` if anything reaches it
+  anyway. Without either, a device below the floor would install cleanly and
+  then take `SIGILL` inside the first matmul — `minSdk` is 24, the APK
+  carries no `abiFilters` and no CPU `<uses-feature>` (none exists for ISA
+  extensions), so the store offers it to every arm64 device.
+- **Store gate: a console rule, not the manifest.** Play Console's device
+  catalog can exclude by RAM (Monitor and improve ▸ Reach and devices ▸
+  Device catalog ▸ Manage exclusion rules); that rule is the Android memory
+  floor's enforcement and is part of the launch checklist, since nothing in
+  the manifest expresses it. Play notes that RAM varies between variants of a
+  model, so exclusion can be partial. `android.hardware.ram.normal` is
+  deliberately not declared: it signals Android Go rather than a RAM figure,
+  and requiring an API-26 feature constant would silently drop API 24–25
+  devices too. No store mechanism can express the dot-product requirement.
 - **Deliberately excluded from the floor**: `i8mm` (`FEAT_MatMul_INT8`,
   ARMv8.6) would let ggml emit `SMMLA` in the repacked GEMM and
   `nrows = 2` vec-dot kernels — a large prefill win, but the resulting
@@ -53,10 +81,13 @@ this floor is #27.
 
 ## Both platforms
 
-- The 7 GiB physical-memory threshold and its rationale live in ADR 0003;
-  `GOLEM_DEVICE_MEMORY_BYTES` exercises the light-model branch on
-  hardware.
+- The 7 GiB threshold and the per-platform floors live in
+  `app/lib/core/domain/device_eligibility.dart`; their rationale is in ADR
+  0003 (threshold) and ADR 0007 (floors).
+- `GOLEM_DEVICE_MEMORY_BYTES` exercises the light-model branch and the floor
+  on hardware; `GOLEM_DEVICE_ENGINE_UNSUPPORTED` exercises the
+  instruction-set refusal. Both are test-only.
 - The load preflight (`availableMemoryBytes`, #62) refuses loads that
   cannot fit free memory plus 512 MiB headroom, with a typed retryable
   failure — the floor governs what we ship to, the preflight governs the
-  moment of load.
+  moment of load, and admission (#27) governs what is offered at all.

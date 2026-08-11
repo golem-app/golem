@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
+import 'package:golem_flutter/core/chrome/golem_button.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
+import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/benchmark/benchmark_screen.dart';
@@ -13,6 +15,7 @@ import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/search_screen.dart';
 import 'package:golem_flutter/features/chat/widgets/composer.dart';
 import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
+import 'package:golem_flutter/features/chat/widgets/recovery_banner.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/features/settings/appearance_screen.dart';
 import 'package:golem_flutter/features/settings/models_screen.dart';
@@ -812,4 +815,167 @@ void main() {
     },
     variant: iosChrome,
   );
+
+  group('an unsupported device (#27)', () {
+    const backend = InferenceBackendConfig(
+      kind: InferenceBackendKind.llama,
+      profileKey: 'gemma4',
+      artifactKey: 'gemma4-gguf',
+      modelPath: 'documents:models/gemma4-gguf/model.gguf',
+      modelPathFromCatalog: true,
+    );
+    const refused = DeviceEligibility(
+      tier: DeviceTier.unsupported,
+      reason: DeviceIneligibilityReason.belowMemoryFloor,
+      message:
+          'This device has less memory than the smallest model Golem ships '
+          'needs to run, so downloads are turned off here. Your chats and '
+          'settings are unaffected.',
+    );
+
+    for (final brightness in Brightness.values) {
+      testWidgets('chat says so ${brightness.name} golden', (tester) async {
+        await pumpWithRepositories(
+          tester,
+          brightness: brightness,
+          backend: backend,
+          eligibility: refused,
+          child: const ChatScreen(),
+        );
+        expect(
+          find.byKey(const Key('device-unsupported-notice')),
+          findsOneWidget,
+        );
+        // No starter chip may invite a prompt this device cannot answer.
+        expect(find.byKey(const Key('starter-chip-explain')), findsNothing);
+        await expectLater(
+          find.byType(ChatScreen),
+          matchesGoldenFile(
+            'goldens/device-unsupported-chat-${brightness.name}.png',
+          ),
+        );
+      }, variant: iosChrome);
+
+      testWidgets('models refuse ${brightness.name} golden', (tester) async {
+        await pumpWithRepositories(
+          tester,
+          brightness: brightness,
+          backend: backend,
+          eligibility: refused,
+          child: const ModelsScreen(),
+        );
+        expect(
+          find.byKey(const Key('model-device-refusal-gemma4-gguf')),
+          findsOneWidget,
+        );
+        await expectLater(
+          find.byType(ModelsScreen),
+          matchesGoldenFile(
+            'goldens/device-unsupported-models-${brightness.name}.png',
+          ),
+        );
+      }, variant: iosChrome);
+    }
+
+    testWidgets('every model affordance is disabled, not merely honest', (
+      tester,
+    ) async {
+      await pumpWithRepositories(
+        tester,
+        backend: backend,
+        eligibility: refused,
+        child: const ModelsScreen(),
+      );
+      // Withheld, not merely inert: a disabled GolemButton still paints its
+      // full accent fill, which would read as an offer.
+      expect(find.byKey(const Key('model-download-gemma4-gguf')), findsNothing);
+      await revealIn(
+        tester,
+        const Key('models-list'),
+        const Key('runtime-device-refusal'),
+      );
+      expect(find.byKey(const Key('runtime-toggle-button')), findsNothing);
+    }, variant: iosChrome);
+
+    testWidgets('the banner offers no recovery it cannot deliver', (
+      tester,
+    ) async {
+      await pumpWithRepositories(
+        tester,
+        child: const RecoveryBanner(
+          failure: ChatFailure(
+            kind: ChatFailureKind.unsupportedDevice,
+            message: 'This device cannot run models.',
+          ),
+        ),
+      );
+      expect(find.byKey(const Key('retry-generation')), findsNothing);
+      expect(find.byKey(const Key('start-new-chat')), findsNothing);
+      expect(find.byKey(const Key('download-active-model')), findsNothing);
+      // Dismissing the banner is the one thing that still works.
+      expect(find.byKey(const Key('discard-generation')), findsOneWidget);
+    }, variant: iosChrome);
+
+    testWidgets('the explanation survives a populated transcript', (
+      tester,
+    ) async {
+      // Discard trims a trailing assistant message, so a refused send leaves
+      // the user's turn behind and the empty state — which carried the only
+      // explanation — never renders again.
+      await pumpWithRepositories(
+        tester,
+        backend: backend,
+        eligibility: refused,
+        history: seedHistory(),
+        child: const ChatScreen(),
+      );
+      expect(find.byKey(const Key('empty-chat')), findsNothing);
+      expect(
+        find.byKey(const Key('device-unsupported-notice')),
+        findsOneWidget,
+      );
+    }, variant: iosChrome);
+
+    testWidgets('a runtime left loaded can still be unloaded', (tester) async {
+      // An earlier build could have persisted `loaded` on a device this one
+      // refuses; withholding both directions would strand it there forever.
+      await pumpWithRepositories(
+        tester,
+        backend: backend,
+        eligibility: refused,
+        model: const ModelState(runtime: RuntimePhase.loaded),
+        child: const ModelsScreen(),
+      );
+      await revealIn(
+        tester,
+        const Key('models-list'),
+        const Key('runtime-toggle-button'),
+      );
+      final toggle = tester.widget<GolemButton>(
+        find.byKey(const Key('runtime-toggle-button')),
+      );
+      expect(toggle.label, startsWith('Unload'));
+      expect(toggle.onPressed, isNotNull);
+    }, variant: iosChrome);
+
+    testWidgets('a supported device keeps every affordance', (tester) async {
+      await pumpWithRepositories(
+        tester,
+        backend: backend,
+        child: const ModelsScreen(),
+      );
+      await revealIn(
+        tester,
+        const Key('models-list'),
+        const Key('runtime-toggle-button'),
+      );
+      expect(find.byKey(const Key('runtime-device-refusal')), findsNothing);
+      expect(
+        tester
+            .widget<GolemButton>(find.byKey(const Key('runtime-toggle-button')))
+            .onPressed,
+        isNotNull,
+      );
+    }, variant: iosChrome);
+  });
 }

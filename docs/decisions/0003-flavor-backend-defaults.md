@@ -63,6 +63,11 @@ the lighter **Qwen 3.5 2B** (`qwen35-2b-gguf`, 1.21 GB).
   platform channel) runs only on the `auto` path, capped at one second.
 - `GOLEM_DEVICE_MEMORY_BYTES` is a test-only override to exercise both
   branches on hardware (both team devices report over 8 GB).
+- Since #27 the reading itself belongs to the device classification: one probe
+  at launch produces a tier, the tier picks the model here, and the same
+  verdict decides whether this device is admitted to running one at all
+  (`0007-supported-device-policy.md`). The thresholds live together in
+  `app/lib/core/domain/device_eligibility.dart`.
 
 ## First-need downloads require consent
 

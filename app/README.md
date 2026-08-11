@@ -48,15 +48,31 @@ Backend resolution (`lib/broker/backend_policy.dart`, decided in
 `GOLEM_INFERENCE_BACKEND` accepts `fake`, `llama`, `mlx`, and `auto`;
 unset falls to the flavor default (`auto` on production/dev, `fake` on
 qa). `auto` composes the llama/GGUF artifact of the device-policy model —
-Gemma 4 E2B at ≥ 7 GiB reported physical memory, the lighter Qwen 3.5 4B
+Gemma 4 E2B at ≥ 7 GiB reported physical memory, the lighter Qwen 3.5 2B
 below or when memory is unknown — deriving the model path, broker
 profile, and active catalog artifact together. A fresh real-backend
 install downloads its model **on first need behind an explicit consent
 tap** in the chat failure banner; nothing multi-gigabyte ever starts
 silently. Builds with an operator-supplied `GOLEM_MODEL_PATH` bypass that
 gate entirely — sideloaded paths are the operator's responsibility and go
-straight to the engine. `GOLEM_DEVICE_MEMORY_BYTES` is a test-only override for
-exercising both policy branches on hardware.
+straight to the engine.
+
+That model choice is one half of a single **device classification** taken once
+at launch (#27, `../docs/decisions/0007-supported-device-policy.md`): the same
+reading decides whether this device is admitted to running a model at all.
+Below the floor — nominal 4 GB, read as 4 GiB on Apple and 3 GiB on Android —
+or on an arm64 Android CPU without the dot-product extension the shipped
+kernels require, the app downloads and loads nothing and says why: the chat
+canvas replaces its starter chips with `device-unsupported-notice`, each model
+card replaces its download button with the reason, and the runtime card
+withholds its toggle. Chats, history, settings, and export are untouched;
+memory that cannot be read classifies as supported, never as refused. The
+App Store enforces its half through `UIRequiredDeviceCapabilities`
+(`iphone-ipad-minimum-performance-a12`); Play's RAM floor is a console-side
+device-catalog exclusion rule, recorded in `../docs/device_floor.md` because
+no manifest can express it. `GOLEM_DEVICE_MEMORY_BYTES` and
+`GOLEM_DEVICE_ENGINE_UNSUPPORTED` are test-only overrides for exercising the
+tiers and both refusals on hardware.
 
 Model **downloads** are real in the `dev` and `production` flavors:
 Settings lists the pinned catalog (`lib/broker/model_catalog.dart`,
@@ -265,7 +281,10 @@ identifiers are `launch-splash`, `chat-composer`, `send-button`, `stop-button`,
 (`resolve` reads the repository, `add` commits what it found, and `add` only
 exists once a resolution is on screen), `download-active-model`
 (the chat failure banner's consent CTA when a real backend's model is not
-downloaded yet), `style-{precise,balanced,creative}`,
+downloaded yet), `device-unsupported-notice`,
+`model-device-refusal-<key>` and `runtime-device-refusal` (the
+supported-device refusals, which replace the download button and the runtime
+toggle rather than disabling them), `style-{precise,balanced,creative}`,
 `gen-temperature-<profile>`, `gen-top-p-<profile>`,
 `gen-top-k-<profile>`, `gen-max-tokens-<profile>` and
 `gen-context-<profile>` (steppers expose `-minus`/`-plus` suffixed
@@ -367,7 +386,8 @@ transcript, search, the composer sheets, the sectioned conversation
 drawer, rename overlay, every settings surface (root, models, response
 style, appearance, privacy, storage, system prompt — with iOS-only
 Advanced variants for the root, custom repository, and sampling states),
-and Benchmark. The widget suite also runs Flutter's iOS 44-point target,
+Benchmark, and both unsupported-device surfaces (chat and models, iOS-only
+in light and dark). The widget suite also runs Flutter's iOS 44-point target,
 semantic-label, contrast, and enlarged-text checks; the settings root,
 appearance, and privacy screens are enrolled alongside chat, which is
 why segments and switches carry full 44-point targets and footnotes use

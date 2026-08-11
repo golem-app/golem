@@ -226,4 +226,32 @@ void main() {
       'Gemma 4 E2B · simulated',
     );
   });
+
+  test('an unsupported device names no model at all', () {
+    // "on device" is a claim about residency, and nothing will ever be
+    // resident here; the subtitle drops the model rather than imply one.
+    expect(
+      chatModelSubtitle(
+        backend: const InferenceBackendConfig(
+          kind: InferenceBackendKind.llama,
+          profileKey: 'qwen35',
+          artifactKey: 'qwen35-2b-gguf',
+          modelPath: 'documents:models/qwen35-2b-gguf/model.gguf',
+          modelPathFromCatalog: true,
+        ),
+        catalog: modelCatalog,
+        runsModels: false,
+      ),
+      'Unsupported device',
+    );
+    // The fake is never refused, so it keeps saying what it is.
+    expect(
+      chatModelSubtitle(
+        backend: const InferenceBackendConfig.fake(),
+        catalog: modelCatalog,
+        runsModels: false,
+      ),
+      contains('simulated'),
+    );
+  });
 }

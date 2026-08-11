@@ -454,16 +454,51 @@ final class NativeInfernoBackend implements InfernoBackend {
   int _nextOperationId = 1;
 
   @override
-  Future<InfernoDeviceProbe> probe() async {
+  Future<InfernoDeviceProbe> probe() async => _describe(_llamaApi);
+
+  /// Engine availability without a backend instance. The native probe is a
+  /// free function, while constructing a [NativeInfernoBackend] registers an
+  /// event listener that keeps the isolate alive until it is disposed — too
+  /// much machinery for a caller that only wants to know what this device can
+  /// run. Callers that already hold a backend use [probe] instead.
+  ///
+  /// [engine] narrows the question to one engine, which is the difference
+  /// between answering it and loading every shipped engine's library to do so:
+  /// asking about llama.cpp must not drag the MLX carrier into a cold start.
+  static Future<InfernoDeviceProbe> probeDevice({InfernoEngineKind? engine}) {
+    final llama = _LlamaNativeApi();
+    final version = llama.abiVersion();
+    if (version != infernoAbiVersion) {
+      throw InfernoException(
+        InfernoErrorCode.nativeUnavailable,
+        'Unsupported native ABI $version (expected $infernoAbiVersion).',
+      );
+    }
+    return _describe(llama, only: engine);
+  }
+
+  static Future<InfernoDeviceProbe> _describe(
+    _NativeApi llama, {
+    InfernoEngineKind? only,
+  }) async {
     final results = <InfernoEngineProbe>[];
     String? operatingSystem;
     for (final api in [
-      _llamaApi,
-      if (Platform.isIOS || Platform.isMacOS) _MlxNativeApi(),
+      if (only == null || only == InfernoEngineKind.llamaCpp) llama,
+      if ((only == null || only == InfernoEngineKind.mlx) &&
+          (Platform.isIOS || Platform.isMacOS))
+        _MlxNativeApi(),
     ]) {
-      final decoded = _probe(api);
-      operatingSystem ??= decoded.$1;
-      results.addAll(decoded.$2);
+      // One engine's failure is not another's answer: a carrier this build
+      // cannot resolve must leave itself out of the list, not discard the
+      // verdict the caller asked for. Absent then reads as unknown upstream.
+      try {
+        final decoded = _probe(api);
+        operatingSystem ??= decoded.$1;
+        results.addAll(decoded.$2);
+      } on InfernoException {
+        continue;
+      }
     }
     return InfernoDeviceProbe(
       operatingSystem: operatingSystem ?? Platform.operatingSystem,
@@ -471,7 +506,7 @@ final class NativeInfernoBackend implements InfernoBackend {
     );
   }
 
-  (String, List<InfernoEngineProbe>) _probe(_NativeApi api) {
+  static (String, List<InfernoEngineProbe>) _probe(_NativeApi api) {
     final pointer = api.probe();
     if (pointer == nullptr) {
       throw const InfernoException(

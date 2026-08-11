@@ -24,14 +24,20 @@ String chatModelLabel({
 }
 
 /// The nav bar's second line. Honesty is non-negotiable: simulated
-/// builds say so, only a real engine claims "on device".
+/// builds say so, only a real engine claims "on device", and a device outside
+/// every supported tier (#27) names no model at all — nothing will ever be
+/// resident there, so naming one would be the loudest lie on the screen.
 String chatModelSubtitle({
   required InferenceBackendConfig backend,
   required List<ModelCatalogEntry> catalog,
   String? modelKey,
   String? residentModelKey,
   Set<String>? loadableKeys,
+  bool runsModels = true,
 }) {
+  if (!backend.simulatedInference && !runsModels) {
+    return 'Unsupported device';
+  }
   final label = chatModelLabel(
     backend: backend,
     catalog: catalog,

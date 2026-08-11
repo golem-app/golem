@@ -351,6 +351,15 @@ extern "C" {
 uint32_t inferno_abi_version(void) { return INFERNO_ABI_VERSION; }
 
 const char *inferno_probe_json(void) {
+  // The compiled ARM kernels are a hard requirement of this binary rather than
+  // a fast path it can fall back from, so the probe answers for the device it
+  // is running on: an engine whose first load would refuse must not report
+  // itself available. The verdict comes from the same predicate the load uses,
+  // so the two can never drift apart.
+  const bool cpu_ok = cpu_meets_floor();
+  const std::string detail =
+      std::string("llama.cpp b10241") +
+      (cpu_ok ? "" : " (requires the ARM dot-product extension)");
   const std::string payload = json{
 #if defined(__ANDROID__)
       {"operatingSystem", "android"},
@@ -363,8 +372,8 @@ const char *inferno_probe_json(void) {
 #endif
       {"engines",
        json::array({{{"name", "llama_cpp"},
-                     {"available", true},
-                     {"detail", "llama.cpp b10241"}}})}}
+                     {"available", cpu_ok},
+                     {"detail", detail}}})}}
                                   .dump();
   auto *copy = static_cast<char *>(std::malloc(payload.size() + 1));
   if (copy == nullptr) return nullptr;

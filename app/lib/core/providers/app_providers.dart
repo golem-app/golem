@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../application/storage_breakdown_service.dart';
 import '../domain/app_preferences.dart';
 import '../domain/app_state.dart';
+import '../domain/device_eligibility.dart';
 import '../domain/generation_settings.dart';
 import '../domain/inference_backend.dart';
 import '../domain/model_activation.dart' as domain;
@@ -93,6 +94,28 @@ DiskSpaceProbe diskFreeSpaceProbe(Ref ref) =>
 @Riverpod(keepAlive: true, retry: noRetry)
 InferenceBackendConfig inferenceBackend(Ref ref) =>
     const InferenceBackendConfig.fake();
+
+/// What this device is allowed to run, classified once at launch (#27). A
+/// permitting default rather than a throwing seam, for the same reason
+/// [inferenceBackend] has one: surfaces across chat and Settings read it, and a
+/// container that never classified a device must not refuse anything. main()
+/// always overrides it with the real verdict.
+/// KeepAlive: process-constant boot configuration.
+@Riverpod(keepAlive: true, retry: noRetry)
+DeviceEligibility deviceEligibility(Ref ref) =>
+    const DeviceEligibility.unclassified();
+
+/// The refusal an unsupported device must present before any download or load,
+/// or null when this device may run models. Derived once and watched by every
+/// surface that gates on it, so the rule — including that a simulated backend
+/// is never gated, since it loads no weights and gating it would only make QA
+/// depend on hardware — exists in exactly one place.
+/// KeepAlive: derived from two process-constant boot values.
+@Riverpod(keepAlive: true, retry: noRetry)
+String? deviceRefusal(Ref ref) =>
+    ref.watch(inferenceBackendProvider).simulatedInference
+    ? null
+    : ref.watch(deviceEligibilityProvider).refusal;
 
 /// The catalog key of the model resident in the engine, straight from the
 /// residency owner (#42). Null while the engine is empty — label helpers fall
@@ -774,6 +797,24 @@ class ChatController extends _$ChatController {
     // GOLEM_MODEL_PATH must reach prepare() untouched, and a key this build no
     // longer carries is prepare()'s own typed failure to describe.
     final backend = ref.read(inferenceBackendProvider);
+    // A device outside every supported tier stops here (#27): prepare() could
+    // only fail, and the missing-model banner below would otherwise offer a
+    // multi-gigabyte download whose weights this device can never load. The
+    // sideload exemption does not apply — an operator's own file needs the
+    // same memory and the same instruction set.
+    final refusal = ref.read(deviceRefusalProvider);
+    if (refusal != null) {
+      state = AsyncData(
+        _value.copyWith(
+          generation: GenerationPhase.failed,
+          failure: ChatFailure(
+            kind: ChatFailureKind.unsupportedDevice,
+            message: refusal,
+          ),
+        ),
+      );
+      return;
+    }
     final target = active.modelKey ?? backend.artifactKey;
     final entry = target == null
         ? null
@@ -1115,6 +1156,19 @@ class ModelController extends _$ModelController {
 
   Future<void> download(String artifactKey) async {
     if (_busy) return;
+    // Defence in depth behind the withheld card button and the chat banner's
+    // absent CTA (#27): a device that can never load these weights must never
+    // spend gigabytes fetching them, whichever path asked. Reconciliation is
+    // the path that still can — it re-adopts a transfer the platform is still
+    // running — so that one is stopped rather than relabelled. Nothing is
+    // published over it: the card already carries the reason.
+    if (ref.read(deviceRefusalProvider) != null) {
+      final phase = state.value?.statusOf(artifactKey).phase;
+      if (phase == ArtifactPhase.downloading || phase == ArtifactPhase.paused) {
+        await cancel(artifactKey);
+      }
+      return;
+    }
     _busy = true;
     try {
       final epoch = ++_operationEpoch;
@@ -1274,6 +1328,20 @@ class ModelController extends _$ModelController {
         state = AsyncData(
           current.copyWith(runtime: RuntimePhase.loading, clearFailure: true),
         );
+        // An unsupported device refuses ahead of every other condition (#27):
+        // installed weights change nothing about what this hardware can run.
+        // Only this branch — unloading stays reachable, so a phase persisted
+        // by an earlier build can always be corrected.
+        final refusal = ref.read(deviceRefusalProvider);
+        if (refusal != null) {
+          final value = await repository.recordRuntime(
+            RuntimePhase.failed,
+            failure: refusal,
+          );
+          if (!ref.mounted) return;
+          state = AsyncData(value);
+          return;
+        }
         // A sideload's path is the operator's own and has no catalog phase to
         // gate on; everything else must be installed before the engine is
         // touched, and which artifact that is follows the active chat (#20).

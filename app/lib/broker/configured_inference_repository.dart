@@ -1,10 +1,14 @@
+import 'dart:io';
+
 import '../core/app_identity.dart';
+import '../core/domain/device_eligibility.dart';
 import '../core/domain/inference_backend.dart';
 import '../core/domain/model_catalog.dart';
 import '../core/repositories/contracts.dart';
 import '../core/repositories/fake_inference_repository.dart';
 import '../core/services/device_storage.dart';
 import 'backend_policy.dart';
+import 'device_capability.dart';
 import 'inferno_inference_repository.dart';
 import 'model_catalog.dart';
 import 'model_profile.dart';
@@ -12,21 +16,46 @@ import 'model_runtime_config.dart';
 import 'runtime.dart';
 
 /// Called once in main(); the result is the single source of truth for the
-/// inference repository, the active artifact, and the backend signal provider.
-Future<InferenceBackendConfig> resolveConfiguredBackend() =>
-    resolveBackendPolicy(
-      backendDefine: const String.fromEnvironment('GOLEM_INFERENCE_BACKEND'),
+/// inference repository, the active artifact, the backend signal provider, and
+/// what this device is allowed to run. The device is read once here: the model
+/// the build selects and the eligibility its surfaces report come from the same
+/// classification, so they cannot disagree.
+Future<({InferenceBackendConfig config, DeviceEligibility eligibility})>
+resolveConfiguredBackend() async {
+  const backendDefine = String.fromEnvironment('GOLEM_INFERENCE_BACKEND');
+  final backendName = resolveBackendName(
+    backendDefine: backendDefine,
+    identity: AppIdentity.current,
+  );
+  final capabilities = await probeDeviceCapabilities(
+    backendName: backendName,
+    physicalMemoryBytes: const DeviceStorageChannel().physicalMemoryBytes,
+    // Test-only: both test phones report over 8 GB, so neither the Qwen branch
+    // nor the floor is otherwise reachable on hardware. 0 = unset.
+    memoryOverrideBytes: const int.fromEnvironment('GOLEM_DEVICE_MEMORY_BYTES'),
+    // Test-only counterpart for the instruction-set refusal, which no device
+    // here can produce: every one of them carries the extension.
+    forceEngineUnsupported: const bool.fromEnvironment(
+      'GOLEM_DEVICE_ENGINE_UNSUPPORTED',
+    ),
+  );
+  final eligibility = classifyDevice(
+    capabilities: capabilities,
+    memoryFloorBytes: deviceMemoryFloorBytes(
+      reportsInstalledMemory: Platform.isIOS || Platform.isMacOS,
+    ),
+  );
+  return (
+    config: resolveBackendPolicy(
+      backendName: backendName,
       profileDefine: const String.fromEnvironment('GOLEM_MODEL_PROFILE'),
       artifactDefine: const String.fromEnvironment('GOLEM_MODEL_ARTIFACT'),
       modelPathDefine: const String.fromEnvironment('GOLEM_MODEL_PATH'),
-      identity: AppIdentity.current,
-      // Test-only: both test phones report over 8 GB, so the Qwen branch is
-      // otherwise unreachable. 0 = unset.
-      memoryOverrideBytes: const int.fromEnvironment(
-        'GOLEM_DEVICE_MEMORY_BYTES',
-      ),
-      physicalMemoryBytes: const DeviceStorageChannel().physicalMemoryBytes,
-    );
+      tier: eligibility.tier,
+    ),
+    eligibility: eligibility,
+  );
+}
 
 InferenceRepository createConfiguredInferenceRepository({
   required InferenceBackendConfig config,

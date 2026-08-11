@@ -591,6 +591,134 @@ final class InferenceBackendProvider
 
 String _$inferenceBackendHash() => r'514f250994225e1c5e3830610653488e7a69988b';
 
+/// What this device is allowed to run, classified once at launch (#27). A
+/// permitting default rather than a throwing seam, for the same reason
+/// [inferenceBackend] has one: surfaces across chat and Settings read it, and a
+/// container that never classified a device must not refuse anything. main()
+/// always overrides it with the real verdict.
+/// KeepAlive: process-constant boot configuration.
+
+@ProviderFor(deviceEligibility)
+final deviceEligibilityProvider = DeviceEligibilityProvider._();
+
+/// What this device is allowed to run, classified once at launch (#27). A
+/// permitting default rather than a throwing seam, for the same reason
+/// [inferenceBackend] has one: surfaces across chat and Settings read it, and a
+/// container that never classified a device must not refuse anything. main()
+/// always overrides it with the real verdict.
+/// KeepAlive: process-constant boot configuration.
+
+final class DeviceEligibilityProvider
+    extends
+        $FunctionalProvider<
+          DeviceEligibility,
+          DeviceEligibility,
+          DeviceEligibility
+        >
+    with $Provider<DeviceEligibility> {
+  /// What this device is allowed to run, classified once at launch (#27). A
+  /// permitting default rather than a throwing seam, for the same reason
+  /// [inferenceBackend] has one: surfaces across chat and Settings read it, and a
+  /// container that never classified a device must not refuse anything. main()
+  /// always overrides it with the real verdict.
+  /// KeepAlive: process-constant boot configuration.
+  DeviceEligibilityProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: noRetry,
+        name: r'deviceEligibilityProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$deviceEligibilityHash();
+
+  @$internal
+  @override
+  $ProviderElement<DeviceEligibility> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  DeviceEligibility create(Ref ref) {
+    return deviceEligibility(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(DeviceEligibility value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<DeviceEligibility>(value),
+    );
+  }
+}
+
+String _$deviceEligibilityHash() => r'd623c80a62b116f77443a56cb163d7cd2d4b904b';
+
+/// The refusal an unsupported device must present before any download or load,
+/// or null when this device may run models. Derived once and watched by every
+/// surface that gates on it, so the rule — including that a simulated backend
+/// is never gated, since it loads no weights and gating it would only make QA
+/// depend on hardware — exists in exactly one place.
+/// KeepAlive: derived from two process-constant boot values.
+
+@ProviderFor(deviceRefusal)
+final deviceRefusalProvider = DeviceRefusalProvider._();
+
+/// The refusal an unsupported device must present before any download or load,
+/// or null when this device may run models. Derived once and watched by every
+/// surface that gates on it, so the rule — including that a simulated backend
+/// is never gated, since it loads no weights and gating it would only make QA
+/// depend on hardware — exists in exactly one place.
+/// KeepAlive: derived from two process-constant boot values.
+
+final class DeviceRefusalProvider
+    extends $FunctionalProvider<String?, String?, String?>
+    with $Provider<String?> {
+  /// The refusal an unsupported device must present before any download or load,
+  /// or null when this device may run models. Derived once and watched by every
+  /// surface that gates on it, so the rule — including that a simulated backend
+  /// is never gated, since it loads no weights and gating it would only make QA
+  /// depend on hardware — exists in exactly one place.
+  /// KeepAlive: derived from two process-constant boot values.
+  DeviceRefusalProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: noRetry,
+        name: r'deviceRefusalProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$deviceRefusalHash();
+
+  @$internal
+  @override
+  $ProviderElement<String?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String? create(Ref ref) {
+    return deviceRefusal(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String?>(value),
+    );
+  }
+}
+
+String _$deviceRefusalHash() => r'468361a06ea6560745860b6503ccdea28219b622';
+
 /// The catalog key of the model resident in the engine, straight from the
 /// residency owner (#42). Null while the engine is empty — label helpers fall
 /// back to the configured artifact, so a lazy first load does not blank the
@@ -1056,7 +1184,7 @@ final class SettingsControllerProvider
 }
 
 String _$settingsControllerHash() =>
-    r'1c2af52933a97a9d1a8713fd6bb2b42bca0ed384';
+    r'16471fb186699675ede268459ed08748adb14234';
 
 /// Only user-set values are stored; profile defaults resolve at the consumer.
 /// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
@@ -1122,7 +1250,7 @@ final class PreferencesControllerProvider
 }
 
 String _$preferencesControllerHash() =>
-    r'aeeb637738d76126ac2b6f0085a3c475c5e7f26d';
+    r'd43fa0e0138513c21ce3a509f155afac7a18cfa0';
 
 /// Persisted app-wide preferences. Every command follows the settings idiom —
 /// drop taps that land in the cold-start load window, publish, then save —
@@ -1179,7 +1307,7 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'2d5ea9018dcaa97c7a6c581929855441cc46c7ec';
+String _$chatControllerHash() => r'cc56e6a1049567e4a16d0dcde84c13406f2345c6';
 
 /// KeepAlive: the chat session aggregate — in-flight generation and unsaved
 /// turns must survive every route transition.
@@ -1236,7 +1364,7 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'13feb0274a7de49f9b86157a27e042d1f66af0f8';
+String _$modelControllerHash() => r'c762b14f89332a86f58f0ab6f7ef900a870c592a';
 
 /// KeepAlive: a command controller whose downloads, busy guard, and epochs
 /// must survive leaving the Models screen (§3.4 — an autoDispose command
@@ -1260,18 +1388,24 @@ abstract class _$ModelController extends $AsyncNotifier<ModelState> {
   }
 }
 
-/// KeepAlive: the startup outcome is process-lifetime; #66 owns any
-/// startup redesign.
+/// KeepAlive: the startup outcome is process-lifetime. This is the scripted
+/// splash theatre (minimum hold, progress ticks, injected demo scenarios);
+/// real launch failures and their retry live before this scope exists, in
+/// the bootstrap gate (docs/decisions/0006-launch-bootstrap.md).
 
 @ProviderFor(StartupController)
 final startupControllerProvider = StartupControllerProvider._();
 
-/// KeepAlive: the startup outcome is process-lifetime; #66 owns any
-/// startup redesign.
+/// KeepAlive: the startup outcome is process-lifetime. This is the scripted
+/// splash theatre (minimum hold, progress ticks, injected demo scenarios);
+/// real launch failures and their retry live before this scope exists, in
+/// the bootstrap gate (docs/decisions/0006-launch-bootstrap.md).
 final class StartupControllerProvider
     extends $AsyncNotifierProvider<StartupController, StartupState> {
-  /// KeepAlive: the startup outcome is process-lifetime; #66 owns any
-  /// startup redesign.
+  /// KeepAlive: the startup outcome is process-lifetime. This is the scripted
+  /// splash theatre (minimum hold, progress ticks, injected demo scenarios);
+  /// real launch failures and their retry live before this scope exists, in
+  /// the bootstrap gate (docs/decisions/0006-launch-bootstrap.md).
   StartupControllerProvider._()
     : super(
         from: null,
@@ -1293,8 +1427,10 @@ final class StartupControllerProvider
 
 String _$startupControllerHash() => r'd4a2a4151c2a95fb1f9bd58bfee3cdd02463a04d';
 
-/// KeepAlive: the startup outcome is process-lifetime; #66 owns any
-/// startup redesign.
+/// KeepAlive: the startup outcome is process-lifetime. This is the scripted
+/// splash theatre (minimum hold, progress ticks, injected demo scenarios);
+/// real launch failures and their retry live before this scope exists, in
+/// the bootstrap gate (docs/decisions/0006-launch-bootstrap.md).
 
 abstract class _$StartupController extends $AsyncNotifier<StartupState> {
   FutureOr<StartupState> build();
