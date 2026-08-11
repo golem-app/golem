@@ -52,14 +52,20 @@ android {
                 "${flutter.targetSdkVersion}."
         }
 
-        // The store artifact carries arm64-v8a alone. Plugin AARs ship
-        // prebuilt libraries for every ABI, so without this the bundle
-        // advertises armeabi-v7a and x86_64 while carrying no Flutter engine
-        // for them, and Play offers the app to devices that cannot start it.
-        // Load-bearing only alongside disable-abi-filtering in
-        // gradle.properties, which stops Flutter's plugin clearing this set.
         ndk {
-            abiFilters += "arm64-v8a"
+            // Golem is arm64-only on Android: nothing below that tier can run
+            // a multi-gigabyte model, and shipping an ABI whose Flutter engine
+            // is absent makes Play offer the app to devices that install it
+            // and crash. Plugin AARs carry prebuilt libraries for every ABI,
+            // so the filter — not --target-platform — is what decides.
+            //
+            // Flutter's plugin writes armeabi-v7a/arm64-v8a/x86_64 here before
+            // this block runs; clearing and re-setting in defaultConfig is the
+            // override Flutter documents, and the only one it promises to
+            // preserve:
+            // docs.flutter.dev/release/breaking-changes/default-abi-filters-android
+            abiFilters.clear()
+            abiFilters.add("arm64-v8a")
         }
     }
 
@@ -91,6 +97,19 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+
+            // Both are AGP defaults today, and tool/check_android_packaging.dart
+            // fails a release that arrives without their output — the R8
+            // mapping and the per-ABI symbols Play needs to symbolicate
+            // crashes. Stated so an AGP default flipping cannot drop
+            // symbolication from the store artifact silently.
+            isMinifyEnabled = true
+            ndk {
+                // SYMBOL_TABLE is AGP's default and what is stated here.
+                // FULL adds DWARF and takes the bundle from 28 MB to 68 MB for
+                // line numbers Play's crash reports do not need.
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
         }
     }
 }

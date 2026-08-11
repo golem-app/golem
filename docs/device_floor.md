@@ -75,13 +75,15 @@ reservations; ADR 0007 carries the derivation. Unknown never refuses.
   Recovering i8mm needs runtime dispatch — `GGML_CPU_ALL_VARIANTS` with
   `GGML_BACKEND_DL`, i.e. several shared libraries instead of one code
   asset — which is a separate piece of work, not a compile flag.
-- **The store bundle carries `arm64-v8a` alone** (`abiFilters` in
-  `app/android/app/build.gradle.kts`, ADR 0010). `armeabi-v7a` and `x86_64`
-  still build at their toolchain baselines for emulators and local checks,
-  but shipping them advertised a tier that does not exist:
-  `cpu_meets_floor()` is compiled `#if defined(__aarch64__)` and returns
-  `true` on a 32-bit build, so the dot-product refusal above never fires
-  there.
+- **Android is `arm64-v8a` alone** (`defaultConfig.ndk.abiFilters` in
+  `app/android/app/build.gradle.kts`, ADR 0010) — every flavor, not just the
+  store bundle, so an x86_64 or 32-bit emulator no longer installs any of
+  them. Shipping the other ABIs advertised a tier that does not exist:
+  `cpu_meets_floor()` is guarded by
+  `#if defined(__linux__) && defined(__aarch64__)` and falls through to
+  `return true` otherwise, so the dot-product refusal above never fired on
+  `armeabi-v7a` or the Android `x86_64` slice. The Inferno hook still knows
+  how to cross-compile both; nothing packages them.
 
 ## Both platforms
 

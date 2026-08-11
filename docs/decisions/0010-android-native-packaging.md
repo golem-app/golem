@@ -95,19 +95,35 @@ offered the app to devices that install it and crash on launch. Flutter's own
 plugin comment describes this hazard exactly; its mitigation stops at excluding
 32-bit x86.
 
-Narrowing needs both halves, because the plugin *clears* `abiFilters` before
-setting its own: `disable-abi-filtering=true` in `gradle.properties` stops the
-clear, and `defaultConfig.ndk.abiFilters` then decides. `--target-platform`
-survives as a build-time saving — one llama.cpp cross-compile instead of three —
-not as the correctness mechanism.
+The override is `abiFilters.clear()` then `add("arm64-v8a")` in `defaultConfig`.
+Flutter's plugin populates that set during `apply()`, before the `android {}`
+block is evaluated, so clearing it there wins — and `defaultConfig` is the only
+place Flutter promises to preserve, since AGP merges flavor and build-type ABI
+sets by *union* and no flavor can therefore narrow below it. Flutter's
+[breaking-change note](https://docs.flutter.dev/release/breaking-changes/default-abi-filters-android)
+documents exactly this. `--target-platform` survives as a build-time saving —
+one llama.cpp cross-compile instead of three — never as the correctness
+mechanism.
 
-Dropping `armeabi-v7a` also closes a hole in the device floor. `cpu_meets_floor()`
-in `llama_shim.cpp` is compiled `#if defined(__aarch64__)`; on a 32-bit build it
-returns `true` unconditionally, so the dot-product refusal that ADR 0007 and
-`docs/device_floor.md` rely on never fires there. A 32-bit device passed
-admission, spent 1.2 GB on weights, and ran generic kernels — a tier ADR 0007
-says does not exist. `x86_64` goes with it: no x86_64 phone runs this, and the
-16 KB emulator this was verified on is arm64.
+The consequence is that **every** Android build is arm64, not just the store
+bundle: `qa` and `dev` APKs no longer install on an x86_64 or 32-bit emulator.
+That is accepted rather than worked around. The alternative — the flavor-scoped
+filter plus `-Pdisable-abi-filtering` — was built and measured first, and it
+buys emulator breadth at a poor price: Flutter says it cannot safely preserve
+flavor filters, disabling the plugin's filtering also removes its exclusion of
+the 32-bit x86 that plugin AARs still carry (the qa APK grew to 79.6 MB and
+gained a `lib/x86/` no engine can serve), and the ABI set ends up restated in
+three flavors. Every Android surface this project verifies on is arm64 — the
+OnePlus 12R and Apple-silicon emulators — so the breadth was hypothetical and
+the failure modes were not. Widening later is one line in `defaultConfig`.
+
+Dropping these two ABIs also closes a hole in the device floor.
+`cpu_meets_floor()` in `llama_shim.cpp` is guarded by
+`#if defined(__linux__) && defined(__aarch64__)` and otherwise falls through to
+`return true`, so the dot-product refusal that ADR 0007 and
+`docs/device_floor.md` rely on never fired on either `armeabi-v7a` or the
+Android `x86_64` slice. Such a device passed admission, spent 1.2 GB on
+weights, and ran generic kernels — a tier ADR 0007 says does not exist.
 
 ## Target API 36, and what it turns on
 

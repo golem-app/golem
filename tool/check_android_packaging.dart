@@ -33,13 +33,19 @@ void main(List<String> arguments) {
       );
       continue;
     }
-    problems.addAll(_check(file));
+    try {
+      problems.addAll(_check(file));
+    } on Object catch (error) {
+      // A structural surprise in one artifact must not cost the diagnostics
+      // already gathered for the other.
+      problems.add('$path could not be parsed: $error');
+    }
   }
 
   if (problems.isEmpty) {
     stdout.writeln(
-      '\nEvery checked artifact satisfies the Play '
-      'native-library rules.',
+      '\nEvery checked artifact satisfies the Play native-library rules that '
+      'apply to it.',
     );
     return;
   }
@@ -66,8 +72,9 @@ const _shippedAbis = {'arm64-v8a'};
 
 const _pageSize = 16384;
 
-/// Play rejects a native debug symbols upload above this.
-const _symbolCeiling = 800 * 1024 * 1024;
+/// Play's limit on the native debug symbols file
+/// (developer.android.com/build/include-native-symbols).
+const _symbolCeiling = 1600 * 1024 * 1024;
 
 const _weightSuffixes = ['.gguf', '.safetensors'];
 
@@ -153,14 +160,21 @@ List<String> _check(File file) {
     '  ABIs: ${_sorted(abis)}  (${_mib(libraryBytes)} of uncompressed .so)',
   );
 
-  if (!bundle) return problems;
-
+  // The ABI set is declared in defaultConfig, so it is the same for every
+  // flavor and both artifact kinds are held to it.
   if (!_setsEqual(abis, _shippedAbis)) {
     problems.add(
-      '${file.path} carries ABIs ${_sorted(abis)}; the shipped bundle is '
+      '${file.path} carries ABIs ${_sorted(abis)}; Android builds carry '
       '${_sorted(_shippedAbis)}. An ABI present without a Flutter engine '
       'makes Play offer the app to devices that cannot start it.',
     );
+  }
+
+  if (!bundle) {
+    // BundleConfig and the symbolication uploads exist only in the bundle
+    // Play receives; an APK is a sideload artifact and is not held to them.
+    stdout.writeln('  (APK: alignment, packaging and ABI set only)');
+    return problems;
   }
   problems.addAll(_checkBundleConfig(file, bytes, entries));
   problems.addAll(_checkSymbolUploads(file, entries, abis));
@@ -214,7 +228,9 @@ List<String> _checkSymbolUploads(
   final symbols = entries.where(
     (entry) => entry.name.startsWith(_symbolPrefix),
   );
-  final total = symbols.fold(0, (sum, entry) => sum + entry.size);
+  // Compressed, because the ceiling applies to the bytes Play receives; the
+  // uncompressed total is roughly 2.5x that and would fail a valid release.
+  final total = symbols.fold(0, (sum, entry) => sum + entry.compressedSize);
   final covered = symbols.map(
     (e) => e.name.substring(_symbolPrefix.length).split('/').first,
   );
@@ -227,8 +243,8 @@ List<String> _checkSymbolUploads(
   if (total > _symbolCeiling) {
     problems.add(
       '${file.path}: native debug symbols total ${_mib(total)}, above the '
-      '${_mib(_symbolCeiling)} Play accepts. Drop debugSymbolLevel to '
-      'SYMBOL_TABLE.',
+      '${_mib(_symbolCeiling)} Play accepts. Keep debugSymbolLevel at '
+      'SYMBOL_TABLE rather than FULL.',
     );
   }
   if (!entries.any((entry) => entry.name == _mappingEntry)) {

@@ -395,9 +395,11 @@ flutter build apk --release --flavor production   # sideload/emulator copy
 (cd .. && dart run tool/check_android_packaging.dart)
 ```
 
-`--flavor production` is not optional; `default-flavor` is `dev`. The bundle
-carries `arm64-v8a` alone, so `--target-platform android-arm64` changes
-nothing about what ships and only saves two llama.cpp cross-compiles.
+`--flavor production` is not optional; `default-flavor` is `dev`. Every Android
+build carries `arm64-v8a` alone (`defaultConfig.ndk.abiFilters`), so
+`--target-platform android-arm64` changes nothing about what ships and only
+saves two llama.cpp cross-compiles — and no Android emulator below arm64 will
+install any flavor.
 
 `check_android_packaging.dart` is the release-time gate for Play's
 native-library rules: 16 KB page alignment on every 64-bit library, the

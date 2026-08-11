@@ -19,6 +19,12 @@ Future<void> main(List<String> arguments) async {
       );
     }
 
+    // Before the archive is fetched: an unusable toolchain should cost
+    // nothing, not a download and an extraction per ABI.
+    if (config.targetOS == OS.android) {
+      _requirePinnedNdk(_androidNdkRoot(config));
+    }
+
     final source = await _llamaSource(input.outputDirectoryShared);
     // CMake keeps the compiler it first cached and will not swap it inside an
     // existing build directory, so the toolchain has to be part of the key or
@@ -32,6 +38,13 @@ Future<void> main(List<String> arguments) async {
     final buildDirectory = Directory.fromUri(
       input.outputDirectoryShared.resolve('llama-build-$targetKey/'),
     );
+    if (config.targetOS == OS.android) {
+      await _pruneSupersededBuilds(
+        input.outputDirectoryShared,
+        config.targetArchitecture,
+        buildDirectory,
+      );
+    }
     final outputDirectory = Directory.fromUri(input.outputDirectory);
     await buildDirectory.create(recursive: true);
     await outputDirectory.create(recursive: true);
@@ -249,6 +262,15 @@ Future<Directory> _llamaSource(Uri sharedOutput) async {
   }
 }
 
+/// The NDK root Flutter selected, derived from the clang path it supplies.
+String _androidNdkRoot(CodeConfig config) {
+  final compiler = config.cCompiler?.compiler.toFilePath();
+  if (compiler == null || !compiler.contains('/toolchains/')) {
+    throw StateError('The Android NDK compiler configuration is missing.');
+  }
+  return compiler.substring(0, compiler.indexOf('/toolchains/'));
+}
+
 /// Flutter resolves the Android NDK by taking the newest one installed, so
 /// without a pin the compiler behind every shipped ggml kernel changes with
 /// whatever the machine happens to have — and before r28 the shipped library
@@ -267,9 +289,33 @@ void _requirePinnedNdk(String ndk) {
   throw StateError(
     'Inferno pins Android NDK $_androidNdkVersion, but Flutter selected '
     '$revision at $ndk. Install the pinned revision with '
-    '`sdkmanager "ndk;$_androidNdkVersion"`, or select it explicitly with '
-    'ANDROID_NDK_HOME.',
+    '`sdkmanager "ndk;$_androidNdkVersion"`. Flutter picks the newest NDK '
+    'installed unless told otherwise, by `flutter config --android-ndk <path>` '
+    'which wins, or ANDROID_NDK_HOME after it.',
   );
+}
+
+/// The build directory is keyed by NDK revision, so a bump leaves the previous
+/// revision's multi-gigabyte tree behind. Nothing else collects it — and
+/// nothing is still using it, since only the current key is ever built.
+Future<void> _pruneSupersededBuilds(
+  Uri sharedOutput,
+  Architecture architecture,
+  Directory current,
+) async {
+  final prefix = 'llama-build-${OS.android}-$architecture-ndk';
+  final shared = Directory.fromUri(sharedOutput);
+  if (!await shared.exists()) return;
+  await for (final entity in shared.list(followLinks: false)) {
+    if (entity is! Directory) continue;
+    final name = entity.uri.pathSegments.where((p) => p.isNotEmpty).last;
+    if (!name.startsWith(prefix) || entity.path == current.path) continue;
+    try {
+      await entity.delete(recursive: true);
+    } on FileSystemException {
+      // A concurrent ABI build may have removed it first; nothing to do.
+    }
+  }
 }
 
 Future<List<String>> _targetCmakeArguments(CodeConfig config) async {
@@ -282,12 +328,7 @@ Future<List<String>> _targetCmakeArguments(CodeConfig config) async {
     ),
   };
   if (config.targetOS == OS.android) {
-    final compiler = config.cCompiler?.compiler.toFilePath();
-    if (compiler == null || !compiler.contains('/toolchains/')) {
-      throw StateError('The Android NDK compiler configuration is missing.');
-    }
-    final ndk = compiler.substring(0, compiler.indexOf('/toolchains/'));
-    _requirePinnedNdk(ndk);
+    final ndk = _androidNdkRoot(config);
     final abi = switch (config.targetArchitecture) {
       Architecture.arm64 => 'arm64-v8a',
       Architecture.x64 => 'x86_64',
