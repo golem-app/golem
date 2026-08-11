@@ -43,6 +43,13 @@ class EmptyChat extends ConsumerWidget {
     // Copy stays honest in both directions: only the fake backend may call
     // itself simulated.
     final backend = ref.watch(inferenceBackendProvider);
+    // A device outside every supported tier says so here rather than letting a
+    // user write a prompt that could only fail (#27). The simulated backend
+    // loads nothing, so it is never refused.
+    final eligibility = ref.watch(deviceEligibilityProvider);
+    final refusal = backend.simulatedInference || eligibility.runsModels
+        ? null
+        : eligibility.message;
     final label = chatModelLabel(
       backend: backend,
       catalog: ref.watch(effectiveModelCatalogProvider),
@@ -57,7 +64,9 @@ class EmptyChat extends ConsumerWidget {
         padding: const EdgeInsets.all(32),
         child: Semantics(
           key: const Key('empty-chat'),
-          label: 'Start a private conversation',
+          label: refusal == null
+              ? 'Start a private conversation'
+              : 'Golem cannot run models on this device',
           child: Column(
             children: [
               Container(
@@ -71,14 +80,25 @@ class EmptyChat extends ConsumerWidget {
                 child: Image.asset('assets/images/golem_mascot.png'),
               ),
               const SizedBox(height: 22),
-              const Text('What are we building?', style: GolemText.display),
+              if (refusal == null)
+                const Text('What are we building?', style: GolemText.display)
+              else
+                const Text(
+                  'Golem can’t run models here',
+                  textAlign: TextAlign.center,
+                  style: GolemText.display,
+                ),
               const SizedBox(height: 10),
               Text(
-                backend.simulatedInference
-                    ? 'This preview simulates $label on this phone. '
-                          'Nothing you type here goes anywhere.'
-                    : '$label is loaded and running on this phone. '
-                          'Nothing you type here goes anywhere.',
+                key: refusal == null
+                    ? null
+                    : const Key('device-unsupported-notice'),
+                refusal ??
+                    (backend.simulatedInference
+                        ? 'This preview simulates $label on this phone. '
+                              'Nothing you type here goes anywhere.'
+                        : '$label is loaded and running on this phone. '
+                              'Nothing you type here goes anywhere.'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   height: 1.4,
@@ -89,64 +109,69 @@ class EmptyChat extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 8,
-                runSpacing: 10,
-                children: [
-                  for (final starter in _starters)
-                    CupertinoButton(
-                      key: starter.key,
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(44, 44),
-                      onPressed: () => onStarter(starter.prompt),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 13,
-                          vertical: 9,
-                        ),
-                        decoration: BoxDecoration(
-                          color: CupertinoDynamicColor.resolve(
-                            GolemTheme.surface,
-                            context,
+              // Starter chips would only prefill a prompt this device cannot
+              // answer, so a refused device gets none.
+              if (refusal == null)
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 10,
+                  children: [
+                    for (final starter in _starters)
+                      CupertinoButton(
+                        key: starter.key,
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(44, 44),
+                        onPressed: () => onStarter(starter.prompt),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 13,
+                            vertical: 9,
                           ),
-                          borderRadius: BorderRadius.circular(GolemRadius.pill),
-                          border: Border.all(
+                          decoration: BoxDecoration(
                             color: CupertinoDynamicColor.resolve(
-                              GolemTheme.divider,
+                              GolemTheme.surface,
                               context,
                             ),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              starter.icon,
-                              size: 15,
+                            borderRadius: BorderRadius.circular(
+                              GolemRadius.pill,
+                            ),
+                            border: Border.all(
                               color: CupertinoDynamicColor.resolve(
-                                GolemTheme.accentIcon,
+                                GolemTheme.divider,
                                 context,
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            Text(
-                              starter.label,
-                              style: TextStyle(
-                                fontSize: 14,
-                                height: 1.3,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                starter.icon,
+                                size: 15,
                                 color: CupertinoDynamicColor.resolve(
-                                  GolemTheme.ink,
+                                  GolemTheme.accentIcon,
                                   context,
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 6),
+                              Text(
+                                starter.label,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  height: 1.3,
+                                  color: CupertinoDynamicColor.resolve(
+                                    GolemTheme.ink,
+                                    context,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                ],
-              ),
+                  ],
+                ),
             ],
           ),
         ),

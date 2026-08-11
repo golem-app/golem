@@ -93,6 +93,12 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
     final simulatedInference = ref
         .watch(inferenceBackendProvider)
         .simulatedInference;
+    // A device outside every supported tier may not start a transfer or a load
+    // (#27); the cards say why instead of offering buttons that would refuse.
+    final eligibility = ref.watch(deviceEligibilityProvider);
+    final deviceRefusal = simulatedInference || eligibility.runsModels
+        ? null
+        : eligibility.message;
     final downloadingKey = model.artifacts.entries
         .where((entry) => entry.value.phase == ArtifactPhase.downloading)
         .map((entry) => entry.key)
@@ -173,6 +179,7 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
                 model.simulated ||
                 pinnedKeys.contains(entry.key) ||
                 resolvedKeys.contains(entry.key),
+            deviceRefusal: deviceRefusal,
           ),
           const SizedBox(height: 12),
         ],
@@ -183,6 +190,7 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
           model: model,
           simulatedInference: simulatedInference,
           activeKey: activeKey,
+          deviceRefusal: deviceRefusal,
         ),
         if (advanced) ...[
           const SizedBox(height: 24),
@@ -230,10 +238,14 @@ class _RuntimeCard extends ConsumerWidget {
     required this.model,
     required this.simulatedInference,
     required this.activeKey,
+    this.deviceRefusal,
   });
   final ModelState model;
   final bool simulatedInference;
   final String? activeKey;
+
+  /// Why this device may not load a model, or null when it may.
+  final String? deviceRefusal;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -270,17 +282,32 @@ class _RuntimeCard extends ConsumerWidget {
                 ),
               ],
               const SizedBox(height: 14),
-              GolemButton.tinted(
-                key: const Key('runtime-toggle-button'),
-                label: model.runtime == RuntimePhase.loaded
-                    ? 'Unload ${simulatedInference ? 'Simulated ' : ''}Runtime'
-                    : 'Load ${simulatedInference ? 'Simulated ' : ''}Runtime',
-                onPressed: model.runtime == RuntimePhase.loading
-                    ? null
-                    : () => ref
-                          .read(modelControllerProvider.notifier)
-                          .toggleRuntime(),
-              ),
+              if (deviceRefusal == null)
+                GolemButton.tinted(
+                  key: const Key('runtime-toggle-button'),
+                  label: model.runtime == RuntimePhase.loaded
+                      ? 'Unload ${simulatedInference ? 'Simulated ' : ''}Runtime'
+                      : 'Load ${simulatedInference ? 'Simulated ' : ''}Runtime',
+                  onPressed: model.runtime == RuntimePhase.loading
+                      ? null
+                      : () => ref
+                            .read(modelControllerProvider.notifier)
+                            .toggleRuntime(),
+                ),
+              if (deviceRefusal != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(
+                    deviceRefusal!,
+                    key: const Key('runtime-device-refusal'),
+                    style: GolemText.footnote.copyWith(
+                      color: CupertinoDynamicColor.resolve(
+                        GolemTheme.mutedInk,
+                        context,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -720,6 +747,7 @@ class _ModelCard extends ConsumerWidget {
     required this.active,
     required this.otherDownloadActive,
     required this.downloadable,
+    this.deviceRefusal,
   });
 
   final ModelCatalogEntry entry;
@@ -731,6 +759,9 @@ class _ModelCard extends ConsumerWidget {
   /// False for hand-added entries on a real download backend, whose
   /// repository would reject the unknown key.
   final bool downloadable;
+
+  /// Why this device may not fetch any weights at all, or null when it may.
+  final String? deviceRefusal;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -894,23 +925,35 @@ class _ModelCard extends ConsumerWidget {
     final download = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        GolemButton.filled(
-          key: Key('model-download-${entry.key}'),
-          label: switch (status.phase) {
-            ArtifactPhase.paused => 'Resume Download',
-            ArtifactPhase.failed => 'Retry Download',
-            _ => 'Download · ${_gigabytes(entry.totalBytes)}',
-          },
-          onPressed: otherDownloadActive || !downloadable
-              ? null
-              : () => controller.download(entry.key),
-        ),
-        if (!downloadable)
+        // A refused device gets the explanation in place of the button rather
+        // than beneath it: a full-width accent CTA that does nothing when
+        // tapped would undo the honesty the copy is there to provide.
+        if (deviceRefusal == null)
+          GolemButton.filled(
+            key: Key('model-download-${entry.key}'),
+            label: switch (status.phase) {
+              ArtifactPhase.paused => 'Resume Download',
+              ArtifactPhase.failed => 'Retry Download',
+              _ => 'Download · ${_gigabytes(entry.totalBytes)}',
+            },
+            onPressed: otherDownloadActive || !downloadable
+                ? null
+                : () => controller.download(entry.key),
+          ),
+        if (!downloadable || deviceRefusal != null)
           Padding(
             padding: const EdgeInsets.only(top: 10),
             child: Text(
-              'This repository has not been resolved against Hugging Face, so '
-              'its files are unknown. Add it again to resolve it.',
+              key: deviceRefusal == null
+                  ? null
+                  : Key('model-device-refusal-${entry.key}'),
+              // An unresolved repository is the more specific problem: it can
+              // be fixed here, while the device verdict cannot.
+              downloadable
+                  ? deviceRefusal!
+                  : 'This repository has not been resolved against Hugging '
+                        'Face, so its files are unknown. Add it again to '
+                        'resolve it.',
               style: GolemText.footnote.copyWith(
                 color: CupertinoDynamicColor.resolve(
                   GolemTheme.mutedInk,

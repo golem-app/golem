@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
+import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
@@ -1412,4 +1413,179 @@ void main() {
       );
     },
   );
+
+  group('an unsupported device is admitted to nothing (#27)', () {
+    const refusal = DeviceEligibility(
+      tier: DeviceTier.unsupported,
+      reason: DeviceIneligibilityReason.belowMemoryFloor,
+      message: 'This device cannot run models.',
+    );
+    const realBackend = InferenceBackendConfig(
+      kind: InferenceBackendKind.llama,
+      profileKey: 'gemma4',
+      artifactKey: 'test-mlx',
+      modelPath: 'documents:models/test-mlx',
+      modelPathFromCatalog: true,
+    );
+
+    ProviderContainer containerFor(
+      Directory directory,
+      _RecordingInferenceRepository inference, {
+      DeviceEligibility eligibility = refusal,
+      InferenceBackendConfig backend = realBackend,
+      ChatHistoryRepository? history,
+      SettingsRepository? settings,
+    }) => ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(
+          history ?? InMemoryChatHistoryRepository(),
+        ),
+        settingsRepositoryProvider.overrideWithValue(
+          settings ?? InMemorySettingsRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        inferenceBackendProvider.overrideWithValue(backend),
+        deviceEligibilityProvider.overrideWithValue(eligibility),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
+      ],
+    );
+
+    test(
+      'a send refuses before the engine, with no download offered',
+      () async {
+        final directory = Directory.systemTemp.createTempSync('golem-floor-');
+        addTearDown(() => directory.deleteSync(recursive: true));
+        final inference = _RecordingInferenceRepository();
+        final container = containerFor(directory, inference);
+        addTearDown(container.dispose);
+        await container.read(chatControllerProvider.future);
+        await container.read(chatControllerProvider.notifier).send('Hello');
+
+        final state = container.read(chatControllerProvider).requireValue;
+        expect(state.generation, GenerationPhase.failed);
+        expect(state.failure?.kind, ChatFailureKind.unsupportedDevice);
+        expect(state.failure?.message, refusal.message);
+        // No artifact key means the banner has no download CTA to render: the
+        // refusal must never turn into an offer to fetch gigabytes.
+        expect(state.failure?.artifactKey, isNull);
+        expect(inference.prepares, 0);
+      },
+    );
+
+    test('the refusal precedes the missing-model CTA', () async {
+      final directory = Directory.systemTemp.createTempSync('golem-floor-');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final container = containerFor(
+        directory,
+        _RecordingInferenceRepository(),
+      );
+      addTearDown(container.dispose);
+      await container.read(chatControllerProvider.future);
+      // The model is not installed either, so both gates apply. The device
+      // verdict is the one worth telling: downloading would not help.
+      await container.read(chatControllerProvider.notifier).send('Hello');
+      expect(
+        container.read(chatControllerProvider).requireValue.failure?.kind,
+        ChatFailureKind.unsupportedDevice,
+      );
+    });
+
+    test('download refuses and the card says why', () async {
+      final directory = Directory.systemTemp.createTempSync('golem-floor-');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final container = containerFor(
+        directory,
+        _RecordingInferenceRepository(),
+      );
+      addTearDown(container.dispose);
+      await container.read(modelControllerProvider.future);
+      await container
+          .read(modelControllerProvider.notifier)
+          .download('test-mlx');
+
+      final status = container
+          .read(modelControllerProvider)
+          .requireValue
+          .statusOf('test-mlx');
+      expect(status.phase, ArtifactPhase.failed);
+      expect(status.failure, refusal.message);
+      expect(status.downloadedBytes, 0);
+    });
+
+    test('the runtime toggle refuses without touching the engine', () async {
+      final directory = Directory.systemTemp.createTempSync('golem-floor-');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final inference = _RecordingInferenceRepository();
+      final container = containerFor(directory, inference);
+      addTearDown(container.dispose);
+      await container.read(modelControllerProvider.future);
+      await container.read(modelControllerProvider.notifier).toggleRuntime();
+
+      final state = container.read(modelControllerProvider).requireValue;
+      expect(state.runtime, RuntimePhase.failed);
+      expect(state.failure, refusal.message);
+      expect(inference.prepares, 0);
+    });
+
+    test('chats and settings survive the classification', () async {
+      final directory = Directory.systemTemp.createTempSync('golem-floor-');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final history = InMemoryChatHistoryRepository();
+      final settings = InMemorySettingsRepository();
+      final container = containerFor(
+        directory,
+        _RecordingInferenceRepository(),
+        history: history,
+        settings: settings,
+      );
+      addTearDown(container.dispose);
+      await container.read(chatControllerProvider.future);
+      await container.read(chatControllerProvider.notifier).send('Hello');
+      await container.read(settingsControllerProvider.future);
+      await container
+          .read(settingsControllerProvider.notifier)
+          .updateModel('gemma4', const SamplingOverrides(maxTokens: 64));
+
+      // The user's own words and settings are untouched by a refusal that is
+      // about hardware, and both are on disk for the next launch.
+      final stored = await history.load();
+      expect(stored.conversations.single.messages.single.text, 'Hello');
+      expect(settings.settings.overridesFor('gemma4').maxTokens, 64);
+    });
+
+    test('a simulated backend is never gated by the device', () async {
+      final directory = Directory.systemTemp.createTempSync('golem-floor-');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final container = containerFor(
+        directory,
+        _RecordingInferenceRepository(),
+        backend: const InferenceBackendConfig.fake(),
+      );
+      addTearDown(container.dispose);
+      await container.read(chatControllerProvider.future);
+      await container.read(chatControllerProvider.notifier).send('Hello');
+      // QA stays deterministic and model-free: the fake loads nothing, so the
+      // floor has nothing to protect and the send completes as always.
+      expect(
+        container.read(chatControllerProvider).requireValue.failure,
+        isNull,
+      );
+
+      await container.read(modelControllerProvider.future);
+      await container
+          .read(modelControllerProvider.notifier)
+          .download('test-mlx');
+      expect(
+        container
+            .read(modelControllerProvider)
+            .requireValue
+            .statusOf('test-mlx')
+            .phase,
+        ArtifactPhase.installed,
+      );
+    });
+  });
 }

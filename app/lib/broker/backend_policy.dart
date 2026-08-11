@@ -1,35 +1,46 @@
 import '../core/app_identity.dart';
+import '../core/domain/device_eligibility.dart';
 import '../core/domain/inference_backend.dart';
 import '../core/domain/model_catalog.dart';
 import 'model_catalog.dart';
 
-/// 7 GiB rather than a literal 8 GB because Android's totalMem reports net of
-/// kernel/firmware reservations (a nominal 8 GB phone reads ~7.5 GB): the
-/// policy classifies nominal capacity, not reported bytes
-/// (docs/decisions/0003-flavor-backend-defaults.md).
-const int deviceMemoryThresholdBytes = 7 * 1024 * 1024 * 1024;
+/// Which engine this build composes, before any device is classified: the
+/// dart-define when there is one, else the flavor default. Resolved on its own
+/// because the capability probe has to know which engine to ask about, and the
+/// full policy needs that probe's verdict.
+String resolveBackendName({
+  required String backendDefine,
+  required AppIdentity identity,
+}) => backendDefine.isNotEmpty
+    ? backendDefine
+    : switch (identity) {
+        AppIdentity.production || AppIdentity.dev => 'auto',
+        AppIdentity.qa || AppIdentity.flutter => 'fake',
+      };
 
-/// Pure apart from the injected memory probe. `auto` is the llama/GGUF artifact
-/// of the device-policy model (ADR 0002 makes llama.cpp the v0 engine); an
-/// operator-supplied `GOLEM_MODEL_PATH` is the separate, capability-unproven
-/// sideload contract. Passing `auto` explicitly lets a qa build exercise the
-/// exact production composition — the only route on the physical iPhone, where
-/// production/dev bundle ids are off-limits.
-Future<InferenceBackendConfig> resolveBackendPolicy({
+/// Pure. `auto` is the llama/GGUF artifact of the device-policy model (ADR 0002
+/// makes llama.cpp the v0 engine); an operator-supplied `GOLEM_MODEL_PATH` is
+/// the separate, capability-unproven sideload contract. Passing `auto`
+/// explicitly lets a qa build exercise the exact production composition — the
+/// only route on the physical iPhone, where production/dev bundle ids are
+/// off-limits.
+///
+/// [tier] comes from the one device classification the launch made, so the
+/// model this build selects and the eligibility its surfaces report can never
+/// disagree. An unsupported device still resolves the lighter model: nothing
+/// will load it, but every label stays addressable.
+InferenceBackendConfig resolveBackendPolicy({
   required String backendDefine,
   required String profileDefine,
   required String artifactDefine,
   required String modelPathDefine,
   required AppIdentity identity,
-  required int memoryOverrideBytes,
-  required Future<int?> Function() physicalMemoryBytes,
-}) async {
-  final backend = backendDefine.isNotEmpty
-      ? backendDefine
-      : switch (identity) {
-          AppIdentity.production || AppIdentity.dev => 'auto',
-          AppIdentity.qa || AppIdentity.flutter => 'fake',
-        };
+  required DeviceTier tier,
+}) {
+  final backend = resolveBackendName(
+    backendDefine: backendDefine,
+    identity: identity,
+  );
   final explicitProfile = profileDefine.isEmpty ? null : profileDefine;
   final explicitArtifact = artifactDefine.isEmpty ? null : artifactDefine;
   if (explicitArtifact != null && modelPathDefine.isNotEmpty) {
@@ -77,17 +88,10 @@ Future<InferenceBackendConfig> resolveBackendPolicy({
       final selected = explicitArtifact == null
           ? null
           : _catalogArtifact(explicitArtifact, ModelEngine.gguf);
-      final memory = selected == null && explicitProfile == null
-          ? memoryOverrideBytes > 0
-                ? memoryOverrideBytes
-                : await _guardedProbe(physicalMemoryBytes)
-          : null;
       final profileKey =
           explicitProfile ??
           selected?.profileKey ??
-          (memory != null && memory >= deviceMemoryThresholdBytes
-              ? 'gemma4'
-              : 'qwen35');
+          (tier == DeviceTier.preferred ? 'gemma4' : 'qwen35');
       _requireMatchingProfile(selected, profileKey);
       // Explicit qwen35 remains the established 4B choice. Only the
       // automatic low-memory branch opts into the new 2B artifact.
@@ -131,14 +135,5 @@ void _requireMatchingProfile(ModelCatalogEntry? entry, String profileKey) {
     throw StateError(
       'GOLEM_MODEL_ARTIFACT does not match GOLEM_MODEL_PROFILE.',
     );
-  }
-}
-
-/// Unknown memory must select the lighter model, never block launch.
-Future<int?> _guardedProbe(Future<int?> Function() probe) async {
-  try {
-    return await probe().timeout(const Duration(seconds: 1));
-  } catch (_) {
-    return null;
   }
 }

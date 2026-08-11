@@ -24,6 +24,7 @@ final _allProviders = <String, ProviderOrFamily>{
   'cacheProbe': cacheProbeProvider,
   'diskFreeSpaceProbe': diskFreeSpaceProbeProvider,
   'inferenceBackend': inferenceBackendProvider,
+  'deviceEligibility': deviceEligibilityProvider,
   'residentModelKey': residentModelKeyProvider,
   'deviceCapacityProbe': deviceCapacityProbeProvider,
   'documentsPath': documentsPathProvider,

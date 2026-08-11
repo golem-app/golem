@@ -11,6 +11,7 @@ import '../broker/model_profile.dart';
 import '../core/app_identity.dart';
 import '../core/domain/app_preferences.dart';
 import '../core/domain/app_state.dart';
+import '../core/domain/device_eligibility.dart';
 import '../core/domain/inference_backend.dart';
 import '../core/domain/model_catalog.dart';
 import '../core/providers/app_providers.dart';
@@ -35,6 +36,7 @@ import '../core/services/repository_resolver.dart';
 final class LaunchDependencies {
   const LaunchDependencies({
     required this.backendConfig,
+    required this.deviceEligibility,
     required this.chatHistoryRepository,
     required this.settingsRepository,
     required this.preferencesRepository,
@@ -51,6 +53,10 @@ final class LaunchDependencies {
   });
 
   final InferenceBackendConfig backendConfig;
+
+  /// The device classification this launch made, from the same read that chose
+  /// the model (#27).
+  final DeviceEligibility deviceEligibility;
   final ChatHistoryRepository chatHistoryRepository;
   final SettingsRepository settingsRepository;
   final PreferencesRepository preferencesRepository;
@@ -167,7 +173,8 @@ _composeRequired({required bool Function() superseded}) async {
   // dart-defines override the flavor default, and an override to real
   // inference drags model management along with it: a real engine fed by a
   // download simulation would "install" files that do not exist.
-  final backendConfig = await resolveConfiguredBackend();
+  final (config: backendConfig, :eligibility) =
+      await resolveConfiguredBackend();
   final support = await getApplicationSupportDirectory();
   final documents = await getApplicationDocumentsDirectory();
   final temporary = await getTemporaryDirectory();
@@ -257,6 +264,7 @@ _composeRequired({required bool Function() superseded}) async {
       FakeModelManagementRepository(stateFile, catalog: mergedCatalog);
   final dependencies = LaunchDependencies(
     backendConfig: backendConfig,
+    deviceEligibility: eligibility,
     chatHistoryRepository: FileChatHistoryRepository(
       File('${support.path}/flutter-chat-v1.json'),
     ),
@@ -318,6 +326,7 @@ List<Override> launchOverrides(LaunchDependencies dependencies) => [
   cacheProbeProvider.overrideWithValue(dependencies.cacheProbe),
   diskFreeSpaceProbeProvider.overrideWithValue(dependencies.diskFreeSpaceProbe),
   inferenceBackendProvider.overrideWithValue(dependencies.backendConfig),
+  deviceEligibilityProvider.overrideWithValue(dependencies.deviceEligibility),
   inferenceRepositoryProvider.overrideWithValue(
     dependencies.inferenceRepository,
   ),

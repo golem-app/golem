@@ -173,6 +173,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           modelKey: chat.active?.modelKey,
                           residentModelKey: ref.watch(residentModelKeyProvider),
                           loadableKeys: ref.watch(loadableModelKeysProvider),
+                          runsModels: ref.watch(
+                            deviceEligibilityProvider.select(
+                              (value) => value.runsModels,
+                            ),
+                          ),
                         ),
                         // Contained glass follows the iOS 26 toolbar style;
                         // bare nav-bar glyphs read too small next to it.

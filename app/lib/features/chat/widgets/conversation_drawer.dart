@@ -41,14 +41,18 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
       widget.chat.conversations,
       DateTime.now(),
     );
-    final modelLabel = chatModelLabel(
+    // The same one-line claim the nav bar makes, from the same function: two
+    // copies of the honesty rule is one copy too many, and this one drifted.
+    final modelSubtitle = chatModelSubtitle(
       backend: ref.watch(inferenceBackendProvider),
       catalog: ref.watch(effectiveModelCatalogProvider),
       modelKey: widget.chat.active?.modelKey,
       residentModelKey: ref.watch(residentModelKeyProvider),
       loadableKeys: ref.watch(loadableModelKeysProvider),
+      runsModels: ref.watch(
+        deviceEligibilityProvider.select((value) => value.runsModels),
+      ),
     );
-    final backend = ref.watch(inferenceBackendProvider);
     final ink = CupertinoDynamicColor.resolve(GolemTheme.drawerInk, context);
     final faint = CupertinoDynamicColor.resolve(
       GolemTheme.drawerFaintInk,
@@ -87,9 +91,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        backend.simulatedInference
-                            ? '$modelLabel · simulated'
-                            : '$modelLabel · on device',
+                        modelSubtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GolemText.caption.copyWith(color: faint),

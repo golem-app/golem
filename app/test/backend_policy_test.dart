@@ -3,38 +3,51 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/backend_policy.dart';
+import 'package:golem_flutter/broker/device_capability.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/app_identity.dart';
+import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 
 const _gib = 1024 * 1024 * 1024;
 
-Future<InferenceBackendConfig> _resolve({
+InferenceBackendConfig _resolve({
   String backend = '',
   String profile = '',
   String artifact = '',
   String modelPath = '',
   AppIdentity identity = AppIdentity.production,
-  int memoryOverride = 0,
-  Future<int?> Function()? probe,
+  DeviceTier tier = DeviceTier.preferred,
 }) => resolveBackendPolicy(
   backendDefine: backend,
   profileDefine: profile,
   artifactDefine: artifact,
   modelPathDefine: modelPath,
   identity: identity,
-  memoryOverrideBytes: memoryOverride,
+  tier: tier,
+);
+
+/// The capability read that produces that tier, with both seams injected so no
+/// test touches a platform channel or a native asset.
+Future<DeviceCapabilities> _capabilities({
+  String backendName = 'auto',
+  int memoryOverride = 0,
+  bool forceEngineUnsupported = false,
+  Future<int?> Function()? probe,
+  Future<bool?> Function(String)? engineProbe,
+}) => probeDeviceCapabilities(
+  backendName: backendName,
   physicalMemoryBytes: probe ?? () async => 8 * _gib,
+  memoryOverrideBytes: memoryOverride,
+  forceEngineUnsupported: forceEngineUnsupported,
+  engineProbe: engineProbe ?? (name) async => true,
 );
 
 void main() {
   test('qa and the flavorless identity default to the fake backend', () async {
     for (final identity in [AppIdentity.qa, AppIdentity.flutter]) {
-      final config = await _resolve(
-        identity: identity,
-        probe: () async => fail('the fake path must never probe memory'),
-      );
+      final config = _resolve(identity: identity);
       expect(config.kind, InferenceBackendKind.fake);
       expect(config.simulatedInference, isTrue);
       expect(config.artifactKey, isNull);
@@ -47,7 +60,7 @@ void main() {
     'production and dev default to auto: llama plus device policy',
     () async {
       for (final identity in [AppIdentity.production, AppIdentity.dev]) {
-        final config = await _resolve(identity: identity);
+        final config = _resolve(identity: identity);
         expect(config.kind, InferenceBackendKind.llama);
         expect(config.simulatedInference, isFalse);
         expect(config.profileKey, 'gemma4');
@@ -61,8 +74,8 @@ void main() {
     },
   );
 
-  test('below the memory threshold the lighter Qwen is the default', () async {
-    final config = await _resolve(probe: () async => 4 * _gib);
+  test('the light tier selects the lighter Qwen', () async {
+    final config = _resolve(tier: DeviceTier.light);
     expect(config.profileKey, 'qwen35');
     expect(config.artifactKey, 'qwen35-2b-gguf');
     expect(
@@ -71,14 +84,41 @@ void main() {
     );
   });
 
-  test('a nominal 8 GB Android that under-reports still gets Gemma', () async {
-    // Android totalMem reports net of kernel reservations: ~7.5 GB on a
-    // nominal 8 GB phone. That must land on the Gemma side.
-    final config = await _resolve(probe: () async => (7.5 * _gib).round());
-    expect(config.profileKey, 'gemma4');
+  test('an unsupported device still resolves a nameable model', () async {
+    // Nothing will load it — the controllers refuse first — but every label
+    // and settings section stays addressable rather than blanking out.
+    final config = _resolve(tier: DeviceTier.unsupported);
+    expect(config.profileKey, 'qwen35');
+    expect(config.artifactKey, 'qwen35-2b-gguf');
   });
 
-  test('unknown memory selects the protective default', () async {
+  test('the capability read produces the tier the policy consumes', () async {
+    Future<DeviceTier> tierFor(DeviceCapabilities capabilities) async =>
+        classifyDevice(
+          capabilities: capabilities,
+          memoryFloorBytes: androidMemoryFloorBytes,
+        ).tier;
+
+    expect(await tierFor(await _capabilities()), DeviceTier.preferred);
+    // Android totalMem reports net of kernel reservations: ~7.5 GB on a
+    // nominal 8 GB phone. That must land on the Gemma side.
+    expect(
+      await tierFor(
+        await _capabilities(probe: () async => (7.5 * _gib).round()),
+      ),
+      DeviceTier.preferred,
+    );
+    expect(
+      await tierFor(await _capabilities(probe: () async => 4 * _gib)),
+      DeviceTier.light,
+    );
+    expect(
+      await tierFor(await _capabilities(probe: () async => 2 * _gib)),
+      DeviceTier.unsupported,
+    );
+  });
+
+  test('an unreachable probe reads as unknown, never as a refusal', () async {
     for (final probe in <Future<int?> Function()>[
       () async => null,
       () async => throw StateError('probe failed'),
@@ -86,33 +126,61 @@ void main() {
       // delayed timer that would outlive the test.
       () => Completer<int?>().future,
     ]) {
-      final config = await _resolve(probe: probe);
-      expect(config.profileKey, 'qwen35', reason: 'probe: $probe');
-      expect(config.artifactKey, 'qwen35-2b-gguf', reason: 'probe: $probe');
+      final capabilities = await _capabilities(probe: probe);
+      expect(capabilities.physicalMemoryBytes, isNull, reason: 'probe: $probe');
+      expect(
+        classifyDevice(
+          capabilities: capabilities,
+          memoryFloorBytes: androidMemoryFloorBytes,
+        ).tier,
+        DeviceTier.light,
+        reason: 'probe: $probe',
+      );
     }
+    // The engine half degrades the same way, and an engine nobody could ask
+    // about must not be reported as missing.
+    final unreachable = await _capabilities(
+      engineProbe: (name) async => throw StateError('probe failed'),
+    );
+    expect(unreachable.engineSupported, isNull);
   });
 
-  test('the memory override define bypasses the probe entirely', () async {
-    final config = await _resolve(
+  test('the simulated backend reads no device at all', () async {
+    final capabilities = await _capabilities(
+      backendName: 'fake',
+      probe: () async => fail('the fake path must never probe memory'),
+      engineProbe: (name) async => fail('the fake path has no engine to probe'),
+    );
+    expect(capabilities.physicalMemoryBytes, isNull);
+    expect(capabilities.engineSupported, isNull);
+  });
+
+  test('the test-only defines reach both halves of the read', () async {
+    final memory = await _capabilities(
       memoryOverride: 4 * _gib,
       probe: () async => fail('the override must bypass the probe'),
     );
-    expect(config.profileKey, 'qwen35');
-    expect(config.artifactKey, 'qwen35-2b-gguf');
+    expect(memory.physicalMemoryBytes, 4 * _gib);
+
+    final engine = await _capabilities(
+      forceEngineUnsupported: true,
+      engineProbe: (name) async => fail('the override must bypass the probe'),
+    );
+    expect(engine.engineSupported, isFalse);
   });
 
   test('explicit defines override the flavor default in any build', () async {
-    final fake = await _resolve(backend: 'fake');
+    final fake = _resolve(backend: 'fake');
     expect(fake.kind, InferenceBackendKind.fake);
 
     // qa + explicit auto exercises the exact production composition — the
     // only real-path route on the physical iPhone.
-    final auto = await _resolve(backend: 'auto', identity: AppIdentity.qa);
+    final auto = _resolve(backend: 'auto', identity: AppIdentity.qa);
     expect(auto.kind, InferenceBackendKind.llama);
     expect(auto.artifactKey, 'gemma4-gguf');
 
     // A supplied path is an operator sideload, profile defaulting to gemma4.
-    final llama = await _resolve(
+    final llama = _resolve(
       backend: 'llama',
       modelPath: 'documents:models/x.gguf',
       identity: AppIdentity.qa,
@@ -123,7 +191,7 @@ void main() {
     expect(llama.modelPath, 'documents:models/x.gguf');
     expect(llama.modelPathFromCatalog, isFalse);
 
-    final mlx = await _resolve(
+    final mlx = _resolve(
       backend: 'mlx',
       profile: 'qwen35',
       modelPath: '/abs/mlx-dir',
@@ -135,7 +203,7 @@ void main() {
 
     // Without an operator path, an explicit engine resolves the exact pinned
     // catalog artifact and retains its capability proof.
-    final catalogMlx = await _resolve(
+    final catalogMlx = _resolve(
       backend: 'mlx',
       profile: 'gemma4',
       identity: AppIdentity.qa,
@@ -146,10 +214,9 @@ void main() {
   });
 
   test('explicit profile and path override the auto policy choices', () async {
-    final config = await _resolve(
+    final config = _resolve(
       profile: 'qwen35',
       modelPath: 'documents:models/sideloaded.gguf',
-      memoryOverride: 16 * _gib,
     );
     expect(config.kind, InferenceBackendKind.llama);
     expect(config.profileKey, 'qwen35');
@@ -162,11 +229,11 @@ void main() {
   test(
     'an exact catalog artifact selects size separately from profile',
     () async {
-      final config = await _resolve(
+      final config = _resolve(
         backend: 'mlx',
         artifact: 'qwen35-2b-mlx',
         identity: AppIdentity.qa,
-        probe: () async => fail('an exact artifact must not probe memory'),
+        tier: DeviceTier.light,
       );
       expect(config.kind, InferenceBackendKind.mlx);
       expect(config.profileKey, 'qwen35');
@@ -177,10 +244,10 @@ void main() {
   );
 
   test('an exact auto artifact bypasses the device policy', () async {
-    final config = await _resolve(
+    final config = _resolve(
       backend: 'auto',
       artifact: 'qwen35-2b-gguf',
-      probe: () async => fail('an exact artifact must not probe memory'),
+      tier: DeviceTier.preferred,
     );
     expect(config.kind, InferenceBackendKind.llama);
     expect(config.profileKey, 'qwen35');
@@ -188,34 +255,38 @@ void main() {
   });
 
   test('catalog artifact overrides reject incoherent composition', () async {
-    await expectLater(
-      _resolve(backend: 'mlx', artifact: 'qwen35-2b-gguf'),
+    expect(
+      () => _resolve(backend: 'mlx', artifact: 'qwen35-2b-gguf'),
       throwsA(isA<StateError>()),
     );
-    await expectLater(
-      _resolve(backend: 'mlx', profile: 'gemma4', artifact: 'qwen35-2b-mlx'),
+    expect(
+      () => _resolve(
+        backend: 'mlx',
+        profile: 'gemma4',
+        artifact: 'qwen35-2b-mlx',
+      ),
       throwsA(isA<StateError>()),
     );
-    await expectLater(
-      _resolve(backend: 'mlx', artifact: 'missing'),
+    expect(
+      () => _resolve(backend: 'mlx', artifact: 'missing'),
       throwsA(isA<StateError>()),
     );
-    await expectLater(
-      _resolve(
+    expect(
+      () => _resolve(
         backend: 'mlx',
         artifact: 'qwen35-2b-mlx',
         modelPath: '/tmp/sideload',
       ),
       throwsA(isA<StateError>()),
     );
-    await expectLater(
-      _resolve(backend: 'fake', artifact: 'qwen35-2b-mlx'),
+    expect(
+      () => _resolve(backend: 'fake', artifact: 'qwen35-2b-mlx'),
       throwsA(isA<StateError>()),
     );
   });
 
   test('an unknown backend value fails loudly', () async {
-    await expectLater(_resolve(backend: 'metal'), throwsA(isA<StateError>()));
+    expect(() => _resolve(backend: 'metal'), throwsA(isA<StateError>()));
   });
 
   test('primaryModelPathFor derives paths from the pinned catalog', () {

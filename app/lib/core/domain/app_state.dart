@@ -15,6 +15,10 @@ enum ChatFailureKind {
   contextExhausted,
   outOfMemory,
   insufficientMemory,
+
+  /// This device is outside every supported tier (#27). Unlike the others this
+  /// one has no recovery at all: no retry, no download, no new chat.
+  unsupportedDevice,
 }
 
 /// A typed chat failure: the classification that picks banner actions,
