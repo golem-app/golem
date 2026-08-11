@@ -6,6 +6,7 @@ import '../../../core/domain/app_state.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
+import '../../onboarding/model_download_consent.dart';
 
 class RecoveryBanner extends ConsumerWidget {
   const RecoveryBanner({required this.failure, super.key});
@@ -102,10 +103,23 @@ class _DownloadActiveModelButton extends ConsumerWidget {
         color: GolemTheme.accent,
         minimumSize: const Size.fromHeight(44),
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        onPressed: () {
+        onPressed: () async {
+          final status = ref
+              .read(modelControllerProvider)
+              .value
+              ?.statusOf(artifactKey);
+          if (status?.phase == ArtifactPhase.notDownloaded) {
+            final approved = await confirmModelDownload(
+              context: context,
+              entry: entry,
+              simulated:
+                  ref.read(modelControllerProvider).value?.simulated ?? false,
+            );
+            if (!approved || !context.mounted) return;
+          }
           ref.read(modelControllerProvider.notifier).download(artifactKey);
           // Progress, pause, and cancel live on the model card.
-          context.push('/settings');
+          context.push('/settings/models');
         },
         child: Text(
           'Download ${entry.displayName} ($gigabytes GB)',

@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/core/chrome/golem_nav_bar.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
@@ -30,6 +31,28 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
     }
     await tester.pumpAndSettle(const Duration(seconds: 2));
+    // A clean QA container owns the complete first-run contract. Returning
+    // device runs may already carry the marker, so the journey remains useful
+    // without weakening the fresh-install assertions when the screen exists.
+    if (find.byKey(const Key('first-run-welcome')).evaluate().isNotEmpty) {
+      await tester.tap(find.byKey(const Key('first-run-get-started')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('first-run-model')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('first-run-download')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('model-download-consent')), findsOneWidget);
+      expect(find.textContaining('no network'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('model-download-confirm')));
+      // Cross the fake repository's first artifact-state update. First run
+      // must remain in charge until the user explicitly starts chatting.
+      await tester.pump(const Duration(milliseconds: 150));
+      expect(
+        find.byKey(const Key('first-run-download-progress')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('first-run-start-chatting')));
+      await tester.pumpAndSettle(const Duration(seconds: 2));
+    }
     if (find.byKey(const Key('empty-chat')).evaluate().isEmpty) {
       await tester.tap(find.byKey(const Key('new-chat-header')));
       await tester.pumpAndSettle();
@@ -232,6 +255,8 @@ void main() {
         scrollable: modelsScrollable,
       );
       await tester.tap(find.byKey(const Key('model-download-gemma4-mlx')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('model-download-confirm')));
       await _pumpUntilFound(
         tester,
         find.byKey(const Key('model-pause-gemma4-mlx')),
@@ -285,7 +310,7 @@ void main() {
       container.read(modelControllerProvider).requireValue.runtime,
       runtimeAfter,
     );
-    await tester.pageBack();
+    await _pageBack(tester);
     await tester.pumpAndSettle();
 
     // Advanced mode reveals the system-prompt row; response style commits
@@ -321,7 +346,7 @@ void main() {
       ResponseStyle.precise,
     );
     expect(find.byKey(const Key('gen-temperature-gemma4')), findsOneWidget);
-    await tester.pageBack();
+    await _pageBack(tester);
     await tester.pumpAndSettle();
 
     // Storage: the breakdown renders and the cache clears with a toast.
@@ -340,7 +365,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('golem-toast')), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 1600));
-    await tester.pageBack();
+    await _pageBack(tester);
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
@@ -387,6 +412,15 @@ Future<void> _pumpUntilBenchmarkResult(
       watch.elapsed < const Duration(seconds: 4)) {
     await tester.pump(const Duration(milliseconds: 100));
   }
+}
+
+Future<void> _pageBack(WidgetTester tester) async {
+  final adaptiveBack = find.byType(GolemBackButton);
+  if (adaptiveBack.evaluate().isNotEmpty) {
+    await tester.tap(adaptiveBack.first);
+    return;
+  }
+  await tester.pageBack();
 }
 
 Future<void> _pumpUntilFound(

@@ -54,7 +54,7 @@ void main() {
           ),
         ),
         GoRoute(
-          path: '/settings',
+          path: '/settings/models',
           builder: (context, state) => const CupertinoPageScaffold(
             child: SizedBox(key: Key('settings-stub')),
           ),
@@ -82,6 +82,9 @@ void main() {
     // The tap starts the simulated download and lands on Settings, where
     // the model card owns progress.
     await tester.tap(find.byKey(const Key('download-active-model')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('model-download-consent')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('model-download-confirm')));
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 50)),
     );

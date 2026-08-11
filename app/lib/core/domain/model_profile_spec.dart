@@ -36,13 +36,18 @@ enum HistoryStripMode { none, reasoningChannels, thinkBlocks }
 /// A *proven* input kind — data, never inferred from a display or file name.
 enum ModelInputModality { text, image }
 
+/// The app's conservative mobile context window. Catalog surfaces use the
+/// same value the broker profiles feed to inference, so onboarding never
+/// repeats a prototype-only context claim.
+const defaultModelContextLength = 8192;
+
 final class ProfileSampling {
   const ProfileSampling({
     required this.maxTokens,
     required this.temperature,
     required this.topP,
     this.topK,
-    this.contextLength = 8192,
+    this.contextLength = defaultModelContextLength,
     this.presencePenalty,
     this.pinned = false,
   });
@@ -108,7 +113,7 @@ final class ProfileSampling {
       topP: topP,
       topK: rawTopK == null ? null : _requirePositiveInt(rawTopK, 'topK'),
       contextLength: _requirePositiveInt(
-        json['contextLength'] ?? 8192,
+        json['contextLength'] ?? defaultModelContextLength,
         'contextLength',
       ),
       presencePenalty: presencePenalty,

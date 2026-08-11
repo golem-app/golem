@@ -50,12 +50,20 @@ unset falls to the flavor default (`auto` on production/dev, `fake` on
 qa). `auto` composes the llama/GGUF artifact of the device-policy model —
 Gemma 4 E2B at ≥ 7 GiB reported physical memory, the lighter Qwen 3.5 2B
 below or when memory is unknown — deriving the model path, broker
-profile, and active catalog artifact together. A fresh real-backend
-install downloads its model **on first need behind an explicit consent
-tap** in the chat failure banner; nothing multi-gigabyte ever starts
-silently. Builds with an operator-supplied `GOLEM_MODEL_PATH` bypass that
-gate entirely — sideloaded paths are the operator's responsibility and go
-straight to the engine.
+profile, and active catalog artifact together. A fresh real-backend install
+enters first-run onboarding before chat. It explains that inference stays on
+device, selects a pinned artifact from the same device tier and engine policy
+as launch, states the exact catalog size, and asks for explicit consent with
+the 500 MiB free-space margin plus a static Wi-Fi/cellular warning. Declining
+starts no transfer and enters chat with a persistent setup banner; sending
+stays disabled until that selected model is installed, while drafting,
+history, settings, and navigation remain usable. Settings and missing-model
+recovery use the same consent dialog, so nothing multi-gigabyte starts
+silently from another UI path. The qa flavor presents the full catalog and
+simulates the flow deterministically with no network or weight files. Existing
+installs with chats or model state, plus builds with an operator-supplied
+`GOLEM_MODEL_PATH`, skip first run; sideloaded paths remain the operator's
+responsibility and go straight to the engine.
 
 That model choice is one half of a single **device classification** taken once
 at launch (#27, `../docs/decisions/0007-supported-device-policy.md`): the same
