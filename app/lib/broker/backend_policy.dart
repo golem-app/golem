@@ -107,6 +107,9 @@ InferenceBackendConfig resolveBackendPolicy({
             ? modelPathDefine
             : primaryModelPathFor(artifactKey),
         modelPathFromCatalog: modelPathDefine.isEmpty,
+        // The tier picked this only when nothing else did.
+        artifactFromDevicePolicy:
+            explicitArtifact == null && explicitProfile == null,
       );
     default:
       throw StateError(

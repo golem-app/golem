@@ -205,7 +205,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
               ),
             ),
           ),
-          _StorageMeter(gigabytes: gigabytes),
+          _StorageMeter(),
           CupertinoButton(
             key: const Key('open-settings'),
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -486,8 +486,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
 /// cache) over the volume's capacity. Hidden entirely when the capacity
 /// is unknown.
 final class _StorageMeter extends ConsumerWidget {
-  const _StorageMeter({required this.gigabytes});
-  final String Function(int) gigabytes;
+  const _StorageMeter();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

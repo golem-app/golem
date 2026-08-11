@@ -1149,6 +1149,71 @@ final class LoadableModelKeysProvider
 
 String _$loadableModelKeysHash() => r'12e16f3f980da93856da1aa47fec36b9d9201e01';
 
+/// The keys a download may be *started* for: the pinned catalog, plus custom
+/// repositories that resolved against Hugging Face and so have a real file
+/// list. An unresolved entry synthesizes its files, so a request for it could
+/// not succeed — Settings and the chat picker both withhold the affordance
+/// rather than failing on the tap, and derive that from here so the rule has
+/// one statement (#79).
+/// KeepAlive, deliberately (#69): same grounds as loadableModelKeys.
+
+@ProviderFor(downloadableModelKeys)
+final downloadableModelKeysProvider = DownloadableModelKeysProvider._();
+
+/// The keys a download may be *started* for: the pinned catalog, plus custom
+/// repositories that resolved against Hugging Face and so have a real file
+/// list. An unresolved entry synthesizes its files, so a request for it could
+/// not succeed — Settings and the chat picker both withhold the affordance
+/// rather than failing on the tap, and derive that from here so the rule has
+/// one statement (#79).
+/// KeepAlive, deliberately (#69): same grounds as loadableModelKeys.
+
+final class DownloadableModelKeysProvider
+    extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
+    with $Provider<Set<String>> {
+  /// The keys a download may be *started* for: the pinned catalog, plus custom
+  /// repositories that resolved against Hugging Face and so have a real file
+  /// list. An unresolved entry synthesizes its files, so a request for it could
+  /// not succeed — Settings and the chat picker both withhold the affordance
+  /// rather than failing on the tap, and derive that from here so the rule has
+  /// one statement (#79).
+  /// KeepAlive, deliberately (#69): same grounds as loadableModelKeys.
+  DownloadableModelKeysProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: noRetry,
+        name: r'downloadableModelKeysProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$downloadableModelKeysHash();
+
+  @$internal
+  @override
+  $ProviderElement<Set<String>> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Set<String> create(Ref ref) {
+    return downloadableModelKeys(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Set<String> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Set<String>>(value),
+    );
+  }
+}
+
+String _$downloadableModelKeysHash() =>
+    r'08c575b7815a7c2c62e015f7010cfe2684b36bb9';
+
 /// Only user-set values are stored; profile defaults resolve at the consumer.
 /// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
 /// owner over write-through persistence.

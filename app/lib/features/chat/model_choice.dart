@@ -88,6 +88,9 @@ enum ModelBlock {
 
   /// The build pins an operator-supplied file, so there is nothing to switch to.
   sideload,
+
+  /// A hand-added repository whose file list was never resolved (#52).
+  unresolvedRepository,
 }
 
 /// One row of the picker: everything shown, nothing computed by the widget.
@@ -179,6 +182,12 @@ final class ModelPickerView {
 /// read only for the tier that explains the recommendation.
 ModelPickerView buildModelPickerView({
   required List<ModelCatalogEntry> catalog,
+
+  /// Admission is a policy about the artifacts this project ships and has
+  /// weighed. A hand-added repository has a synthesized size and no tier the
+  /// rule could judge, so it is not put to it — first run only ever asked
+  /// about pinned entries either.
+  required List<ModelCatalogEntry> pinnedCatalog,
   required Set<String> downloadableKeys,
   required InferenceBackendConfig backend,
   required ModelState? models,
@@ -187,6 +196,7 @@ ModelPickerView buildModelPickerView({
   required DeviceEligibility eligibility,
   required String? deviceRefusal,
   required bool advanced,
+  required bool simulatedTransfers,
   String? selectedKey,
 }) {
   final simulated = backend.simulatedInference;
@@ -234,7 +244,7 @@ ModelPickerView buildModelPickerView({
   // so the two surfaces cannot reach opposite verdicts on one phone (#26/#79).
   final admission = {
     for (final option in modelAdmissionOptions(
-      catalog: catalog,
+      catalog: pinnedCatalog,
       backend: backend,
       eligibility: eligibility,
     ))
@@ -256,7 +266,9 @@ ModelPickerView buildModelPickerView({
     simulated: simulated,
     tier: eligibility.tier,
     memoryKnown: eligibility.memoryKnown,
-    recommendedKey: recommendedKey,
+    fromDevicePolicy:
+        backend.artifactFromDevicePolicy &&
+        recommendedKey == backend.artifactKey,
   );
 
   // Over the visible rows, not the catalog: a transfer on a row this sheet
@@ -278,7 +290,7 @@ ModelPickerView buildModelPickerView({
         ambiguousName: duplicated.contains(entry.displayName),
         recommendation: entry.key == recommendedKey ? recommendation : null,
         transferringKey: transferring,
-        simulatedTransfers: models?.simulated ?? simulated,
+        simulatedTransfers: simulatedTransfers,
         admission: admission[entry.key],
         downloadable: downloadableKeys.contains(entry.key),
       ),
@@ -360,6 +372,13 @@ ModelChoice _choiceFor({
         when !installed &&
             admission?.block == ModelAdmissionBlock.needsPreferredTier =>
       (ModelBlock.needsMoreMemory, admission!.disabledReason!),
+    // Nothing can be fetched for a repository that never resolved, so the row
+    // must not tell the user to download it. Settings says the same.
+    false when !installed && !downloadable => (
+      ModelBlock.unresolvedRepository,
+      'This repository has not been resolved against Hugging Face, so its '
+          'files are unknown. Add it again in Settings to resolve it.',
+    ),
     false when installed && !loadsHere => (
       ModelBlock.otherEngine,
       // Plural deliberately: "a MLX" and "an MLX" are both wrong depending on
@@ -412,9 +431,9 @@ ModelChoice _choiceFor({
     // which on a fresh install is not downloaded — ticking that row while it
     // reads "Download it to use it in this chat" is the kind of contradiction
     // this ticket exists to remove. The RECOMMENDED badge still points at it.
-    needsConsent: status.phase == ArtifactPhase.notDownloaded,
     selected: selectable && entry.key == selectedKey,
     selectable: selectable,
+    needsConsent: status.phase == ArtifactPhase.notDownloaded,
     block: blocked.$1,
     blockReason: blocked.$2,
     transfer: _transferFor(
@@ -526,21 +545,16 @@ String _recommendationReason({
   required bool simulated,
   required DeviceTier tier,
   required bool memoryKnown,
-  required String? recommendedKey,
+  required bool fromDevicePolicy,
 }) {
   if (simulated) return 'This build’s default model.';
-  // An explicit GOLEM_MODEL_ARTIFACT or GOLEM_MODEL_PROFILE bypasses the
-  // device policy entirely (backend_policy.dart's llama/mlx branches never
-  // read the tier), so a memory sentence there would credit a classification
-  // that played no part. The tier explains the choice only when the choice is
-  // the one the tier makes.
-  final tierFamily = tier == DeviceTier.light ? 'qwen35-2b-' : 'gemma4-';
-  if (recommendedKey == null || !recommendedKey.startsWith(tierFamily)) {
-    return 'This build’s default model.';
-  }
-  // The light tier is also where an unreadable memory probe lands (ADR 0007:
-  // unknown is not a refusal). Saying it was "sized to fit this phone" there
-  // would describe a measurement nothing performed.
+  // An explicit GOLEM_MODEL_ARTIFACT or GOLEM_MODEL_PROFILE fixes the artifact
+  // and the tier is never read (backend_policy.dart), so a memory sentence
+  // there would credit a classification that played no part. The build says
+  // which case it is rather than the copy guessing from a key prefix.
+  if (!fromDevicePolicy) return 'This build’s default model.';
+  // The light tier is also where an unreadable probe lands (ADR 0007: unknown
+  // is not a refusal), and absence of evidence is not a low reading.
   if (!memoryKnown) {
     return 'The lighter model, picked because this phone’s memory could '
         'not be read.';
@@ -554,11 +568,6 @@ String _recommendationReason({
   };
 }
 
-/// What choosing does, or the one reason nothing here can be chosen.
-///
-/// The sideload sentence names the file the build pins — never the path around
-/// it, which is a developer's machine and not the user's business
-/// (`sideloadedModelLabel`).
 String? _footnote({
   required InferenceBackendConfig backend,
   required String? deviceRefusal,

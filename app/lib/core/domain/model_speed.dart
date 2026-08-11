@@ -40,15 +40,32 @@ Map<String, double> measuredTokensPerSecondByModel(
   return best;
 }
 
-/// The single scan, for one key.
+/// One key, without building the whole map: a caller asking per row would
+/// otherwise walk the entire history once per row and throw the rest away.
 double? measuredTokensPerSecond(
   List<ChatConversation> conversations, {
   required String modelKey,
   required String? defaultModelKey,
-}) => measuredTokensPerSecondByModel(
-  conversations,
-  defaultModelKey: defaultModelKey,
-)[modelKey];
+}) {
+  double? best;
+  DateTime? bestAt;
+  for (final conversation in conversations) {
+    if ((conversation.modelKey ?? defaultModelKey) != modelKey) continue;
+    for (final message in conversation.messages) {
+      final metrics = message.metrics;
+      if (message.role != MessageRole.assistant ||
+          message.isStreaming ||
+          metrics == null) {
+        continue;
+      }
+      if (bestAt == null || message.createdAt.isAfter(bestAt)) {
+        bestAt = message.createdAt;
+        best = metrics.decodeTokensPerSecond;
+      }
+    }
+  }
+  return best;
+}
 
 /// What a conversation with no per-chat choice actually ran, which is what
 /// unattributed metrics belong to. The fake names no boot artifact, so the

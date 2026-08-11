@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/broker/backend_policy.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
@@ -7,13 +8,14 @@ import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/chat/model_choice.dart';
 
 void main() {
-  const llama = InferenceBackendConfig(
-    kind: InferenceBackendKind.llama,
-    profileKey: 'gemma4',
-    artifactKey: 'gemma4-gguf',
-    modelPath: 'documents:models/gemma4-gguf/weights.gguf',
-    modelPathFromCatalog: true,
+  InferenceBackendConfig auto(DeviceTier tier) => resolveBackendPolicy(
+    backendName: 'auto',
+    profileDefine: '',
+    artifactDefine: '',
+    modelPathDefine: '',
+    tier: tier,
   );
+  final llama = auto(DeviceTier.preferred);
   const mlx = InferenceBackendConfig(
     kind: InferenceBackendKind.mlx,
     profileKey: 'gemma4',
@@ -54,7 +56,7 @@ void main() {
   };
 
   ModelPickerView view({
-    InferenceBackendConfig backend = llama,
+    InferenceBackendConfig? backend,
     ModelState? models,
     List<ModelCatalogEntry>? catalog,
     List<ChatConversation> conversations = const [],
@@ -65,11 +67,14 @@ void main() {
     bool advanced = false,
     String? selectedKey,
   }) {
+    backend ??= llama;
     // Matching what both repositories publish: a stamped active artifact, which
     // is the fake's only source for a recommendation.
     final state = models ?? stateWith(const {});
     return buildModelPickerView(
       catalog: catalog ?? modelCatalog,
+      pinnedCatalog: modelCatalog,
+      simulatedTransfers: backend.simulatedInference,
       downloadableKeys: {for (final e in catalog ?? modelCatalog) e.key},
       backend: backend,
       models: state,
@@ -181,13 +186,7 @@ void main() {
     });
 
     test('a light-tier device is told the model was sized for it', () {
-      const light = InferenceBackendConfig(
-        kind: InferenceBackendKind.llama,
-        profileKey: 'qwen35',
-        artifactKey: 'qwen35-2b-gguf',
-        modelPath: 'documents:models/qwen35-2b-gguf/weights.gguf',
-        modelPathFromCatalog: true,
-      );
+      final light = auto(DeviceTier.light);
       final built = view(
         backend: light,
         eligibility: const DeviceEligibility(tier: DeviceTier.light),
@@ -203,13 +202,7 @@ void main() {
       // The light tier is also where a probe that answered nothing lands
       // (ADR 0007). Claiming the model was "sized to fit this phone" there
       // would describe a reading that never happened.
-      const light = InferenceBackendConfig(
-        kind: InferenceBackendKind.llama,
-        profileKey: 'qwen35',
-        artifactKey: 'qwen35-2b-gguf',
-        modelPath: 'documents:models/qwen35-2b-gguf/weights.gguf',
-        modelPathFromCatalog: true,
-      );
+      final light = auto(DeviceTier.light);
       final built = view(
         backend: light,
         eligibility: classifyDevice(
@@ -221,6 +214,23 @@ void main() {
         rowFor(built, 'qwen35-2b-gguf').recommendation,
         'The lighter model, picked because this phone’s memory could not '
         'be read.',
+      );
+    });
+
+    test('a dart-define artifact credits the tier with nothing', () {
+      // resolveBackendPolicy's llama/mlx branches never read the tier, so a
+      // memory sentence there would credit a classification that took no part.
+      final pinned = resolveBackendPolicy(
+        backendName: 'llama',
+        profileDefine: 'qwen35',
+        artifactDefine: '',
+        modelPathDefine: '',
+        tier: DeviceTier.preferred,
+      );
+      final built = view(backend: pinned);
+      expect(
+        rowFor(built, pinned.artifactKey!).recommendation,
+        'This build’s default model.',
       );
     });
 
@@ -618,6 +628,8 @@ void main() {
           });
           final built = buildModelPickerView(
             catalog: modelCatalog,
+            pinnedCatalog: modelCatalog,
+            simulatedTransfers: backend.simulatedInference,
             downloadableKeys: {for (final e in modelCatalog) e.key},
             backend: backend,
             models: models,

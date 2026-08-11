@@ -28,8 +28,14 @@ Future<T?> showGolemSheet<T>({
       // enclosing Column offers no bound — so the ceiling belongs to the one
       // place that knows what a sheet is, rather than to each caller that
       // outgrows the screen. Content past this scrolls inside its own body.
+      // Four fifths of the space *above* the keyboard, plus the keyboard
+      // itself: bodies pad for viewInsets inside this box (rename does), so a
+      // cap that merely subtracted the inset would charge for it twice and
+      // clip the button off the bottom of the sheet.
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.8,
+        maxHeight:
+            (MediaQuery.sizeOf(context).height - _keyboard(context)) * 0.8 +
+            _keyboard(context),
       ),
       child: Container(
         key: sheetKey,
@@ -66,6 +72,9 @@ Future<T?> showGolemSheet<T>({
     ),
   ),
 );
+
+double _keyboard(BuildContext context) =>
+    MediaQuery.viewInsetsOf(context).bottom;
 
 class GolemSheetAction {
   const GolemSheetAction({

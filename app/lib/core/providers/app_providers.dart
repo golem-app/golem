@@ -245,6 +245,36 @@ Set<String> loadableModelKeys(Ref ref) => domain.loadableModelKeys(
   models: ref.watch(modelControllerProvider).value,
 );
 
+/// The keys a download may be *started* for: the pinned catalog, plus custom
+/// repositories that resolved against Hugging Face and so have a real file
+/// list. An unresolved entry synthesizes its files, so a request for it could
+/// not succeed — Settings and the chat picker both withhold the affordance
+/// rather than failing on the tap, and derive that from here so the rule has
+/// one statement (#79).
+/// KeepAlive, deliberately (#69): same grounds as loadableModelKeys.
+@Riverpod(keepAlive: true, retry: noRetry)
+Set<String> downloadableModelKeys(Ref ref) {
+  final simulated =
+      ref.watch(modelControllerProvider).value?.simulated ??
+      ref.watch(inferenceBackendProvider).simulatedInference;
+  final pinned = {
+    for (final entry in ref.watch(modelCatalogEntriesProvider)) entry.key,
+  };
+  final resolved = {
+    for (final spec
+        in ref.watch(preferencesControllerProvider).value?.customModels ??
+            const <CustomModelSpec>[])
+      if (spec.resolved != null) spec.key,
+  };
+  return {
+    for (final entry in ref.watch(effectiveModelCatalogProvider))
+      if (simulated ||
+          pinned.contains(entry.key) ||
+          resolved.contains(entry.key))
+        entry.key,
+  };
+}
+
 /// Only user-set values are stored; profile defaults resolve at the consumer.
 /// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
 /// owner over write-through persistence.

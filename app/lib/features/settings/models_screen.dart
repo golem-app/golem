@@ -78,18 +78,7 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
 
   Widget _body(BuildContext context, ModelState model) {
     final catalog = ref.watch(effectiveModelCatalogProvider);
-    final pinnedKeys = {
-      for (final entry in ref.watch(modelCatalogEntriesProvider)) entry.key,
-    };
-    // A hand-added repository can be fetched once it has resolved: its file
-    // list is then real. An unresolved one still cannot, because its files are
-    // synthesized and nothing would be on the other end of the request.
-    final resolvedKeys = {
-      for (final spec
-          in ref.watch(preferencesControllerProvider).value?.customModels ??
-              const <CustomModelSpec>[])
-        if (spec.resolved != null) spec.key,
-    };
+    final downloadableKeys = ref.watch(downloadableModelKeysProvider);
     final advanced =
         ref.watch(preferencesControllerProvider).value?.advancedMode ?? false;
     final simulatedInference = ref
@@ -174,11 +163,9 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
             active: entry.key == activeKey,
             otherDownloadActive:
                 downloadingKey != null && downloadingKey != entry.key,
-            downloadable:
-                model.simulated ||
-                pinnedKeys.contains(entry.key) ||
-                resolvedKeys.contains(entry.key),
+            downloadable: downloadableKeys.contains(entry.key),
             deviceRefusal: deviceRefusal,
+            defaultMeasuredKey: defaultMeasuredModelKey(backend, model),
           ),
           const SizedBox(height: 12),
         ],
@@ -749,6 +736,7 @@ class _ModelCard extends ConsumerWidget {
     required this.active,
     required this.otherDownloadActive,
     required this.downloadable,
+    required this.defaultMeasuredKey,
     this.deviceRefusal,
   });
 
@@ -765,13 +753,16 @@ class _ModelCard extends ConsumerWidget {
   /// Why this device may not fetch any weights at all, or null when it may.
   final String? deviceRefusal;
 
+  /// What an unattributed metric belongs to, resolved once by the list rather
+  /// than re-derived — and re-subscribed — per card.
+  final String? defaultMeasuredKey;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(modelControllerProvider.notifier);
     final suffix = simulated ? ' · simulated' : '';
     final statusLabel = _statusLabel(suffix);
     final chats = ref.watch(chatControllerProvider).value?.conversations;
-    final backend = ref.watch(inferenceBackendProvider);
     // Attribution comes from the shared helper, not a local fallback: the
     // picker quotes the same numbers, and a different default had one surface
     // showing a rate the other did not (#79).
@@ -780,10 +771,7 @@ class _ModelCard extends ConsumerWidget {
         : measuredTokensPerSecond(
             chats,
             modelKey: entry.key,
-            defaultModelKey: defaultMeasuredModelKey(
-              backend,
-              ref.watch(modelControllerProvider).value,
-            ),
+            defaultModelKey: defaultMeasuredKey,
           );
     return GolemCard(
       child: Column(

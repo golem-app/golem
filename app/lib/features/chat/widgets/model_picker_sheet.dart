@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/chrome/golem_badge.dart';
 import '../../../core/chrome/golem_button.dart';
 import '../../../core/chrome/golem_sheet.dart';
-import '../../../core/domain/app_preferences.dart';
 import '../../../core/domain/model_activation.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
@@ -41,25 +40,16 @@ final class _ModelPickerContent extends ConsumerWidget {
         .where((item) => item.id == conversationId)
         .firstOrNull
         ?.modelKey;
-    // The same predicate Settings uses: pinned entries and resolved custom
-    // repositories can be fetched, an unresolved one cannot.
-    final pinnedKeys = {
-      for (final entry in ref.watch(modelCatalogEntriesProvider)) entry.key,
-    };
     final preferences = ref.watch(preferencesControllerProvider).value;
-    final resolvedKeys = {
-      for (final spec in preferences?.customModels ?? const <CustomModelSpec>[])
-        if (spec.resolved != null) spec.key,
-    };
+    // One reading, used by the row label, the download guard and the consent
+    // dialog alike. Defaulting these separately produced a real transfer
+    // behind a dialog promising a simulation, in the window before model
+    // state resolves.
+    final simulatedTransfers = models?.simulated ?? backend.simulatedInference;
     final view = buildModelPickerView(
       catalog: catalog,
-      downloadableKeys: {
-        for (final entry in catalog)
-          if ((models?.simulated ?? true) ||
-              pinnedKeys.contains(entry.key) ||
-              resolvedKeys.contains(entry.key))
-            entry.key,
-      },
+      pinnedCatalog: ref.watch(modelCatalogEntriesProvider),
+      downloadableKeys: ref.watch(downloadableModelKeysProvider),
       backend: backend,
       models: models,
       loadableKeys: loadable,
@@ -67,6 +57,7 @@ final class _ModelPickerContent extends ConsumerWidget {
       eligibility: ref.watch(deviceEligibilityProvider),
       deviceRefusal: ref.watch(deviceRefusalProvider),
       advanced: preferences?.advancedMode ?? false,
+      simulatedTransfers: simulatedTransfers,
       selectedKey: effectiveModelKey(
         backend: backend,
         catalog: catalog,
@@ -113,7 +104,7 @@ final class _ModelPickerContent extends ConsumerWidget {
                           context,
                           ref,
                           choice,
-                          models?.simulated ?? true,
+                          simulatedTransfers,
                         ),
                       ),
                       const SizedBox(height: GolemSpace.s2),

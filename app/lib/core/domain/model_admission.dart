@@ -20,6 +20,7 @@ final class ModelAdmissionOption {
     required this.enabled,
     required this.recommended,
     this.block,
+    this.memoryKnown = true,
   });
 
   final ModelCatalogEntry entry;
@@ -27,9 +28,18 @@ final class ModelAdmissionOption {
   final bool recommended;
   final ModelAdmissionBlock? block;
 
+  /// Whether the reading behind a tier refusal actually happened. The light
+  /// tier is also where an unreadable probe lands, and unknown is not a low
+  /// value (ADR 0007) — so the refusal may not describe it as one.
+  final bool memoryKnown;
+
   String? get disabledReason => switch (block) {
     ModelAdmissionBlock.otherEngine =>
-      'This build uses the ${entry.engine == ModelEngine.mlx ? 'GGUF' : 'MLX'} engine.',
+      'This build uses the '
+          '${entry.engine == ModelEngine.mlx ? 'GGUF' : 'MLX'} engine.',
+    ModelAdmissionBlock.needsPreferredTier when !memoryKnown =>
+      'Golem could not read this phone’s memory, so it ships the lighter '
+          'model here.',
     ModelAdmissionBlock.needsPreferredTier =>
       'Needs more memory than this phone reports.',
     ModelAdmissionBlock.unsupportedDevice =>
@@ -80,6 +90,7 @@ List<ModelAdmissionOption> modelAdmissionOptions({
         enabled: item.block == null,
         recommended: item.entry.key == recommendedKey,
         block: item.block,
+        memoryKnown: eligibility.memoryKnown,
       ),
   ];
 }
