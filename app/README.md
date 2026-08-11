@@ -241,7 +241,12 @@ added), runtime controls, Benchmark,
 JSON export, and the native share sheet. Privacy & data can stop saving chat
 history (confirming, then emptying the on-disk store), export every chat as
 JSON, and delete all chats; Storage breaks usage into models, chats, and
-cache with per-model delete and a cache clear. A resolved custom repository
+cache with per-model delete and a cache clear. That screen's promise that
+Golem sends no analytics is load-bearing: the app ships no crash reporter or
+telemetry of any kind, and relies on Play vitals plus Apple's opt-in crash
+reports instead — the trade, and what it costs, is recorded in
+[ADR 0011](../docs/decisions/0011-crash-visibility.md). A resolved custom
+repository
 downloads, verifies, and activates through the same paths as a pinned one; the
 fake simulates the whole flow, and an unresolved entry still refuses to download
 because its file list is synthesized.
@@ -291,7 +296,9 @@ footnote while each row says only that it is refused.
 
 Stable keys/semantics preserve the native automation vocabulary. The most useful
 identifiers are `launch-splash`, `chat-composer`, `send-button`, `stop-button`,
-`reasoning-toggle`, `composer-attach`, `composer-model-chip`,
+`reasoning-toggle`, `reasoning-card-header` (the transcript card's own
+disclosure, which reports Expanded/Collapsed as its semantic value),
+`composer-attach`, `composer-model-chip`,
 `starter-chip-<name>`, `generating-pill`, `stopped-caption`,
 `message-copy-<id>`, `message-regenerate-<id>`, `message-share-<id>`,
 `message-menu-<id>` plus `menu-message-{copy,regenerate,branch,share,delete}`,
@@ -314,6 +321,8 @@ itself a button, so a download inside it cannot swallow the tap),
 `advanced-mode-switch`, `about-row`, `about-sheet`,
 `models-tab-{all,installed}`, `model-card-<key>`, `model-status-<key>`,
 `model-download-<key>`, `model-pause-<key>`, `model-cancel-<key>`,
+`model-progress-<key>` (the download bar, whose percentage is a semantic
+value because the bar itself paints one and says none),
 `model-delete-<key>`, `confirm-model-delete` (catalog keys: `gemma4-mlx`,
 `gemma4-gguf`, `qwen35-2b-mlx`, `qwen35-2b-gguf`, `qwen35-mlx`, `qwen35-gguf`,
 plus derived `custom-<repository-slug>` entries),
@@ -331,7 +340,8 @@ toggle rather than disabling them), `style-{precise,balanced,creative}`,
 buttons; the sampling card edits the active profile),
 `gen-reset-<profile>` (profile keys: `gemma4`, `qwen35`),
 `system-prompt-field`, `system-prompt-reset`,
-`theme-{system,light,dark}`, `text-scale-slider`,
+`theme-{system,light,dark}`, `text-scale-slider` and the `text-size-control`
+node that names it,
 `toggle-{metrics,reasoning,haptics,save-history}`, `confirm-history-off`,
 `export-chats`, `delete-all-chats`, `confirm-delete-all`, `storage-bar`,
 `storage-model-<key>`, `storage-delete-<key>`, `clear-cache`,
@@ -467,10 +477,21 @@ llama build with Advanced on, which is the only way to record the states an
 engine composition produces — the recommendation's device-tier reason, an
 installed artifact of the other engine explaining itself, the count of what
 is not listed, and the artifact line. The widget suite also runs Flutter's iOS 44-point target,
-semantic-label, contrast, and enlarged-text checks; the settings root,
+semantic-label, and contrast checks; the settings root,
 appearance, privacy, and legal screens are enrolled alongside chat, which is
 why segments and switches carry full 44-point targets and footnotes use
-muted rather than tertiary ink.
+muted rather than tertiary ink. Every major surface — chat empty, seeded and
+with a code card, the open drawer, the composer's sheets, and every settings
+screen — additionally pumps at a 1.6× text scale, because the app's own slider
+reaches 1.3× and the platform factor multiplies on top of it; an overflow
+throws, so a clean pump is the assertion.
+
+What a screen reader is told is asserted separately in
+`test/accessibility_test.dart`, none of it being visible to a golden: that a
+toast and each edge of a generation are announced, that the busy composer reads
+as read-only rather than disabled, and that switches, the text-size slider, the
+reasoning disclosure, a download's progress, and each message are named exactly
+once.
 
 ## iPhone 17 simulator verification
 
