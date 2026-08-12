@@ -10,6 +10,7 @@ import '../../../core/theme/golem_theme.dart';
 import '../model_label.dart';
 import 'attach_sheet.dart';
 import 'model_picker_sheet.dart';
+import '../../../l10n/l10n.dart';
 
 class Composer extends ConsumerStatefulWidget {
   const Composer({
@@ -76,16 +77,18 @@ class _ComposerState extends ConsumerState<Composer> {
         supportsImages: supportsImages,
       );
       if (source == null || !mounted) return;
-      final picked = await widget.picker.pick(source);
+      final picked = await widget.picker.pick(
+        source,
+        filesLabel: context.l10n.images,
+      );
       if (picked == null || !mounted) return;
       setState(() => _pending.add(picked));
     } on ImageRejectedException catch (error) {
       if (!mounted) return;
       showGolemToast(context, switch (error.reason) {
-        ImageRejection.unsupportedType =>
-          'That file type is not supported. Use a JPEG, PNG, or WebP image.',
-        ImageRejection.tooLarge => 'That image is too large to attach.',
-        ImageRejection.undecodable => 'That image could not be read.',
+        ImageRejection.unsupportedType => context.l10n.unsupportedImageType,
+        ImageRejection.tooLarge => context.l10n.imageTooLarge,
+        ImageRejection.undecodable => context.l10n.imageUnreadable,
       });
     } catch (error) {
       // The picker is a platform channel: a denied permission, a revoked grant
@@ -103,9 +106,8 @@ class _ComposerState extends ConsumerState<Composer> {
       showGolemToast(
         context,
         denied
-            ? 'Golem needs access to your camera and photos. Turn it on in '
-                  'Settings to attach a picture.'
-            : 'That picture could not be added.',
+            ? context.l10n.imagePermissionDenied
+            : context.l10n.imageAddFailed,
       );
     }
   }
@@ -145,7 +147,7 @@ class _ComposerState extends ConsumerState<Composer> {
                     onPressed: () => setState(() => _pending.removeAt(index)),
                     child: Semantics(
                       button: true,
-                      label: 'Remove attached image',
+                      label: context.l10n.removeAttachedImage,
                       child: Container(
                         width: 22,
                         height: 22,
@@ -258,7 +260,7 @@ class _ComposerState extends ConsumerState<Composer> {
                 readOnly: generating,
                 minLines: 1,
                 maxLines: 6,
-                placeholder: 'Message Golem…',
+                placeholder: context.l10n.messagePlaceholder,
                 textInputAction: TextInputAction.newline,
                 // 14pt keeps the single-line field at the 44pt tap target.
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -274,7 +276,7 @@ class _ComposerState extends ConsumerState<Composer> {
                       children: [
                         _PowerButton(
                           buttonKey: const Key('composer-attach'),
-                          semanticLabel: 'Add to this chat',
+                          semanticLabel: context.l10n.addToChat,
                           onPressed: generating
                               ? null
                               : () => _attach(modelLabel, supportsImages),
@@ -298,7 +300,7 @@ class _ComposerState extends ConsumerState<Composer> {
                             constraints: const BoxConstraints(maxWidth: 190),
                             child: _PowerButton(
                               buttonKey: const Key('composer-model-chip'),
-                              semanticLabel: 'Model for this chat',
+                              semanticLabel: context.l10n.modelForChat,
                               onPressed: generating
                                   ? null
                                   : () => _openModelPicker(context, ref),
@@ -363,8 +365,8 @@ class _ComposerState extends ConsumerState<Composer> {
                         _PowerButton(
                           buttonKey: const Key('reasoning-toggle'),
                           semanticLabel: reasoningEnabled
-                              ? 'Reasoning on'
-                              : 'Reasoning off',
+                              ? context.l10n.reasoningOn
+                              : context.l10n.reasoningOff,
                           onPressed: generating
                               ? null
                               : () => ref
@@ -401,7 +403,7 @@ class _ComposerState extends ConsumerState<Composer> {
                                       ),
                                       const SizedBox(width: 6),
                                       Text(
-                                        'Think',
+                                        context.l10n.think,
                                         style: GolemText.captionStrong.copyWith(
                                           color: CupertinoDynamicColor.resolve(
                                             GolemTheme.ink,
@@ -495,7 +497,7 @@ class _ComposerState extends ConsumerState<Composer> {
                           child: Center(
                             child: generating
                                 ? Semantics(
-                                    label: 'Stop',
+                                    label: context.l10n.stop,
                                     child: Container(
                                       width: 14,
                                       height: 14,
@@ -505,9 +507,9 @@ class _ComposerState extends ConsumerState<Composer> {
                                       ),
                                     ),
                                   )
-                                : const Icon(
+                                : Icon(
                                     CupertinoIcons.arrow_up,
-                                    semanticLabel: 'Send',
+                                    semanticLabel: context.l10n.send,
                                     color: CupertinoColors.white,
                                     size: 20,
                                   ),

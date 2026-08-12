@@ -13,6 +13,7 @@ import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
 import 'widgets/settings_rows.dart';
 import '../../core/domain/byte_format.dart';
+import '../../l10n/l10n.dart';
 
 class StorageScreen extends ConsumerWidget {
   const StorageScreen({super.key});
@@ -30,15 +31,16 @@ class StorageScreen extends ConsumerWidget {
     final model = modelValue.value;
     return CupertinoPageScaffold(
       navigationBar: GolemNavBar(
-        title: 'Storage',
-        previousPageTitle: 'Settings',
+        title: context.l10n.settingsStorage,
+        previousPageTitle: context.l10n.settingsTitle,
       ),
       child: SafeArea(
         bottom: false,
         child: failed
             ? RetryPane(
                 key: const Key('storage-error'),
-                message: "Couldn't read storage.",
+                message: context.l10n.storageReadFailed,
+                actionLabel: context.l10n.tryAgain,
                 onRetry: () {
                   // Only the provider that actually failed: invalidating a
                   // healthy ModelController would kill an in-flight download
@@ -59,7 +61,7 @@ class StorageScreen extends ConsumerWidget {
                 children: [
                   _UsageCard(breakdown: breakdown),
                   const SizedBox(height: 24),
-                  const SectionHeader('Downloaded models'),
+                  SectionHeader(context.l10n.downloadedModels),
                   const SizedBox(height: 8),
                   _DownloadedModels(model: model, catalog: catalog),
                   const SizedBox(height: 24),
@@ -67,8 +69,8 @@ class StorageScreen extends ConsumerWidget {
                     children: [
                       SettingsNavRow(
                         key: const Key('clear-cache'),
-                        label: 'Clear inference cache',
-                        value: _megabytes(breakdown.cacheBytes),
+                        label: context.l10n.clearInferenceCache,
+                        value: _megabytes(context, breakdown.cacheBytes),
                         onTap: breakdown.cacheBytes == 0
                             ? null
                             : () => _clearCache(context, ref),
@@ -76,10 +78,7 @@ class StorageScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 18),
-                  const SettingsFootnote(
-                    'Deleting a model frees the space immediately. Your '
-                    'chats are kept.',
-                  ),
+                  SettingsFootnote(context.l10n.modelDeletionFootnote),
                 ],
               ),
       ),
@@ -89,7 +88,7 @@ class StorageScreen extends ConsumerWidget {
   Future<void> _clearCache(BuildContext context, WidgetRef ref) async {
     await ref.read(cacheProbeProvider).clear();
     ref.invalidate(storageBreakdownProvider);
-    if (context.mounted) showGolemToast(context, 'Cache cleared');
+    if (context.mounted) showGolemToast(context, context.l10n.cacheCleared);
   }
 }
 
@@ -135,7 +134,7 @@ class _UsageCard extends StatelessWidget {
                   ),
                   if (free != null)
                     Text(
-                      '${gigabytes(free)} free',
+                      context.l10n.storageFree(gigabytes(free)),
                       style: GolemText.footnote.copyWith(color: muted),
                     ),
                 ],
@@ -170,11 +169,15 @@ class _UsageCard extends StatelessWidget {
                 children: [
                   _Legend(
                     color: accent,
-                    label: 'Models ${gigabytes(breakdown.modelsBytes)}',
+                    label: context.l10n.storageModelsAmount(
+                      gigabytes(breakdown.modelsBytes),
+                    ),
                   ),
                   _Legend(
                     color: chatsColor,
-                    label: 'Chats ${_megabytes(breakdown.chatsBytes)}',
+                    label: context.l10n.storageChatsAmount(
+                      _megabytes(context, breakdown.chatsBytes),
+                    ),
                   ),
                   // An always-present "Images 0 MB" would be clutter on the
                   // many installs that never attach one; the bar's arithmetic
@@ -182,11 +185,15 @@ class _UsageCard extends StatelessWidget {
                   if (breakdown.attachmentsBytes > 0)
                     _Legend(
                       color: attachmentsColor,
-                      label: 'Images ${_megabytes(breakdown.attachmentsBytes)}',
+                      label: context.l10n.storageImagesAmount(
+                        _megabytes(context, breakdown.attachmentsBytes),
+                      ),
                     ),
                   _Legend(
                     color: cacheColor,
-                    label: 'Cache ${_megabytes(breakdown.cacheBytes)}',
+                    label: context.l10n.storageCacheAmount(
+                      _megabytes(context, breakdown.cacheBytes),
+                    ),
                   ),
                 ],
               ),
@@ -254,9 +261,9 @@ class _DownloadedModels extends ConsumerWidget {
         .where((entry) => model.statusOf(entry.key).downloadedBytes > 0)
         .toList();
     if (rows.isEmpty) {
-      return const SettingsFootnote(
-        'No downloaded models yet.',
-        key: Key('storage-models-empty'),
+      return SettingsFootnote(
+        context.l10n.noDownloadedModels,
+        key: const Key('storage-models-empty'),
       );
     }
     return SettingsCard(
@@ -281,10 +288,10 @@ class _DownloadedModels extends ConsumerWidget {
                         [
                           entry.engine == ModelEngine.mlx ? 'MLX' : 'GGUF',
                           entry.quantization,
-                          if (entry.key == activeKey) 'active',
+                          if (entry.key == activeKey) context.l10n.active,
                           if (model.statusOf(entry.key).phase !=
                               ArtifactPhase.installed)
-                            'partial',
+                            context.l10n.partial,
                         ].join(' · '),
                         style: GolemText.caption.copyWith(color: muted),
                       ),
@@ -323,15 +330,21 @@ class _DownloadedModels extends ConsumerWidget {
     dialogKey: const Key('model-delete-dialog'),
     // Display names no longer carry a quantization, so two artifacts of one
     // family share one (#79). A destructive dialog must still say which.
-    title: 'Delete ${entry.displayName} · ${engineFormat(entry.engine)}?',
-    message:
-        'Removes ${gigabytes(model.statusOf(entry.key).downloadedBytes)} '
-        'from this device. The model can be downloaded again later.',
+    title: context.l10n.deleteModelArtifactTitle(
+      entry.displayName,
+      engineFormat(entry.engine),
+    ),
+    message: context.l10n.deleteModelStorageMessage(
+      gigabytes(model.statusOf(entry.key).downloadedBytes),
+    ),
     actions: [
-      GolemAlertAction(label: 'Keep', onPressed: () => Navigator.pop(context)),
+      GolemAlertAction(
+        label: context.l10n.keep,
+        onPressed: () => Navigator.pop(context),
+      ),
       GolemAlertAction(
         key: const Key('confirm-model-delete'),
-        label: 'Delete',
+        label: context.l10n.delete,
         isDestructive: true,
         onPressed: () {
           Navigator.pop(context);
@@ -342,5 +355,6 @@ class _DownloadedModels extends ConsumerWidget {
   );
 }
 
-String _megabytes(int bytes) =>
-    bytes >= 1e9 ? gigabytes(bytes) : '${(bytes / 1e6).round()} MB';
+String _megabytes(BuildContext context, int bytes) => bytes >= 1e9
+    ? gigabytes(bytes)
+    : context.l10n.megabytes((bytes / 1e6).round());

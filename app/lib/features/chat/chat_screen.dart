@@ -8,6 +8,7 @@ import '../../core/domain/app_state.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
+import '../../l10n/l10n.dart';
 import '../../core/widgets/retry_pane.dart';
 import 'model_label.dart';
 import 'widgets/attach_sheet.dart';
@@ -119,9 +120,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (before == null || after == null) return;
     if (_busy(before) == _busy(after)) return;
     final message = _busy(after)
-        ? 'Golem is responding'
+        ? context.l10n.golemResponding
         : after == GenerationPhase.idle
-        ? 'Response finished'
+        ? context.l10n.responseFinished
         : null;
     if (message == null) return;
     SemanticsService.sendAnnouncement(
@@ -167,7 +168,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       error: (error, stack) => CupertinoPageScaffold(
         child: RetryPane(
           key: const Key('chat-load-error'),
-          message: "Couldn't load chat history.",
+          message: context.l10n.chatHistoryLoadFailed,
+          actionLabel: context.l10n.tryAgain,
           onRetry: () => ref.invalidate(chatControllerProvider),
         ),
       ),
@@ -201,7 +203,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       backgroundColor: GolemTheme.canvas,
                       navigationBar: GolemNavBar(
                         backgroundColor: GolemTheme.canvas,
-                        title: chat.active?.title ?? 'New chat',
+                        title: chat.active == null || chat.active!.title.isEmpty
+                            ? context.l10n.newChat
+                            : chat.active!.title,
                         subtitle: chatModelSubtitle(
                           backend: ref.watch(inferenceBackendProvider),
                           catalog: ref.watch(effectiveModelCatalogProvider),
@@ -213,6 +217,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               (value) => value.runsModels,
                             ),
                           ),
+                          unsupportedLabel: context.l10n.unsupportedDevice,
+                          simulatedLabel: context.l10n.simulated,
+                          onDeviceLabel: context.l10n.onDevice,
                         ),
                         // Contained glass follows the iOS 26 toolbar style;
                         // bare nav-bar glyphs read too small next to it.
@@ -226,7 +233,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                   _focus.unfocus();
                                   setState(() => _drawerOpen = true);
                                 },
-                          child: const Glass(
+                          child: Glass(
                             radius: 20,
                             floating: true,
                             child: SizedBox(
@@ -234,7 +241,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               height: 40,
                               child: Icon(
                                 CupertinoIcons.bars,
-                                semanticLabel: 'Open conversations',
+                                semanticLabel: context.l10n.openConversations,
                                 size: 24,
                               ),
                             ),
@@ -249,7 +256,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               : () => ref
                                     .read(chatControllerProvider.notifier)
                                     .newChat(),
-                          child: const Glass(
+                          child: Glass(
                             radius: 20,
                             floating: true,
                             child: SizedBox(
@@ -257,7 +264,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               height: 40,
                               child: Icon(
                                 CupertinoIcons.square_pencil,
-                                semanticLabel: 'New chat',
+                                semanticLabel: context.l10n.newChat,
                                 size: 24,
                               ),
                             ),
@@ -313,7 +320,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     // action lets the screen-reader escape gesture close it.
                     child: Semantics(
                       button: true,
-                      label: 'Close conversations',
+                      label: context.l10n.closeConversations,
                       onDismiss: () => setState(() => _drawerOpen = false),
                       child: GestureDetector(
                         key: const Key('drawer-dismiss'),

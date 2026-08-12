@@ -13,6 +13,7 @@ import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
 import 'markdown/golem_markdown.dart';
+import '../../../l10n/l10n.dart';
 
 class MessageBubble extends ConsumerWidget {
   const MessageBubble({
@@ -123,7 +124,7 @@ class MessageBubble extends ConsumerWidget {
             if (stoppedTokens != null) ...[
               const SizedBox(height: 8),
               Text(
-                'Stopped after $stoppedTokens tokens',
+                context.l10n.stoppedAfterTokens(stoppedTokens!),
                 key: const Key('stopped-caption'),
                 style: GolemText.caption.copyWith(
                   color: CupertinoDynamicColor.resolve(
@@ -154,7 +155,7 @@ class MessageBubble extends ConsumerWidget {
     );
     return Semantics(
       key: Key('message-${message.id}'),
-      label: _semanticLabel(message, isUser: isUser),
+      label: _semanticLabel(context, message, isUser: isUser),
       child: Padding(
         padding: const EdgeInsets.only(bottom: 14),
         child: Column(
@@ -195,26 +196,26 @@ class MessageBubble extends ConsumerWidget {
           action(
             key: Key('message-copy-${message.id}'),
             icon: CupertinoIcons.doc_on_doc,
-            label: 'Copy message',
+            label: context.l10n.copyMessage,
             onPressed: () => _copy(context),
           ),
           if (canRegenerate)
             action(
               key: Key('message-regenerate-${message.id}'),
               icon: CupertinoIcons.arrow_clockwise,
-              label: 'Regenerate response',
+              label: context.l10n.regenerateResponse,
               onPressed: () =>
                   ref.read(chatControllerProvider.notifier).regenerate(),
             ),
           action(
             key: Key('message-share-${message.id}'),
             icon: CupertinoIcons.square_arrow_up,
-            label: 'Share message',
+            label: context.l10n.shareMessage,
             onPressed: () => _share(context),
           ),
           GolemMenu(
             anchorKey: Key('message-menu-${message.id}'),
-            triggerSemanticLabel: 'Message actions',
+            triggerSemanticLabel: context.l10n.messageActions,
             triggerColor: tint,
             items: _menuItems(context, ref),
           ),
@@ -226,32 +227,32 @@ class MessageBubble extends ConsumerWidget {
   List<GolemMenuItem> _menuItems(BuildContext context, WidgetRef ref) => [
     GolemMenuItem(
       itemKey: const Key('menu-message-copy'),
-      label: 'Copy',
+      label: context.l10n.copy,
       icon: CupertinoIcons.doc_on_doc,
       onPressed: () => _copy(context),
     ),
     if (canRegenerate)
       GolemMenuItem(
         itemKey: const Key('menu-message-regenerate'),
-        label: 'Regenerate',
+        label: context.l10n.regenerate,
         icon: CupertinoIcons.arrow_clockwise,
         onPressed: () => ref.read(chatControllerProvider.notifier).regenerate(),
       ),
     GolemMenuItem(
       itemKey: const Key('menu-message-branch'),
-      label: 'Branch from here',
+      label: context.l10n.branchFromHere,
       icon: CupertinoIcons.arrow_branch,
       onPressed: () => _branch(context, ref),
     ),
     GolemMenuItem(
       itemKey: const Key('menu-message-share'),
-      label: 'Share',
+      label: context.l10n.share,
       icon: CupertinoIcons.square_arrow_up,
       onPressed: () => _share(context),
     ),
     GolemMenuItem(
       itemKey: const Key('menu-message-delete'),
-      label: 'Delete message',
+      label: context.l10n.deleteMessage,
       icon: CupertinoIcons.trash,
       isDestructive: true,
       onPressed: () =>
@@ -261,12 +262,14 @@ class MessageBubble extends ConsumerWidget {
 
   void _copy(BuildContext context) {
     Clipboard.setData(ClipboardData(text: message.text));
-    showGolemToast(context, 'Copied to clipboard');
+    showGolemToast(context, context.l10n.copiedToClipboard);
   }
 
   Future<void> _branch(BuildContext context, WidgetRef ref) async {
     await ref.read(chatControllerProvider.notifier).branchFrom(message.id);
-    if (context.mounted) showGolemToast(context, 'New branch started');
+    if (context.mounted) {
+      showGolemToast(context, context.l10n.newBranchStarted);
+    }
   }
 
   Future<void> _share(BuildContext context) async {
@@ -289,11 +292,11 @@ class MessageBubble extends ConsumerWidget {
     await showGolemActions(
       context: context,
       title: message.role == MessageRole.user
-          ? 'Your message'
-          : 'Golem response',
+          ? context.l10n.yourMessage
+          : context.l10n.golemResponse,
       actions: [
         GolemSheetAction(
-          label: 'Copy',
+          label: context.l10n.copy,
           onPressed: () {
             Navigator.pop(context);
             _copy(context);
@@ -301,7 +304,7 @@ class MessageBubble extends ConsumerWidget {
         ),
         if (message.role == MessageRole.user && idle)
           GolemSheetAction(
-            label: 'Edit and retry',
+            label: context.l10n.editAndRetry,
             onPressed: () {
               Navigator.pop(context);
               _showEdit(context, ref);
@@ -309,7 +312,7 @@ class MessageBubble extends ConsumerWidget {
           ),
         if (message.role == MessageRole.assistant && canRegenerate)
           GolemSheetAction(
-            label: 'Regenerate',
+            label: context.l10n.regenerate,
             onPressed: () {
               Navigator.pop(context);
               ref.read(chatControllerProvider.notifier).regenerate();
@@ -317,7 +320,7 @@ class MessageBubble extends ConsumerWidget {
           ),
         if (idle)
           GolemSheetAction(
-            label: 'Branch from here',
+            label: context.l10n.branchFromHere,
             onPressed: () {
               Navigator.pop(context);
               _branch(context, ref);
@@ -325,7 +328,7 @@ class MessageBubble extends ConsumerWidget {
           ),
         if (message.role == MessageRole.assistant)
           GolemSheetAction(
-            label: 'Share',
+            label: context.l10n.share,
             onPressed: () {
               Navigator.pop(context);
               _share(context);
@@ -333,7 +336,7 @@ class MessageBubble extends ConsumerWidget {
           ),
         if (idle)
           GolemSheetAction(
-            label: 'Delete message',
+            label: context.l10n.deleteMessage,
             isDestructive: true,
             onPressed: () {
               Navigator.pop(context);
@@ -350,7 +353,7 @@ class MessageBubble extends ConsumerWidget {
     final controller = TextEditingController(text: message.text);
     await showGolemAlert(
       context: context,
-      title: 'Edit message',
+      title: context.l10n.editMessage,
       content: Padding(
         padding: const EdgeInsets.only(top: 12),
         child: CupertinoTextField(
@@ -362,12 +365,12 @@ class MessageBubble extends ConsumerWidget {
       ),
       actions: [
         GolemAlertAction(
-          label: 'Cancel',
+          label: context.l10n.cancel,
           onPressed: () => Navigator.pop(context),
         ),
         GolemAlertAction(
           key: const Key('edit-message-save'),
-          label: 'Save and regenerate',
+          label: context.l10n.saveAndRegenerate,
           onPressed: () {
             Navigator.pop(context);
             ref
@@ -452,8 +455,10 @@ class _ReasoningCardState extends State<_ReasoningCard> {
             key: const Key('reasoning-card-header'),
             container: true,
             button: true,
-            label: widget.streaming ? 'Reasoning, live' : 'Reasoning',
-            value: _expanded ? 'Expanded' : 'Collapsed',
+            label: widget.streaming
+                ? context.l10n.reasoningLive
+                : context.l10n.reasoning,
+            value: _expanded ? context.l10n.expanded : context.l10n.collapsed,
             onTap: () => setState(() => _userToggle = !_expanded),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -472,7 +477,9 @@ class _ReasoningCardState extends State<_ReasoningCard> {
                     const SizedBox(width: 7),
                     Expanded(
                       child: Text(
-                        widget.streaming ? 'Reasoning · LIVE' : 'Reasoning',
+                        widget.streaming
+                            ? context.l10n.reasoningLiveBadge
+                            : context.l10n.reasoning,
                         style: GolemText.footnoteStrong,
                       ),
                     ),
@@ -522,8 +529,9 @@ class _GeneratingPill extends StatelessWidget {
           const SizedBox(width: 8),
           Flexible(
             child: Text(
-              'Generating · '
-              '${metrics.decodeTokensPerSecond.toStringAsFixed(1)} tok/s',
+              context.l10n.generatingAtRate(
+                metrics.decodeTokensPerSecond.toStringAsFixed(1),
+              ),
               style: GolemText.metrics.copyWith(color: accent),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -583,7 +591,10 @@ class _MetricsPill extends StatelessWidget {
       borderRadius: BorderRadius.circular(GolemRadius.pill),
     ),
     child: Text(
-      '${metrics.decodeTokensPerSecond.toStringAsFixed(1)} tok/s  ·  ${metrics.tokenCount} tokens',
+      context.l10n.tokenRateSummary(
+        metrics.decodeTokensPerSecond.toStringAsFixed(1),
+        metrics.tokenCount,
+      ),
       style: GolemText.metrics.copyWith(
         color: CupertinoDynamicColor.resolve(GolemTheme.accent, context),
       ),
@@ -595,14 +606,16 @@ class _MetricsPill extends StatelessWidget {
 /// bubble's own rendered text rather than restating it. Repeating the message
 /// here read every answer twice, once from this label and once from the
 /// Text below it.
-String _semanticLabel(ChatMessage message, {required bool isUser}) {
-  final speaker = isUser ? 'You' : 'Golem';
+String _semanticLabel(
+  BuildContext context,
+  ChatMessage message, {
+  required bool isUser,
+}) {
+  final speaker = isUser
+      ? context.l10n.userSpeaker
+      : context.l10n.assistantSpeaker;
   final images = message.images.length;
-  final picture = switch (images) {
-    0 => '',
-    1 => ' 1 image.',
-    _ => ' $images images.',
-  };
+  final picture = context.l10n.imageCountSentence(images);
   return '$speaker:$picture';
 }
 
@@ -652,8 +665,8 @@ class _AttachedImageState extends ConsumerState<_AttachedImage> {
               if (bytes == null) {
                 return Semantics(
                   label: snapshot.connectionState == ConnectionState.done
-                      ? 'Image is no longer available'
-                      : 'Loading image',
+                      ? context.l10n.imageUnavailable
+                      : context.l10n.loadingImage,
                   child: ColoredBox(
                     color: CupertinoDynamicColor.resolve(
                       GolemTheme.divider,

@@ -10,6 +10,7 @@ import '../../core/domain/app_preferences.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
+import '../../l10n/l10n.dart';
 import '../chat/model_label.dart';
 import '../legal/ai_disclaimer.dart';
 import 'save_feedback.dart';
@@ -33,8 +34,12 @@ class SettingsScreen extends ConsumerWidget {
     // or failed — the Storage screen owns the full error surface.
     final storage = ref.watch(storageBreakdownProvider).value;
     final style = preferences.styleFor(backend.profileKey);
+    final l10n = context.l10n;
     return CupertinoPageScaffold(
-      navigationBar: GolemNavBar(title: 'Settings', previousPageTitle: 'Chat'),
+      navigationBar: GolemNavBar(
+        title: l10n.settingsTitle,
+        previousPageTitle: l10n.chatTitle,
+      ),
       child: SafeArea(
         bottom: false,
         child: ListView(
@@ -45,13 +50,13 @@ class SettingsScreen extends ConsumerWidget {
               const SimulationBanner(),
               const SizedBox(height: 24),
             ],
-            const SectionHeader('Model'),
+            SectionHeader(l10n.settingsSectionModel),
             const SizedBox(height: 8),
             SettingsCard(
               children: [
                 SettingsNavRow(
                   key: const Key('settings-model-row'),
-                  label: 'Model',
+                  label: l10n.settingsModel,
                   value: chatModelLabel(
                     backend: backend,
                     catalog: catalog,
@@ -61,17 +66,17 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 SettingsNavRow(
                   key: const Key('settings-style-row'),
-                  label: 'Response style',
-                  value: _styleLabel(style),
+                  label: l10n.settingsResponseStyle,
+                  value: _styleLabel(style, l10n),
                   onTap: () => context.push('/settings/response-style'),
                 ),
                 if (preferences.advancedMode)
                   SettingsNavRow(
                     key: const Key('settings-system-prompt-row'),
-                    label: 'System prompt',
+                    label: l10n.settingsSystemPrompt,
                     value: preferences.systemPrompt == null
-                        ? 'Default'
-                        : 'Custom',
+                        ? l10n.defaultValue
+                        : l10n.customValue,
                     onTap: () => context.push('/settings/system-prompt'),
                   ),
               ],
@@ -79,24 +84,30 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 10),
             const AiDisclaimer(key: Key('settings-ai-disclaimer')),
             const SizedBox(height: 24),
-            const SectionHeader('App'),
+            SectionHeader(l10n.settingsSectionApp),
             const SizedBox(height: 8),
             SettingsCard(
               children: [
                 SettingsNavRow(
                   key: const Key('settings-appearance-row'),
-                  label: 'Appearance',
-                  value: _themeLabel(preferences.theme),
+                  label: l10n.settingsAppearance,
+                  value: _themeLabel(preferences.theme, l10n),
                   onTap: () => context.push('/settings/appearance'),
                 ),
                 SettingsNavRow(
+                  key: const Key('settings-language-row'),
+                  label: l10n.settingsLanguage,
+                  value: _languageLabel(preferences.language, l10n),
+                  onTap: () => context.push('/settings/language'),
+                ),
+                SettingsNavRow(
                   key: const Key('settings-privacy-row'),
-                  label: 'Privacy & data',
+                  label: l10n.settingsPrivacyData,
                   onTap: () => context.push('/settings/privacy'),
                 ),
                 SettingsNavRow(
                   key: const Key('settings-storage-row'),
-                  label: 'Storage',
+                  label: l10n.settingsStorage,
                   value: storage == null
                       ? null
                       : '${(storage.usedBytes / 1e9).toStringAsFixed(1)} GB',
@@ -105,7 +116,7 @@ class SettingsScreen extends ConsumerWidget {
                 if (identity.internalToolsEnabled)
                   SettingsNavRow(
                     key: const Key('open-benchmark'),
-                    label: 'Benchmark',
+                    label: l10n.settingsBenchmark,
                     onTap: () => context.push('/benchmark'),
                   ),
               ],
@@ -126,7 +137,7 @@ class SettingsScreen extends ConsumerWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                'Advanced mode',
+                                l10n.advancedMode,
                                 style: GolemText.body,
                               ),
                             ),
@@ -157,8 +168,7 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Sampling controls, a custom system prompt, and '
-                          'loading any Hugging Face repository by hand.',
+                          l10n.advancedModeDetail,
                           style: GolemText.footnote.copyWith(
                             color: CupertinoDynamicColor.resolve(
                               GolemTheme.mutedInk,
@@ -173,33 +183,30 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 24),
-            const SectionHeader('About & legal'),
+            SectionHeader(l10n.aboutLegal),
             const SizedBox(height: 8),
             SettingsCard(
               children: [
                 SettingsNavRow(
                   key: const Key('model-attribution-row'),
-                  label: 'Model attribution',
+                  label: l10n.settingsModelAttribution,
                   onTap: () => context.push('/settings/model-attribution'),
                 ),
                 SettingsNavRow(
                   key: const Key('open-source-licenses-row'),
-                  label: 'Open-source licenses',
+                  label: l10n.settingsOpenSourceLicenses,
                   onTap: () => context.push('/settings/licenses'),
                 ),
                 SettingsNavRow(
                   key: const Key('about-row'),
-                  label: 'About Golem',
+                  label: l10n.settingsAboutGolem,
                   value: appVersion,
                   onTap: () => _showAbout(context, ref),
                 ),
               ],
             ),
             const SizedBox(height: 18),
-            const SettingsFootnote(
-              'Golem is open source. Nothing on this screen sends anything '
-              'anywhere.',
-            ),
+            SettingsFootnote(l10n.openSourcePrivacyFootnote),
           ],
         ),
       ),
@@ -220,7 +227,7 @@ class SettingsScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('About Golem', style: GolemText.cardTitle),
+            Text(context.l10n.settingsAboutGolem, style: GolemText.cardTitle),
             const SizedBox(height: 14),
             Text(
               '${identity.displayName} $appVersion · ${identity.applicationId}',
@@ -235,19 +242,14 @@ class SettingsScreen extends ConsumerWidget {
             Text(
               [
                 if (model?.simulated ?? true)
-                  'Model downloads are a deterministic simulation of the '
-                      'pinned catalog; no network access exists.'
+                  context.l10n.modelDownloadsSimulated
                 else
-                  'Model downloads fetch the pinned artifacts from Hugging '
-                      'Face over HTTPS.',
+                  context.l10n.modelDownloadsReal,
                 if (simulatedInference)
-                  'Inference is a deterministic UI simulation — no model '
-                      'weights, engine, or hardware measurement is included.'
+                  context.l10n.inferenceSimulated
                 else
-                  'Inference runs the local engine on this device with the '
-                      'active model.',
-                'Nothing else touches the network, and Golem reads no other '
-                    'app\'s data.',
+                  context.l10n.inferenceLocal,
+                context.l10n.networkPrivacyStatement,
               ].join(' '),
               style: GolemText.footnote.copyWith(
                 height: 1.4,
@@ -264,17 +266,26 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-String _styleLabel(ResponseStyle style) => switch (style) {
-  ResponseStyle.precise => 'Precise',
-  ResponseStyle.balanced => 'Balanced',
-  ResponseStyle.creative => 'Creative',
-};
+String _styleLabel(ResponseStyle style, AppLocalizations l10n) =>
+    switch (style) {
+      ResponseStyle.precise => l10n.stylePrecise,
+      ResponseStyle.balanced => l10n.styleBalanced,
+      ResponseStyle.creative => l10n.styleCreative,
+    };
 
-String _themeLabel(ThemeSetting theme) => switch (theme) {
-  ThemeSetting.system => 'System',
-  ThemeSetting.light => 'Light',
-  ThemeSetting.dark => 'Dark',
-};
+String _themeLabel(ThemeSetting theme, AppLocalizations l10n) =>
+    switch (theme) {
+      ThemeSetting.system => l10n.themeSystem,
+      ThemeSetting.light => l10n.themeLight,
+      ThemeSetting.dark => l10n.themeDark,
+    };
+
+String _languageLabel(AppLanguage language, AppLocalizations l10n) =>
+    switch (language) {
+      AppLanguage.system => l10n.languageSystem,
+      AppLanguage.english => l10n.languageEnglish,
+      AppLanguage.polish => l10n.languagePolish,
+    };
 
 /// The honesty banner qa builds show at the top of settings.
 class SimulationBanner extends StatelessWidget {
@@ -297,7 +308,7 @@ class SimulationBanner extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: Text(
-            'SIMULATED INFERENCE · No hardware validation',
+            context.l10n.simulatedInferenceBanner,
             style: TextStyle(
               color: CupertinoDynamicColor.resolve(GolemTheme.accent, context),
               fontWeight: FontWeight.w600,

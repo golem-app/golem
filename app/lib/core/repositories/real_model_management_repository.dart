@@ -279,6 +279,11 @@ final class RealModelManagementRepository implements ModelManagementRepository {
             failure:
                 'Needs ${gigabytes(remaining + diskSpaceMargin)} free; '
                 '${gigabytes(free)} available.',
+            failureReason: ArtifactFailure(
+              ArtifactFailureKind.insufficientStorage,
+              requiredBytes: remaining + diskSpaceMargin,
+              availableBytes: free,
+            ),
           ),
         ),
       );
@@ -386,6 +391,9 @@ final class RealModelManagementRepository implements ModelManagementRepository {
                 phase: ArtifactPhase.failed,
                 downloadedBytes: verifiedBytes,
                 failure: message,
+                failureReason: const ArtifactFailure(
+                  ArtifactFailureKind.transfer,
+                ),
               ),
             ),
           );
@@ -421,6 +429,12 @@ final class RealModelManagementRepository implements ModelManagementRepository {
               failure: sized
                   ? '${spec.path} failed SHA-256 verification.'
                   : '${spec.path} did not arrive at its expected size.',
+              failureReason: ArtifactFailure(
+                sized
+                    ? ArtifactFailureKind.hashVerification
+                    : ArtifactFailureKind.unexpectedSize,
+                fileName: spec.path,
+              ),
             ),
           ),
         );

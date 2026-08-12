@@ -10,7 +10,6 @@ import '../../core/domain/app_preferences.dart';
 import '../../core/domain/byte_format.dart';
 import '../../core/domain/inference_backend.dart';
 import '../../core/domain/model_activation.dart';
-import '../../core/domain/model_admission.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
@@ -21,6 +20,8 @@ import '../../core/widgets/labeled_row.dart';
 import '../../core/widgets/progress_track.dart';
 import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
+import '../../l10n/l10n.dart';
+import '../../l10n/presentation_messages.dart';
 import '../onboarding/model_download_consent.dart';
 import 'application/custom_repository_workflow.dart';
 import 'widgets/settings_rows.dart';
@@ -59,8 +60,8 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
     final model = ref.watch(modelControllerProvider);
     return CupertinoPageScaffold(
       navigationBar: GolemNavBar(
-        title: 'Models',
-        previousPageTitle: 'Settings',
+        title: context.l10n.models,
+        previousPageTitle: context.l10n.settings,
       ),
       child: SafeArea(
         bottom: false,
@@ -68,7 +69,8 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
           loading: () => const Center(child: CupertinoActivityIndicator()),
           error: (error, stack) => RetryPane(
             key: const Key('models-load-error'),
-            message: "Couldn't load model state.",
+            message: context.l10n.modelsLoadFailed,
+            actionLabel: context.l10n.tryAgain,
             onRetry: () => ref.invalidate(modelControllerProvider),
           ),
           data: (value) => _body(context, value),
@@ -88,6 +90,12 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
     // A device outside every supported tier may not start a transfer or a load
     // (#27); the cards say why instead of offering buttons that would refuse.
     final deviceRefusal = ref.watch(deviceRefusalProvider);
+    final refusalMessage = deviceRefusal == null
+        ? null
+        : deviceRefusalMessage(
+            context.l10n,
+            ref.watch(deviceEligibilityProvider).reason,
+          );
     // Verification holds the slot as surely as the transfer does — it runs
     // inside the same download() stream, behind the same busy guard — so a
     // button offered during it would do nothing when tapped. The chat picker
@@ -139,15 +147,15 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
         GolemSegmented<_CatalogTab>(
           groupValue: _tab,
           onChanged: (tab) => setState(() => _tab = tab),
-          segments: const {
+          segments: {
             _CatalogTab.all: Text(
-              'All models',
-              key: Key('models-tab-all'),
+              context.l10n.allModelsTitle,
+              key: const Key('models-tab-all'),
               style: GolemText.footnoteStrong,
             ),
             _CatalogTab.installed: Text(
-              'Installed',
-              key: Key('models-tab-installed'),
+              context.l10n.installedModels,
+              key: const Key('models-tab-installed'),
               style: GolemText.footnoteStrong,
             ),
           },
@@ -158,9 +166,8 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
             padding: const EdgeInsets.symmetric(vertical: 28),
             child: SettingsFootnote(
               model.simulated
-                  ? 'Nothing is installed yet. Downloads here are a '
-                        'deterministic simulation.'
-                  : 'Nothing is installed yet.',
+                  ? context.l10n.nothingInstalledSimulated
+                  : context.l10n.nothingInstalled,
               key: const Key('models-empty'),
             ),
           ),
@@ -173,23 +180,23 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
             otherDownloadActive:
                 downloadingKey != null && downloadingKey != entry.key,
             downloadable: downloadableKeys.contains(entry.key),
-            deviceRefusal: deviceRefusal,
+            deviceRefusal: refusalMessage,
             defaultMeasuredKey: defaultMeasuredModelKey(backend, model),
           ),
           const SizedBox(height: 12),
         ],
         const SizedBox(height: 12),
-        const SectionHeader('Runtime'),
+        SectionHeader(context.l10n.runtime),
         const SizedBox(height: 8),
         _RuntimeCard(
           model: model,
           simulatedInference: simulatedInference,
           activeKey: activeKey,
-          deviceRefusal: deviceRefusal,
+          deviceRefusal: refusalMessage,
         ),
         if (advanced) ...[
           const SizedBox(height: 24),
-          const SectionHeader('Custom repository'),
+          SectionHeader(context.l10n.customRepository),
           const SizedBox(height: 8),
           _CustomRepositoryCard(
             controller: _repositoryController,
@@ -218,10 +225,8 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
         const SizedBox(height: 18),
         SettingsFootnote(
           model.simulated
-              ? 'Downloads are a deterministic simulation of the pinned '
-                    'catalog; no network access exists.'
-              : 'Downloads pull straight from Hugging Face and are verified '
-                    'by revision hash.',
+              ? context.l10n.modelDownloadsSimulated
+              : context.l10n.modelDownloadsReal,
         ),
       ],
     );
@@ -254,25 +259,29 @@ class _RuntimeCard extends ConsumerWidget {
           child: Column(
             children: [
               LabeledRow(
-                label: 'Active model',
+                label: context.l10n.activeModel,
                 value:
                     active?.displayName ??
                     // A sideload has no entry to name, so name its file.
                     (backend.sideloaded
                         ? sideloadedModelLabel(backend.modelPath!)
                         : simulatedInference
-                        ? 'None · simulated inference'
-                        : 'None'),
+                        ? context.l10n.noneSimulatedInference
+                        : context.l10n.none),
               ),
               const SizedBox(height: 10),
               LabeledRow(
-                label: 'State',
-                value: _runtimeLabel(model.runtime, simulatedInference),
+                label: context.l10n.state,
+                value: _runtimeLabel(
+                  context,
+                  model.runtime,
+                  simulatedInference,
+                ),
               ),
               if (model.failure != null) ...[
                 const SizedBox(height: 10),
                 Text(
-                  model.failure!,
+                  context.l10n.modelRuntimeFailed,
                   style: const TextStyle(color: GolemTheme.destructive),
                 ),
               ],
@@ -284,8 +293,12 @@ class _RuntimeCard extends ConsumerWidget {
                 GolemButton.tinted(
                   key: const Key('runtime-toggle-button'),
                   label: model.runtime == RuntimePhase.loaded
-                      ? 'Unload ${simulatedInference ? 'Simulated ' : ''}Runtime'
-                      : 'Load ${simulatedInference ? 'Simulated ' : ''}Runtime',
+                      ? simulatedInference
+                            ? context.l10n.unloadSimulatedRuntime
+                            : context.l10n.unloadRuntime
+                      : simulatedInference
+                      ? context.l10n.loadSimulatedRuntime
+                      : context.l10n.loadRuntime,
                   onPressed: model.runtime == RuntimePhase.loading
                       ? null
                       : () => ref
@@ -340,9 +353,9 @@ final class _WeightChoice extends _AddState {
 }
 
 final class _Refused extends _AddState {
-  const _Refused(this.message);
+  const _Refused(this.reason);
 
-  final String message;
+  final RepositoryRejection reason;
 }
 
 class _CustomRepositoryCard extends ConsumerWidget {
@@ -411,7 +424,7 @@ class _CustomRepositoryCard extends ConsumerWidget {
       RepositoryNeedsWeightChoice(:final candidates) => _WeightChoice(
         candidates,
       ),
-      RepositoryRejected(:final message) => _Refused(message),
+      RepositoryRejected(:final reason) => _Refused(reason),
     });
   }
 
@@ -434,14 +447,14 @@ class _CustomRepositoryCard extends ConsumerWidget {
       // The preference write failed and rolled back; the resolution card is
       // still on screen, so Add remains the retry affordance.
       if (context.mounted) {
-        showGolemToast(context, "Couldn't save the model. Try again.");
+        showGolemToast(context, context.l10n.modelSaveFailed);
       }
       return;
     }
     // The controllers and the draft state belong to the screen, which may be
     // gone: only it can decide whether resetting them is still meaningful.
     onAdded();
-    if (context.mounted) showGolemToast(context, 'Model added');
+    if (context.mounted) showGolemToast(context, context.l10n.modelAdded);
   }
 
   @override
@@ -486,7 +499,7 @@ class _CustomRepositoryCard extends ConsumerWidget {
                 context,
                 key: const Key('custom-repo-revision'),
                 controller: revisionController,
-                placeholder: 'main — or a branch, tag, or commit',
+                placeholder: context.l10n.repositoryRevisionPlaceholder,
                 muted: muted,
               ),
               const SizedBox(height: 16),
@@ -494,16 +507,10 @@ class _CustomRepositoryCard extends ConsumerWidget {
               const SizedBox(height: 12),
               Text(switch (state) {
                 _Resolved(:final outcome) when outcome.profile == null =>
-                  'This will download and can be deleted, but Golem cannot '
-                      'prompt it: its chat template is not one this version '
-                      'recognizes.',
+                  context.l10n.unknownTemplateWarning,
                 _ when simulatedDownloads =>
-                  'This build simulates downloads, so the revision and size '
-                      'below are synthesized rather than read from Hugging '
-                      'Face.',
-                _ =>
-                  'Only public repositories are supported. Nothing downloads '
-                      'until you have seen what resolving found.',
+                  context.l10n.simulatedRepositoryDetail,
+                _ => context.l10n.publicRepositoryDetail,
               }, style: GolemText.footnote.copyWith(color: muted)),
             ],
           ),
@@ -549,28 +556,27 @@ class _CustomRepositoryCard extends ConsumerWidget {
           const SizedBox(width: 10),
           Flexible(
             child: Text(
-              'Reading the repository…',
+              context.l10n.readingRepository,
               style: GolemText.footnote.copyWith(color: muted),
             ),
           ),
         ],
       ),
     ],
-    _Refused(:final message) => [
+    _Refused(:final reason) => [
       Text(
         key: const Key('custom-repo-error'),
-        message,
+        repositoryRejectionMessage(context.l10n, reason),
         style: GolemText.footnote.copyWith(
           color: CupertinoDynamicColor.resolve(GolemTheme.destructive, context),
         ),
       ),
       const SizedBox(height: 14),
-      _resolveButton(ref, label: 'Try again'),
+      _resolveButton(ref, label: context.l10n.tryAgain),
     ],
     _WeightChoice(:final candidates) => [
       Text(
-        'This repository holds several weight files. Choose the one to '
-        'install:',
+        context.l10n.chooseWeightFile,
         style: GolemText.footnote.copyWith(color: muted),
       ),
       const SizedBox(height: 10),
@@ -604,24 +610,24 @@ class _CustomRepositoryCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           LabeledRow(
-            label: 'Revision',
+            label: context.l10n.revision,
             // The commit, not the ref that was typed: this is what installs.
             value: outcome.resolved.commitSha.substring(0, 12),
           ),
           const SizedBox(height: 8),
           LabeledRow(
-            label: 'Quantization',
+            label: context.l10n.quantization,
             value: outcome.resolved.quantization,
           ),
           const SizedBox(height: 8),
           LabeledRow(
-            label: 'Size',
+            label: context.l10n.size,
             value: gigabytes(outcome.resolved.totalBytes),
           ),
           const SizedBox(height: 8),
           LabeledRow(
-            label: 'Prompt profile',
-            value: outcome.profile?.key ?? 'Not recognized',
+            label: context.l10n.promptProfile,
+            value: outcome.profile?.key ?? context.l10n.notRecognized,
           ),
           const SizedBox(height: 12),
           for (final file in outcome.resolved.files.take(5))
@@ -646,7 +652,7 @@ class _CustomRepositoryCard extends ConsumerWidget {
             ),
           if (outcome.resolved.files.length > 5)
             Text(
-              '+ ${outcome.resolved.files.length - 5} more files',
+              context.l10n.moreFiles(outcome.resolved.files.length - 5),
               style: GolemText.footnote.copyWith(color: muted),
             ),
         ],
@@ -655,19 +661,19 @@ class _CustomRepositoryCard extends ConsumerWidget {
       Builder(
         builder: (context) => GolemButton.filled(
           key: const Key('custom-repo-add'),
-          label: 'Add model',
+          label: context.l10n.addModel,
           onPressed: () => _add(context, ref, outcome),
         ),
       ),
     ],
   };
 
-  Widget _resolveButton(WidgetRef ref, {String label = 'Resolve'}) =>
+  Widget _resolveButton(WidgetRef ref, {String? label}) =>
       ValueListenableBuilder<TextEditingValue>(
         valueListenable: controller,
         builder: (context, value, _) => GolemButton.filled(
           key: const Key('custom-repo-resolve'),
-          label: label,
+          label: label ?? context.l10n.resolveRepository,
           onPressed: value.text.trim().isEmpty ? null : () => _resolve(ref),
         ),
       );
@@ -769,8 +775,8 @@ class _ModelCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(modelControllerProvider.notifier);
-    final suffix = simulated ? ' · simulated' : '';
-    final statusLabel = _statusLabel(suffix);
+    final suffix = simulated ? ' · ${context.l10n.simulated}' : '';
+    final statusLabel = _statusLabel(context, suffix);
     final chats = ref.watch(chatControllerProvider).value?.conversations;
     // Attribution comes from the shared helper, not a local fallback: the
     // picker quotes the same numbers, and a different default had one surface
@@ -807,7 +813,7 @@ class _ModelCard extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(GolemRadius.badge),
                   ),
                   child: Text(
-                    'ACTIVE',
+                    context.l10n.activeBadge,
                     style: GolemText.badge.copyWith(
                       color: CupertinoDynamicColor.resolve(
                         GolemTheme.accent,
@@ -832,7 +838,10 @@ class _ModelCard extends ConsumerWidget {
           const SizedBox(height: 14),
           Semantics(
             key: Key('model-status-${entry.key}'),
-            label: '${entry.displayName} ${_engineLabel(entry.engine)} status',
+            label: context.l10n.modelStatusLabel(
+              entry.displayName,
+              _engineLabel(entry.engine),
+            ),
             value: statusLabel,
             child: _Status(icon: _statusIcon(), label: statusLabel),
           ),
@@ -844,7 +853,7 @@ class _ModelCard extends ConsumerWidget {
               value: entry.totalBytes == 0
                   ? 0
                   : (status.downloadedBytes / entry.totalBytes).clamp(0, 1),
-              label: 'Download$suffix',
+              label: context.l10n.downloadProgressLabel(suffix),
             ),
           ],
           if (status.phase == ArtifactPhase.verifying) ...[
@@ -853,15 +862,14 @@ class _ModelCard extends ConsumerWidget {
               children: [
                 const CupertinoActivityIndicator(),
                 const SizedBox(width: 10),
-                Text('Verifying files$suffix…'),
+                Text(context.l10n.verifyingFilesStatus(suffix)),
               ],
             ),
           ],
-          if (status.phase == ArtifactPhase.failed &&
-              status.failure != null) ...[
+          if (status.phase == ArtifactPhase.failed) ...[
             const SizedBox(height: 10),
             Text(
-              status.failure!,
+              artifactFailureMessage(context.l10n, status),
               style: const TextStyle(color: GolemTheme.destructive),
             ),
           ],
@@ -872,14 +880,14 @@ class _ModelCard extends ConsumerWidget {
             onTap: () => launchUrl(entry.repositoryUrl),
             child: Semantics(
               button: true,
-              label: 'Open ${entry.repository} on Hugging Face',
+              label: context.l10n.openRepository(entry.repository),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
                   children: [
                     Expanded(
                       child: LabeledRow(
-                        label: 'Repository',
+                        label: context.l10n.repository,
                         value: entry.repository,
                       ),
                     ),
@@ -899,26 +907,27 @@ class _ModelCard extends ConsumerWidget {
           ),
           const SizedBox(height: 6),
           LabeledRow(
-            label: 'Revision',
+            label: context.l10n.revision,
             value: entry.revision.length > 12
                 ? entry.revision.substring(0, 12)
                 : entry.revision,
           ),
           const SizedBox(height: 6),
           LabeledRow(
-            label: 'Size',
-            value:
-                '${gigabytes(entry.totalBytes)} · '
-                '${entry.files.length} ${entry.files.length == 1 ? 'file' : 'files'}',
+            label: context.l10n.size,
+            value: context.l10n.modelSizeAndFiles(
+              gigabytes(entry.totalBytes),
+              entry.files.length,
+            ),
           ),
           if (measured != null) ...[
             const SizedBox(height: 6),
             LabeledRow(
-              label: 'Measured',
+              label: context.l10n.measured,
               // Honesty: the fake's canned rate is never sold as hardware.
               value: simulated
-                  ? '${measured.toStringAsFixed(1)} tok/s · simulated'
-                  : '${measured.toStringAsFixed(1)} tok/s on this phone',
+                  ? context.l10n.measuredSimulated(measured.toStringAsFixed(1))
+                  : context.l10n.measuredOnPhone(measured.toStringAsFixed(1)),
             ),
           ],
           ..._buttons(context, controller),
@@ -938,9 +947,9 @@ class _ModelCard extends ConsumerWidget {
           GolemButton.filled(
             key: Key('model-download-${entry.key}'),
             label: switch (status.phase) {
-              ArtifactPhase.paused => 'Resume Download',
-              ArtifactPhase.failed => 'Retry Download',
-              _ => 'Download · ${gigabytes(entry.totalBytes)}',
+              ArtifactPhase.paused => context.l10n.resumeDownload,
+              ArtifactPhase.failed => context.l10n.retryDownload,
+              _ => context.l10n.downloadSizeAction(gigabytes(entry.totalBytes)),
             },
             onPressed: otherDownloadActive || !downloadable
                 ? null
@@ -967,7 +976,9 @@ class _ModelCard extends ConsumerWidget {
               key: downloadable
                   ? Key('model-device-refusal-${entry.key}')
                   : null,
-              downloadable ? deviceRefusal! : unresolvedRepositoryReason,
+              downloadable
+                  ? deviceRefusal!
+                  : context.l10n.unresolvedRepositoryReason,
               style: GolemText.footnote.copyWith(
                 color: CupertinoDynamicColor.resolve(
                   GolemTheme.mutedInk,
@@ -982,9 +993,9 @@ class _ModelCard extends ConsumerWidget {
       key: Key('model-cancel-${entry.key}'),
       minimumSize: const Size.fromHeight(48),
       onPressed: () => controller.cancel(entry.key),
-      child: const Text(
-        'Cancel and Discard',
-        style: TextStyle(color: GolemTheme.destructive),
+      child: Text(
+        context.l10n.cancelAndDiscard,
+        style: const TextStyle(color: GolemTheme.destructive),
       ),
     );
     return switch (status.phase) {
@@ -993,7 +1004,7 @@ class _ModelCard extends ConsumerWidget {
         const SizedBox(height: 14),
         GolemButton.tinted(
           key: Key('model-pause-${entry.key}'),
-          label: 'Pause',
+          label: context.l10n.pause,
           onPressed: () => controller.pause(entry.key),
         ),
         cancel,
@@ -1007,9 +1018,9 @@ class _ModelCard extends ConsumerWidget {
           key: Key('model-delete-${entry.key}'),
           minimumSize: const Size.fromHeight(48),
           onPressed: () => _confirmDelete(context, controller),
-          child: const Text(
-            'Delete Download',
-            style: TextStyle(color: GolemTheme.destructive),
+          child: Text(
+            context.l10n.deleteDownload,
+            style: const TextStyle(color: GolemTheme.destructive),
           ),
         ),
       ],
@@ -1024,15 +1035,21 @@ class _ModelCard extends ConsumerWidget {
     dialogKey: const Key('model-delete-dialog'),
     // Display names no longer carry a quantization, so two artifacts of one
     // family share one (#79). A destructive dialog must still say which.
-    title: 'Delete ${entry.displayName} · ${engineFormat(entry.engine)}?',
-    message:
-        'Removes ${gigabytes(entry.totalBytes)} from this device. '
-        'The model can be downloaded again later.',
+    title: context.l10n.deleteModelArtifactTitle(
+      entry.displayName,
+      engineFormat(entry.engine),
+    ),
+    message: context.l10n.deleteModelStorageMessage(
+      gigabytes(entry.totalBytes),
+    ),
     actions: [
-      GolemAlertAction(label: 'Keep', onPressed: () => Navigator.pop(context)),
+      GolemAlertAction(
+        label: context.l10n.keep,
+        onPressed: () => Navigator.pop(context),
+      ),
       GolemAlertAction(
         key: const Key('confirm-model-delete'),
-        label: 'Delete',
+        label: context.l10n.delete,
         isDestructive: true,
         onPressed: () {
           Navigator.pop(context);
@@ -1042,17 +1059,22 @@ class _ModelCard extends ConsumerWidget {
     ],
   );
 
-  String _statusLabel(String suffix) => switch (status.phase) {
-    ArtifactPhase.notDownloaded => 'Not downloaded',
-    ArtifactPhase.downloading =>
-      'Downloading ${gigabytes(status.downloadedBytes)} of '
-          '${gigabytes(entry.totalBytes)}$suffix',
-    ArtifactPhase.paused =>
-      'Paused at ${gigabytes(status.downloadedBytes)}$suffix',
-    ArtifactPhase.verifying => 'Verifying$suffix',
-    ArtifactPhase.installed => 'Installed and verified$suffix',
-    ArtifactPhase.failed => 'Download failed',
-  };
+  String _statusLabel(BuildContext context, String suffix) =>
+      switch (status.phase) {
+        ArtifactPhase.notDownloaded => context.l10n.notDownloaded,
+        ArtifactPhase.downloading => context.l10n.downloadingAmountStatus(
+          gigabytes(status.downloadedBytes),
+          gigabytes(entry.totalBytes),
+          suffix,
+        ),
+        ArtifactPhase.paused => context.l10n.pausedAtStatus(
+          gigabytes(status.downloadedBytes),
+          suffix,
+        ),
+        ArtifactPhase.verifying => context.l10n.verifyingStatus(suffix),
+        ArtifactPhase.installed => context.l10n.installedVerifiedStatus(suffix),
+        ArtifactPhase.failed => context.l10n.downloadFailed,
+      };
 
   IconData _statusIcon() => switch (status.phase) {
     ArtifactPhase.notDownloaded => CupertinoIcons.cloud_download,
@@ -1100,7 +1122,7 @@ class _Progress extends StatelessWidget {
     key: progressKey,
     container: true,
     label: label,
-    value: '${(value * 100).round()} percent',
+    value: context.l10n.percentValue((value * 100).round()),
     child: ExcludeSemantics(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1133,9 +1155,15 @@ String _engineLabel(ModelEngine engine) => switch (engine) {
   ModelEngine.gguf => 'GGUF · llama.cpp',
 };
 
-String _runtimeLabel(RuntimePhase phase, bool simulated) => switch (phase) {
-  RuntimePhase.unloaded => 'Unloaded',
-  RuntimePhase.loading => simulated ? 'Loading simulation…' : 'Loading…',
-  RuntimePhase.loaded => simulated ? 'Ready · simulated' : 'Ready',
-  RuntimePhase.failed => 'Stopped',
+String _runtimeLabel(
+  BuildContext context,
+  RuntimePhase phase,
+  bool simulated,
+) => switch (phase) {
+  RuntimePhase.unloaded => context.l10n.unloaded,
+  RuntimePhase.loading =>
+    simulated ? context.l10n.loadingSimulation : context.l10n.loading,
+  RuntimePhase.loaded =>
+    simulated ? context.l10n.readySimulated : context.l10n.ready,
+  RuntimePhase.failed => context.l10n.stopped,
 };

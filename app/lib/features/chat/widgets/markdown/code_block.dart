@@ -5,6 +5,7 @@ import 'package:highlight/highlight.dart' as hl show Node;
 
 import '../../../../core/chrome/golem_toast.dart';
 import '../../../../core/theme/golem_theme.dart';
+import '../../../../l10n/l10n.dart';
 
 /// Header text for a fence that carried no language.
 ///
@@ -17,8 +18,6 @@ import '../../../../core/theme/golem_theme.dart';
 /// best-vs-runner-up margin does not either. Guessing would mislabel prose
 /// far more often than it would help code, so the card says what it knows
 /// and nothing more.
-const _untaggedLanguageLabel = 'CODE';
-
 /// Fence tags models write that `highlight` does not register. Without
 /// these the card prints a language header over a body it never actually
 /// colorized — `tsx` in particular is everywhere in React answers.
@@ -109,8 +108,7 @@ final class _MarkdownCodeBlockState extends State<MarkdownCodeBlock> {
                   children: [
                     Expanded(
                       child: Text(
-                        (widget.language ?? _untaggedLanguageLabel)
-                            .toUpperCase(),
+                        (widget.language ?? context.l10n.code).toUpperCase(),
                         style: GolemText.codeLanguage.copyWith(
                           inherit: false,
                           color: palette.headerInk,
@@ -180,10 +178,12 @@ final class _CopyChip extends StatelessWidget {
     minimumSize: const Size(44, 44),
     onPressed: () async {
       await Clipboard.setData(ClipboardData(text: code));
-      if (context.mounted) showGolemToast(context, 'Copied to clipboard');
+      if (context.mounted) {
+        showGolemToast(context, context.l10n.copiedToClipboard);
+      }
     },
     child: Semantics(
-      label: 'Copy code',
+      label: context.l10n.copyCode,
       excludeSemantics: true,
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -198,7 +198,7 @@ final class _CopyChip extends StatelessWidget {
               Icon(CupertinoIcons.doc_on_doc, size: 13, color: palette.chipInk),
               const SizedBox(width: 5),
               Text(
-                'Copy',
+                context.l10n.copy,
                 style: GolemText.caption.copyWith(
                   inherit: false,
                   fontWeight: FontWeight.w600,

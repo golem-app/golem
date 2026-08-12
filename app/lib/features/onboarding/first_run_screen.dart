@@ -13,6 +13,8 @@ import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/progress_track.dart';
+import '../../l10n/l10n.dart';
+import '../../l10n/presentation_messages.dart';
 import '../legal/ai_disclaimer.dart';
 import 'application/onboarding_controller.dart';
 import 'model_download_consent.dart';
@@ -70,7 +72,7 @@ class FirstRunScreen extends ConsumerWidget {
 class _WelcomeScreen extends ConsumerWidget {
   const _WelcomeScreen({this.failure});
 
-  final String? failure;
+  final FirstRunFailure? failure;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => _FirstRunScaffold(
@@ -87,14 +89,10 @@ class _WelcomeScreen extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: GolemSpace.s6),
-        const Text(
-          'A chat app that never phones home.',
-          style: GolemText.display,
-        ),
+        Text(context.l10n.firstRunTagline, style: GolemText.display),
         const SizedBox(height: GolemSpace.s3),
         Text(
-          'Golem loads one open model onto your phone and runs it there. '
-          'No account, no server, and no copy of your conversations anywhere else.',
+          context.l10n.firstRunIntroduction,
           style: GolemText.body.copyWith(
             color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
           ),
@@ -102,20 +100,20 @@ class _WelcomeScreen extends ConsumerWidget {
         const SizedBox(height: GolemSpace.s4),
         const AiDisclaimer(key: Key('first-run-ai-disclaimer')),
         const SizedBox(height: GolemSpace.s8),
-        const _Promise(
+        _Promise(
           icon: CupertinoIcons.lock,
-          title: 'Nothing leaves the device',
-          detail: 'Messages live in Golem’s private storage.',
+          title: context.l10n.promisePrivateTitle,
+          detail: context.l10n.promisePrivateDetail,
         ),
-        const _Promise(
+        _Promise(
           icon: CupertinoIcons.wifi,
-          title: 'Works with no connection',
-          detail: 'Once a model is downloaded, that’s it.',
+          title: context.l10n.promiseOfflineTitle,
+          detail: context.l10n.promiseOfflineDetail,
         ),
-        const _Promise(
+        _Promise(
           icon: CupertinoIcons.slider_horizontal_3,
-          title: 'Every knob, if you want it',
-          detail: 'Response style, system prompt, and sampling controls.',
+          title: context.l10n.promiseControlTitle,
+          detail: context.l10n.promiseControlDetail,
         ),
         const Spacer(),
         if (failure != null) _FailureText(failure!),
@@ -123,7 +121,7 @@ class _WelcomeScreen extends ConsumerWidget {
     ),
     action: GolemButton.filled(
       key: const Key('first-run-get-started'),
-      label: 'Get started',
+      label: context.l10n.getStarted,
       onPressed: () =>
           ref.read(firstRunControllerProvider.notifier).continueFromWelcome(),
     ),
@@ -180,7 +178,7 @@ class _ModelScreen extends ConsumerWidget {
 
   final ModelCatalogEntry? entry;
   final bool recommended;
-  final String? failure;
+  final FirstRunFailure? failure;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -191,13 +189,12 @@ class _ModelScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: GolemSpace.s8),
-          const Text('One model. Nothing to set up.', style: GolemText.display),
+          Text(context.l10n.oneModelHeadline, style: GolemText.display),
           const SizedBox(height: GolemSpace.s3),
           Text(
             selected == null
-                ? 'Golem could not find a compatible model in this build.'
-                : 'Golem downloads ${selected.displayName} once, then never '
-                      'needs the network to answer a chat.',
+                ? context.l10n.noCompatibleModel
+                : context.l10n.modelOfflineIntroduction(selected.displayName),
             style: GolemText.body.copyWith(
               color: CupertinoDynamicColor.resolve(
                 GolemTheme.mutedInk,
@@ -220,8 +217,10 @@ class _ModelScreen extends ConsumerWidget {
           GolemButton.filled(
             key: const Key('first-run-download'),
             label: selected == null
-                ? 'Download unavailable'
-                : 'Download · ${formatModelBytes(selected.totalBytes)}',
+                ? context.l10n.downloadUnavailable
+                : context.l10n.downloadSize(
+                    formatModelBytes(selected.totalBytes),
+                  ),
             onPressed: selected == null
                 ? null
                 : () => _requestDownload(context, ref, selected),
@@ -231,7 +230,7 @@ class _ModelScreen extends ConsumerWidget {
             minimumSize: Size.fromHeight(GolemChrome.current.minimumTapTarget),
             onPressed: () =>
                 ref.read(firstRunControllerProvider.notifier).showCatalog(),
-            child: const Text('Choose a different model'),
+            child: Text(context.l10n.chooseDifferentModel),
           ),
           const _PageDots(index: 1),
         ],
@@ -256,7 +255,7 @@ class _FeaturedModelCard extends StatelessWidget {
             Expanded(
               child: Text(entry.displayName, style: GolemText.cardTitle),
             ),
-            if (recommended) const GolemBadge(label: 'RECOMMENDED'),
+            if (recommended) GolemBadge(label: context.l10n.recommended),
           ],
         ),
         const SizedBox(height: GolemSpace.s1),
@@ -271,30 +270,33 @@ class _FeaturedModelCard extends StatelessWidget {
           children: [
             Expanded(
               child: _Fact(
-                label: 'Download',
+                label: context.l10n.download,
                 value: formatModelBytes(entry.totalBytes),
               ),
             ),
             const SizedBox(width: GolemSpace.s2),
             Expanded(
               child: _Fact(
-                label: 'Context',
-                value: '${entry.contextLength ~/ 1024}K tokens',
+                label: context.l10n.context,
+                value: context.l10n.tokensThousands(
+                  entry.contextLength ~/ 1024,
+                ),
               ),
             ),
             const SizedBox(width: GolemSpace.s2),
             Expanded(
               child: _Fact(
-                label: 'Input',
-                value: entry.supportsImages ? 'Text + image' : 'Text',
+                label: context.l10n.input,
+                value: entry.supportsImages
+                    ? context.l10n.textAndImages
+                    : context.l10n.textOnly,
               ),
             ),
           ],
         ),
         const SizedBox(height: GolemSpace.s4),
         Text(
-          'Good for everyday writing, summaries, and light code. Model speed '
-          'depends on this phone and is not estimated before it runs.',
+          context.l10n.featuredModelDetail,
           style: GolemText.footnote.copyWith(
             color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
           ),
@@ -340,7 +342,7 @@ class _CatalogScreen extends ConsumerWidget {
   const _CatalogScreen({required this.selectedKey, this.failure});
 
   final String? selectedKey;
-  final String? failure;
+  final FirstRunFailure? failure;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -355,8 +357,8 @@ class _CatalogScreen extends ConsumerWidget {
     return CupertinoPageScaffold(
       key: const Key('first-run-catalog'),
       navigationBar: GolemNavBar(
-        title: 'All models',
-        previousPageTitle: 'Back',
+        title: context.l10n.allModelsTitle,
+        previousPageTitle: context.l10n.back,
         leading: GolemBackButton(
           key: const Key('first-run-catalog-back'),
           onPressed: () =>
@@ -373,10 +375,8 @@ class _CatalogScreen extends ConsumerWidget {
                 children: [
                   Text(
                     ref.watch(inferenceBackendProvider).simulatedInference
-                        ? 'This QA build shows the full pinned catalog. '
-                              'Downloads and model runs are simulated.'
-                        : 'Models for this build’s engine can be selected. '
-                              'Larger models need the preferred device tier.',
+                        ? context.l10n.catalogSimulationDetail
+                        : context.l10n.catalogDeviceDetail,
                     style: GolemText.footnote.copyWith(
                       color: CupertinoDynamicColor.resolve(
                         GolemTheme.mutedInk,
@@ -411,8 +411,10 @@ class _CatalogScreen extends ConsumerWidget {
               child: GolemButton.filled(
                 key: const Key('first-run-catalog-download'),
                 label: selected == null
-                    ? 'Choose a model'
-                    : 'Download · ${formatModelBytes(selected.entry.totalBytes)}',
+                    ? context.l10n.chooseModel
+                    : context.l10n.downloadSize(
+                        formatModelBytes(selected.entry.totalBytes),
+                      ),
                 onPressed: selected == null
                     ? null
                     : () => _requestDownload(context, ref, selected.entry),
@@ -464,7 +466,7 @@ class _CatalogModelRow extends StatelessWidget {
                         ),
                         if (option.recommended) ...[
                           const SizedBox(width: 8),
-                          const GolemBadge(label: 'RECOMMENDED'),
+                          GolemBadge(label: context.l10n.recommended),
                         ],
                       ],
                     ),
@@ -480,10 +482,10 @@ class _CatalogModelRow extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (option.disabledReason != null) ...[
+                    if (!option.enabled) ...[
                       const SizedBox(height: 3),
                       Text(
-                        option.disabledReason!,
+                        modelAdmissionReason(context.l10n, option),
                         style: GolemText.caption.copyWith(
                           color: CupertinoDynamicColor.resolve(
                             GolemTheme.mutedInk,
@@ -519,7 +521,7 @@ class _DownloadScreen extends ConsumerWidget {
   const _DownloadScreen({required this.entry, this.failure});
 
   final ModelCatalogEntry? entry;
-  final String? failure;
+  final FirstRunFailure? failure;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -538,8 +540,8 @@ class _DownloadScreen extends ConsumerWidget {
         children: [
           const Spacer(),
           Semantics(
-            label: 'Download progress',
-            value: '${(progress * 100).round()} percent',
+            label: context.l10n.downloadProgress,
+            value: context.l10n.percentValue((progress * 100).round()),
             child: Text('${(progress * 100).round()}%', style: GolemText.hero),
           ),
           const SizedBox(height: GolemSpace.s4),
@@ -552,13 +554,13 @@ class _DownloadScreen extends ConsumerWidget {
           ),
           const SizedBox(height: GolemSpace.s6),
           Text(
-            _downloadHeading(selected, status),
+            _downloadHeading(context, selected, status),
             textAlign: TextAlign.center,
             style: GolemText.display,
           ),
           const SizedBox(height: GolemSpace.s3),
           Text(
-            _downloadDetail(selected, status, simulated),
+            _downloadDetail(context, selected, status, simulated),
             textAlign: TextAlign.center,
             style: GolemText.body.copyWith(
               color: CupertinoDynamicColor.resolve(
@@ -579,7 +581,7 @@ class _DownloadScreen extends ConsumerWidget {
         children: [
           GolemButton.filled(
             key: const Key('first-run-start-chatting'),
-            label: 'Start chatting',
+            label: context.l10n.startChatting,
             onPressed: () =>
                 ref.read(firstRunControllerProvider.notifier).complete(),
           ),
@@ -593,7 +595,7 @@ class _DownloadScreen extends ConsumerWidget {
                 onPressed: () => ref
                     .read(modelControllerProvider.notifier)
                     .pause(selected.key),
-                child: const Text('Pause download'),
+                child: Text(context.l10n.pauseDownload),
               ),
               ArtifactPhase.paused || ArtifactPhase.failed => CupertinoButton(
                 key: const Key('first-run-resume-download'),
@@ -607,8 +609,8 @@ class _DownloadScreen extends ConsumerWidget {
                 ),
                 child: Text(
                   status.phase == ArtifactPhase.failed
-                      ? 'Retry download'
-                      : 'Resume download',
+                      ? context.l10n.retryDownload
+                      : context.l10n.resumeDownload,
                 ),
               ),
               _ => const SizedBox(height: 44),
@@ -618,42 +620,53 @@ class _DownloadScreen extends ConsumerWidget {
     );
   }
 
-  String _downloadHeading(ModelCatalogEntry? entry, ArtifactStatus status) =>
-      switch (status.phase) {
-        ArtifactPhase.installed => '${entry?.displayName ?? 'Model'} is ready',
-        ArtifactPhase.verifying => 'Verifying ${entry?.displayName ?? 'model'}',
-        ArtifactPhase.paused => 'Download paused',
-        ArtifactPhase.failed => 'Download needs attention',
-        _ => 'Downloading ${entry?.displayName ?? 'model'}',
-      };
+  String _downloadHeading(
+    BuildContext context,
+    ModelCatalogEntry? entry,
+    ArtifactStatus status,
+  ) => switch (status.phase) {
+    ArtifactPhase.installed => context.l10n.modelReady(
+      entry?.displayName ?? context.l10n.model,
+    ),
+    ArtifactPhase.verifying => context.l10n.modelVerifying(
+      entry?.displayName ?? context.l10n.model,
+    ),
+    ArtifactPhase.paused => context.l10n.downloadPaused,
+    ArtifactPhase.failed => context.l10n.downloadNeedsAttention,
+    _ => context.l10n.modelDownloading(
+      entry?.displayName ?? context.l10n.model,
+    ),
+  };
 
   String _downloadDetail(
+    BuildContext context,
     ModelCatalogEntry? entry,
     ArtifactStatus status,
     bool simulated,
   ) {
-    if (entry == null) return 'The selected catalog entry is unavailable.';
+    if (entry == null) return context.l10n.selectedCatalogUnavailable;
     if (status.phase == ArtifactPhase.failed) {
-      return status.failure ?? 'The download failed. You can try again.';
+      return artifactFailureMessage(context.l10n, status);
     }
     if (status.phase == ArtifactPhase.installed) {
       return simulated
-          ? 'The deterministic QA simulation is complete; no weights were stored.'
-          : 'Verified on this device. Golem can now answer without a network connection.';
+          ? context.l10n.downloadSimulationComplete
+          : context.l10n.downloadComplete;
     }
-    final amount =
-        '${formatModelBytes(status.downloadedBytes)} of ${formatModelBytes(entry.totalBytes)}';
+    final amount = context.l10n.downloadAmount(
+      formatModelBytes(status.downloadedBytes),
+      formatModelBytes(entry.totalBytes),
+    );
     return simulated
-        ? '$amount · simulated. No network request or model-weight write occurs.'
-        : '$amount. Keep Golem open when practical; the platform may continue '
-              'the transfer in the background.';
+        ? context.l10n.downloadSimulationProgress(amount)
+        : context.l10n.downloadRealProgress(amount);
   }
 }
 
 class _UnsupportedScreen extends ConsumerWidget {
   const _UnsupportedScreen({this.failure});
 
-  final String? failure;
+  final FirstRunFailure? failure;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => _FirstRunScaffold(
@@ -668,19 +681,20 @@ class _UnsupportedScreen extends ConsumerWidget {
           color: GolemTheme.accentIcon,
         ),
         const SizedBox(height: GolemSpace.s6),
-        const Text('Chats stay available.', style: GolemText.display),
+        Text(context.l10n.chatsStayAvailable, style: GolemText.display),
         const SizedBox(height: GolemSpace.s3),
         Text(
-          ref.watch(deviceRefusalProvider) ??
-              'Golem cannot run models on this device.',
+          deviceRefusalMessage(
+            context.l10n,
+            ref.watch(deviceEligibilityProvider).reason,
+          ),
           style: GolemText.body.copyWith(
             color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
           ),
         ),
         const SizedBox(height: GolemSpace.s4),
         Text(
-          'No model will be downloaded. You can still open chats, history, '
-          'settings, and exports.',
+          context.l10n.unsupportedFeaturesRemain,
           style: GolemText.footnote.copyWith(
             color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
           ),
@@ -694,7 +708,7 @@ class _UnsupportedScreen extends ConsumerWidget {
     ),
     action: GolemButton.filled(
       key: const Key('first-run-continue-unsupported'),
-      label: 'Continue to Golem',
+      label: context.l10n.continueToGolem,
       onPressed: () => ref
           .read(firstRunControllerProvider.notifier)
           .complete(keepSelection: false),
@@ -729,13 +743,16 @@ class _PageDots extends StatelessWidget {
 }
 
 class _FailureText extends StatelessWidget {
-  const _FailureText(this.message);
+  const _FailureText(this.failure);
 
-  final String message;
+  final FirstRunFailure failure;
 
   @override
   Widget build(BuildContext context) => Text(
-    message,
+    switch (failure) {
+      FirstRunFailure.modelChoiceSave => context.l10n.modelChoiceSaveFailed,
+      FirstRunFailure.setupSave => context.l10n.setupSaveFailed,
+    },
     key: const Key('first-run-save-failure'),
     style: GolemText.footnote.copyWith(
       color: CupertinoDynamicColor.resolve(GolemTheme.destructiveText, context),

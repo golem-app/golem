@@ -9,6 +9,8 @@ import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/progress_track.dart';
+import '../../l10n/l10n.dart';
+import '../../l10n/presentation_messages.dart';
 import 'model_download_consent.dart';
 
 /// The recoverable path promised when first-run consent is declined. It reads
@@ -55,12 +57,12 @@ class ModelSetupBanner extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            _headline(entry.displayName, status),
+            _headline(context, entry.displayName, status),
             style: GolemText.footnoteStrong,
           ),
           const SizedBox(height: 3),
           Text(
-            _detail(status, model.simulated),
+            _detail(context, status, model.simulated),
             style: GolemText.caption.copyWith(
               color: CupertinoDynamicColor.resolve(
                 GolemTheme.mutedInk,
@@ -75,8 +77,8 @@ class ModelSetupBanner extends ConsumerWidget {
             // the only thing carrying how far along it is.
             Semantics(
               container: true,
-              label: 'Download',
-              value: '${(progress * 100).round()} percent',
+              label: context.l10n.download,
+              value: context.l10n.percentValue((progress * 100).round()),
               child: ProgressTrack(
                 value: progress,
                 trackColor: GolemTheme.divider,
@@ -88,7 +90,9 @@ class ModelSetupBanner extends ConsumerWidget {
           switch (status.phase) {
             ArtifactPhase.notDownloaded => GolemButton.filled(
               key: const Key('model-setup-download'),
-              label: 'Download · ${formatModelBytes(entry.totalBytes)}',
+              label: context.l10n.downloadSize(
+                formatModelBytes(entry.totalBytes),
+              ),
               onPressed: () async {
                 final approved = await confirmModelDownload(
                   context: context,
@@ -104,13 +108,15 @@ class ModelSetupBanner extends ConsumerWidget {
             ),
             ArtifactPhase.downloading => GolemButton.tinted(
               key: const Key('model-setup-pause'),
-              label: 'Pause',
+              label: context.l10n.pause,
               onPressed: () =>
                   ref.read(modelControllerProvider.notifier).pause(key),
             ),
             ArtifactPhase.paused || ArtifactPhase.failed => GolemButton.filled(
               key: const Key('model-setup-resume'),
-              label: status.phase == ArtifactPhase.failed ? 'Retry' : 'Resume',
+              label: status.phase == ArtifactPhase.failed
+                  ? context.l10n.retry
+                  : context.l10n.resume,
               onPressed: () => unawaited(
                 ref.read(modelControllerProvider.notifier).download(key),
               ),
@@ -125,32 +131,26 @@ class ModelSetupBanner extends ConsumerWidget {
     );
   }
 
-  String _headline(String name, ArtifactStatus status) =>
+  String _headline(BuildContext context, String name, ArtifactStatus status) =>
       switch (status.phase) {
-        ArtifactPhase.notDownloaded => 'Finish setting up $name',
-        ArtifactPhase.downloading => 'Downloading $name',
-        ArtifactPhase.paused => '$name download paused',
-        ArtifactPhase.verifying => 'Verifying $name',
-        ArtifactPhase.failed => '$name needs attention',
-        ArtifactPhase.installed => '$name is ready',
+        ArtifactPhase.notDownloaded => context.l10n.finishModelSetup(name),
+        ArtifactPhase.downloading => context.l10n.modelDownloading(name),
+        ArtifactPhase.paused => context.l10n.modelDownloadPaused(name),
+        ArtifactPhase.verifying => context.l10n.modelVerifying(name),
+        ArtifactPhase.failed => context.l10n.modelNeedsAttention(name),
+        ArtifactPhase.installed => context.l10n.modelReady(name),
       };
 
-  String _detail(
-    ArtifactStatus status,
-    bool simulated,
-  ) => switch (status.phase) {
-    ArtifactPhase.notDownloaded =>
-      'Download the selected model before sending. You can still draft messages and use the rest of Golem.',
-    ArtifactPhase.downloading =>
-      simulated
-          ? 'Deterministic QA simulation; no network or weights.'
-          : 'The model must finish and verify before messages can be sent.',
-    ArtifactPhase.paused =>
-      'Resume when you are ready. Existing progress is kept.',
-    ArtifactPhase.verifying =>
-      'Checking the downloaded files before they can run.',
-    ArtifactPhase.failed =>
-      status.failure ?? 'The download failed. Your chats are unaffected.',
-    ArtifactPhase.installed => 'Ready.',
-  };
+  String _detail(BuildContext context, ArtifactStatus status, bool simulated) =>
+      switch (status.phase) {
+        ArtifactPhase.notDownloaded => context.l10n.setupDownloadPrompt,
+        ArtifactPhase.downloading =>
+          simulated
+              ? context.l10n.qaDownloadShort
+              : context.l10n.downloadBeforeSending,
+        ArtifactPhase.paused => context.l10n.resumeProgressKept,
+        ArtifactPhase.verifying => context.l10n.checkingDownloadedFiles,
+        ArtifactPhase.failed => artifactFailureMessage(context.l10n, status),
+        ArtifactPhase.installed => context.l10n.ready,
+      };
 }

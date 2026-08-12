@@ -818,7 +818,10 @@ final class _StubPicker extends AttachmentPicker {
   final Object? error;
 
   @override
-  Future<PreparedImage?> pick(AttachSource source) async {
+  Future<PreparedImage?> pick(
+    AttachSource source, {
+    String filesLabel = 'Images',
+  }) async {
     if (rejection != null) throw ImageRejectedException(rejection!);
     if (error != null) throw error!;
     return PreparedImage(

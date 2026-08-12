@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
+import '../../l10n/l10n.dart';
 
 typedef LicenseCatalogLoader = Future<List<OpenSourceLicense>> Function();
 
@@ -64,8 +65,8 @@ class _OpenSourceLicensesScreenState extends State<OpenSourceLicensesScreen> {
   Widget build(BuildContext context) => CupertinoPageScaffold(
     key: const Key('open-source-licenses-screen'),
     navigationBar: GolemNavBar(
-      title: 'Open-source licenses',
-      previousPageTitle: 'Settings',
+      title: context.l10n.settingsOpenSourceLicenses,
+      previousPageTitle: context.l10n.settingsTitle,
     ),
     child: SafeArea(
       bottom: false,
@@ -84,9 +85,7 @@ class _OpenSourceLicensesScreenState extends State<OpenSourceLicensesScreen> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
             children: [
               Text(
-                'Golem is built with open-source software. These notices are '
-                'available offline and include Dart, native engine, and model '
-                'licenses used by this build.',
+                context.l10n.licensesIntroduction,
                 style: GolemText.footnote.copyWith(
                   color: CupertinoDynamicColor.resolve(
                     GolemTheme.mutedInk,
@@ -95,7 +94,7 @@ class _OpenSourceLicensesScreenState extends State<OpenSourceLicensesScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              SectionHeader('${licenses.length} license entries'),
+              SectionHeader(context.l10n.licenseEntries(licenses.length)),
               const SizedBox(height: 8),
               for (final license in licenses) ...[
                 _LicenseDisclosure(license: license),
@@ -121,15 +120,15 @@ class _LicenseFailure extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            "Licenses couldn't be loaded.",
-            key: Key('licenses-error'),
+          Text(
+            context.l10n.licensesLoadFailed,
+            key: const Key('licenses-error'),
             textAlign: TextAlign.center,
             style: GolemText.cardTitle,
           ),
           const SizedBox(height: 8),
           Text(
-            'The bundled files are still on this device. Try loading them again.',
+            context.l10n.licensesRetryDetail,
             textAlign: TextAlign.center,
             style: GolemText.footnote.copyWith(
               color: CupertinoDynamicColor.resolve(
@@ -142,7 +141,7 @@ class _LicenseFailure extends StatelessWidget {
           CupertinoButton.filled(
             key: const Key('licenses-retry'),
             onPressed: onRetry,
-            child: const Text('Try again'),
+            child: Text(context.l10n.tryAgain),
           ),
         ],
       ),
@@ -179,7 +178,9 @@ class _LicenseDisclosureState extends State<_LicenseDisclosure> {
           Semantics(
             button: true,
             expanded: _expanded,
-            label: '${_expanded ? 'Hide' : 'Show'} license for $title',
+            label: _expanded
+                ? context.l10n.hideLicenseFor(title)
+                : context.l10n.showLicenseFor(title),
             child: CupertinoButton(
               key: Key('license-${title.toLowerCase()}'),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),

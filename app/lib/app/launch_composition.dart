@@ -93,22 +93,12 @@ const downloaderStartDeadline = Duration(seconds: 5);
 /// dart-define `StateError`s (and kin): developer text that goes to
 /// diagnostics, never onto a surface.
 LaunchFailure classifyLaunchFailure(Object error) => switch (error) {
-  TimeoutException() => const LaunchFailure(
-    kind: LaunchFailureKind.timedOut,
-    message: 'Starting is taking longer than expected.',
-  ),
+  TimeoutException() => const LaunchFailure(LaunchFailureKind.timedOut),
   MissingPluginException() || PlatformException() => const LaunchFailure(
-    kind: LaunchFailureKind.storageUnavailable,
-    message: 'Golem could not access its storage on this device.',
+    LaunchFailureKind.storageUnavailable,
   ),
-  Error() => const LaunchFailure(
-    kind: LaunchFailureKind.invalidConfiguration,
-    message: 'This build of Golem is misconfigured and cannot start.',
-  ),
-  _ => const LaunchFailure(
-    kind: LaunchFailureKind.unknown,
-    message: 'Golem could not finish starting.',
-  ),
+  Error() => const LaunchFailure(LaunchFailureKind.invalidConfiguration),
+  _ => const LaunchFailure(LaunchFailureKind.unknown),
 };
 
 /// Release-mode evidence seam (`GOLEM_LAUNCH_FAILURES=<n>`): fails the first

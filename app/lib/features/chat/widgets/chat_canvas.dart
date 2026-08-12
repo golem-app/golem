@@ -13,6 +13,8 @@ import 'empty_chat.dart';
 import 'message_bubble.dart';
 import 'persistence_recovery_banner.dart';
 import 'recovery_banner.dart';
+import '../../../l10n/l10n.dart';
+import '../../../l10n/presentation_messages.dart';
 
 class ChatCanvas extends ConsumerWidget {
   const ChatCanvas({
@@ -104,7 +106,7 @@ class ChatCanvas extends ConsumerWidget {
                   right: 18,
                   child: Semantics(
                     button: true,
-                    label: 'Jump to latest message',
+                    label: context.l10n.jumpToLatest,
                     child: CupertinoButton(
                       key: const Key('jump-to-latest'),
                       padding: EdgeInsets.zero,
@@ -134,7 +136,12 @@ class ChatCanvas extends ConsumerWidget {
         // dismissed banner, leaving an unanswered message and no explanation
         // (#27). Exactly one of the three is ever on screen.
         else if (hasMessages && refusal != null)
-          _DeviceRefusalNotice(message: refusal),
+          _DeviceRefusalNotice(
+            message: deviceRefusalMessage(
+              context.l10n,
+              ref.watch(deviceEligibilityProvider).reason,
+            ),
+          ),
         if (chat.failure == null && refusal == null) const ModelSetupBanner(),
         Composer(
           picker: picker,

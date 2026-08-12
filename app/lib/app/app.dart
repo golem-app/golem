@@ -8,6 +8,7 @@ import '../core/app_identity.dart';
 import '../core/domain/app_preferences.dart';
 import '../core/providers/app_providers.dart';
 import '../core/theme/golem_theme.dart';
+import '../l10n/l10n.dart';
 import '../features/benchmark/benchmark_screen.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/chat/widgets/attach_sheet.dart';
@@ -16,6 +17,7 @@ import '../features/legal/model_attribution_screen.dart';
 import '../features/legal/open_source_licenses_screen.dart';
 import '../features/onboarding/first_run_gate.dart';
 import '../features/settings/appearance_screen.dart';
+import '../features/settings/language_screen.dart';
 import '../features/settings/models_screen.dart';
 import '../features/settings/privacy_screen.dart';
 import '../features/settings/response_style_screen.dart';
@@ -56,6 +58,10 @@ GoRouter createAppRouter({
     GoRoute(
       path: '/settings/appearance',
       builder: (context, state) => const AppearanceScreen(),
+    ),
+    GoRoute(
+      path: '/settings/language',
+      builder: (context, state) => const LanguageScreen(),
     ),
     GoRoute(
       path: '/settings/privacy',
@@ -175,12 +181,20 @@ class _GolemAppState extends ConsumerState<GolemApp>
       minTextScale,
       maxTextScale,
     );
+    final locale = switch (preferences?.language ?? AppLanguage.system) {
+      AppLanguage.system => null,
+      AppLanguage.english => const Locale('en'),
+      AppLanguage.polish => const Locale('pl'),
+    };
     return CupertinoApp.router(
       title: widget.identity.displayName,
       debugShowCheckedModeBanner: false,
       routerConfig: _router,
       theme: GolemTheme.theme(brightness),
-      supportedLocales: const [Locale('en')],
+      locale: locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localeListResolutionCallback: resolveAppLocale,
       builder: (context, child) {
         var body = child ?? const SizedBox.shrink();
         if (textScale != 1.0) {

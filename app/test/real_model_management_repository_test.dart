@@ -264,6 +264,8 @@ void main() {
     final status = states.single.statusOf('test-mlx');
     expect(status.phase, ArtifactPhase.failed);
     expect(status.failure, contains('free'));
+    expect(status.failureReason?.kind, ArtifactFailureKind.insufficientStorage);
+    expect(status.failureReason?.availableBytes, 5);
     expect(downloader.requestedUrls, isEmpty);
   });
 
@@ -277,6 +279,8 @@ void main() {
     final status = states.last.statusOf('test-mlx');
     expect(status.phase, ArtifactPhase.failed);
     expect(status.failure, contains('SHA-256'));
+    expect(status.failureReason?.kind, ArtifactFailureKind.hashVerification);
+    expect(status.failureReason?.fileName, _fileOne);
     expect(
       File('${temp.path}/documents/models/test-mlx/$_fileOne').existsSync(),
       isFalse,
@@ -822,6 +826,8 @@ void main() {
       expect(status.phase, ArtifactPhase.failed);
       expect(status.failure, contains('did not arrive at its expected size'));
       expect(status.failure, isNot(contains('SHA-256')));
+      expect(status.failureReason?.kind, ArtifactFailureKind.unexpectedSize);
+      expect(status.failureReason?.fileName, unhashed);
       expect(
         File(
           '${temp.path}/documents/models/custom-mixed/$unhashed',

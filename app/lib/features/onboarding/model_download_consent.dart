@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../../core/chrome/golem_alert.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/byte_format.dart';
+import '../../l10n/l10n.dart';
 
 /// Kept as a name the onboarding copy reads well with; the formatting itself
 /// has one owner, so the size in this dialog and the size on the button that
@@ -21,23 +22,27 @@ Future<bool> confirmModelDownload({
   await showGolemAlert(
     context: context,
     dialogKey: const Key('model-download-consent'),
-    title: simulated ? 'Simulate this download?' : 'Download this model?',
+    title: simulated
+        ? context.l10n.simulateDownloadTitle
+        : context.l10n.downloadModelTitle,
     message: simulated
-        ? '${entry.displayName} is shown as a '
-              '${formatModelBytes(entry.totalBytes)} download. This QA '
-              'simulation uses no network and stores no model weights.'
-        : '${entry.displayName} downloads ${formatModelBytes(entry.totalBytes)} '
-              'from Hugging Face. Keep that space plus 500 MiB free. Wi-Fi '
-              'is recommended; cellular data charges may apply.',
+        ? context.l10n.simulateDownloadMessage(
+            entry.displayName,
+            formatModelBytes(entry.totalBytes),
+          )
+        : context.l10n.downloadModelMessage(
+            entry.displayName,
+            formatModelBytes(entry.totalBytes),
+          ),
     actions: [
       GolemAlertAction(
         key: const Key('model-download-not-now'),
-        label: 'Not now',
+        label: context.l10n.notNow,
         onPressed: () => Navigator.pop(context),
       ),
       GolemAlertAction(
         key: const Key('model-download-confirm'),
-        label: simulated ? 'Simulate' : 'Download',
+        label: simulated ? context.l10n.simulate : context.l10n.download,
         isDefault: true,
         onPressed: () {
           approved = true;

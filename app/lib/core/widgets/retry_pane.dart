@@ -6,9 +6,15 @@ import '../theme/golem_theme.dart';
 /// The one read-failure surface: fixed copy (raw exception text never
 /// reaches a screen, §8.1) and a retry that re-runs the failed read.
 class RetryPane extends StatelessWidget {
-  const RetryPane({required this.message, required this.onRetry, super.key});
+  const RetryPane({
+    required this.message,
+    required this.actionLabel,
+    required this.onRetry,
+    super.key,
+  });
 
   final String message;
+  final String actionLabel;
   final VoidCallback onRetry;
 
   @override
@@ -29,7 +35,7 @@ class RetryPane extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             GolemButton.filled(
-              label: 'Try again',
+              label: actionLabel,
               onPressed: onRetry,
               expand: false,
             ),

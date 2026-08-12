@@ -782,20 +782,6 @@ void main() {
         );
       }
     });
-
-    test('every rejection carries copy a user can act on', () async {
-      for (final reason in RepositoryRejection.values) {
-        expect(reason.message, isNotEmpty, reason: reason.name);
-        expect(reason.message, endsWith('.'), reason: reason.name);
-        // Copy must not leak identifiers, URLs or status codes.
-        expect(reason.message, isNot(contains('http')), reason: reason.name);
-        expect(
-          reason.message,
-          isNot(matches(RegExp(r'\b[45]\d\d\b'))),
-          reason: reason.name,
-        );
-      }
-    });
   });
 
   group('catalog keys', () {

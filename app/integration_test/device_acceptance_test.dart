@@ -407,7 +407,10 @@ final class _RedImagePicker extends AttachmentPicker {
   final Uint8List bytes;
 
   @override
-  Future<PreparedImage?> pick(AttachSource source) async => PreparedImage(
+  Future<PreparedImage?> pick(
+    AttachSource source, {
+    String filesLabel = 'Images',
+  }) async => PreparedImage(
     bytes: bytes,
     mimeType: 'image/png',
     width: 320,

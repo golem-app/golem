@@ -5,6 +5,7 @@ import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/domain/app_state.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
+import '../../../l10n/l10n.dart';
 
 /// Non-blocking recovery for a live chat session whose durable snapshot is
 /// stale. This is separate from generation recovery because saving history
@@ -29,9 +30,8 @@ class PersistenceRecoveryBanner extends ConsumerWidget {
       Expanded(
         child: Semantics(
           liveRegion: true,
-          child: const Text(
-            'Chat history isn’t saving. Your latest changes could be '
-            'lost when you close the app.',
+          child: Text(
+            context.l10n.chatHistoryNotSaving,
             style: GolemText.footnote,
           ),
         ),
@@ -46,15 +46,17 @@ class PersistenceRecoveryBanner extends ConsumerWidget {
           ? null
           : () => ref.read(chatControllerProvider.notifier).retryPersistence(),
       child: retrying
-          ? const Row(
+          ? Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                ExcludeSemantics(child: CupertinoActivityIndicator(radius: 8)),
-                SizedBox(width: 6),
-                Text('Saving…'),
+                const ExcludeSemantics(
+                  child: CupertinoActivityIndicator(radius: 8),
+                ),
+                const SizedBox(width: 6),
+                Text(context.l10n.saving),
               ],
             )
-          : const Text('Try again'),
+          : Text(context.l10n.tryAgain),
     );
 
     return Semantics(

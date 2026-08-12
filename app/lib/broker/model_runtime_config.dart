@@ -54,10 +54,10 @@ ModelRuntimeConfig resolveModelRuntimeConfig(
   final entry = entries.where((item) => item.key == catalogKey).firstOrNull;
   if (entry == null) {
     // Reachable in normal use: a conversation persists its modelKey and a later
-    // build may no longer carry that entry. The message is user-facing copy
-    // (handbook v4.2A §5.3), so the internal key rides on `cause`.
+    // build may no longer carry that entry. The stable kind drives localized
+    // presentation, while the internal key rides on `cause` for diagnostics.
     throw InferenceException(
-      InferenceFailureKind.engine,
+      InferenceFailureKind.modelUnavailable,
       "This chat's model is not available in this version of Golem. "
       'Choose another model to continue.',
       cause: StateError('Unknown catalog key "$catalogKey".'),
@@ -67,7 +67,7 @@ ModelRuntimeConfig resolveModelRuntimeConfig(
   final profile = registry[entry.profileKey];
   if (profile == null) {
     throw InferenceException(
-      InferenceFailureKind.engine,
+      InferenceFailureKind.unsupportedModel,
       entry.profileKey == unresolvedProfileKey
           ? 'This model has not been checked against a supported chat '
                 'template yet, so it cannot be loaded. Add it again to '
@@ -81,7 +81,7 @@ ModelRuntimeConfig resolveModelRuntimeConfig(
   final modelPath = modelPathForEntry(entry);
   if (modelPath == null) {
     throw InferenceException(
-      InferenceFailureKind.engine,
+      InferenceFailureKind.unsupportedModel,
       'This model does not name exactly one weights file, so it cannot be '
       'loaded. Remove it and add a supported model.',
     );

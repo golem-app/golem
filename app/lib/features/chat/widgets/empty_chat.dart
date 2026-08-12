@@ -4,39 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../model_label.dart';
+import '../../../l10n/l10n.dart';
+import '../../../l10n/presentation_messages.dart';
 
 class EmptyChat extends ConsumerWidget {
   const EmptyChat({required this.onStarter, super.key});
 
   /// Receives a starter prompt to prefill the composer with.
   final ValueChanged<String> onStarter;
-
-  static const _starters = [
-    (
-      key: Key('starter-chip-draft-reply'),
-      icon: CupertinoIcons.pencil,
-      label: 'Draft a reply',
-      prompt: 'Draft a reply to this message: ',
-    ),
-    (
-      key: Key('starter-chip-explain'),
-      icon: CupertinoIcons.lightbulb,
-      label: 'Explain something',
-      prompt: 'Explain, simply: ',
-    ),
-    (
-      key: Key('starter-chip-rewrite'),
-      icon: CupertinoIcons.doc_on_doc,
-      label: 'Rewrite my text',
-      prompt: 'Rewrite this so it reads clearly: ',
-    ),
-    (
-      key: Key('starter-chip-summarise'),
-      icon: CupertinoIcons.search,
-      label: 'Summarise a note',
-      prompt: 'Summarise this note: ',
-    ),
-  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -47,6 +22,12 @@ class EmptyChat extends ConsumerWidget {
     // user write a prompt that could only fail (#27). The simulated backend
     // loads nothing, so it is never refused.
     final refusal = ref.watch(deviceRefusalProvider);
+    final refusalMessage = refusal == null
+        ? null
+        : deviceRefusalMessage(
+            context.l10n,
+            ref.watch(deviceEligibilityProvider).reason,
+          );
     // Only the supported copy names a model, so only it pays for the label —
     // and only it subscribes this widget to residency and the catalog.
     final label = refusal != null
@@ -62,14 +43,41 @@ class EmptyChat extends ConsumerWidget {
             residentModelKey: ref.watch(residentModelKeyProvider),
             loadableKeys: ref.watch(loadableModelKeysProvider),
           );
+    final l10n = context.l10n;
+    final starters = [
+      (
+        key: const Key('starter-chip-draft-reply'),
+        icon: CupertinoIcons.pencil,
+        label: l10n.starterDraftReply,
+        prompt: l10n.starterDraftReplyPrompt,
+      ),
+      (
+        key: const Key('starter-chip-explain'),
+        icon: CupertinoIcons.lightbulb,
+        label: l10n.starterExplain,
+        prompt: l10n.starterExplainPrompt,
+      ),
+      (
+        key: const Key('starter-chip-rewrite'),
+        icon: CupertinoIcons.doc_on_doc,
+        label: l10n.starterRewrite,
+        prompt: l10n.starterRewritePrompt,
+      ),
+      (
+        key: const Key('starter-chip-summarise'),
+        icon: CupertinoIcons.search,
+        label: l10n.starterSummarise,
+        prompt: l10n.starterSummarisePrompt,
+      ),
+    ];
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(32),
         child: Semantics(
           key: const Key('empty-chat'),
           label: refusal == null
-              ? 'Start a private conversation'
-              : 'Golem cannot run models on this device',
+              ? l10n.startPrivateConversation
+              : l10n.modelsUnavailableGeneric,
           child: Column(
             children: [
               Container(
@@ -84,10 +92,10 @@ class EmptyChat extends ConsumerWidget {
               ),
               const SizedBox(height: 22),
               if (refusal == null)
-                const Text('What are we building?', style: GolemText.display)
+                Text(l10n.whatAreWeBuilding, style: GolemText.display)
               else
-                const Text(
-                  'Golem can’t run models here',
+                Text(
+                  l10n.cannotRunModelsHere,
                   textAlign: TextAlign.center,
                   style: GolemText.display,
                 ),
@@ -96,12 +104,10 @@ class EmptyChat extends ConsumerWidget {
                 key: refusal == null
                     ? null
                     : const Key('device-unsupported-notice'),
-                refusal ??
+                refusalMessage ??
                     (backend.simulatedInference
-                        ? 'This preview simulates $label on this phone. '
-                              'Nothing you type here goes anywhere.'
-                        : '$label is loaded and running on this phone. '
-                              'Nothing you type here goes anywhere.'),
+                        ? l10n.simulatedModelPrivacy(label!)
+                        : l10n.localModelPrivacy(label!)),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   height: 1.4,
@@ -120,7 +126,7 @@ class EmptyChat extends ConsumerWidget {
                   spacing: 8,
                   runSpacing: 10,
                   children: [
-                    for (final starter in _starters)
+                    for (final starter in starters)
                       CupertinoButton(
                         key: starter.key,
                         padding: EdgeInsets.zero,

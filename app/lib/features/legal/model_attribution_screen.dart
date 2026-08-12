@@ -10,6 +10,7 @@ import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
 import '../settings/widgets/settings_rows.dart';
+import '../../l10n/l10n.dart';
 
 typedef ExternalUriLauncher = Future<bool> Function(Uri uri);
 
@@ -114,8 +115,8 @@ class ModelAttributionScreen extends ConsumerWidget {
     return CupertinoPageScaffold(
       key: const Key('model-attribution-screen'),
       navigationBar: GolemNavBar(
-        title: 'Model attribution',
-        previousPageTitle: 'Settings',
+        title: context.l10n.settingsModelAttribution,
+        previousPageTitle: context.l10n.settingsTitle,
       ),
       child: SafeArea(
         bottom: false,
@@ -124,8 +125,7 @@ class ModelAttributionScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
           children: [
             Text(
-              'Golem does not include model weights. It downloads the exact '
-              'artifacts listed here only after you approve a download.',
+              context.l10n.modelAttributionIntroduction,
               style: GolemText.footnote.copyWith(
                 color: CupertinoDynamicColor.resolve(
                   GolemTheme.mutedInk,
@@ -140,11 +140,11 @@ class ModelAttributionScreen extends ConsumerWidget {
               SettingsCard(
                 children: [
                   SettingsNavRow(
-                    label: 'Official model card',
+                    label: context.l10n.officialModelCard,
                     onTap: () => unawaited(openUri(family.modelCardUri)),
                   ),
                   SettingsNavRow(
-                    label: 'License',
+                    label: context.l10n.license,
                     value: family.licenseName,
                     onTap: () => unawaited(openUri(family.licenseUri)),
                   ),
@@ -162,8 +162,7 @@ class ModelAttributionScreen extends ConsumerWidget {
               const SizedBox(height: 24),
             ],
             Text(
-              'Repositories added by hand are governed by their own upstream '
-              'terms. Golem does not certify or redistribute them.',
+              context.l10n.customRepositoryTerms,
               style: GolemText.footnote.copyWith(
                 color: CupertinoDynamicColor.resolve(
                   GolemTheme.mutedInk,

@@ -675,8 +675,15 @@ void main() {
           'The local inference runtime hit an internal error.',
     };
     const expectedKind = <InfernoErrorCode, InferenceFailureKind>{
+      InfernoErrorCode.invalidModelPath:
+          InferenceFailureKind.invalidModelArtifact,
+      InfernoErrorCode.corruptModel: InferenceFailureKind.invalidModelArtifact,
+      InfernoErrorCode.incompatibleModel:
+          InferenceFailureKind.invalidModelArtifact,
       InfernoErrorCode.contextExhausted: InferenceFailureKind.contextExhausted,
       InfernoErrorCode.outOfMemory: InferenceFailureKind.outOfMemory,
+      InfernoErrorCode.unsupportedDevice:
+          InferenceFailureKind.unsupportedDevice,
     };
 
     // A real file path: Inferno's own load pre-flight must pass so the

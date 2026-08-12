@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../l10n/l10n.dart';
 import '../theme/golem_theme.dart';
 import 'golem_chrome.dart';
 
@@ -83,9 +84,9 @@ class GolemBackButton extends StatelessWidget {
       padding: EdgeInsets.zero,
       minimumSize: Size(target, target),
       onPressed: onPressed ?? () => Navigator.of(context).maybePop(),
-      child: const Icon(
+      child: Icon(
         CupertinoIcons.arrow_left,
-        semanticLabel: 'Back',
+        semanticLabel: context.l10n.back,
         size: 24,
       ),
     );

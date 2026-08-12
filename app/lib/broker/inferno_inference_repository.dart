@@ -56,7 +56,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
     final reader = readAttachment;
     if (reader == null) {
       throw const InferenceException(
-        InferenceFailureKind.engine,
+        InferenceFailureKind.unsupportedImages,
         'This build cannot read image attachments.',
       );
     }
@@ -65,7 +65,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
       final bytes = await reader(image.attachmentId);
       if (bytes == null) {
         throw const InferenceException(
-          InferenceFailureKind.engine,
+          InferenceFailureKind.attachmentUnavailable,
           'An image in this conversation is no longer available. Remove it '
           'and send again.',
         );
@@ -311,7 +311,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
       // The composer gates this: reaching here means an image-carrying chat was
       // pointed at a text-only model. Refuse before the engine.
       throw const InferenceException(
-        InferenceFailureKind.engine,
+        InferenceFailureKind.unsupportedImages,
         'This model cannot read images. Pick a model that can, or remove the '
         'image.',
       );

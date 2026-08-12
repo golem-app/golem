@@ -132,9 +132,9 @@ final class BrokerGenerationCompleted extends BrokerRuntimeEvent {
   final BrokerStopReason reason;
 }
 
-/// `toString` is the user-facing message, so a banner never shows a package
-/// exception verbatim. The broker's subtype of the app-level
-/// [InferenceException] so controllers catch one type across backends (§19.2).
+/// The broker's subtype of the app-level [InferenceException], so controllers
+/// catch one semantic failure type across backends. [message] is diagnostic;
+/// presentation maps [kind] to localized copy and never renders it (§19.2).
 final class BrokerRuntimeException extends InferenceException {
   const BrokerRuntimeException(
     String message, {
@@ -288,12 +288,14 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
       switch (error.code) {
         InfernoErrorCode.invalidModelPath => BrokerRuntimeException(
           'The model file could not be found on this device.',
+          kind: InferenceFailureKind.invalidModelArtifact,
           cause: error,
         ),
         InfernoErrorCode.corruptModel ||
         InfernoErrorCode.incompatibleModel => BrokerRuntimeException(
           'The model on this device is damaged or not compatible '
           'with this build.',
+          kind: InferenceFailureKind.invalidModelArtifact,
           cause: error,
         ),
         InfernoErrorCode.loadFailed => BrokerRuntimeException(
@@ -319,6 +321,7 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
         InfernoErrorCode.unsupportedDevice => BrokerRuntimeException(
           'This device’s processor is missing an instruction set the '
           'local engine needs, so it cannot run models here.',
+          kind: InferenceFailureKind.unsupportedDevice,
           cause: error,
         ),
         InfernoErrorCode.cancelled => BrokerRuntimeException(

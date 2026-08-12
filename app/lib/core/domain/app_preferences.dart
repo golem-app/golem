@@ -12,6 +12,22 @@ import 'resolved_repository.dart';
 
 enum ThemeSetting { system, light, dark }
 
+/// The app's UI language. Domain and persistence keep stable semantic codes;
+/// Flutter [Locale] values are created only by the app presentation root.
+enum AppLanguage {
+  system(null),
+  english('en'),
+  polish('pl');
+
+  const AppLanguage(this.code);
+  final String? code;
+
+  static AppLanguage fromCode(Object? code) => values.firstWhere(
+    (language) => language.code == code,
+    orElse: () => AppLanguage.system,
+  );
+}
+
 /// Increment only when an existing install must see a materially new first-run
 /// contract. Older preference files omit it and therefore read as zero.
 const currentOnboardingVersion = 1;
@@ -164,6 +180,7 @@ final class CustomModelSpec {
 final class AppPreferences {
   const AppPreferences({
     this.theme = ThemeSetting.system,
+    this.language = AppLanguage.system,
     this.textScale = 1.0,
     this.showMetrics = true,
     this.expandReasoning = false,
@@ -178,6 +195,7 @@ final class AppPreferences {
   });
 
   final ThemeSetting theme;
+  final AppLanguage language;
   final double textScale;
   final bool showMetrics;
   final bool expandReasoning;
@@ -212,6 +230,7 @@ final class AppPreferences {
 
   AppPreferences copyWith({
     ThemeSetting? theme,
+    AppLanguage? language,
     double? textScale,
     bool? showMetrics,
     bool? expandReasoning,
@@ -225,6 +244,7 @@ final class AppPreferences {
     List<CustomModelSpec>? customModels,
   }) => AppPreferences(
     theme: theme ?? this.theme,
+    language: language ?? this.language,
     textScale: textScale ?? this.textScale,
     showMetrics: showMetrics ?? this.showMetrics,
     expandReasoning: expandReasoning ?? this.expandReasoning,
@@ -259,13 +279,14 @@ final class AppPreferences {
   );
 
   /// v2 added each custom repository's proven profile (#43), v3 its resolved
-  /// commit and files (#52), and v4 the first-run version and model choice
-  /// (#26). Every change is additive, so older files load directly.
-  static const schemaVersion = 4;
+  /// commit and files (#52), v4 the first-run version and model choice (#26),
+  /// and v5 the explicit UI language (#71). Every change is additive.
+  static const schemaVersion = 5;
 
   Map<String, Object?> toJson() => {
     'schemaVersion': schemaVersion,
     if (theme != ThemeSetting.system) 'theme': theme.name,
+    if (language != AppLanguage.system) 'language': language.code,
     if (textScale != 1.0) 'textScale': textScale,
     if (!showMetrics) 'showMetrics': showMetrics,
     if (expandReasoning) 'expandReasoning': expandReasoning,
@@ -289,6 +310,7 @@ final class AppPreferences {
   bool operator ==(Object other) =>
       other is AppPreferences &&
       other.theme == theme &&
+      other.language == language &&
       other.textScale == textScale &&
       other.showMetrics == showMetrics &&
       other.expandReasoning == expandReasoning &&
@@ -304,6 +326,7 @@ final class AppPreferences {
   @override
   int get hashCode => Object.hash(
     theme,
+    language,
     textScale,
     showMetrics,
     expandReasoning,
@@ -324,6 +347,7 @@ final class AppPreferences {
     if (version != 1 &&
         version != 2 &&
         version != 3 &&
+        version != 4 &&
         version != schemaVersion) {
       throw const FormatException('Unsupported app preferences schema');
     }
@@ -333,6 +357,7 @@ final class AppPreferences {
       theme: ThemeSetting.values.byName(
         json['theme'] as String? ?? ThemeSetting.system.name,
       ),
+      language: AppLanguage.fromCode(json['language']),
       textScale: (json['textScale'] as num?)?.toDouble() ?? 1.0,
       showMetrics: json['showMetrics'] as bool? ?? true,
       expandReasoning: json['expandReasoning'] as bool? ?? false,

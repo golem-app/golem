@@ -5,12 +5,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/app_identity.dart';
-import 'package:golem_flutter/features/legal/ai_disclaimer.dart';
 import 'package:golem_flutter/features/legal/license_registry.dart';
 import 'package:golem_flutter/features/legal/model_attribution_screen.dart';
 import 'package:golem_flutter/features/legal/open_source_licenses_screen.dart';
 import 'package:golem_flutter/features/onboarding/first_run_screen.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_en.dart';
 
 import 'support/harness.dart';
 
@@ -109,14 +109,14 @@ void main() {
   ) async {
     await pumpWithRepositories(tester, child: const FirstRunScreen());
     expect(find.byKey(const Key('first-run-ai-disclaimer')), findsOneWidget);
-    expect(find.text(aiDisclaimerText), findsOneWidget);
+    expect(find.text(AppLocalizationsEn().aiDisclaimer), findsOneWidget);
 
     await pumpWithRepositories(
       tester,
       child: const SettingsScreen(identity: AppIdentity.dev),
     );
     expect(find.byKey(const Key('settings-ai-disclaimer')), findsOneWidget);
-    expect(find.text(aiDisclaimerText), findsOneWidget);
+    expect(find.text(AppLocalizationsEn().aiDisclaimer), findsOneWidget);
     final list = find
         .descendant(
           of: find.byKey(const Key('settings-list')),

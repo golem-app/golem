@@ -20,7 +20,7 @@ void main() {
         normalizeTitle('  hello   private   world  '),
         'hello private world',
       );
-      expect(normalizeTitle('   '), 'New chat');
+      expect(normalizeTitle('   '), isEmpty);
       final longTitle = List.filled(80, 'x').join();
       expect(normalizeTitle(longTitle).length, 48);
       expect(normalizeTitle(longTitle).endsWith('…'), isTrue);
@@ -109,7 +109,7 @@ void main() {
     // The file is rewritten as v2 on the next ordinary save.
     await repository.save(loaded);
     final raw = jsonDecode(await file.readAsString()) as Map<String, Object?>;
-    expect(raw['schemaVersion'], 2);
+    expect(raw['schemaVersion'], 3);
     final rewritten =
         ((raw['conversations']! as List).single as Map)['messages']! as List;
     expect((rewritten.first as Map)['parts'], [
@@ -254,6 +254,53 @@ void main() {
     expect(legacy.modelKey, isNull);
   });
 
+  test('generated title migration applies only to pre-v3 snapshots', () {
+    Map<String, Object?> conversation(String title, {bool image = false}) => {
+      'id': 'chat',
+      'title': title,
+      'messages': image
+          ? [
+              ChatMessage(
+                id: 'image',
+                role: MessageRole.user,
+                parts: const [
+                  ImagePart(
+                    attachmentId: 'image.jpg',
+                    mimeType: 'image/jpeg',
+                    width: 1,
+                    height: 1,
+                    byteCount: 1,
+                  ),
+                ],
+                createdAt: DateTime.utc(2026, 8, 1),
+              ).toJson(),
+            ]
+          : const <Object?>[],
+      'updatedAt': DateTime.utc(2026, 8, 1).toIso8601String(),
+    };
+
+    ChatHistorySnapshot decode(int version, Map<String, Object?> item) =>
+        ChatHistorySnapshot.fromJson({
+          'schemaVersion': version,
+          'activeConversationId': 'chat',
+          'conversations': [item],
+        });
+
+    expect(decode(2, conversation('New chat')).conversations.single.title, '');
+    expect(
+      decode(2, conversation('Image', image: true)).conversations.single.title,
+      '',
+    );
+    expect(
+      decode(3, conversation('New chat')).conversations.single.title,
+      'New chat',
+    );
+    expect(
+      decode(3, conversation('Image', image: true)).conversations.single.title,
+      'Image',
+    );
+  });
+
   test('branchUpTo copies the prefix and withoutMessage removes by id', () {
     DateTime at(int day) => DateTime.utc(2026, 8, day);
     ChatMessage message(String id, MessageRole role) => ChatMessage.text(
@@ -319,7 +366,11 @@ void main() {
         ),
       ],
     );
-    final transcript = conversation.transcriptMarkdown();
+    final transcript = conversation.transcriptMarkdown(
+      untitledTitle: 'New chat',
+      userSpeaker: 'You',
+      assistantSpeaker: 'Golem',
+    );
     expect(transcript, contains('## Weekend plans'));
     expect(transcript, contains('**You:** Any ideas?'));
     expect(transcript, contains('**Golem:** A slow morning walk.'));
@@ -431,7 +482,7 @@ void main() {
     // Only non-default values reach disk, so future default changes reach
     // users who never touched a control.
     final raw = jsonDecode(await file.readAsString()) as Map<String, Object?>;
-    expect(raw['schemaVersion'], 4);
+    expect(raw['schemaVersion'], 5);
     expect(raw.containsKey('hapticsOnSend'), isFalse);
     expect(raw.containsKey('saveHistory'), isFalse);
     expect((raw['responseStyles'] as Map).keys, ['gemma4']);
@@ -474,7 +525,7 @@ void main() {
 
       await repository.save(loaded);
       final raw = jsonDecode(await file.readAsString()) as Map<String, Object?>;
-      expect(raw['schemaVersion'], 4);
+      expect(raw['schemaVersion'], 5);
       expect(loaded.onboardingVersion, 0);
       expect(loaded.onboardingModelKey, isNull);
       expect((raw['customModels']! as List).single, {
@@ -593,7 +644,7 @@ void main() {
       expect(stored.files.first.sha256, resolution.files.first.sha256);
       expect(stored.files.last.sha256, isNull);
       final raw = jsonDecode(await file.readAsString()) as Map<String, Object?>;
-      expect(raw['schemaVersion'], 4);
+      expect(raw['schemaVersion'], 5);
     });
 
     test('a v1 or v2 entry loads as unresolved rather than failing', () async {

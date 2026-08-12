@@ -108,14 +108,12 @@ void main() {
     test('ChatFailure and InferenceMetrics compare by content', () {
       const failure = ChatFailure(
         kind: ChatFailureKind.missingModel,
-        message: 'Download it first.',
         artifactKey: 'gemma4-gguf',
       );
       expect(
         failure,
         const ChatFailure(
           kind: ChatFailureKind.missingModel,
-          message: 'Download it first.',
           artifactKey: 'gemma4-gguf',
         ),
       );

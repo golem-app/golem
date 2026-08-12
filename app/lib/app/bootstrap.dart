@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/domain/app_state.dart';
 import '../core/app_identity.dart';
 import '../core/theme/golem_theme.dart';
+import '../l10n/l10n.dart';
 import '../features/chat/widgets/attach_sheet.dart';
 import '../features/splash/splash_screen.dart';
 import 'app.dart';
@@ -95,20 +96,33 @@ class _BootstrapAppState extends State<BootstrapApp>
       );
     }
     final failure = _failure;
-    // The backend is not resolved yet, so this layer claims nothing about a
-    // model: its copy is about starting Golem. The gate's SplashScreen takes
-    // over the same scaffold once the scope exists.
-    final message = failure?.message ?? 'Starting up';
     return CupertinoApp(
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localeListResolutionCallback: resolveAppLocale,
       theme: GolemTheme.theme(
         WidgetsBinding.instance.platformDispatcher.platformBrightness,
       ),
-      home: SplashScaffold(
-        semanticValue: message,
-        caption: message,
-        progress: 0,
-        onRetry: (failure?.retryable ?? false) ? _run : null,
+      home: Builder(
+        builder: (context) {
+          final l10n = context.l10n;
+          final message = switch (failure?.kind) {
+            LaunchFailureKind.timedOut => l10n.launchTakingLonger,
+            LaunchFailureKind.storageUnavailable =>
+              l10n.launchStorageUnavailable,
+            LaunchFailureKind.invalidConfiguration =>
+              l10n.launchInvalidConfiguration,
+            LaunchFailureKind.unknown => l10n.launchUnknownFailure,
+            null => l10n.startingUp,
+          };
+          return SplashScaffold(
+            semanticValue: message,
+            caption: message,
+            progress: 0,
+            onRetry: (failure?.retryable ?? false) ? _run : null,
+          );
+        },
       ),
     );
   }

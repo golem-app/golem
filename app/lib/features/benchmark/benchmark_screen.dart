@@ -10,6 +10,7 @@ import 'application/benchmark_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/labeled_row.dart';
 import '../../core/widgets/section_header.dart';
+import '../../l10n/l10n.dart';
 
 class BenchmarkScreen extends ConsumerWidget {
   const BenchmarkScreen({super.key});
@@ -19,8 +20,8 @@ class BenchmarkScreen extends ConsumerWidget {
     final benchmark = ref.watch(benchmarkControllerProvider);
     return CupertinoPageScaffold(
       navigationBar: GolemNavBar(
-        title: 'Benchmark',
-        previousPageTitle: 'Settings',
+        title: context.l10n.benchmark,
+        previousPageTitle: context.l10n.settings,
       ),
       child: SafeArea(
         bottom: false,
@@ -30,15 +31,15 @@ class BenchmarkScreen extends ConsumerWidget {
           children: [
             const _SimulatedNotice(),
             const SizedBox(height: 28),
-            const SectionHeader('Protocol'),
+            SectionHeader(context.l10n.protocol),
             const SizedBox(height: 8),
             GolemCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Prompt',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                  Text(
+                    context.l10n.prompt,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
                   CupertinoButton(
@@ -59,7 +60,7 @@ class BenchmarkScreen extends ConsumerWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              _caseTitle(benchmark.caseId),
+                              _caseTitle(context, benchmark.caseId),
                               style: TextStyle(
                                 color: CupertinoDynamicColor.resolve(
                                   GolemTheme.ink,
@@ -77,22 +78,22 @@ class BenchmarkScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Run',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                  Text(
+                    context.l10n.run,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
                   CupertinoSlidingSegmentedControl<BenchmarkPhase>(
                     key: const Key('benchmark-phase-picker'),
                     groupValue: benchmark.phase,
-                    children: const {
+                    children: {
                       BenchmarkPhase.warmup: Padding(
-                        padding: EdgeInsets.all(9),
-                        child: Text('Warmup'),
+                        padding: const EdgeInsets.all(9),
+                        child: Text(context.l10n.warmup),
                       ),
                       BenchmarkPhase.measured: Padding(
-                        padding: EdgeInsets.all(9),
-                        child: Text('Measured'),
+                        padding: const EdgeInsets.all(9),
+                        child: Text(context.l10n.measured),
                       ),
                     },
                     onValueChanged: (value) {
@@ -104,17 +105,17 @@ class BenchmarkScreen extends ConsumerWidget {
                     },
                   ),
                   const SizedBox(height: 18),
-                  const LabeledRow(label: 'Context', value: '4,096'),
+                  LabeledRow(label: context.l10n.context, value: '4,096'),
                   const SizedBox(height: 10),
-                  const LabeledRow(label: 'Maximum output', value: '1,024'),
+                  LabeledRow(label: context.l10n.maximumOutput, value: '1,024'),
                   const SizedBox(height: 10),
                   LabeledRow(
-                    label: 'Seed',
+                    label: context.l10n.seed,
                     value: _seed(benchmark.caseId).toString(),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Uses the tracked production prompt fixture. Output and timing are deterministic simulations only.',
+                    context.l10n.benchmarkProtocolDetail,
                     style: TextStyle(
                       color: CupertinoDynamicColor.resolve(
                         GolemTheme.mutedInk,
@@ -128,16 +129,25 @@ class BenchmarkScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 28),
-            const SectionHeader('Simulation status'),
+            SectionHeader(context.l10n.simulationStatus),
             const SizedBox(height: 8),
             GolemCard(
               child: Column(
                 children: [
-                  const LabeledRow(label: 'Thermal', value: 'Not measured'),
+                  LabeledRow(
+                    label: context.l10n.thermal,
+                    value: context.l10n.notMeasured,
+                  ),
                   const SizedBox(height: 10),
-                  const LabeledRow(label: 'Low Power Mode', value: 'Not read'),
+                  LabeledRow(
+                    label: context.l10n.lowPowerMode,
+                    value: context.l10n.notRead,
+                  ),
                   const SizedBox(height: 10),
-                  const LabeledRow(label: 'Hardware validation', value: 'No'),
+                  LabeledRow(
+                    label: context.l10n.hardwareValidation,
+                    value: context.l10n.no,
+                  ),
                   const SizedBox(height: 16),
                   CupertinoButton(
                     key: Key(
@@ -155,20 +165,22 @@ class BenchmarkScreen extends ConsumerWidget {
                               .read(benchmarkControllerProvider.notifier)
                               .run(),
                     child: benchmark.isRunning
-                        ? const Text('Stop Simulated Benchmark')
-                        : const Text(
-                            'Run Simulated Benchmark',
-                            style: TextStyle(color: CupertinoColors.white),
+                        ? Text(context.l10n.stopSimulatedBenchmark)
+                        : Text(
+                            context.l10n.runSimulatedBenchmark,
+                            style: const TextStyle(
+                              color: CupertinoColors.white,
+                            ),
                           ),
                   ),
                   if (benchmark.isRunning) ...[
                     const SizedBox(height: 14),
-                    const Row(
+                    Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        CupertinoActivityIndicator(),
-                        SizedBox(width: 10),
-                        Text('Generating deterministic result…'),
+                        const CupertinoActivityIndicator(),
+                        const SizedBox(width: 10),
+                        Text(context.l10n.generatingDeterministicResult),
                       ],
                     ),
                   ],
@@ -177,7 +189,7 @@ class BenchmarkScreen extends ConsumerWidget {
             ),
             if (benchmark.result != null) ...[
               const SizedBox(height: 28),
-              const SectionHeader('Simulated result'),
+              SectionHeader(context.l10n.simulatedResult),
               const SizedBox(height: 8),
               _ResultCard(state: benchmark),
             ],
@@ -193,7 +205,7 @@ class BenchmarkScreen extends ConsumerWidget {
     String selected,
   ) => showGolemActions(
     context: context,
-    title: 'Benchmark prompt',
+    title: context.l10n.benchmarkPrompt,
     actions: [
       for (final id in const [
         'short-explanation',
@@ -201,7 +213,7 @@ class BenchmarkScreen extends ConsumerWidget {
         'long-synthesis',
       ])
         GolemSheetAction(
-          label: '${id == selected ? '✓  ' : ''}${_caseTitle(id)}',
+          label: '${id == selected ? '✓  ' : ''}${_caseTitle(context, id)}',
           onPressed: () {
             ref.read(benchmarkControllerProvider.notifier).selectCase(id);
             Navigator.pop(context);
@@ -231,9 +243,9 @@ class _ResultCard extends ConsumerWidget {
               ),
               borderRadius: BorderRadius.circular(18),
             ),
-            child: const Text(
-              'SIMULATED · NOT HARDWARE VALIDATED',
-              style: TextStyle(
+            child: Text(
+              context.l10n.simulatedNotValidated,
+              style: const TextStyle(
                 color: GolemTheme.amber,
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
@@ -242,19 +254,26 @@ class _ResultCard extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           LabeledRow(
-            label: 'Generated',
-            value: '${result.metrics.tokenCount} tokens',
+            label: context.l10n.generated,
+            value: context.l10n.tokenCount(result.metrics.tokenCount),
           ),
           const SizedBox(height: 10),
           LabeledRow(
-            label: 'Decode',
-            value:
-                '${result.metrics.decodeTokensPerSecond.toStringAsFixed(1)} tok/s',
+            label: context.l10n.decode,
+            value: context.l10n.tokenRate(
+              result.metrics.decodeTokensPerSecond.toStringAsFixed(1),
+            ),
           ),
           const SizedBox(height: 10),
-          const LabeledRow(label: 'Peak memory', value: 'Not measured'),
+          LabeledRow(
+            label: context.l10n.peakMemory,
+            value: context.l10n.notMeasured,
+          ),
           const SizedBox(height: 10),
-          const LabeledRow(label: 'Stop', value: 'Simulated end of turn'),
+          LabeledRow(
+            label: context.l10n.stop,
+            value: context.l10n.simulatedEndOfTurn,
+          ),
           const SizedBox(height: 16),
           CupertinoButton(
             key: const Key('benchmark-export-button'),
@@ -268,8 +287,8 @@ class _ResultCard extends ConsumerWidget {
               final box = context.findRenderObject() as RenderBox?;
               await SharePlus.instance.share(
                 ShareParams(
-                  title: 'Golem simulated benchmark',
-                  text: 'Simulated benchmark JSON — not hardware validated.',
+                  title: context.l10n.benchmarkExportTitle,
+                  text: context.l10n.benchmarkExportText,
                   files: [XFile(path)],
                   sharePositionOrigin: box == null
                       ? null
@@ -277,14 +296,14 @@ class _ResultCard extends ConsumerWidget {
                 ),
               );
             },
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(CupertinoIcons.share, color: CupertinoColors.white),
-                SizedBox(width: 8),
+                const Icon(CupertinoIcons.share, color: CupertinoColors.white),
+                const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    'Export Simulated JSON',
+                    context.l10n.exportSimulatedJson,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: CupertinoColors.white),
@@ -322,17 +341,17 @@ class _SimulatedNotice extends StatelessWidget {
         ),
       ),
     ),
-    child: const Row(
+    child: Row(
       children: [
-        Icon(
+        const Icon(
           CupertinoIcons.exclamationmark_triangle_fill,
           color: GolemTheme.amber,
         ),
-        SizedBox(width: 10),
+        const SizedBox(width: 10),
         Expanded(
           child: Text(
-            'This screen simulates the workflow. It does not measure this device.',
-            style: TextStyle(fontWeight: FontWeight.w600, height: 1.35),
+            context.l10n.benchmarkSimulationNotice,
+            style: const TextStyle(fontWeight: FontWeight.w600, height: 1.35),
           ),
         ),
       ],
@@ -340,10 +359,10 @@ class _SimulatedNotice extends StatelessWidget {
   );
 }
 
-String _caseTitle(String id) => switch (id) {
-  'short-explanation' => 'Short explanation',
-  'medium-review' => 'Medium review',
-  'long-synthesis' => 'Long synthesis',
+String _caseTitle(BuildContext context, String id) => switch (id) {
+  'short-explanation' => context.l10n.shortExplanation,
+  'medium-review' => context.l10n.mediumReview,
+  'long-synthesis' => context.l10n.longSynthesis,
   _ => id,
 };
 

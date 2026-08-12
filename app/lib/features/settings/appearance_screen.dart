@@ -7,6 +7,7 @@ import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
+import '../../l10n/l10n.dart';
 import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
 
@@ -16,6 +17,7 @@ class AppearanceScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final preferencesValue = ref.watch(preferencesControllerProvider);
     // The app root deliberately degrades a failed preferences read to
     // defaults; this screen is where that failure surfaces with a retry —
@@ -23,14 +25,15 @@ class AppearanceScreen extends ConsumerWidget {
     if (preferencesValue.hasError) {
       return CupertinoPageScaffold(
         navigationBar: GolemNavBar(
-          title: 'Appearance',
-          previousPageTitle: 'Settings',
+          title: l10n.settingsAppearance,
+          previousPageTitle: l10n.settingsTitle,
         ),
         child: SafeArea(
           bottom: false,
           child: RetryPane(
             key: const Key('preferences-load-error'),
-            message: "Couldn't load preferences.",
+            message: l10n.preferencesLoadFailed,
+            actionLabel: l10n.tryAgain,
             onRetry: () => ref.invalidate(preferencesControllerProvider),
           ),
         ),
@@ -40,40 +43,40 @@ class AppearanceScreen extends ConsumerWidget {
     final notifier = ref.read(preferencesControllerProvider.notifier);
     return CupertinoPageScaffold(
       navigationBar: GolemNavBar(
-        title: 'Appearance',
-        previousPageTitle: 'Settings',
+        title: l10n.settingsAppearance,
+        previousPageTitle: l10n.settingsTitle,
       ),
       child: SafeArea(
         bottom: false,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
           children: [
-            const SectionHeader('Theme'),
+            SectionHeader(l10n.theme),
             const SizedBox(height: 8),
             GolemSegmented<ThemeSetting>(
               groupValue: preferences.theme,
               onChanged: (value) =>
                   announceFailedSave(context, notifier.setTheme(value)),
-              segments: const {
+              segments: {
                 ThemeSetting.system: Text(
-                  'System',
-                  key: Key('theme-system'),
+                  l10n.themeSystem,
+                  key: const Key('theme-system'),
                   style: GolemText.footnoteStrong,
                 ),
                 ThemeSetting.light: Text(
-                  'Light',
-                  key: Key('theme-light'),
+                  l10n.themeLight,
+                  key: const Key('theme-light'),
                   style: GolemText.footnoteStrong,
                 ),
                 ThemeSetting.dark: Text(
-                  'Dark',
-                  key: Key('theme-dark'),
+                  l10n.themeDark,
+                  key: const Key('theme-dark'),
                   style: GolemText.footnoteStrong,
                 ),
               },
             ),
             const SizedBox(height: 24),
-            const SectionHeader('Text size'),
+            SectionHeader(l10n.textSize),
             const SizedBox(height: 8),
             _TextSizeCard(
               scale: preferences.textScale,
@@ -81,13 +84,13 @@ class AppearanceScreen extends ConsumerWidget {
                   announceFailedSave(context, notifier.setTextScale(value)),
             ),
             const SizedBox(height: 24),
-            const SectionHeader('In the transcript'),
+            SectionHeader(l10n.inTranscript),
             const SizedBox(height: 8),
             SettingsCard(
               children: [
                 SettingsToggleRow(
                   toggleKey: const Key('toggle-metrics'),
-                  label: 'Show inference metrics',
+                  label: l10n.showInferenceMetrics,
                   value: preferences.showMetrics,
                   onChanged: (value) => announceFailedSave(
                     context,
@@ -96,7 +99,7 @@ class AppearanceScreen extends ConsumerWidget {
                 ),
                 SettingsToggleRow(
                   toggleKey: const Key('toggle-reasoning'),
-                  label: 'Always expand reasoning',
+                  label: l10n.alwaysExpandReasoning,
                   value: preferences.expandReasoning,
                   onChanged: (value) => announceFailedSave(
                     context,
@@ -105,7 +108,7 @@ class AppearanceScreen extends ConsumerWidget {
                 ),
                 SettingsToggleRow(
                   toggleKey: const Key('toggle-haptics'),
-                  label: 'Haptics on send',
+                  label: l10n.hapticsOnSend,
                   value: preferences.hapticsOnSend,
                   onChanged: (value) => announceFailedSave(
                     context,
@@ -142,7 +145,7 @@ class _TextSizeCardState extends State<_TextSizeCard> {
   static const _step = 0.05;
   double? _drag;
 
-  static String _percent(double scale) => '${(scale * 100).round()} percent';
+  static int _percent(double scale) => (scale * 100).round();
 
   double _stepped(double scale, int direction) =>
       (scale + _step * direction).clamp(_min, _max);
@@ -187,7 +190,7 @@ class _TextSizeCardState extends State<_TextSizeCard> {
                       ),
                       child: MediaQuery.withNoTextScaling(
                         child: Text(
-                          'Looks about right.',
+                          context.l10n.textPreview,
                           style: GolemText.body.copyWith(
                             color: GolemTheme.textOnDark,
                             fontSize:
@@ -221,10 +224,14 @@ class _TextSizeCardState extends State<_TextSizeCard> {
                       key: const Key('text-size-control'),
                       container: true,
                       slider: true,
-                      label: 'Text size',
-                      value: _percent(scale),
-                      increasedValue: _percent(_stepped(scale, 1)),
-                      decreasedValue: _percent(_stepped(scale, -1)),
+                      label: context.l10n.textSize,
+                      value: context.l10n.percentValue(_percent(scale)),
+                      increasedValue: context.l10n.percentValue(
+                        _percent(_stepped(scale, 1)),
+                      ),
+                      decreasedValue: context.l10n.percentValue(
+                        _percent(_stepped(scale, -1)),
+                      ),
                       onIncrease: () => widget.onCommit(_stepped(scale, 1)),
                       onDecrease: () => widget.onCommit(_stepped(scale, -1)),
                       child: ExcludeSemantics(

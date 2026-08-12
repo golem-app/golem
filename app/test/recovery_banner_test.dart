@@ -11,6 +11,9 @@ import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/fake_model_management_repository.dart';
 import 'package:golem_flutter/features/chat/widgets/recovery_banner.dart';
 
+import 'support/harness.dart';
+import 'support/in_memory_chat_history_repository.dart';
+
 const _catalog = [
   ModelCatalogEntry(
     key: 'test-gguf',
@@ -46,8 +49,6 @@ void main() {
             child: RecoveryBanner(
               failure: ChatFailure(
                 kind: ChatFailureKind.missingModel,
-                message:
-                    'The local model is not downloaded on this device yet.',
                 artifactKey: 'test-gguf',
               ),
             ),
@@ -105,10 +106,7 @@ void main() {
         child: CupertinoApp(
           home: CupertinoPageScaffold(
             child: RecoveryBanner(
-              failure: ChatFailure(
-                kind: ChatFailureKind.generic,
-                message: 'Something failed.',
-              ),
+              failure: ChatFailure(kind: ChatFailureKind.generic),
             ),
           ),
         ),
@@ -130,9 +128,7 @@ void main() {
         ProviderScope(
           child: CupertinoApp(
             home: CupertinoPageScaffold(
-              child: RecoveryBanner(
-                failure: ChatFailure(kind: kind, message: 'Memory copy.'),
-              ),
+              child: RecoveryBanner(failure: ChatFailure(kind: kind)),
             ),
           ),
         ),
@@ -150,10 +146,7 @@ void main() {
         child: CupertinoApp(
           home: CupertinoPageScaffold(
             child: RecoveryBanner(
-              failure: ChatFailure(
-                kind: ChatFailureKind.contextExhausted,
-                message: 'This conversation no longer fits.',
-              ),
+              failure: ChatFailure(kind: ChatFailureKind.contextExhausted),
             ),
           ),
         ),
@@ -162,5 +155,83 @@ void main() {
     expect(find.byKey(const Key('retry-generation')), findsNothing);
     expect(find.byKey(const Key('start-new-chat')), findsOneWidget);
     expect(find.byKey(const Key('discard-generation')), findsOneWidget);
+  });
+
+  testWidgets('a missing attachment offers removal, never a futile retry', (
+    tester,
+  ) async {
+    final conversation = ChatConversation(
+      id: 'chat',
+      title: 'Image',
+      updatedAt: DateTime.utc(2026, 8, 12),
+      messages: [
+        ChatMessage.text(
+          id: 'user',
+          role: MessageRole.user,
+          text: 'Describe this',
+          createdAt: DateTime.utc(2026, 8, 12),
+        ),
+        ChatMessage.text(
+          id: 'draft',
+          role: MessageRole.assistant,
+          text: '',
+          createdAt: DateTime.utc(2026, 8, 12),
+        ),
+      ],
+    );
+    final history = InMemoryChatHistoryRepository(
+      ChatHistorySnapshot(
+        conversations: [conversation],
+        activeId: conversation.id,
+      ),
+    );
+    await pumpWithRepositories(
+      tester,
+      chatHistory: history,
+      child: const CupertinoPageScaffold(
+        child: RecoveryBanner(
+          failure: ChatFailure(kind: ChatFailureKind.attachmentUnavailable),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('retry-generation')), findsNothing);
+    expect(find.byKey(const Key('remove-failed-turn')), findsOneWidget);
+    expect(
+      find.textContaining('image in this conversation is no longer available'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('remove-failed-turn')));
+    await tester.pumpAndSettle();
+    expect(history.snapshot.conversations.single.messages, isEmpty);
+  });
+
+  testWidgets('an unavailable model opens the per-chat model picker', (
+    tester,
+  ) async {
+    final conversation = ChatConversation(
+      id: 'chat',
+      title: 'Persisted',
+      updatedAt: DateTime.utc(2026, 8, 12),
+      messages: const [],
+    );
+    await pumpWithRepositories(
+      tester,
+      history: ChatHistorySnapshot(
+        conversations: [conversation],
+        activeId: conversation.id,
+      ),
+      child: const CupertinoPageScaffold(
+        child: RecoveryBanner(
+          failure: ChatFailure(kind: ChatFailureKind.modelUnavailable),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('retry-generation')), findsNothing);
+    expect(find.byKey(const Key('choose-recovery-model')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('choose-recovery-model')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('model-picker-sheet')), findsOneWidget);
   });
 }

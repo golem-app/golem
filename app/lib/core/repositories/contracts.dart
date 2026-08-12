@@ -47,6 +47,24 @@ enum InferenceFailureKind {
   /// Unclassified engine or runtime failure; Retry is a reasonable action.
   engine,
 
+  /// A persisted conversation names a model this build no longer carries.
+  modelUnavailable,
+
+  /// The model's profile or artifact shape is not supported by this build.
+  unsupportedModel,
+
+  /// An attachment referenced by persisted history no longer exists.
+  attachmentUnavailable,
+
+  /// The selected model or composed backend cannot consume attached images.
+  unsupportedImages,
+
+  /// Installed weights are missing, damaged, or incompatible with the engine.
+  invalidModelArtifact,
+
+  /// The native engine reports that this processor is unsupported.
+  unsupportedDevice,
+
   /// The conversation no longer fits the window; an identical retry must fail.
   contextExhausted,
 
@@ -60,13 +78,19 @@ enum InferenceFailureKind {
   budgetExhaustedBeforeAnswer,
 }
 
-/// [message] is user-presentable copy, and `toString` is that message so no
-/// surface ever shows a package exception verbatim (§19.2).
+/// [message] is diagnostic source-language copy for logs and tests. App
+/// presentation switches exhaustively on [kind] and never displays it.
 class InferenceException implements Exception {
-  const InferenceException(this.kind, this.message, {this.cause});
+  const InferenceException(
+    this.kind,
+    this.message, {
+    this.cause,
+    this.contextTokens,
+  });
 
   final InferenceFailureKind kind;
   final String message;
+  final int? contextTokens;
 
   /// The underlying vendor error, for logs and failure metrics only.
   final Object? cause;
