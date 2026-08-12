@@ -12,9 +12,14 @@ import 'retry.dart';
 
 part 'app_providers.g.dart';
 
+// Ownership (#88): this file holds only what is genuinely shared across
+// features — the launch seams (mirroring LaunchDependencies, wired by
+// launchOverrides), the boot-constant derivations, and the session bridges.
+// Feature providers live in features/<name>/application/.
+//
 // Lifetime policy (#69): the repository/probe seams below are keepAlive
 // because they are composition-injected process-lifetime dependencies —
-// overridden once in main.dart, never recomputed; disposing one could only
+// overridden once at launch, never recomputed; disposing one could only
 // re-throw its seam. Providers with a narrower owner say so individually.
 
 @Riverpod(keepAlive: true, retry: noRetry)

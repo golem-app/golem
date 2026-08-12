@@ -174,15 +174,21 @@ The Flutter app never migrates, opens, or otherwise reads another app's data.
 ## Architecture
 
 `CupertinoApp.router` and GoRouter own navigation. Features live under
-`lib/features/`; shared immutable models, the Golem Navy design tokens
+`lib/features/`, each owning its controllers and derivations in
+`features/<name>/application/` with committed `.g.dart` parts (chat, models,
+settings — including preferences and storage accounting — splash, benchmark,
+onboarding, eval). Shared immutable models, the Golem Navy design tokens
 (`lib/core/theme/` — colors, type ramp, radii/spacing/sizes, elevation and
 motion, light + dark), the platform-chrome layer (`lib/core/chrome/` —
 `GolemChrome` resolves cupertino or android chrome from the target platform
 and drives the nav bar, menu, alert, sheet, action list, and primary button;
-layout, color, and type stay identical across platforms), repository
-contracts, and generated Riverpod providers live under `lib/core/`. The
-design source of truth is the handoff under `references/ui_redesign/` at the
-repo root.
+layout, color, and type stay identical across platforms), and repository
+contracts live under `lib/core/`. `lib/core/providers/app_providers.dart`
+holds only what is genuinely shared: the launch seams wired by
+`launchOverrides`, the boot-constant derivations, and the session bridges
+through which one feature's controller offers capabilities to another
+without a feature→feature import (#88). The design source of truth is the
+handoff under `references/ui_redesign/` at the repo root.
 
 - `ChatController`: authoritative chats and active selection for the live
   session, with an orthogonal recovery notice when durability falls behind.

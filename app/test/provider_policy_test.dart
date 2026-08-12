@@ -10,6 +10,7 @@ import 'package:golem_flutter/features/benchmark/application/benchmark_providers
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/chat/application/search_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
+import 'package:golem_flutter/features/onboarding/application/onboarding_controller.dart';
 import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
 import 'package:golem_flutter/features/settings/application/settings_providers.dart';
 import 'package:golem_flutter/features/settings/application/storage_providers.dart';
@@ -31,13 +32,17 @@ final _allProviders = <String, ProviderOrFamily>{
   'diskFreeSpaceProbe': diskFreeSpaceProbeProvider,
   'inferenceBackend': inferenceBackendProvider,
   'deviceEligibility': deviceEligibilityProvider,
+  'deviceRefusal': deviceRefusalProvider,
   'residentModelKey': residentModelKeyProvider,
+  'chatSessionBridge': chatSessionBridgeProvider,
+  'modelSessionBridge': modelSessionBridgeProvider,
   'deviceCapacityProbe': deviceCapacityProbeProvider,
   'documentsPath': documentsPathProvider,
   'chatStorageSignature': chatStorageSignatureProvider,
   'storageBreakdown': storageBreakdownProvider,
   'effectiveModelCatalog': effectiveModelCatalogProvider,
   'loadableModelKeys': loadableModelKeysProvider,
+  'downloadableModelKeys': downloadableModelKeysProvider,
   'searchQuery': searchQueryProvider,
   'chatSearchResults': chatSearchResultsProvider,
   'settingsController': settingsControllerProvider,
@@ -46,6 +51,7 @@ final _allProviders = <String, ProviderOrFamily>{
   'modelController': modelControllerProvider,
   'startupController': startupControllerProvider,
   'benchmarkController': benchmarkControllerProvider,
+  'firstRunController': firstRunControllerProvider,
 };
 
 final class _FailingSettingsRepository implements SettingsRepository {
