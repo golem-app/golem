@@ -15,6 +15,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:golem_flutter/main.dart' as app;
 
 import 'support/acceptance_hud.dart';
+import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 
 /// The real-model chat acceptance for one device/engine cell (#20).
 ///

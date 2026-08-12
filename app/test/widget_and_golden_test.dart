@@ -37,6 +37,7 @@ import 'package:golem_flutter/features/benchmark/application/benchmark_providers
 import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
+import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 
 Future<List<OpenSourceLicense>> _goldenLicenses() async => [
   OpenSourceLicense(

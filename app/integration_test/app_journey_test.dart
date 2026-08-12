@@ -14,6 +14,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:golem_flutter/main.dart' as app;
 
 import '../test/support/image_fixtures.dart';
+import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();

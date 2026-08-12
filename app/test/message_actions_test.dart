@@ -2,10 +2,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 
 import 'support/harness.dart';
+import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 
 void main() {
   testWidgets('the action row copies with a toast and branches', (

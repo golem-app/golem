@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/domain/app_state.dart';
-import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../../../l10n/l10n.dart';
+import '../application/chat_providers.dart';
 
 /// Non-blocking recovery for a live chat session whose durable snapshot is
 /// stale. This is separate from generation recovery because saving history

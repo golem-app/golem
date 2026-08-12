@@ -3,12 +3,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
-import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/features/chat/widgets/persistence_recovery_banner.dart';
 import 'package:golem_flutter/features/chat/widgets/recovery_banner.dart';
 
 import 'support/harness.dart';
 import 'support/scripted_chat_history_repository.dart';
+import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 
 class _PersistenceHost extends ConsumerWidget {
   const _PersistenceHost({this.withInferenceFailure = false});

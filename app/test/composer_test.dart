@@ -18,6 +18,7 @@ import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
 
 import 'support/harness.dart';
 import 'support/in_memory_attachment_repository.dart';
+import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 
 void main() {
   testWidgets('picking a model persists it and relabels chip and nav', (

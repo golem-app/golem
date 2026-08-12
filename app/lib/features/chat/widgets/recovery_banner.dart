@@ -9,6 +9,7 @@ import '../../../core/theme/golem_theme.dart';
 import '../../onboarding/model_download_consent.dart';
 import '../../../l10n/l10n.dart';
 import 'model_picker_sheet.dart';
+import '../application/chat_providers.dart';
 
 class RecoveryBanner extends ConsumerWidget {
   const RecoveryBanner({required this.failure, super.key});

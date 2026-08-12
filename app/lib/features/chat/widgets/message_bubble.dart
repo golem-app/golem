@@ -14,6 +14,7 @@ import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
 import 'markdown/golem_markdown.dart';
 import '../../../l10n/l10n.dart';
+import '../application/chat_providers.dart';
 
 class MessageBubble extends ConsumerWidget {
   const MessageBubble({

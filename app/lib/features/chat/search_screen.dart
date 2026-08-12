@@ -7,9 +7,9 @@ import 'package:intl/intl.dart';
 
 import 'application/search_providers.dart';
 import 'domain/chat_search.dart';
-import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../l10n/l10n.dart';
+import 'application/chat_providers.dart';
 
 /// Full-screen search across every chat. The raw field text is
 /// widget-local; a 350 ms debounce publishes the normalized query, and

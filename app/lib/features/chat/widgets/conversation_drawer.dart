@@ -17,6 +17,8 @@ import '../../../core/theme/golem_theme.dart';
 import '../model_label.dart';
 import '../../../core/domain/byte_format.dart';
 import '../../../l10n/l10n.dart';
+import '../application/chat_providers.dart';
+import '../../settings/application/storage_providers.dart';
 
 class ConversationDrawer extends ConsumerStatefulWidget {
   const ConversationDrawer({

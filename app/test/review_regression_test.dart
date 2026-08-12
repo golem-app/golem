@@ -17,6 +17,7 @@ import 'package:golem_flutter/core/repositories/file_settings_repository.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
 
 import 'support/in_memory_chat_history_repository.dart';
+import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 
 Future<String> _fixtureAsset(String key) async =>
     '[{"role": "user", "content": "${'x' * 400}"}]';

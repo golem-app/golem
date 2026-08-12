@@ -6,6 +6,7 @@ import '../../../core/theme/golem_theme.dart';
 import '../model_label.dart';
 import '../../../l10n/l10n.dart';
 import '../../../l10n/presentation_messages.dart';
+import '../application/chat_providers.dart';
 
 class EmptyChat extends ConsumerWidget {
   const EmptyChat({required this.onStarter, super.key});
