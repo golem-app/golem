@@ -23,3 +23,17 @@ final class ChatSessionBridge {
   /// Whether a generation is visibly in flight; false while chat has no state.
   bool generationActive() => _generationActive?.call() ?? false;
 }
+
+/// The model feature's capabilities offered across feature boundaries (#88),
+/// bound by ModelController during `build()`.
+final class ModelSessionBridge {
+  Future<void> Function()? _reflectEngineLoaded;
+
+  void bindReflectEngineLoaded(Future<void> Function() fn) =>
+      _reflectEngineLoaded = fn;
+
+  /// Records that the engine holds weights after a lazy prepare. No-op while
+  /// the model controller has not built, matching its own empty-state guard.
+  Future<void> reflectEngineLoaded() async =>
+      await _reflectEngineLoaded?.call();
+}

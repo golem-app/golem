@@ -844,6 +844,65 @@ final class ChatSessionBridgeProvider
 
 String _$chatSessionBridgeHash() => r'1efa00b8214e652cbecedb0c3cda09762f5614bd';
 
+/// The model feature's counterpart to [chatSessionBridge] (#88): chat and
+/// preferences command the model controller through this seam.
+/// KeepAlive: the binding must outlive route transitions, like its owner.
+
+@ProviderFor(modelSessionBridge)
+final modelSessionBridgeProvider = ModelSessionBridgeProvider._();
+
+/// The model feature's counterpart to [chatSessionBridge] (#88): chat and
+/// preferences command the model controller through this seam.
+/// KeepAlive: the binding must outlive route transitions, like its owner.
+
+final class ModelSessionBridgeProvider
+    extends
+        $FunctionalProvider<
+          ModelSessionBridge,
+          ModelSessionBridge,
+          ModelSessionBridge
+        >
+    with $Provider<ModelSessionBridge> {
+  /// The model feature's counterpart to [chatSessionBridge] (#88): chat and
+  /// preferences command the model controller through this seam.
+  /// KeepAlive: the binding must outlive route transitions, like its owner.
+  ModelSessionBridgeProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: noRetry,
+        name: r'modelSessionBridgeProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$modelSessionBridgeHash();
+
+  @$internal
+  @override
+  $ProviderElement<ModelSessionBridge> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ModelSessionBridge create(Ref ref) {
+    return modelSessionBridge(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ModelSessionBridge value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ModelSessionBridge>(value),
+    );
+  }
+}
+
+String _$modelSessionBridgeHash() =>
+    r'42baf5a2fe819e81c92b764690c347f26ca02b83';
+
 @ProviderFor(deviceCapacityProbe)
 final deviceCapacityProbeProvider = DeviceCapacityProbeProvider._();
 
@@ -1433,7 +1492,7 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'86901554928cad3b2083b90d82c48e54c1dfa8f0';
+String _$chatControllerHash() => r'4a1c29674acb9edb8b20fd3a3ba05c3ebfad376f';
 
 /// KeepAlive: the chat session aggregate — in-flight generation and unsaved
 /// turns must survive every route transition.
@@ -1490,7 +1549,7 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'15ddd7709b7bd6b1ff494b1dad821270ea4a020a';
+String _$modelControllerHash() => r'2c3c5328c73b069f57ee1065f098016e7c886c6e';
 
 /// KeepAlive: a command controller whose downloads, busy guard, and epochs
 /// must survive leaving the Models screen (§3.4 — an autoDispose command

@@ -169,6 +169,12 @@ String? residentModelKey(Ref ref) {
 @Riverpod(keepAlive: true, retry: noRetry)
 ChatSessionBridge chatSessionBridge(Ref ref) => ChatSessionBridge();
 
+/// The model feature's counterpart to [chatSessionBridge] (#88): chat and
+/// preferences command the model controller through this seam.
+/// KeepAlive: the binding must outlive route transitions, like its owner.
+@Riverpod(keepAlive: true, retry: noRetry)
+ModelSessionBridge modelSessionBridge(Ref ref) => ModelSessionBridge();
+
 @Riverpod(keepAlive: true, retry: noRetry)
 DiskCapacityProbe deviceCapacityProbe(Ref ref) =>
     throw UnimplementedError('Override deviceCapacityProbeProvider at startup');
@@ -1060,7 +1066,7 @@ class ChatController extends _$ChatController {
       // claiming "Unloaded". Awaited on purpose: a recorded phase must not race
       // the stream it describes.
       if (!backend.simulatedInference) {
-        await ref.read(modelControllerProvider.notifier).reflectEngineLoaded();
+        await ref.read(modelSessionBridgeProvider).reflectEngineLoaded();
         if (!ref.mounted || epoch != _generationEpoch) return;
       }
       state = AsyncData(_value.copyWith(generation: GenerationPhase.streaming));
@@ -1339,8 +1345,14 @@ class ModelController extends _$ModelController {
   bool _engineBusy = false;
 
   @override
-  Future<ModelState> build() =>
-      ref.read(modelManagementRepositoryProvider).load();
+  Future<ModelState> build() {
+    // Bound before any await so commands arriving during hydration see it; a
+    // rebuild re-binds the same bridge instance (#88).
+    ref
+        .read(modelSessionBridgeProvider)
+        .bindReflectEngineLoaded(reflectEngineLoaded);
+    return ref.read(modelManagementRepositoryProvider).load();
+  }
 
   /// Re-runs reconciliation and re-attaches to anything the platform is still
   /// transferring. Called at startup once the first state has settled, and on
