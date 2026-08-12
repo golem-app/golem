@@ -12,6 +12,7 @@ import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/retry.dart';
 import '../../../core/repositories/contracts.dart';
 import '../../../core/services/image_intake.dart';
+import '../../models/application/model_providers.dart';
 
 part 'chat_providers.g.dart';
 

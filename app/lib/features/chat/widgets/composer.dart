@@ -12,6 +12,7 @@ import 'attach_sheet.dart';
 import 'model_picker_sheet.dart';
 import '../../../l10n/l10n.dart';
 import '../application/chat_providers.dart';
+import '../../models/application/model_providers.dart';
 
 class Composer extends ConsumerStatefulWidget {
   const Composer({

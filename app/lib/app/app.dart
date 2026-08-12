@@ -25,6 +25,7 @@ import '../features/settings/settings_screen.dart';
 import '../features/settings/storage_screen.dart';
 import '../features/settings/system_prompt_screen.dart';
 import '../features/splash/splash_screen.dart';
+import '../features/models/application/model_providers.dart';
 
 /// Creates the route table for one app identity. Production omits internal
 /// routes entirely rather than relying on a hidden navigation affordance.

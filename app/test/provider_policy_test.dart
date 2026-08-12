@@ -10,6 +10,7 @@ import 'package:golem_flutter/core/providers/retry.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/settings/application/storage_providers.dart';
+import 'package:golem_flutter/features/models/application/model_providers.dart';
 
 /// Every generated provider, so a new annotation missing `retry: noRetry`
 /// fails here instead of silently inheriting the ten-retry default.

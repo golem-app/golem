@@ -16,6 +16,7 @@ import '../legal/ai_disclaimer.dart';
 import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
 import 'application/storage_providers.dart';
+import '../models/application/model_providers.dart';
 
 /// The minimal settings root: model and app rows, the Advanced mode
 /// switch, and About. Everything heavier lives one screen deeper.

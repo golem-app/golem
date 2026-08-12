@@ -19,6 +19,7 @@ import '../../l10n/l10n.dart';
 import '../chat/model_label.dart';
 import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
+import '../models/application/model_providers.dart';
 
 /// Response style: the three presets, and — in Advanced mode — the raw
 /// sampling controls for the active model profile.

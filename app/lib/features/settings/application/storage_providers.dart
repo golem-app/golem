@@ -7,6 +7,7 @@ import '../../../core/repositories/contracts.dart';
 import '../../../core/services/cache_probe.dart';
 import '../../../core/services/device_storage.dart';
 import '../../chat/application/chat_providers.dart';
+import '../../models/application/model_providers.dart';
 
 // The breakdown types stay importable beside the provider that produces them.
 export '../../../core/application/storage_breakdown_service.dart'

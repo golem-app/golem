@@ -15,6 +15,7 @@ import 'widgets/attach_sheet.dart';
 import 'widgets/chat_canvas.dart';
 import 'widgets/conversation_drawer.dart';
 import 'application/chat_providers.dart';
+import '../models/application/model_providers.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({this.picker = const AttachmentPicker(), super.key});

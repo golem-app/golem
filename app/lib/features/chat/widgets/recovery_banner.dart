@@ -4,12 +4,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/domain/app_state.dart';
 import '../../../core/domain/models.dart';
-import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../../onboarding/model_download_consent.dart';
 import '../../../l10n/l10n.dart';
 import 'model_picker_sheet.dart';
 import '../application/chat_providers.dart';
+import '../../models/application/model_providers.dart';
 
 class RecoveryBanner extends ConsumerWidget {
   const RecoveryBanner({required this.failure, super.key});

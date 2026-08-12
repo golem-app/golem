@@ -26,6 +26,7 @@ import '../onboarding/model_download_consent.dart';
 import 'application/custom_repository_workflow.dart';
 import 'widgets/settings_rows.dart';
 import '../chat/application/chat_providers.dart';
+import '../models/application/model_providers.dart';
 
 enum _CatalogTab { all, installed }
 

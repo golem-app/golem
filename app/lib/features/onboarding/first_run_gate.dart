@@ -6,6 +6,7 @@ import '../../core/providers/app_providers.dart';
 import 'domain/onboarding_policy.dart';
 import 'first_run_screen.dart';
 import '../chat/application/chat_providers.dart';
+import '../models/application/model_providers.dart';
 
 class FirstRunGate extends ConsumerStatefulWidget {
   const FirstRunGate({required this.child, super.key});

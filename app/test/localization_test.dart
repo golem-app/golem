@@ -17,6 +17,7 @@ import 'package:golem_flutter/l10n/presentation_messages.dart';
 import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
+import 'package:golem_flutter/features/models/application/model_providers.dart';
 
 void main() {
   test('English and Polish catalogs have identical resources', () {
