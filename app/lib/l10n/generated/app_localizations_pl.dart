@@ -119,6 +119,9 @@ class AppLocalizationsPl extends AppLocalizations {
   String get languagePolish => 'Polski';
 
   @override
+  String get languageArabic => 'العربية';
+
+  @override
   String get languageSystemDetail =>
       'Używaj języka wybranego na tym urządzeniu.';
 

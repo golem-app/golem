@@ -4,6 +4,7 @@ import '../core/domain/model_admission.dart';
 import '../core/domain/model_catalog.dart';
 import '../core/domain/models.dart';
 import '../core/services/repository_resolver.dart';
+import 'bidi.dart';
 import 'generated/app_localizations.dart';
 
 String deviceRefusalMessage(
@@ -21,7 +22,7 @@ String modelAdmissionReason(
   ModelAdmissionOption option,
 ) => switch (option.block) {
   ModelAdmissionBlock.otherEngine => l10n.otherEngineAdmission(
-    option.entry.engine == ModelEngine.mlx ? 'GGUF' : 'MLX',
+    ltrIsolate(option.entry.engine == ModelEngine.mlx ? 'GGUF' : 'MLX'),
   ),
   ModelAdmissionBlock.needsPreferredTier when !option.memoryKnown =>
     l10n.memoryUnreadableLighterModel,
@@ -62,18 +63,18 @@ String artifactFailureMessage(AppLocalizations l10n, ArtifactStatus status) =>
         :final availableBytes?,
       ) =>
         l10n.downloadInsufficientStorage(
-          gigabytes(requiredBytes),
-          gigabytes(availableBytes),
+          ltrIsolate(gigabytes(requiredBytes)),
+          ltrIsolate(gigabytes(availableBytes)),
         ),
       ArtifactFailure(
         kind: ArtifactFailureKind.hashVerification,
         :final fileName?,
       ) =>
-        l10n.downloadHashVerificationFailed(fileName),
+        l10n.downloadHashVerificationFailed(ltrIsolate(fileName)),
       ArtifactFailure(
         kind: ArtifactFailureKind.unexpectedSize,
         :final fileName?,
       ) =>
-        l10n.downloadUnexpectedFileSize(fileName),
+        l10n.downloadUnexpectedFileSize(ltrIsolate(fileName)),
       _ => l10n.downloadFailed,
     };

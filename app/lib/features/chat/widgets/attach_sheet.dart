@@ -175,7 +175,7 @@ class _AttachRow extends StatelessWidget {
         key: rowKey,
         padding: EdgeInsets.zero,
         minimumSize: const Size.fromHeight(GolemSize.hitTarget),
-        alignment: Alignment.centerLeft,
+        alignment: AlignmentDirectional.centerStart,
         onPressed: enabled ? () => Navigator.pop(context, source) : null,
         child: Opacity(
           opacity: enabled ? 1 : 0.45,

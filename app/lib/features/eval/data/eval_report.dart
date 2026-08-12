@@ -127,6 +127,7 @@ final class EvalRunReport {
   const EvalRunReport({
     required this.createdAt,
     required this.host,
+    required this.suite,
     required this.profile,
     required this.results,
     required this.artifacts,
@@ -134,6 +135,7 @@ final class EvalRunReport {
 
   final DateTime createdAt;
   final String host;
+  final String suite;
 
   /// The run's template profile — an experimental variable, since mode-specific
   /// sampling alone swings a run between an answer and a budget-exhausted think
@@ -156,6 +158,7 @@ final class EvalRunReport {
   Map<String, Object?> toJson() => {
     'createdAt': createdAt.toIso8601String(),
     'host': host,
+    'suite': suite,
     'profile': {
       'key': profile.key,
       'stopSequences': profile.stopSequences,
@@ -238,6 +241,7 @@ final class EvalRunReport {
       )
       ..writeln()
       ..writeln('- Host: $host')
+      ..writeln('- Suite: `$suite`')
       ..writeln(
         '- Template profile: `${profile.key}` — '
         'thinking ${_sampling(profile.sampling(reasoningEnabled: true))}, '

@@ -72,6 +72,8 @@
   "@languageEnglish": {"description": "English language endonym."},
   "languagePolish": "Polski",
   "@languagePolish": {"description": "Polish language endonym."},
+  "languageArabic": "العربية",
+  "@languageArabic": {"description": "Arabic language endonym."},
   "languageSystemDetail": "Use the language selected for this device.",
   "@languageSystemDetail": {"description": "System-language choice explanation."},
   "languageSaveFailed": "The language could not be saved. Your previous choice was restored.",

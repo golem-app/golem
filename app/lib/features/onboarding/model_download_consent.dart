@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../../core/chrome/golem_alert.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/byte_format.dart';
+import '../../l10n/bidi.dart';
 import '../../l10n/l10n.dart';
 
 /// Kept as a name the onboarding copy reads well with; the formatting itself
@@ -27,12 +28,12 @@ Future<bool> confirmModelDownload({
         : context.l10n.downloadModelTitle,
     message: simulated
         ? context.l10n.simulateDownloadMessage(
-            entry.displayName,
-            formatModelBytes(entry.totalBytes),
+            ltrIsolate(entry.displayName),
+            ltrIsolate(formatModelBytes(entry.totalBytes)),
           )
         : context.l10n.downloadModelMessage(
-            entry.displayName,
-            formatModelBytes(entry.totalBytes),
+            ltrIsolate(entry.displayName),
+            ltrIsolate(formatModelBytes(entry.totalBytes)),
           ),
     actions: [
       GolemAlertAction(

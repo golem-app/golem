@@ -131,7 +131,7 @@ final class _ModelPickerContent extends ConsumerWidget {
               key: const Key('model-picker-manage'),
               padding: EdgeInsets.zero,
               minimumSize: const Size.fromHeight(GolemSize.hitTarget),
-              alignment: Alignment.centerLeft,
+              alignment: AlignmentDirectional.centerStart,
               onPressed: () {
                 Navigator.pop(context);
                 context.push('/settings');

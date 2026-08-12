@@ -531,6 +531,7 @@ class _CustomRepositoryCard extends ConsumerWidget {
   }) => CupertinoTextField(
     key: key,
     controller: controller,
+    textDirection: TextDirection.ltr,
     placeholder: placeholder,
     autocorrect: false,
     enableSuggestions: false,

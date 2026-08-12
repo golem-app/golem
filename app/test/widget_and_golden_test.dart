@@ -54,6 +54,42 @@ Future<List<OpenSourceLicense>> _goldenLicenses() async => [
   ),
 ];
 
+ChatHistorySnapshot _arabicMixedHistory() {
+  final conversation = ChatConversation(
+    id: 'arabic-chat',
+    title: 'مشروع API محلي',
+    updatedAt: DateTime.utc(2026, 8, 12),
+    messages: [
+      ChatMessage.text(
+        id: 'arabic-user',
+        role: MessageRole.user,
+        text: 'اشرح طريقة قراءة ملف config.json بأمان.',
+        createdAt: DateTime.utc(2026, 8, 12),
+      ),
+      ChatMessage.text(
+        id: 'arabic-assistant',
+        role: MessageRole.assistant,
+        text:
+            'اقرأ الملف محليًا وتحقق من القيم قبل استخدامها.\n\n'
+            '```dart\nfinal file = File("config.json");\n```\n\n'
+            '- احتفظ بالمسار `config.json` كما هو.\n'
+            '- لا تعرض API_KEY في السجل.',
+        metrics: const InferenceMetrics(
+          promptTokensPerSecond: 92,
+          decodeTokensPerSecond: 18.4,
+          tokenCount: 64,
+          elapsedSeconds: 3.5,
+        ),
+        createdAt: DateTime.utc(2026, 8, 12),
+      ),
+    ],
+  );
+  return ChatHistorySnapshot(
+    conversations: [conversation],
+    activeId: conversation.id,
+  );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -422,6 +458,78 @@ void main() {
     activeArtifactKey: 'gemma4-mlx',
     simulated: true,
   );
+
+  testWidgets('Arabic mixed chat light golden', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      locale: const Locale('ar'),
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(language: AppLanguage.arabic),
+      ),
+      history: _arabicMixedHistory(),
+      child: const ChatScreen(),
+    );
+    await expectLater(
+      find.byType(ChatScreen),
+      matchesGoldenFile('goldens/arabic-mixed-chat-light${chromeSuffix()}.png'),
+    );
+  }, variant: bothChromes);
+
+  testWidgets('Arabic drawer dark golden', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      brightness: Brightness.dark,
+      locale: const Locale('ar'),
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(language: AppLanguage.arabic),
+      ),
+      history: _arabicMixedHistory(),
+      child: const ChatScreen(),
+    );
+    await tester.tap(find.byKey(const Key('open-drawer')));
+    await tester.pumpAndSettle();
+    await expectLater(
+      find.byType(ChatScreen),
+      matchesGoldenFile('goldens/arabic-drawer-dark${chromeSuffix()}.png'),
+    );
+  }, variant: bothChromes);
+
+  testWidgets('Arabic settings light golden', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      locale: const Locale('ar'),
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(language: AppLanguage.arabic),
+      ),
+      child: const SettingsScreen(identity: AppIdentity.qa),
+    );
+    await expectLater(
+      find.byType(SettingsScreen),
+      matchesGoldenFile('goldens/arabic-settings-light${chromeSuffix()}.png'),
+    );
+  }, variant: bothChromes);
+
+  testWidgets('Arabic model recovery picker dark golden', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      brightness: Brightness.dark,
+      locale: const Locale('ar'),
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(language: AppLanguage.arabic),
+      ),
+      history: _arabicMixedHistory(),
+      model: pickerSeed,
+      child: const ChatScreen(),
+    );
+    await tester.tap(find.byKey(const Key('composer-model-chip')));
+    await tester.pumpAndSettle();
+    await expectLater(
+      find.byKey(const Key('model-picker-sheet')),
+      matchesGoldenFile(
+        'goldens/arabic-model-picker-dark${chromeSuffix()}.png',
+      ),
+    );
+  }, variant: bothChromes);
 
   Future<void> revealIn(WidgetTester tester, Key listKey, Key target) async {
     await tester.scrollUntilVisible(

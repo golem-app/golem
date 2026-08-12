@@ -17,6 +17,7 @@ const _combo = EvalCombo(
 EvalRunReport _fixtureReport() => EvalRunReport(
   createdAt: DateTime.utc(2026, 8, 5, 12),
   host: 'macOS test-host',
+  suite: 'default',
   profile: const Gemma4Profile(),
   results: [
     EvalComboResult(
@@ -80,6 +81,7 @@ void main() {
     );
 
     expect(json['enginePins'], containsPair('llamaCppRelease', 'b10241'));
+    expect(json['suite'], 'default');
     final result = (json['results']! as List).single as Map;
     expect(result['passed'], isFalse);
     final prompts = result['prompts']! as List;
@@ -98,6 +100,7 @@ void main() {
     final markdown = _fixtureReport().renderMarkdown();
     expect(markdown, contains('# Golem model evaluation — 2026-08-05'));
     expect(markdown, contains('## model.gguf · llamaCpp'));
+    expect(markdown, contains('- Suite: `default`'));
     expect(markdown, contains('- Profile: `gemma4`'));
     expect(markdown, contains('llama.cpp b10241'));
     expect(markdown, contains('unsloth/gemma-4-E2B-it-qat-GGUF @ 66a399f6'));
@@ -113,6 +116,7 @@ void main() {
     final report = EvalRunReport(
       createdAt: DateTime.utc(2026, 8, 5, 12),
       host: 'android test-host',
+      suite: 'arabic-smoke',
       profile: const Gemma4Profile(),
       results: [
         EvalComboResult(

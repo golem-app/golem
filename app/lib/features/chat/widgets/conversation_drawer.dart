@@ -14,6 +14,7 @@ import '../../../core/domain/byte_format.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
+import '../../../l10n/bidi.dart';
 import '../../../l10n/l10n.dart';
 import '../../models/application/model_providers.dart';
 import '../../settings/application/storage_providers.dart';
@@ -286,8 +287,8 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
       child: Stack(
         children: [
           if (selected)
-            Positioned(
-              left: 0,
+            PositionedDirectional(
+              start: 0,
               top: 8,
               bottom: 8,
               child: Container(
@@ -303,9 +304,9 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
               Expanded(
                 child: CupertinoButton(
                   key: Key('conversation-${item.id}'),
-                  padding: const EdgeInsets.only(left: 20, right: 4),
+                  padding: const EdgeInsetsDirectional.only(start: 20, end: 4),
                   minimumSize: const Size.fromHeight(52),
-                  alignment: Alignment.centerLeft,
+                  alignment: AlignmentDirectional.centerStart,
                   onPressed: widget.blocked
                       ? null
                       : () {
@@ -316,6 +317,12 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                         },
                   child: Text(
                     item.title.isEmpty ? context.l10n.newChat : item.title,
+                    textDirection: item.title.isEmpty
+                        ? Directionality.of(context)
+                        : contentTextDirection(
+                            item.title,
+                            fallback: Directionality.of(context),
+                          ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -429,19 +436,26 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
             children: [
               Text(context.l10n.renameChat, style: GolemText.cardTitle),
               const SizedBox(height: 16),
-              CupertinoTextField(
-                key: const Key('rename-field'),
-                controller: controller,
-                placeholder: context.l10n.newChat,
-                autofocus: true,
-                maxLength: 80,
-                clearButtonMode: OverlayVisibilityMode.editing,
-                padding: const EdgeInsets.all(14),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: controller,
+                builder: (context, value, _) => CupertinoTextField(
+                  key: const Key('rename-field'),
+                  controller: controller,
+                  textDirection: contentTextDirection(
+                    value.text,
+                    fallback: Directionality.of(context),
+                  ),
+                  placeholder: context.l10n.newChat,
+                  autofocus: true,
+                  maxLength: 80,
+                  clearButtonMode: OverlayVisibilityMode.editing,
+                  padding: const EdgeInsets.all(14),
+                ),
               ),
               Padding(
-                padding: const EdgeInsets.only(top: 8, right: 2),
+                padding: const EdgeInsetsDirectional.only(top: 8, end: 2),
                 child: Align(
-                  alignment: Alignment.centerRight,
+                  alignment: AlignmentDirectional.centerEnd,
                   child: ValueListenableBuilder(
                     valueListenable: controller,
                     builder: (context, value, _) => Text(
@@ -546,7 +560,7 @@ final class _StorageMeter extends ConsumerWidget {
                     gigabytes(overview.usedBytes),
                     gigabytes(total),
                   ),
-                  textAlign: TextAlign.right,
+                  textAlign: TextAlign.end,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GolemText.caption.copyWith(color: muted),
@@ -577,7 +591,7 @@ final class _StorageMeter extends ConsumerWidget {
                     child: FractionallySizedBox(
                       // Left-anchored: the default centers the fill, which
                       // would float it in the middle of the track.
-                      alignment: Alignment.centerLeft,
+                      alignment: AlignmentDirectional.centerStart,
                       widthFactor: (overview.usedBytes / total).clamp(0.0, 1.0),
                       child: ColoredBox(
                         color: CupertinoDynamicColor.resolve(

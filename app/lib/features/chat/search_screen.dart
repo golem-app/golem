@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme/golem_theme.dart';
+import '../../l10n/bidi.dart';
 import '../../l10n/l10n.dart';
 import 'application/chat_providers.dart';
 import 'application/search_providers.dart';
@@ -82,7 +83,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(
+              padding: const EdgeInsetsDirectional.fromSTEB(
                 GolemSpace.gutter,
                 GolemSpace.s2,
                 GolemSpace.s2,
@@ -91,13 +92,44 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: CupertinoSearchTextField(
-                      key: const Key('search-field'),
-                      controller: _controller,
-                      autofocus: true,
-                      placeholder: context.l10n.searchChats,
-                      onChanged: _onChanged,
-                      onSubmitted: (text) => _query.publish(text),
+                    child: ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _controller,
+                      builder: (context, value, _) => CupertinoTextField(
+                        key: const Key('search-field'),
+                        controller: _controller,
+                        textDirection: contentTextDirection(
+                          value.text,
+                          fallback: Directionality.of(context),
+                        ),
+                        autofocus: true,
+                        placeholder: context.l10n.searchChats,
+                        textInputAction: TextInputAction.search,
+                        padding: const EdgeInsetsDirectional.fromSTEB(
+                          5.5,
+                          8,
+                          5.5,
+                          8,
+                        ),
+                        prefix: const Padding(
+                          padding: EdgeInsetsDirectional.fromSTEB(6, 8, 0, 8),
+                          child: Icon(
+                            CupertinoIcons.search,
+                            key: Key('search-prefix'),
+                            size: 20,
+                            color: CupertinoColors.secondaryLabel,
+                          ),
+                        ),
+                        clearButtonMode: OverlayVisibilityMode.editing,
+                        clearButtonSemanticLabel: CupertinoLocalizations.of(
+                          context,
+                        ).clearButtonLabel,
+                        decoration: BoxDecoration(
+                          color: CupertinoColors.tertiarySystemFill,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        onChanged: _onChanged,
+                        onSubmitted: (text) => _query.publish(text),
+                      ),
                     ),
                   ),
                   CupertinoButton(
@@ -148,8 +180,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       ),
                       children: [
                         Padding(
-                          padding: const EdgeInsets.only(
-                            left: 2,
+                          padding: const EdgeInsetsDirectional.only(
+                            start: 2,
                             bottom: GolemSpace.s2,
                           ),
                           child: Text(
@@ -227,6 +259,10 @@ final class _ResultCard extends StatelessWidget {
           children: [
             Text(
               result.title,
+              textDirection: contentTextDirection(
+                result.title,
+                fallback: Directionality.of(context),
+              ),
               style: GolemText.bodyStrong.copyWith(
                 color: CupertinoDynamicColor.resolve(GolemTheme.ink, context),
               ),
@@ -267,6 +303,10 @@ final class _ResultCard extends StatelessWidget {
                     )
                   : TextSpan(text: result.snippet),
               style: GolemText.footnote.copyWith(color: muted),
+              textDirection: contentTextDirection(
+                result.snippet,
+                fallback: Directionality.of(context),
+              ),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
             ),

@@ -71,6 +71,8 @@ final class EvalPrompt {
 /// `docs/notes/determinism-probe.md` (recorded: `d710455907eadf55` on both
 /// engines at seed 7).
 const evalAnchorPromptId = 'anchor-jupiter';
+const defaultEvalSuite = 'default';
+const arabicSmokeEvalSuite = 'arabic-smoke';
 
 const defaultEvalPrompts = <EvalPrompt>[
   EvalPrompt(
@@ -189,3 +191,45 @@ const defaultEvalPrompts = <EvalPrompt>[
     ],
   ),
 ];
+
+/// Bounded Modern Standard Arabic smoke coverage. This checks that each
+/// shipping model family can understand and answer two simple Arabic prompts;
+/// it does not claim quality for regional spoken dialects.
+const arabicSmokeEvalPrompts = <EvalPrompt>[
+  EvalPrompt(
+    id: 'arabic-largest-planet',
+    messages: [
+      {
+        'role': 'user',
+        'content': 'ما أكبر كوكب في المجموعة الشمسية؟ أجب بجملة عربية قصيرة.',
+      },
+    ],
+    checks: [
+      EvalCheck.contains('المشتري'),
+      EvalCheck.regexp(r'[\u0600-\u06ff]'),
+    ],
+  ),
+  EvalPrompt(
+    id: 'arabic-arithmetic-17x23',
+    messages: [
+      {
+        'role': 'user',
+        'content': 'ما حاصل ضرب 17 في 23؟ أجب بجملة عربية قصيرة تتضمن النتيجة.',
+      },
+    ],
+    checks: [
+      EvalCheck.regexp(r'(391|٣٩١)'),
+      EvalCheck.regexp(r'[\u0600-\u06ff]'),
+    ],
+  ),
+];
+
+List<EvalPrompt> evalPromptsForSuite(String suite) => switch (suite) {
+  defaultEvalSuite => defaultEvalPrompts,
+  arabicSmokeEvalSuite => arabicSmokeEvalPrompts,
+  _ => throw ArgumentError.value(
+    suite,
+    'suite',
+    'Expected $defaultEvalSuite or $arabicSmokeEvalSuite',
+  ),
+};

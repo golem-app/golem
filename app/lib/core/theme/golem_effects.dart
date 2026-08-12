@@ -68,8 +68,15 @@ abstract final class GolemShadow {
   /// The conversation drawer, cast sideways onto the scrimmed chat. Navy
   /// like the other overlay shadows rather than the flat black it replaced,
   /// which smeared grey over the light drawer's rounded edge.
-  static const drawer = [
-    BoxShadow(color: Color(0x38060D1F), blurRadius: 40, offset: Offset(12, 0)),
+  static List<BoxShadow> drawer(BuildContext context) => [
+    BoxShadow(
+      color: const Color(0x38060D1F),
+      blurRadius: 40,
+      offset: Offset(
+        Directionality.of(context) == TextDirection.rtl ? -12 : 12,
+        0,
+      ),
+    ),
   ];
 }
 

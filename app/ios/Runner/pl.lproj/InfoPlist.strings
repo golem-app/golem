@@ -1,0 +1,2 @@
+"NSCameraUsageDescription" = "Golem używa aparatu tylko wtedy, gdy robisz zdjęcie, aby załączyć je do czatu. Zdjęcia pozostają na tym urządzeniu.";
+"NSPhotoLibraryUsageDescription" = "Golem odczytuje zdjęcie tylko wtedy, gdy załączasz je do czatu. Zdjęcia pozostają na tym urządzeniu.";

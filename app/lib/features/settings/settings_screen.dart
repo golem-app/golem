@@ -288,6 +288,7 @@ String _languageLabel(AppLanguage language, AppLocalizations l10n) =>
       AppLanguage.system => l10n.languageSystem,
       AppLanguage.english => l10n.languageEnglish,
       AppLanguage.polish => l10n.languagePolish,
+      AppLanguage.arabic => l10n.languageArabic,
     };
 
 /// The honesty banner qa builds show at the top of settings.

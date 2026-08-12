@@ -1,5 +1,11 @@
 import 'package:flutter/cupertino.dart';
 
+abstract final class GolemFont {
+  /// Script coverage behind the explicit Apple faces. The active platform
+  /// picks the first installed family; Latin glyphs continue to use SF Pro.
+  static const fallbacks = ['SF Arabic', 'Geeza Pro', 'Noto Sans Arabic'];
+}
+
 /// The Golem Navy type ramp. Styles are partial (they merge over the
 /// ambient `DefaultTextStyle`, which carries the ink color from the
 /// theme) so call sites keep resolving color exactly as before.
@@ -9,6 +15,7 @@ abstract final class GolemText {
   /// Splash wordmark.
   static const hero = TextStyle(
     fontFamily: _display,
+    fontFamilyFallback: GolemFont.fallbacks,
     fontSize: 34,
     fontWeight: FontWeight.w700,
     height: 1.2,
@@ -18,6 +25,7 @@ abstract final class GolemText {
   /// Empty-state headline, settings section headers.
   static const display = TextStyle(
     fontFamily: _display,
+    fontFamilyFallback: GolemFont.fallbacks,
     fontSize: 28,
     fontWeight: FontWeight.w700,
     height: 1.25,

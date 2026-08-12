@@ -101,9 +101,9 @@ class ChatCanvas extends ConsumerWidget {
               // A stale flag from a previous conversation must not leave a
               // dead control with no tail to jump to.
               if (showJump && hasMessages)
-                Positioned(
+                PositionedDirectional(
                   bottom: 10,
-                  right: 18,
+                  end: 18,
                   child: Semantics(
                     button: true,
                     label: context.l10n.jumpToLatest,

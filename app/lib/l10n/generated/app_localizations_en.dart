@@ -119,6 +119,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languagePolish => 'Polski';
 
   @override
+  String get languageArabic => 'العربية';
+
+  @override
   String get languageSystemDetail =>
       'Use the language selected for this device.';
 

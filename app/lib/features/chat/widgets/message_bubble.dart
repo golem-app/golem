@@ -12,6 +12,7 @@ import '../../../core/chrome/golem_toast.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
+import '../../../l10n/bidi.dart';
 import '../../../l10n/l10n.dart';
 import '../../settings/application/preferences_providers.dart';
 import '../application/chat_providers.dart';
@@ -110,6 +111,10 @@ class MessageBubble extends ConsumerWidget {
             if (isUser && message.text.isNotEmpty)
               Text(
                 message.text,
+                textDirection: contentTextDirection(
+                  message.text,
+                  fallback: Directionality.of(context),
+                ),
                 style: GolemText.body.copyWith(color: GolemTheme.textOnDark),
               )
             else if (!isUser &&
@@ -166,7 +171,9 @@ class MessageBubble extends ConsumerWidget {
               : CrossAxisAlignment.start,
           children: [
             Align(
-              alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+              alignment: isUser
+                  ? AlignmentDirectional.centerEnd
+                  : AlignmentDirectional.centerStart,
               child: bubble,
             ),
             if (!isUser && idle && hasContent) _actionRow(context, ref),
@@ -358,11 +365,18 @@ class MessageBubble extends ConsumerWidget {
       title: context.l10n.editMessage,
       content: Padding(
         padding: const EdgeInsets.only(top: 12),
-        child: CupertinoTextField(
-          key: const Key('edit-message-field'),
-          controller: controller,
-          minLines: 2,
-          maxLines: 5,
+        child: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: controller,
+          builder: (context, value, _) => CupertinoTextField(
+            key: const Key('edit-message-field'),
+            controller: controller,
+            textDirection: contentTextDirection(
+              value.text,
+              fallback: Directionality.of(context),
+            ),
+            minLines: 2,
+            maxLines: 5,
+          ),
         ),
       ),
       actions: [
@@ -502,7 +516,14 @@ class _ReasoningCardState extends State<_ReasoningCard> {
           ),
           if (_expanded) ...[
             const SizedBox(height: 8),
-            Text(widget.text, style: GolemText.footnote),
+            Text(
+              widget.text,
+              textDirection: contentTextDirection(
+                widget.text,
+                fallback: Directionality.of(context),
+              ),
+              style: GolemText.footnote,
+            ),
           ],
         ],
       ),

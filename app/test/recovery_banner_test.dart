@@ -78,7 +78,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Download Test Model (2.6 GB)'), findsOneWidget);
+    expect(
+      find.text('Download \u2066Test Model\u2069 (\u20662.6 GB\u2069)'),
+      findsOneWidget,
+    );
 
     // The tap starts the simulated download and lands on Settings, where
     // the model card owns progress.

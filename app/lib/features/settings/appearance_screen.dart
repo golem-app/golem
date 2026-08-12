@@ -174,7 +174,7 @@ class _TextSizeCardState extends State<_TextSizeCard> {
               // the slider below announces the setting itself.
               ExcludeSemantics(
                 child: Align(
-                  alignment: Alignment.centerLeft,
+                  alignment: AlignmentDirectional.centerStart,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: CupertinoDynamicColor.resolve(

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/chrome/golem_button.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/theme/golem_theme.dart';
+import '../../l10n/bidi.dart';
 import '../../l10n/l10n.dart';
 import 'application/preferences_providers.dart';
 import 'save_feedback.dart';
@@ -95,26 +96,33 @@ class _SystemPromptScreenState extends ConsumerState<SystemPromptScreen> {
                   ),
                 ),
               ),
-              CupertinoTextField(
-                key: const Key('system-prompt-field'),
-                controller: _controller,
-                maxLines: 8,
-                minLines: 5,
-                placeholder: context.l10n.systemPromptExample,
-                padding: const EdgeInsets.all(14),
-                style: GolemText.body,
-                decoration: BoxDecoration(
-                  color: CupertinoDynamicColor.resolve(
-                    GolemTheme.surface,
-                    context,
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _controller,
+                builder: (context, value, _) => CupertinoTextField(
+                  key: const Key('system-prompt-field'),
+                  controller: _controller,
+                  textDirection: contentTextDirection(
+                    value.text,
+                    fallback: Directionality.of(context),
                   ),
-                  border: Border.all(
+                  maxLines: 8,
+                  minLines: 5,
+                  placeholder: context.l10n.systemPromptExample,
+                  padding: const EdgeInsets.all(14),
+                  style: GolemText.body,
+                  decoration: BoxDecoration(
                     color: CupertinoDynamicColor.resolve(
-                      GolemTheme.borderStrong,
+                      GolemTheme.surface,
                       context,
                     ),
+                    border: Border.all(
+                      color: CupertinoDynamicColor.resolve(
+                        GolemTheme.borderStrong,
+                        context,
+                      ),
+                    ),
+                    borderRadius: BorderRadius.circular(GolemRadius.field),
                   ),
-                  borderRadius: BorderRadius.circular(GolemRadius.field),
                 ),
               ),
               const SizedBox(height: 16),

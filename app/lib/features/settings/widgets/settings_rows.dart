@@ -94,7 +94,7 @@ class SettingsNavRow extends StatelessWidget {
           if (onTap != null && !destructive) ...[
             const SizedBox(width: 6),
             Icon(
-              CupertinoIcons.chevron_forward,
+              CupertinoIcons.forward,
               size: 18,
               color: CupertinoDynamicColor.resolve(
                 GolemTheme.tertiaryInk,

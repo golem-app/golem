@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/domain/app_state.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/theme/golem_theme.dart';
+import '../../../l10n/bidi.dart';
 import '../../../l10n/l10n.dart';
 import '../../models/application/model_providers.dart';
 import '../../onboarding/model_download_consent.dart';
@@ -200,7 +201,10 @@ class _DownloadActiveModelButton extends ConsumerWidget {
           context.push('/settings/models');
         },
         child: Text(
-          context.l10n.downloadNamedModel(entry.displayName, '$gigabytes GB'),
+          context.l10n.downloadNamedModel(
+            ltrIsolate(entry.displayName),
+            ltrIsolate('$gigabytes GB'),
+          ),
           style: const TextStyle(color: CupertinoColors.white, fontSize: 14),
         ),
       ),
