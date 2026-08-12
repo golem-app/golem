@@ -7,16 +7,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
-import 'package:golem_flutter/features/chat/chat_screen.dart';
-
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/services/image_intake.dart';
+import 'package:golem_flutter/features/chat/application/chat_providers.dart';
+import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/widgets/attach_sheet.dart';
 import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
-
-import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
+
 import 'support/harness.dart';
 import 'support/in_memory_attachment_repository.dart';
 

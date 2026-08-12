@@ -1,9 +1,6 @@
 import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart'
     show ProviderListenableSelect;
-import 'package:riverpod_annotation/riverpod_annotation.dart';
-
 import '../../../core/domain/app_preferences.dart';
 import '../../../core/domain/equality.dart';
 import '../../../core/domain/model_activation.dart' as domain;
@@ -12,6 +9,7 @@ import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/retry.dart';
 import '../../settings/application/preferences_providers.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'model_providers.g.dart';
 

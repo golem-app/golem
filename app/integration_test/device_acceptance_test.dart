@@ -7,15 +7,14 @@ import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/services/image_intake.dart';
+import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/widgets/attach_sheet.dart';
+import 'package:golem_flutter/features/models/application/model_providers.dart';
+import 'package:golem_flutter/main.dart' as app;
 import 'package:image/image.dart' as img;
 import 'package:integration_test/integration_test.dart';
 
-import 'package:golem_flutter/main.dart' as app;
-
-import 'package:golem_flutter/features/chat/application/chat_providers.dart';
-import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'support/acceptance_hud.dart';
 
 /// The real-model chat acceptance for one device/engine cell (#20).

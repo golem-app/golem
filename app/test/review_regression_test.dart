@@ -15,10 +15,10 @@ import 'package:golem_flutter/core/repositories/file_chat_history_repository.dar
 import 'package:golem_flutter/core/repositories/file_settings_repository.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
-
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/splash/application/startup_providers.dart';
+
 import 'support/in_memory_chat_history_repository.dart';
 
 Future<String> _fixtureAsset(String key) async =>

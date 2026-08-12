@@ -24,6 +24,7 @@ import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
 import 'package:golem_flutter/features/settings/application/settings_providers.dart';
 import 'package:golem_flutter/features/settings/application/storage_providers.dart';
+
 import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
 import 'support/in_memory_settings_repository.dart';

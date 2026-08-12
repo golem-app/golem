@@ -6,16 +6,15 @@ import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/services/image_intake.dart';
 import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
+import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/widgets/attach_sheet.dart';
-import 'package:integration_test/integration_test.dart';
-
-import 'package:golem_flutter/main.dart' as app;
-
-import '../test/support/image_fixtures.dart';
-import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
+import 'package:golem_flutter/main.dart' as app;
+import 'package:integration_test/integration_test.dart';
+
+import '../test/support/image_fixtures.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
