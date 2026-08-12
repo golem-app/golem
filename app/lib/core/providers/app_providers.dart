@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart'
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../app_identity.dart';
+import '../application/session_bridges.dart';
 import '../application/storage_breakdown_service.dart';
 import '../domain/app_preferences.dart';
 import '../domain/app_state.dart';
@@ -160,6 +161,13 @@ String? residentModelKey(Ref ref) {
   ref.onDispose(() => listenable.removeListener(onChange));
   return listenable.value;
 }
+
+/// The chat session's capabilities offered across feature boundaries (#88):
+/// ChatController binds itself in during `build()`, and the model feature
+/// reads session facts here instead of the chat provider.
+/// KeepAlive: the binding must outlive route transitions, like its owner.
+@Riverpod(keepAlive: true, retry: noRetry)
+ChatSessionBridge chatSessionBridge(Ref ref) => ChatSessionBridge();
 
 @Riverpod(keepAlive: true, retry: noRetry)
 DiskCapacityProbe deviceCapacityProbe(Ref ref) =>
@@ -524,6 +532,14 @@ class ChatController extends _$ChatController {
       _generationEpoch++;
       _persistenceEpoch++;
     });
+    // Bound before the first await so commands arriving during hydration see
+    // it; a rebuild re-binds the same bridge instance (#88).
+    ref.read(chatSessionBridgeProvider).bindSessionFacts(
+      activeModelKey: () => state.value?.active?.modelKey,
+      generationActive: () =>
+          (state.value?.generation ?? GenerationPhase.idle) !=
+          GenerationPhase.idle,
+    );
     final snapshot = await ref.read(chatHistoryRepositoryProvider).load();
     await _retainReferenced(_attachments, snapshot.conversations);
     return ChatState(
@@ -1609,8 +1625,7 @@ class ModelController extends _$ModelController {
     if (_engineBusy) return;
     final current = state.value;
     if (current == null) return;
-    final chat = ref.read(chatControllerProvider).value;
-    if (chat != null && chat.generation != GenerationPhase.idle) return;
+    if (ref.read(chatSessionBridgeProvider).generationActive()) return;
     // Its own guard: backgrounding and memory pressure can both fire, and this
     // still must not unload twice.
     if (_releasing) return;
@@ -1641,8 +1656,8 @@ class ModelController extends _$ModelController {
   String? _engineTargetKey() {
     final backend = ref.read(inferenceBackendProvider);
     if (backend.sideloaded) return null;
-    final active = ref.read(chatControllerProvider).value?.active;
-    return active?.modelKey ?? state.value?.activeArtifactKey;
+    final chatModelKey = ref.read(chatSessionBridgeProvider).activeModelKey();
+    return chatModelKey ?? state.value?.activeArtifactKey;
   }
 
   /// The load-refusal copy for a not-installed target. Owned here since #42:

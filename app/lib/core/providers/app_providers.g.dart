@@ -783,6 +783,67 @@ final class ResidentModelKeyProvider
 
 String _$residentModelKeyHash() => r'a0072e8c58064797a9c045af4114c54a7db92439';
 
+/// The chat session's capabilities offered across feature boundaries (#88):
+/// ChatController binds itself in during `build()`, and the model feature
+/// reads session facts here instead of the chat provider.
+/// KeepAlive: the binding must outlive route transitions, like its owner.
+
+@ProviderFor(chatSessionBridge)
+final chatSessionBridgeProvider = ChatSessionBridgeProvider._();
+
+/// The chat session's capabilities offered across feature boundaries (#88):
+/// ChatController binds itself in during `build()`, and the model feature
+/// reads session facts here instead of the chat provider.
+/// KeepAlive: the binding must outlive route transitions, like its owner.
+
+final class ChatSessionBridgeProvider
+    extends
+        $FunctionalProvider<
+          ChatSessionBridge,
+          ChatSessionBridge,
+          ChatSessionBridge
+        >
+    with $Provider<ChatSessionBridge> {
+  /// The chat session's capabilities offered across feature boundaries (#88):
+  /// ChatController binds itself in during `build()`, and the model feature
+  /// reads session facts here instead of the chat provider.
+  /// KeepAlive: the binding must outlive route transitions, like its owner.
+  ChatSessionBridgeProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: noRetry,
+        name: r'chatSessionBridgeProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatSessionBridgeHash();
+
+  @$internal
+  @override
+  $ProviderElement<ChatSessionBridge> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ChatSessionBridge create(Ref ref) {
+    return chatSessionBridge(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ChatSessionBridge value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ChatSessionBridge>(value),
+    );
+  }
+}
+
+String _$chatSessionBridgeHash() => r'1efa00b8214e652cbecedb0c3cda09762f5614bd';
+
 @ProviderFor(deviceCapacityProbe)
 final deviceCapacityProbeProvider = DeviceCapacityProbeProvider._();
 
@@ -1086,7 +1147,7 @@ final class EffectiveModelCatalogProvider
 }
 
 String _$effectiveModelCatalogHash() =>
-    r'd30df0161aff1d214c0d08f6e8533f60197f5df3';
+    r'aa68c62ef5cceb4bef133c12bd8a560a65a1477d';
 
 /// The models a per-chat selection may name: installed, and of the engine this
 /// build composed. Derived here so chat, Settings, and Storage cannot disagree
@@ -1212,7 +1273,7 @@ final class DownloadableModelKeysProvider
 }
 
 String _$downloadableModelKeysHash() =>
-    r'08c575b7815a7c2c62e015f7010cfe2684b36bb9';
+    r'f9cd2176ddd9c2ba36232444c34b2f369499f5d2';
 
 /// Only user-set values are stored; profile defaults resolve at the consumer.
 /// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
@@ -1315,7 +1376,7 @@ final class PreferencesControllerProvider
 }
 
 String _$preferencesControllerHash() =>
-    r'8ee5e0844427c186848f2e691283dccc502263d9';
+    r'991b3ff38def394669a0cd48fb37a7555d202fd9';
 
 /// Persisted app-wide preferences. Every command follows the settings idiom —
 /// drop taps that land in the cold-start load window, publish, then save —
@@ -1372,7 +1433,7 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'e27f0def29ce0562da3716be17043cd808d8bdce';
+String _$chatControllerHash() => r'86901554928cad3b2083b90d82c48e54c1dfa8f0';
 
 /// KeepAlive: the chat session aggregate — in-flight generation and unsaved
 /// turns must survive every route transition.
@@ -1429,7 +1490,7 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'c762b14f89332a86f58f0ab6f7ef900a870c592a';
+String _$modelControllerHash() => r'15ddd7709b7bd6b1ff494b1dad821270ea4a020a';
 
 /// KeepAlive: a command controller whose downloads, busy guard, and epochs
 /// must survive leaving the Models screen (§3.4 — an autoDispose command
@@ -1490,7 +1551,7 @@ final class StartupControllerProvider
   StartupController create() => StartupController();
 }
 
-String _$startupControllerHash() => r'd4a2a4151c2a95fb1f9bd58bfee3cdd02463a04d';
+String _$startupControllerHash() => r'08284a007c45251308e5f2fc134927daf7eefd00';
 
 /// KeepAlive: the startup outcome is process-lifetime. This is the scripted
 /// splash theatre (minimum hold, progress ticks, injected demo scenarios);

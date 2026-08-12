@@ -42,7 +42,7 @@ final class FirstRunControllerProvider
 }
 
 String _$firstRunControllerHash() =>
-    r'47c89c1f62683e5e098d24564bd696625e42921e';
+    r'414c797277939d3c9317511c944b21d68391bdef';
 
 abstract class _$FirstRunController extends $Notifier<FirstRunState> {
   FirstRunState build();
