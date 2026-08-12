@@ -3,8 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
-import 'package:golem_flutter/core/providers/app_providers.dart';
+import 'package:golem_flutter/core/domain/models.dart';
+import 'package:golem_flutter/core/repositories/contracts.dart';
+import 'package:golem_flutter/features/chat/application/chat_providers.dart';
+import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/settings/appearance_screen.dart';
+import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
+import 'package:golem_flutter/features/settings/application/settings_providers.dart';
 
 import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
@@ -213,6 +218,40 @@ void main() {
       // The model card was never registered behind the failed preference.
       expect(container.read(modelControllerProvider).requireValue, models);
     });
+
+    test(
+      'registration reaches an owner nothing else has built (#88)',
+      () async {
+        // Pre-split, the notifier read force-built ModelController; the launch
+        // composition's ensure-owner hook must preserve that, so a
+        // preferences-only flow still registers the committed model with the
+        // management repository — the durable outcome the next launch
+        // re-merges from.
+        final management = _RecordingModels();
+        final container = buildContainer(
+          preferences: InMemoryPreferencesRepository(),
+          models: management,
+        );
+        addTearDown(container.dispose);
+        final controller = container.read(
+          preferencesControllerProvider.notifier,
+        );
+        await container.read(preferencesControllerProvider.future);
+
+        const spec = CustomModelSpec(
+          repository: 'org/model',
+          engine: ModelEngine.gguf,
+        );
+        final added = await controller.addCustomModel(spec);
+
+        expect(added, isTrue);
+        expect(
+          management.added.map((entry) => entry.key),
+          contains(spec.key),
+          reason: 'the runtime catalog must gain the entry this session',
+        );
+      },
+    );
   });
 
   group('ChatController.deleteAllChats', () {
@@ -267,4 +306,30 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1600));
     expect(find.byKey(const Key('golem-toast')), findsNothing);
   });
+}
+
+final class _RecordingModels implements ModelManagementRepository {
+  final added = <ModelCatalogEntry>[];
+  static const _state = ModelState();
+
+  @override
+  Future<ModelState> load() async => _state;
+  @override
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    String? failure,
+  }) async => _state;
+  @override
+  Stream<ModelState> download(String artifactKey) => Stream.value(_state);
+  @override
+  Future<ModelState> pause(String artifactKey) async => _state;
+  @override
+  Future<ModelState> cancel(String artifactKey) async => _state;
+  @override
+  Future<ModelState> delete(String artifactKey) async => _state;
+  @override
+  Future<ModelState> addModel(ModelCatalogEntry entry) async {
+    added.add(entry);
+    return _state;
+  }
 }

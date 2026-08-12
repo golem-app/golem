@@ -2,15 +2,18 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/chrome/golem_toast.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/services/image_intake.dart';
-import '../../../core/chrome/golem_toast.dart';
 import '../../../core/theme/golem_theme.dart';
+import '../../../l10n/l10n.dart';
+import '../../models/application/model_providers.dart';
+import '../../settings/application/preferences_providers.dart';
+import '../application/chat_providers.dart';
 import '../model_label.dart';
 import 'attach_sheet.dart';
 import 'model_picker_sheet.dart';
-import '../../../l10n/l10n.dart';
 
 class Composer extends ConsumerStatefulWidget {
   const Composer({

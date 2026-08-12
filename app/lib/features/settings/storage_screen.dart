@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/chrome/golem_alert.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_toast.dart';
+import '../../core/domain/byte_format.dart';
 import '../../core/domain/model_activation.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/models.dart';
@@ -11,9 +12,11 @@ import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
-import 'widgets/settings_rows.dart';
-import '../../core/domain/byte_format.dart';
 import '../../l10n/l10n.dart';
+import '../chat/application/chat_providers.dart';
+import '../models/application/model_providers.dart';
+import 'application/storage_providers.dart';
+import 'widgets/settings_rows.dart';
 
 class StorageScreen extends ConsumerWidget {
   const StorageScreen({super.key});

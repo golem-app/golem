@@ -11,7 +11,10 @@ import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../../../core/widgets/progress_track.dart';
 import '../../../l10n/l10n.dart';
+import '../../models/application/model_providers.dart';
 import '../../onboarding/model_download_consent.dart';
+import '../../settings/application/preferences_providers.dart';
+import '../application/chat_providers.dart';
 import '../model_choice.dart';
 
 /// The per-chat model sheet. What each row says, why it is offered or refused,

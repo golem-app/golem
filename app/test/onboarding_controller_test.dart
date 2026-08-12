@@ -4,9 +4,9 @@ import 'package:golem_flutter/app/launch_composition.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
-import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/providers/retry.dart';
 import 'package:golem_flutter/features/onboarding/application/onboarding_controller.dart';
+import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
 
 import 'support/harness.dart';
 import 'support/in_memory_preferences_repository.dart';

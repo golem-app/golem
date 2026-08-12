@@ -13,6 +13,9 @@ import '../../core/widgets/section_header.dart';
 import '../../l10n/l10n.dart';
 import '../chat/model_label.dart';
 import '../legal/ai_disclaimer.dart';
+import '../models/application/model_providers.dart';
+import 'application/preferences_providers.dart';
+import 'application/storage_providers.dart';
 import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
 

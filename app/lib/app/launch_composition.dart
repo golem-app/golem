@@ -9,6 +9,7 @@ import '../broker/configured_inference_repository.dart';
 import '../broker/model_catalog.dart';
 import '../broker/model_profile.dart';
 import '../core/app_identity.dart';
+import '../core/application/session_bridges.dart';
 import '../core/domain/app_preferences.dart';
 import '../core/domain/app_state.dart';
 import '../core/domain/device_eligibility.dart';
@@ -29,6 +30,8 @@ import '../core/services/custom_repository_resolver.dart';
 import '../core/services/device_storage.dart';
 import '../core/services/hugging_face_api.dart';
 import '../core/services/repository_resolver.dart';
+import '../features/chat/application/chat_providers.dart';
+import '../features/models/application/model_providers.dart';
 
 /// Everything one successful launch composition produces: the full set of
 /// inputs for [launchOverrides]. Interface-typed throughout so host tests can
@@ -347,6 +350,25 @@ List<Override> launchOverrides(LaunchDependencies dependencies) => [
     dependencies.deviceCapacityProbe,
   ),
   documentsPathProvider.overrideWithValue(dependencies.documentsPath),
+  // The session bridges' ensure-owner hooks: a command reaching an unbuilt
+  // owner constructs it — the pre-split `ref.read(...notifier)` semantics —
+  // and the owner's build binds the bridge before the dispatch proceeds.
+  // Only the composition root may name the feature providers; the bridges
+  // themselves stay core (#88).
+  // Container reads, not ref reads: the owners watch their bridge to re-bind
+  // on refresh, so a ref read here would register bridge→owner and trip the
+  // circular-dependency assert. The container read force-builds without
+  // registering a dependency.
+  chatSessionBridgeProvider.overrideWith((ref) {
+    final bridge = ChatSessionBridge();
+    bridge.bindEnsureOwner(() => ref.container.read(chatControllerProvider));
+    return bridge;
+  }),
+  modelSessionBridgeProvider.overrideWith((ref) {
+    final bridge = ModelSessionBridge();
+    bridge.bindEnsureOwner(() => ref.container.read(modelControllerProvider));
+    return bridge;
+  }),
   if (dependencies.benchmarkRepository case final benchmarkRepository?)
     benchmarkRepositoryProvider.overrideWithValue(benchmarkRepository),
 ];

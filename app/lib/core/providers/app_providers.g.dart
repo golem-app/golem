@@ -783,6 +783,126 @@ final class ResidentModelKeyProvider
 
 String _$residentModelKeyHash() => r'a0072e8c58064797a9c045af4114c54a7db92439';
 
+/// The chat session's capabilities offered across feature boundaries (#88):
+/// ChatController binds itself in during `build()`, and the model feature
+/// reads session facts here instead of the chat provider.
+/// KeepAlive: the binding must outlive route transitions, like its owner.
+
+@ProviderFor(chatSessionBridge)
+final chatSessionBridgeProvider = ChatSessionBridgeProvider._();
+
+/// The chat session's capabilities offered across feature boundaries (#88):
+/// ChatController binds itself in during `build()`, and the model feature
+/// reads session facts here instead of the chat provider.
+/// KeepAlive: the binding must outlive route transitions, like its owner.
+
+final class ChatSessionBridgeProvider
+    extends
+        $FunctionalProvider<
+          ChatSessionBridge,
+          ChatSessionBridge,
+          ChatSessionBridge
+        >
+    with $Provider<ChatSessionBridge> {
+  /// The chat session's capabilities offered across feature boundaries (#88):
+  /// ChatController binds itself in during `build()`, and the model feature
+  /// reads session facts here instead of the chat provider.
+  /// KeepAlive: the binding must outlive route transitions, like its owner.
+  ChatSessionBridgeProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: noRetry,
+        name: r'chatSessionBridgeProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatSessionBridgeHash();
+
+  @$internal
+  @override
+  $ProviderElement<ChatSessionBridge> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ChatSessionBridge create(Ref ref) {
+    return chatSessionBridge(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ChatSessionBridge value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ChatSessionBridge>(value),
+    );
+  }
+}
+
+String _$chatSessionBridgeHash() => r'1efa00b8214e652cbecedb0c3cda09762f5614bd';
+
+/// The model feature's counterpart to [chatSessionBridge] (#88): chat and
+/// preferences command the model controller through this seam.
+/// KeepAlive: the binding must outlive route transitions, like its owner.
+
+@ProviderFor(modelSessionBridge)
+final modelSessionBridgeProvider = ModelSessionBridgeProvider._();
+
+/// The model feature's counterpart to [chatSessionBridge] (#88): chat and
+/// preferences command the model controller through this seam.
+/// KeepAlive: the binding must outlive route transitions, like its owner.
+
+final class ModelSessionBridgeProvider
+    extends
+        $FunctionalProvider<
+          ModelSessionBridge,
+          ModelSessionBridge,
+          ModelSessionBridge
+        >
+    with $Provider<ModelSessionBridge> {
+  /// The model feature's counterpart to [chatSessionBridge] (#88): chat and
+  /// preferences command the model controller through this seam.
+  /// KeepAlive: the binding must outlive route transitions, like its owner.
+  ModelSessionBridgeProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: noRetry,
+        name: r'modelSessionBridgeProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$modelSessionBridgeHash();
+
+  @$internal
+  @override
+  $ProviderElement<ModelSessionBridge> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ModelSessionBridge create(Ref ref) {
+    return modelSessionBridge(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ModelSessionBridge value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ModelSessionBridge>(value),
+    );
+  }
+}
+
+String _$modelSessionBridgeHash() =>
+    r'42baf5a2fe819e81c92b764690c347f26ca02b83';
+
 @ProviderFor(deviceCapacityProbe)
 final deviceCapacityProbeProvider = DeviceCapacityProbeProvider._();
 
@@ -871,646 +991,3 @@ final class DocumentsPathProvider
 }
 
 String _$documentsPathHash() => r'2642290dce766869e9b00ab9bc831b6a60672caf';
-
-/// A cheap signature that changes only when conversations or messages are added
-/// or removed. ChatController reassigns state on every streaming delta, so
-/// anything as heavy as disk probing must key on this rather than the raw chat
-/// state, or it re-runs per token for the always-mounted drawer meter.
-/// KeepAlive, deliberately (#69): would classify as an autoDispose derived
-/// value, but on the pinned flutter_riverpod (3.3.2) a widget-watched
-/// derivation over an async controller still trips Flutter's element-update
-/// invariant when a provider scope is swapped mid-test — the class of bug
-/// fixed upstream in 3.4.0 ("markNeedsBuild ... inside Widget lifecycle").
-/// Revisit when the pin crosses 3.4.0.
-
-@ProviderFor(chatStorageSignature)
-final chatStorageSignatureProvider = ChatStorageSignatureProvider._();
-
-/// A cheap signature that changes only when conversations or messages are added
-/// or removed. ChatController reassigns state on every streaming delta, so
-/// anything as heavy as disk probing must key on this rather than the raw chat
-/// state, or it re-runs per token for the always-mounted drawer meter.
-/// KeepAlive, deliberately (#69): would classify as an autoDispose derived
-/// value, but on the pinned flutter_riverpod (3.3.2) a widget-watched
-/// derivation over an async controller still trips Flutter's element-update
-/// invariant when a provider scope is swapped mid-test — the class of bug
-/// fixed upstream in 3.4.0 ("markNeedsBuild ... inside Widget lifecycle").
-/// Revisit when the pin crosses 3.4.0.
-
-final class ChatStorageSignatureProvider
-    extends $FunctionalProvider<(int, int), (int, int), (int, int)>
-    with $Provider<(int, int)> {
-  /// A cheap signature that changes only when conversations or messages are added
-  /// or removed. ChatController reassigns state on every streaming delta, so
-  /// anything as heavy as disk probing must key on this rather than the raw chat
-  /// state, or it re-runs per token for the always-mounted drawer meter.
-  /// KeepAlive, deliberately (#69): would classify as an autoDispose derived
-  /// value, but on the pinned flutter_riverpod (3.3.2) a widget-watched
-  /// derivation over an async controller still trips Flutter's element-update
-  /// invariant when a provider scope is swapped mid-test — the class of bug
-  /// fixed upstream in 3.4.0 ("markNeedsBuild ... inside Widget lifecycle").
-  /// Revisit when the pin crosses 3.4.0.
-  ChatStorageSignatureProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: noRetry,
-        name: r'chatStorageSignatureProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$chatStorageSignatureHash();
-
-  @$internal
-  @override
-  $ProviderElement<(int, int)> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  (int, int) create(Ref ref) {
-    return chatStorageSignature(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue((int, int) value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<(int, int)>(value),
-    );
-  }
-}
-
-String _$chatStorageSignatureHash() =>
-    r'ebfde4072049845a37f487bcef5a939d1755019a';
-
-/// Storage accounting for the drawer meter and the Storage screen. Free and
-/// total bytes are null whenever the platform cannot report them (or the seams
-/// are unwired) — surfaces hide those figures instead of inventing them. The
-/// provider owns seam tolerance; the service owns the computation and its
-/// required-vs-optional failure policy.
-/// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it
-/// continuously anyway, and the 3.3.2 scope-swap hazard (see
-/// chatStorageSignature) rules autoDispose out. Staleness is owned by
-/// invalidation — the storage signature upstream and `ref.invalidate` after
-/// a cache clear — never by a `KeepAliveLink` TTL (§4.4, a silent no-op on
-/// keepAlive providers). Revisit when the pin crosses 3.4.0.
-
-@ProviderFor(storageBreakdown)
-final storageBreakdownProvider = StorageBreakdownProvider._();
-
-/// Storage accounting for the drawer meter and the Storage screen. Free and
-/// total bytes are null whenever the platform cannot report them (or the seams
-/// are unwired) — surfaces hide those figures instead of inventing them. The
-/// provider owns seam tolerance; the service owns the computation and its
-/// required-vs-optional failure policy.
-/// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it
-/// continuously anyway, and the 3.3.2 scope-swap hazard (see
-/// chatStorageSignature) rules autoDispose out. Staleness is owned by
-/// invalidation — the storage signature upstream and `ref.invalidate` after
-/// a cache clear — never by a `KeepAliveLink` TTL (§4.4, a silent no-op on
-/// keepAlive providers). Revisit when the pin crosses 3.4.0.
-
-final class StorageBreakdownProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<StorageBreakdown>,
-          StorageBreakdown,
-          FutureOr<StorageBreakdown>
-        >
-    with $FutureModifier<StorageBreakdown>, $FutureProvider<StorageBreakdown> {
-  /// Storage accounting for the drawer meter and the Storage screen. Free and
-  /// total bytes are null whenever the platform cannot report them (or the seams
-  /// are unwired) — surfaces hide those figures instead of inventing them. The
-  /// provider owns seam tolerance; the service owns the computation and its
-  /// required-vs-optional failure policy.
-  /// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it
-  /// continuously anyway, and the 3.3.2 scope-swap hazard (see
-  /// chatStorageSignature) rules autoDispose out. Staleness is owned by
-  /// invalidation — the storage signature upstream and `ref.invalidate` after
-  /// a cache clear — never by a `KeepAliveLink` TTL (§4.4, a silent no-op on
-  /// keepAlive providers). Revisit when the pin crosses 3.4.0.
-  StorageBreakdownProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: noRetry,
-        name: r'storageBreakdownProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$storageBreakdownHash();
-
-  @$internal
-  @override
-  $FutureProviderElement<StorageBreakdown> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<StorageBreakdown> create(Ref ref) {
-    return storageBreakdown(ref);
-  }
-}
-
-String _$storageBreakdownHash() => r'4ba7c85265ff7001eabf61e7b6339e0080f2a0ba';
-
-/// Pinned entries plus the user's custom repositories, derived — never stored —
-/// so the pinned manifest stays the single source of model knowledge.
-/// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
-/// (composer, drawer, recovery banner), so disposal would never fire in
-/// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature)
-/// rules autoDispose out. Revisit when the pin crosses 3.4.0.
-
-@ProviderFor(effectiveModelCatalog)
-final effectiveModelCatalogProvider = EffectiveModelCatalogProvider._();
-
-/// Pinned entries plus the user's custom repositories, derived — never stored —
-/// so the pinned manifest stays the single source of model knowledge.
-/// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
-/// (composer, drawer, recovery banner), so disposal would never fire in
-/// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature)
-/// rules autoDispose out. Revisit when the pin crosses 3.4.0.
-
-final class EffectiveModelCatalogProvider
-    extends
-        $FunctionalProvider<
-          List<ModelCatalogEntry>,
-          List<ModelCatalogEntry>,
-          List<ModelCatalogEntry>
-        >
-    with $Provider<List<ModelCatalogEntry>> {
-  /// Pinned entries plus the user's custom repositories, derived — never stored —
-  /// so the pinned manifest stays the single source of model knowledge.
-  /// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
-  /// (composer, drawer, recovery banner), so disposal would never fire in
-  /// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature)
-  /// rules autoDispose out. Revisit when the pin crosses 3.4.0.
-  EffectiveModelCatalogProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: noRetry,
-        name: r'effectiveModelCatalogProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$effectiveModelCatalogHash();
-
-  @$internal
-  @override
-  $ProviderElement<List<ModelCatalogEntry>> $createElement(
-    $ProviderPointer pointer,
-  ) => $ProviderElement(pointer);
-
-  @override
-  List<ModelCatalogEntry> create(Ref ref) {
-    return effectiveModelCatalog(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<ModelCatalogEntry> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<List<ModelCatalogEntry>>(value),
-    );
-  }
-}
-
-String _$effectiveModelCatalogHash() =>
-    r'd30df0161aff1d214c0d08f6e8533f60197f5df3';
-
-/// The models a per-chat selection may name: installed, and of the engine this
-/// build composed. Derived here so chat, Settings, and Storage cannot disagree
-/// about which model is live (#20).
-/// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
-/// continuously watched, and the 3.3.2 scope-swap hazard. Revisit when the
-/// pin crosses 3.4.0.
-
-@ProviderFor(loadableModelKeys)
-final loadableModelKeysProvider = LoadableModelKeysProvider._();
-
-/// The models a per-chat selection may name: installed, and of the engine this
-/// build composed. Derived here so chat, Settings, and Storage cannot disagree
-/// about which model is live (#20).
-/// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
-/// continuously watched, and the 3.3.2 scope-swap hazard. Revisit when the
-/// pin crosses 3.4.0.
-
-final class LoadableModelKeysProvider
-    extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
-    with $Provider<Set<String>> {
-  /// The models a per-chat selection may name: installed, and of the engine this
-  /// build composed. Derived here so chat, Settings, and Storage cannot disagree
-  /// about which model is live (#20).
-  /// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
-  /// continuously watched, and the 3.3.2 scope-swap hazard. Revisit when the
-  /// pin crosses 3.4.0.
-  LoadableModelKeysProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: noRetry,
-        name: r'loadableModelKeysProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$loadableModelKeysHash();
-
-  @$internal
-  @override
-  $ProviderElement<Set<String>> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  Set<String> create(Ref ref) {
-    return loadableModelKeys(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(Set<String> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<Set<String>>(value),
-    );
-  }
-}
-
-String _$loadableModelKeysHash() => r'12e16f3f980da93856da1aa47fec36b9d9201e01';
-
-/// The keys a download may be *started* for: the pinned catalog, plus custom
-/// repositories that resolved against Hugging Face and so have a real file
-/// list. An unresolved entry synthesizes its files, so a request for it could
-/// not succeed — Settings and the chat picker both withhold the affordance
-/// rather than failing on the tap, and derive that from here so the rule has
-/// one statement (#79).
-/// KeepAlive, deliberately (#69): same grounds as loadableModelKeys.
-
-@ProviderFor(downloadableModelKeys)
-final downloadableModelKeysProvider = DownloadableModelKeysProvider._();
-
-/// The keys a download may be *started* for: the pinned catalog, plus custom
-/// repositories that resolved against Hugging Face and so have a real file
-/// list. An unresolved entry synthesizes its files, so a request for it could
-/// not succeed — Settings and the chat picker both withhold the affordance
-/// rather than failing on the tap, and derive that from here so the rule has
-/// one statement (#79).
-/// KeepAlive, deliberately (#69): same grounds as loadableModelKeys.
-
-final class DownloadableModelKeysProvider
-    extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
-    with $Provider<Set<String>> {
-  /// The keys a download may be *started* for: the pinned catalog, plus custom
-  /// repositories that resolved against Hugging Face and so have a real file
-  /// list. An unresolved entry synthesizes its files, so a request for it could
-  /// not succeed — Settings and the chat picker both withhold the affordance
-  /// rather than failing on the tap, and derive that from here so the rule has
-  /// one statement (#79).
-  /// KeepAlive, deliberately (#69): same grounds as loadableModelKeys.
-  DownloadableModelKeysProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: noRetry,
-        name: r'downloadableModelKeysProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$downloadableModelKeysHash();
-
-  @$internal
-  @override
-  $ProviderElement<Set<String>> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  Set<String> create(Ref ref) {
-    return downloadableModelKeys(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(Set<String> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<Set<String>>(value),
-    );
-  }
-}
-
-String _$downloadableModelKeysHash() =>
-    r'08c575b7815a7c2c62e015f7010cfe2684b36bb9';
-
-/// Only user-set values are stored; profile defaults resolve at the consumer.
-/// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
-/// owner over write-through persistence.
-
-@ProviderFor(SettingsController)
-final settingsControllerProvider = SettingsControllerProvider._();
-
-/// Only user-set values are stored; profile defaults resolve at the consumer.
-/// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
-/// owner over write-through persistence.
-final class SettingsControllerProvider
-    extends $AsyncNotifierProvider<SettingsController, GenerationSettings> {
-  /// Only user-set values are stored; profile defaults resolve at the consumer.
-  /// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
-  /// owner over write-through persistence.
-  SettingsControllerProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: noRetry,
-        name: r'settingsControllerProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$settingsControllerHash();
-
-  @$internal
-  @override
-  SettingsController create() => SettingsController();
-}
-
-String _$settingsControllerHash() =>
-    r'16471fb186699675ede268459ed08748adb14234';
-
-/// Only user-set values are stored; profile defaults resolve at the consumer.
-/// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
-/// owner over write-through persistence.
-
-abstract class _$SettingsController extends $AsyncNotifier<GenerationSettings> {
-  FutureOr<GenerationSettings> build();
-  @$mustCallSuper
-  @override
-  WhenComplete runBuild() {
-    final ref =
-        this.ref as $Ref<AsyncValue<GenerationSettings>, GenerationSettings>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<AsyncValue<GenerationSettings>, GenerationSettings>,
-              AsyncValue<GenerationSettings>,
-              Object?,
-              Object?
-            >;
-    return element.handleCreate(ref, build);
-  }
-}
-
-/// Persisted app-wide preferences. Every command follows the settings idiom —
-/// drop taps that land in the cold-start load window, publish, then save —
-/// and returns false after rolling back a failed write, never throwing.
-/// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
-/// root on every frame.
-
-@ProviderFor(PreferencesController)
-final preferencesControllerProvider = PreferencesControllerProvider._();
-
-/// Persisted app-wide preferences. Every command follows the settings idiom —
-/// drop taps that land in the cold-start load window, publish, then save —
-/// and returns false after rolling back a failed write, never throwing.
-/// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
-/// root on every frame.
-final class PreferencesControllerProvider
-    extends $AsyncNotifierProvider<PreferencesController, AppPreferences> {
-  /// Persisted app-wide preferences. Every command follows the settings idiom —
-  /// drop taps that land in the cold-start load window, publish, then save —
-  /// and returns false after rolling back a failed write, never throwing.
-  /// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
-  /// root on every frame.
-  PreferencesControllerProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: noRetry,
-        name: r'preferencesControllerProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$preferencesControllerHash();
-
-  @$internal
-  @override
-  PreferencesController create() => PreferencesController();
-}
-
-String _$preferencesControllerHash() =>
-    r'8ee5e0844427c186848f2e691283dccc502263d9';
-
-/// Persisted app-wide preferences. Every command follows the settings idiom —
-/// drop taps that land in the cold-start load window, publish, then save —
-/// and returns false after rolling back a failed write, never throwing.
-/// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
-/// root on every frame.
-
-abstract class _$PreferencesController extends $AsyncNotifier<AppPreferences> {
-  FutureOr<AppPreferences> build();
-  @$mustCallSuper
-  @override
-  WhenComplete runBuild() {
-    final ref = this.ref as $Ref<AsyncValue<AppPreferences>, AppPreferences>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<AsyncValue<AppPreferences>, AppPreferences>,
-              AsyncValue<AppPreferences>,
-              Object?,
-              Object?
-            >;
-    return element.handleCreate(ref, build);
-  }
-}
-
-/// KeepAlive: the chat session aggregate — in-flight generation and unsaved
-/// turns must survive every route transition.
-
-@ProviderFor(ChatController)
-final chatControllerProvider = ChatControllerProvider._();
-
-/// KeepAlive: the chat session aggregate — in-flight generation and unsaved
-/// turns must survive every route transition.
-final class ChatControllerProvider
-    extends $AsyncNotifierProvider<ChatController, ChatState> {
-  /// KeepAlive: the chat session aggregate — in-flight generation and unsaved
-  /// turns must survive every route transition.
-  ChatControllerProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: noRetry,
-        name: r'chatControllerProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$chatControllerHash();
-
-  @$internal
-  @override
-  ChatController create() => ChatController();
-}
-
-String _$chatControllerHash() => r'e27f0def29ce0562da3716be17043cd808d8bdce';
-
-/// KeepAlive: the chat session aggregate — in-flight generation and unsaved
-/// turns must survive every route transition.
-
-abstract class _$ChatController extends $AsyncNotifier<ChatState> {
-  FutureOr<ChatState> build();
-  @$mustCallSuper
-  @override
-  WhenComplete runBuild() {
-    final ref = this.ref as $Ref<AsyncValue<ChatState>, ChatState>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<AsyncValue<ChatState>, ChatState>,
-              AsyncValue<ChatState>,
-              Object?,
-              Object?
-            >;
-    return element.handleCreate(ref, build);
-  }
-}
-
-/// KeepAlive: a command controller whose downloads, busy guard, and epochs
-/// must survive leaving the Models screen (§3.4 — an autoDispose command
-/// provider dies mid-flight).
-
-@ProviderFor(ModelController)
-final modelControllerProvider = ModelControllerProvider._();
-
-/// KeepAlive: a command controller whose downloads, busy guard, and epochs
-/// must survive leaving the Models screen (§3.4 — an autoDispose command
-/// provider dies mid-flight).
-final class ModelControllerProvider
-    extends $AsyncNotifierProvider<ModelController, ModelState> {
-  /// KeepAlive: a command controller whose downloads, busy guard, and epochs
-  /// must survive leaving the Models screen (§3.4 — an autoDispose command
-  /// provider dies mid-flight).
-  ModelControllerProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: noRetry,
-        name: r'modelControllerProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$modelControllerHash();
-
-  @$internal
-  @override
-  ModelController create() => ModelController();
-}
-
-String _$modelControllerHash() => r'c762b14f89332a86f58f0ab6f7ef900a870c592a';
-
-/// KeepAlive: a command controller whose downloads, busy guard, and epochs
-/// must survive leaving the Models screen (§3.4 — an autoDispose command
-/// provider dies mid-flight).
-
-abstract class _$ModelController extends $AsyncNotifier<ModelState> {
-  FutureOr<ModelState> build();
-  @$mustCallSuper
-  @override
-  WhenComplete runBuild() {
-    final ref = this.ref as $Ref<AsyncValue<ModelState>, ModelState>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<AsyncValue<ModelState>, ModelState>,
-              AsyncValue<ModelState>,
-              Object?,
-              Object?
-            >;
-    return element.handleCreate(ref, build);
-  }
-}
-
-/// KeepAlive: the startup outcome is process-lifetime. This is the scripted
-/// splash theatre (minimum hold, progress ticks, injected demo scenarios);
-/// real launch failures and their retry live before this scope exists, in
-/// the bootstrap gate (docs/decisions/0006-launch-bootstrap.md).
-
-@ProviderFor(StartupController)
-final startupControllerProvider = StartupControllerProvider._();
-
-/// KeepAlive: the startup outcome is process-lifetime. This is the scripted
-/// splash theatre (minimum hold, progress ticks, injected demo scenarios);
-/// real launch failures and their retry live before this scope exists, in
-/// the bootstrap gate (docs/decisions/0006-launch-bootstrap.md).
-final class StartupControllerProvider
-    extends $AsyncNotifierProvider<StartupController, StartupState> {
-  /// KeepAlive: the startup outcome is process-lifetime. This is the scripted
-  /// splash theatre (minimum hold, progress ticks, injected demo scenarios);
-  /// real launch failures and their retry live before this scope exists, in
-  /// the bootstrap gate (docs/decisions/0006-launch-bootstrap.md).
-  StartupControllerProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: noRetry,
-        name: r'startupControllerProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$startupControllerHash();
-
-  @$internal
-  @override
-  StartupController create() => StartupController();
-}
-
-String _$startupControllerHash() => r'd4a2a4151c2a95fb1f9bd58bfee3cdd02463a04d';
-
-/// KeepAlive: the startup outcome is process-lifetime. This is the scripted
-/// splash theatre (minimum hold, progress ticks, injected demo scenarios);
-/// real launch failures and their retry live before this scope exists, in
-/// the bootstrap gate (docs/decisions/0006-launch-bootstrap.md).
-
-abstract class _$StartupController extends $AsyncNotifier<StartupState> {
-  FutureOr<StartupState> build();
-  @$mustCallSuper
-  @override
-  WhenComplete runBuild() {
-    final ref = this.ref as $Ref<AsyncValue<StartupState>, StartupState>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<AsyncValue<StartupState>, StartupState>,
-              AsyncValue<StartupState>,
-              Object?,
-              Object?
-            >;
-    return element.handleCreate(ref, build);
-  }
-}

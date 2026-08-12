@@ -1,8 +1,8 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/retry.dart';
 import '../domain/chat_search.dart';
+import 'chat_providers.dart';
 
 part 'search_providers.g.dart';
 

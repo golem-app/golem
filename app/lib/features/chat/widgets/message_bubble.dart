@@ -12,8 +12,10 @@ import '../../../core/chrome/golem_toast.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
-import 'markdown/golem_markdown.dart';
 import '../../../l10n/l10n.dart';
+import '../../settings/application/preferences_providers.dart';
+import '../application/chat_providers.dart';
+import 'markdown/golem_markdown.dart';
 
 class MessageBubble extends ConsumerWidget {
   const MessageBubble({

@@ -1,11 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:golem_flutter/core/providers/app_providers.dart';
+import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
-import 'package:integration_test/integration_test.dart';
-
 import 'package:golem_flutter/main.dart' as app;
+import 'package:integration_test/integration_test.dart';
 
 /// Drives one real on-device generation through the app's own chat UI, for
 /// the cross-device determinism probe and for validating a real backend where

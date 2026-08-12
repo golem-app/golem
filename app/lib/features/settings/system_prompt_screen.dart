@@ -5,11 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/chrome/golem_button.dart';
 import '../../core/chrome/golem_nav_bar.dart';
-import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
+import '../../l10n/l10n.dart';
+import 'application/preferences_providers.dart';
 import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
-import '../../l10n/l10n.dart';
 
 /// The Advanced-mode system prompt editor. The draft is widget-local and
 /// commits debounced on text changes (a TextEditingController also

@@ -13,8 +13,8 @@ import '../../core/domain/model_activation.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
-import '../../core/services/repository_resolver.dart';
 import '../../core/providers/app_providers.dart';
+import '../../core/services/repository_resolver.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/labeled_row.dart';
 import '../../core/widgets/progress_track.dart';
@@ -22,8 +22,11 @@ import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
 import '../../l10n/l10n.dart';
 import '../../l10n/presentation_messages.dart';
+import '../chat/application/chat_providers.dart';
+import '../models/application/model_providers.dart';
 import '../onboarding/model_download_consent.dart';
 import 'application/custom_repository_workflow.dart';
+import 'application/preferences_providers.dart';
 import 'widgets/settings_rows.dart';
 
 enum _CatalogTab { all, installed }

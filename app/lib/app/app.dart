@@ -6,17 +6,17 @@ import 'package:go_router/go_router.dart';
 
 import '../core/app_identity.dart';
 import '../core/domain/app_preferences.dart';
-import '../core/providers/app_providers.dart';
 import '../core/theme/golem_theme.dart';
-import '../l10n/l10n.dart';
 import '../features/benchmark/benchmark_screen.dart';
 import '../features/chat/chat_screen.dart';
-import '../features/chat/widgets/attach_sheet.dart';
 import '../features/chat/search_screen.dart';
+import '../features/chat/widgets/attach_sheet.dart';
 import '../features/legal/model_attribution_screen.dart';
 import '../features/legal/open_source_licenses_screen.dart';
+import '../features/models/application/model_providers.dart';
 import '../features/onboarding/first_run_gate.dart';
 import '../features/settings/appearance_screen.dart';
+import '../features/settings/application/preferences_providers.dart';
 import '../features/settings/language_screen.dart';
 import '../features/settings/models_screen.dart';
 import '../features/settings/privacy_screen.dart';
@@ -25,6 +25,7 @@ import '../features/settings/settings_screen.dart';
 import '../features/settings/storage_screen.dart';
 import '../features/settings/system_prompt_screen.dart';
 import '../features/splash/splash_screen.dart';
+import '../l10n/l10n.dart';
 
 /// Creates the route table for one app identity. Production omits internal
 /// routes entirely rather than relying on a hidden navigation affordance.
