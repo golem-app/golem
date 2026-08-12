@@ -15,20 +15,11 @@ void main() {
     expect(await _libFilesContaining('acceptance_hud'), isEmpty);
   });
 
-  test(
-    'no Material import, because nothing supplies MaterialLocalizations',
-    () async {
-      // The app dropped flutter_localizations (#74) on the strength of this
-      // being empty: CupertinoApp contributes only Default{Cupertino,Widgets}
-      // Localizations, so the first Material widget calling
-      // MaterialLocalizations.of(context) throws at runtime, on that surface
-      // only — invisible to analyze and to every other test here.
-      expect(
-        await _libFilesContaining('package:flutter/material.dart'),
-        isEmpty,
-      );
-    },
-  );
+  test('the app stays Cupertino-only', () async {
+    // Generated global delegates now supply framework localizations on both
+    // chromes. Product widgets still use the repository's Cupertino layer.
+    expect(await _libFilesContaining('package:flutter/material.dart'), isEmpty);
+  });
 }
 
 Future<List<String>> _libFilesContaining(String needle) async {

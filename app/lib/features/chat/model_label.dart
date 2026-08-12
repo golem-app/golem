@@ -34,9 +34,12 @@ String chatModelSubtitle({
   String? residentModelKey,
   Set<String>? loadableKeys,
   bool runsModels = true,
+  String unsupportedLabel = 'Unsupported device',
+  String simulatedLabel = 'simulated',
+  String onDeviceLabel = 'on device',
 }) {
   if (!backend.simulatedInference && !runsModels) {
-    return 'Unsupported device';
+    return unsupportedLabel;
   }
   final label = chatModelLabel(
     backend: backend,
@@ -46,8 +49,8 @@ String chatModelSubtitle({
     loadableKeys: loadableKeys,
   );
   return backend.simulatedInference
-      ? '$label · simulated'
-      : '$label · on device';
+      ? '$label · $simulatedLabel'
+      : '$label · $onDeviceLabel';
 }
 
 /// Whether the model this chat effectively runs accepts images.

@@ -31,10 +31,7 @@ class _PersistenceHost extends ConsumerWidget {
               PersistenceRecoveryBanner(phase: persistence),
             if (withInferenceFailure)
               const RecoveryBanner(
-                failure: ChatFailure(
-                  kind: ChatFailureKind.generic,
-                  message: 'Generation failed independently.',
-                ),
+                failure: ChatFailure(kind: ChatFailureKind.generic),
               ),
           ],
         ),

@@ -121,7 +121,7 @@ void main() {
             .having(
               (state) => state.failure,
               'failure',
-              contains('save setup'),
+              FirstRunFailure.setupSave,
             ),
       );
       expect(preferences.preferences.onboardingVersion, 0);

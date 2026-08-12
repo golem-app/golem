@@ -22,6 +22,7 @@ import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/features/legal/model_attribution_screen.dart';
 import 'package:golem_flutter/features/legal/open_source_licenses_screen.dart';
 import 'package:golem_flutter/features/settings/appearance_screen.dart';
+import 'package:golem_flutter/features/settings/language_screen.dart';
 import 'package:golem_flutter/features/settings/models_screen.dart';
 import 'package:golem_flutter/features/settings/privacy_screen.dart';
 import 'package:golem_flutter/features/settings/response_style_screen.dart';
@@ -520,6 +521,26 @@ void main() {
         ),
       );
     }, variant: bothChromes);
+
+    if (brightness == Brightness.light) {
+      testWidgets('settings language Polish golden', (tester) async {
+        await pumpWithRepositories(
+          tester,
+          brightness: brightness,
+          locale: const Locale('pl'),
+          preferences: InMemoryPreferencesRepository(
+            const AppPreferences(language: AppLanguage.polish),
+          ),
+          child: const LanguageScreen(),
+        );
+        await expectLater(
+          find.byType(LanguageScreen),
+          matchesGoldenFile(
+            'goldens/settings-language-polish${chromeSuffix()}.png',
+          ),
+        );
+      }, variant: bothChromes);
+    }
 
     testWidgets('settings privacy ${brightness.name} golden', (tester) async {
       await pumpWithRepositories(
@@ -1160,10 +1181,7 @@ void main() {
       await pumpWithRepositories(
         tester,
         child: const RecoveryBanner(
-          failure: ChatFailure(
-            kind: ChatFailureKind.unsupportedDevice,
-            message: 'This device cannot run models.',
-          ),
+          failure: ChatFailure(kind: ChatFailureKind.unsupportedDevice),
         ),
       );
       expect(find.byKey(const Key('retry-generation')), findsNothing);

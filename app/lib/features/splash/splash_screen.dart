@@ -6,6 +6,7 @@ import '../../core/chrome/golem_button.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/progress_track.dart';
+import '../../l10n/l10n.dart';
 
 class StartupGate extends ConsumerWidget {
   const StartupGate({required this.child, super.key});
@@ -43,14 +44,14 @@ class SplashScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final (semanticValue, caption) = switch (state.phase) {
       StartupPhase.failed => (
-        'Starting failed',
-        'Golem could not finish starting',
+        context.l10n.startupFailed,
+        context.l10n.startupCouldNotFinish,
       ),
       StartupPhase.missingModel => (
-        'Preparing first-run setup',
-        'Preparing setup',
+        context.l10n.preparingFirstRun,
+        context.l10n.preparingSetup,
       ),
-      _ => ('Starting Golem on this device', 'Getting things ready'),
+      _ => (context.l10n.startingOnDevice, context.l10n.gettingReady),
     };
     return SplashScaffold(
       semanticValue: semanticValue,
@@ -82,7 +83,7 @@ class SplashScaffold extends StatelessWidget {
     final retry = onRetry;
     return Semantics(
       key: const Key('launch-splash'),
-      label: 'Golem',
+      label: context.l10n.appName,
       value: semanticValue,
       liveRegion: true,
       child: ColoredBox(
@@ -113,14 +114,14 @@ class SplashScaffold extends StatelessWidget {
                   ),
                   const SizedBox(height: 28),
                   Text(
-                    'Golem',
+                    context.l10n.appName,
                     style: GolemText.hero.copyWith(
                       color: CupertinoColors.white,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Private, local, and ready when you are.',
+                    context.l10n.splashTagline,
                     style: GolemText.body.copyWith(
                       color: GolemTheme.mutedOnDark,
                     ),
@@ -151,7 +152,7 @@ class SplashScaffold extends StatelessWidget {
                       const SizedBox(height: 14),
                       GolemButton.filled(
                         key: const Key('splash-retry'),
-                        label: 'Try again',
+                        label: context.l10n.tryAgain,
                         onPressed: retry,
                         expand: false,
                       ),

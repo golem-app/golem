@@ -78,11 +78,10 @@ rest of that table, so it clears with #38 too.
 
 - **`native_toolchain_c`** — declared in `packages/inferno` but never
   imported; `hook/build.dart` drives the compilers itself.
-- **`flutter_localizations`** (and `intl` with it) — all three localization
-  delegates were inert. Nothing in the repository imports
-  `package:flutter/material.dart`, `CupertinoApp` and `WidgetsApp` already
-  append their own default delegates, and `supportedLocales` is
-  `const [Locale('en')]`.
+- **`flutter_localizations`** (and `intl` with it) — removed while the app was
+  English-only, then deliberately restored by #71 for generated English and
+  Polish catalogs, framework delegates, locale resolution, plurals, and
+  locale-aware formatting. Product widgets remain Cupertino-only.
 
 ## What is deliberately not removed
 

@@ -16,6 +16,7 @@ import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../model_label.dart';
 import '../../../core/domain/byte_format.dart';
+import '../../../l10n/l10n.dart';
 
 class ConversationDrawer extends ConsumerStatefulWidget {
   const ConversationDrawer({
@@ -50,6 +51,9 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
       runsModels: ref.watch(
         deviceEligibilityProvider.select((value) => value.runsModels),
       ),
+      unsupportedLabel: context.l10n.unsupportedDevice,
+      simulatedLabel: context.l10n.simulated,
+      onDeviceLabel: context.l10n.onDevice,
     );
     final ink = CupertinoDynamicColor.resolve(GolemTheme.drawerInk, context);
     final faint = CupertinoDynamicColor.resolve(
@@ -113,13 +117,13 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                       ref.read(chatControllerProvider.notifier).newChat();
                       widget.close();
                     },
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(CupertinoIcons.add, color: CupertinoColors.white),
                   SizedBox(width: 8),
                   Text(
-                    'New chat',
+                    context.l10n.newChat,
                     style: TextStyle(
                       color: CupertinoColors.white,
                       fontWeight: FontWeight.w600,
@@ -163,7 +167,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Search chats',
+                        context.l10n.searchChats,
                         style: TextStyle(color: faint, fontSize: 17),
                       ),
                     ),
@@ -177,7 +181,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                 ? Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
-                      'Your conversations will appear here.',
+                      context.l10n.conversationsAppearHere,
                       style: TextStyle(
                         color: CupertinoDynamicColor.resolve(
                           GolemTheme.drawerMutedInk,
@@ -190,10 +194,14 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                     children: [
-                      _section(context, 'Pinned', sections.pinned),
-                      _section(context, 'Today', sections.today),
-                      _section(context, 'Yesterday', sections.yesterday),
-                      _section(context, 'Earlier', sections.earlier),
+                      _section(context, context.l10n.pinned, sections.pinned),
+                      _section(context, context.l10n.today, sections.today),
+                      _section(
+                        context,
+                        context.l10n.yesterday,
+                        sections.yesterday,
+                      ),
+                      _section(context, context.l10n.earlier, sections.earlier),
                     ],
                   ),
           ),
@@ -223,7 +231,10 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
               children: [
                 Icon(CupertinoIcons.slider_horizontal_3, color: ink, size: 21),
                 const SizedBox(width: 14),
-                Text('Settings', style: TextStyle(color: ink, fontSize: 17)),
+                Text(
+                  context.l10n.settings,
+                  style: TextStyle(color: ink, fontSize: 17),
+                ),
               ],
             ),
           ),
@@ -301,7 +312,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                           widget.close();
                         },
                   child: Text(
-                    item.title,
+                    item.title.isEmpty ? context.l10n.newChat : item.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -322,11 +333,13 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                   GolemTheme.drawerMutedInk,
                   context,
                 ),
-                triggerSemanticLabel: 'Conversation actions',
+                triggerSemanticLabel: context.l10n.conversationActions,
                 items: [
                   GolemMenuItem(
                     itemKey: const Key('menu-pin-toggle'),
-                    label: item.pinned ? 'Unpin' : 'Pin to top',
+                    label: item.pinned
+                        ? context.l10n.unpin
+                        : context.l10n.pinToTop,
                     icon: item.pinned
                         ? CupertinoIcons.pin_slash
                         : CupertinoIcons.arrow_up_to_line,
@@ -334,19 +347,19 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                   ),
                   GolemMenuItem(
                     itemKey: const Key('menu-rename'),
-                    label: 'Rename',
+                    label: context.l10n.rename,
                     icon: CupertinoIcons.pencil,
                     onPressed: () => _rename(context, item),
                   ),
                   GolemMenuItem(
                     itemKey: const Key('menu-share-transcript'),
-                    label: 'Share transcript',
+                    label: context.l10n.shareTranscript,
                     icon: CupertinoIcons.square_arrow_up,
                     onPressed: () => _shareTranscript(context, item),
                   ),
                   GolemMenuItem(
                     itemKey: const Key('menu-delete'),
-                    label: 'Delete',
+                    label: context.l10n.delete,
                     icon: CupertinoIcons.trash,
                     isDestructive: true,
                     onPressed: () => _delete(context, item),
@@ -369,7 +382,10 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
         .read(chatControllerProvider.notifier)
         .togglePinned(conversation.id);
     if (context.mounted) {
-      showGolemToast(context, wasPinned ? 'Unpinned' : 'Pinned');
+      showGolemToast(
+        context,
+        wasPinned ? context.l10n.unpinned : context.l10n.pinned,
+      );
     }
   }
 
@@ -380,7 +396,11 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
     final box = context.findRenderObject() as RenderBox?;
     await SharePlus.instance.share(
       ShareParams(
-        text: conversation.transcriptMarkdown(),
+        text: conversation.transcriptMarkdown(
+          untitledTitle: context.l10n.newChat,
+          userSpeaker: context.l10n.userSpeaker,
+          assistantSpeaker: context.l10n.assistantSpeaker,
+        ),
         sharePositionOrigin: box == null
             ? null
             : box.localToGlobal(Offset.zero) & box.size,
@@ -404,11 +424,12 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Rename chat', style: GolemText.cardTitle),
+              Text(context.l10n.renameChat, style: GolemText.cardTitle),
               const SizedBox(height: 16),
               CupertinoTextField(
                 key: const Key('rename-field'),
                 controller: controller,
+                placeholder: context.l10n.newChat,
                 autofocus: true,
                 maxLength: 80,
                 clearButtonMode: OverlayVisibilityMode.editing,
@@ -436,7 +457,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
               const SizedBox(height: 12),
               GolemButton.filled(
                 key: const Key('rename-save'),
-                label: 'Save',
+                label: context.l10n.save,
                 onPressed: () {
                   ref
                       .read(chatControllerProvider.notifier)
@@ -458,24 +479,27 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
   ) async {
     await showGolemAlert(
       context: context,
-      title: 'Delete chat?',
-      message:
-          '“${conversation.title}” and all of its messages will be removed from this device.',
+      title: context.l10n.deleteChatTitle,
+      message: context.l10n.deleteNamedChatMessage(
+        conversation.title.isEmpty ? context.l10n.newChat : conversation.title,
+      ),
       actions: [
         GolemAlertAction(
-          label: 'Cancel',
+          label: context.l10n.cancel,
           onPressed: () => Navigator.pop(context),
         ),
         GolemAlertAction(
           key: const Key('confirm-delete'),
-          label: 'Delete',
+          label: context.l10n.delete,
           isDestructive: true,
           onPressed: () {
             ref
                 .read(chatControllerProvider.notifier)
                 .deleteConversation(conversation.id);
             Navigator.pop(context);
-            if (context.mounted) showGolemToast(context, 'Chat deleted');
+            if (context.mounted) {
+              showGolemToast(context, context.l10n.chatDeleted);
+            }
           },
         ),
       ],
@@ -508,11 +532,17 @@ final class _StorageMeter extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Text('Storage', style: GolemText.caption.copyWith(color: muted)),
+              Text(
+                context.l10n.settingsStorage,
+                style: GolemText.caption.copyWith(color: muted),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  '${gigabytes(overview.usedBytes)} of ${gigabytes(total)}',
+                  context.l10n.storageAmount(
+                    gigabytes(overview.usedBytes),
+                    gigabytes(total),
+                  ),
                   textAlign: TextAlign.right,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

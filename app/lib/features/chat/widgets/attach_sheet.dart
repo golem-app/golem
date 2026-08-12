@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/chrome/golem_sheet.dart';
 import '../../../core/services/image_intake.dart';
 import '../../../core/theme/golem_theme.dart';
+import '../../../l10n/l10n.dart';
 
 enum AttachSource { photoLibrary, camera, files }
 
@@ -34,36 +35,36 @@ Future<AttachSource?> showAttachSheet(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Center(child: Text('Add to this chat', style: GolemText.cardTitle)),
+          Center(
+            child: Text(context.l10n.addToChat, style: GolemText.cardTitle),
+          ),
           const SizedBox(height: GolemSpace.s4),
           _AttachRow(
             rowKey: const Key('attach-photo-library'),
             icon: CupertinoIcons.photo_on_rectangle,
-            label: 'Photo library',
+            label: context.l10n.photoLibrary,
             enabled: supportsImages,
             source: AttachSource.photoLibrary,
           ),
           _AttachRow(
             rowKey: const Key('attach-take-photo'),
             icon: CupertinoIcons.camera,
-            label: 'Take a photo',
+            label: context.l10n.takePhoto,
             enabled: supportsImages,
             source: AttachSource.camera,
           ),
           _AttachRow(
             rowKey: const Key('attach-files'),
             icon: CupertinoIcons.folder,
-            label: 'Files',
+            label: context.l10n.files,
             enabled: supportsImages,
             source: AttachSource.files,
           ),
           const SizedBox(height: GolemSpace.s3),
           Text(
             supportsImages
-                ? 'Images are read on this device. $modelLabel can see them; '
-                      'nothing is uploaded.'
-                : '$modelLabel handles text only. Switch to a model that '
-                      'reads images to attach one.',
+                ? context.l10n.imagesPrivateDetail(modelLabel)
+                : context.l10n.imagesUnsupportedDetail(modelLabel),
             style: GolemText.footnote.copyWith(
               color: CupertinoDynamicColor.resolve(
                 GolemTheme.mutedInk,
@@ -85,7 +86,10 @@ class AttachmentPicker {
 
   final ImageIntake intake;
 
-  Future<PreparedImage?> pick(AttachSource source) async {
+  Future<PreparedImage?> pick(
+    AttachSource source, {
+    String filesLabel = 'Images',
+  }) async {
     switch (source) {
       case AttachSource.photoLibrary:
       case AttachSource.camera:
@@ -106,9 +110,9 @@ class AttachmentPicker {
         );
       case AttachSource.files:
         final file = await openFile(
-          acceptedTypeGroups: const [
+          acceptedTypeGroups: [
             XTypeGroup(
-              label: 'Images',
+              label: filesLabel,
               extensions: ['jpg', 'jpeg', 'png', 'webp'],
               mimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
               uniformTypeIdentifiers: [

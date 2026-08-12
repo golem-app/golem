@@ -8,15 +8,17 @@ part 'onboarding_controller.g.dart';
 
 enum FirstRunStep { welcome, model, catalog, download, unsupported, complete }
 
+enum FirstRunFailure { modelChoiceSave, setupSave }
+
 final class FirstRunState {
   const FirstRunState({required this.step, this.failure});
 
   final FirstRunStep step;
-  final String? failure;
+  final FirstRunFailure? failure;
 
   FirstRunState copyWith({
     FirstRunStep? step,
-    String? failure,
+    FirstRunFailure? failure,
     bool clearFailure = false,
   }) => FirstRunState(
     step: step ?? this.step,
@@ -64,7 +66,7 @@ class FirstRunController extends _$FirstRunController {
     if (!saved) {
       state = FirstRunState(
         step: state.step,
-        failure: 'Your model choice could not be saved. Try again.',
+        failure: FirstRunFailure.modelChoiceSave,
       );
     }
     return saved;
@@ -85,7 +87,7 @@ class FirstRunController extends _$FirstRunController {
     if (!ref.mounted) return saved;
     state = saved
         ? state.copyWith(step: FirstRunStep.complete, clearFailure: true)
-        : state.copyWith(failure: 'Golem could not save setup. Try again.');
+        : state.copyWith(failure: FirstRunFailure.setupSave);
     return saved;
   }
 }

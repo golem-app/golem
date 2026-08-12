@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart'
+    show ProviderListenableSelect;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../app_identity.dart';
@@ -7,6 +9,7 @@ import '../application/storage_breakdown_service.dart';
 import '../domain/app_preferences.dart';
 import '../domain/app_state.dart';
 import '../domain/device_eligibility.dart';
+import '../domain/equality.dart';
 import '../domain/generation_settings.dart';
 import '../domain/inference_backend.dart';
 import '../domain/model_activation.dart' as domain;
@@ -27,6 +30,29 @@ export '../application/storage_breakdown_service.dart'
     show StorageBreakdown, StorageBreakdownTotals;
 
 part 'app_providers.g.dart';
+
+/// A value-equal projection of the only preference leaf the model-catalog
+/// derivations consume. Watching the whole [AppPreferences] object made a
+/// language or theme change invalidate the catalog while the app root was
+/// rebuilding Localizations, which trips Riverpod 3.3.2's known mid-build
+/// refresh hazard. The unmodifiable view remains owned by AppPreferences.
+final class _CustomModelsSelection {
+  const _CustomModelsSelection(this.models);
+
+  final List<CustomModelSpec> models;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _CustomModelsSelection && listEquals(other.models, models);
+
+  @override
+  int get hashCode => listHash(models);
+}
+
+_CustomModelsSelection _customModelsFrom(AsyncValue<AppPreferences> value) =>
+    _CustomModelsSelection(
+      value.value?.customModels ?? const <CustomModelSpec>[],
+    );
 
 // Lifetime policy (#69): the repository/probe seams below are keepAlive
 // because they are composition-injected process-lifetime dependencies —
@@ -222,9 +248,9 @@ Future<StorageBreakdown> storageBreakdown(Ref ref) async {
 @Riverpod(keepAlive: true, retry: noRetry)
 List<ModelCatalogEntry> effectiveModelCatalog(Ref ref) {
   final pinned = ref.watch(modelCatalogEntriesProvider);
-  final custom =
-      ref.watch(preferencesControllerProvider).value?.customModels ??
-      const <CustomModelSpec>[];
+  final custom = ref
+      .watch(preferencesControllerProvider.select(_customModelsFrom))
+      .models;
   final pinnedKeys = {for (final entry in pinned) entry.key};
   return [
     ...pinned,
@@ -263,8 +289,9 @@ Set<String> downloadableModelKeys(Ref ref) {
   };
   final resolved = {
     for (final spec
-        in ref.watch(preferencesControllerProvider).value?.customModels ??
-            const <CustomModelSpec>[])
+        in ref
+            .watch(preferencesControllerProvider.select(_customModelsFrom))
+            .models)
       if (spec.resolved != null) spec.key,
   };
   return {
@@ -370,6 +397,9 @@ class PreferencesController extends _$PreferencesController {
 
   Future<bool> setTheme(ThemeSetting theme) =>
       _commit((value) => value.copyWith(theme: theme));
+
+  Future<bool> setLanguage(AppLanguage language) =>
+      _commit((value) => value.copyWith(language: language));
 
   Future<bool> setTextScale(double scale) =>
       _commit((value) => value.copyWith(textScale: scale));
@@ -686,7 +716,7 @@ class ChatController extends _$ChatController {
               .firstOrNull;
     final conversation = ChatConversation(
       id: newId(),
-      title: 'New chat',
+      title: '',
       messages: const [],
       updatedAt: now,
       // First run is allowed to name a compatible model before its weights
@@ -870,10 +900,7 @@ class ChatController extends _$ChatController {
       // failure and keep the composer's content for another try.
       state = AsyncData(
         _value.copyWith(
-          failure: const ChatFailure(
-            kind: ChatFailureKind.generic,
-            message: 'That image could not be saved. Try attaching it again.',
-          ),
+          failure: const ChatFailure(kind: ChatFailureKind.attachmentSave),
         ),
       );
       Error.throwWithStackTrace(error, stackTrace);
@@ -886,9 +913,7 @@ class ChatController extends _$ChatController {
       parts: parts,
       createdAt: DateTime.now(),
     );
-    final title = active.messages.isEmpty
-        ? normalizeTitle(text.isEmpty ? 'Image' : text)
-        : active.title;
+    final title = active.messages.isEmpty ? normalizeTitle(text) : active.title;
     final updated = active.copyWith(
       title: title,
       messages: [...active.messages, user],
@@ -965,10 +990,7 @@ class ChatController extends _$ChatController {
       state = AsyncData(
         _value.copyWith(
           generation: GenerationPhase.failed,
-          failure: ChatFailure(
-            kind: ChatFailureKind.unsupportedDevice,
-            message: refusal,
-          ),
+          failure: const ChatFailure(kind: ChatFailureKind.unsupportedDevice),
         ),
       );
       return;
@@ -986,9 +1008,6 @@ class ChatController extends _$ChatController {
             generation: GenerationPhase.failed,
             failure: ChatFailure(
               kind: ChatFailureKind.missingModel,
-              message:
-                  '${entry.displayName} is not downloaded on this device yet. '
-                  'Download it to use it in this chat.',
               artifactKey: entry.key,
             ),
           ),
@@ -1087,26 +1106,36 @@ class ChatController extends _$ChatController {
     }
   }
 
-  /// Typed inference exceptions carry their own copy and recovery kind; the
-  /// rest get fixed generic copy — raw exception text never reaches it (§19.4).
+  /// Typed inference exceptions retain their recovery kind and safe arguments;
+  /// presentation owns localized copy. Unknown errors stay generic, and raw
+  /// exception text never reaches the banner (§19.4).
   static ChatFailure _classifiedFailure(Object error) => switch (error) {
-    InferenceException(:final kind, :final message) => ChatFailure(
+    InferenceException(:final kind, :final contextTokens) => ChatFailure(
       kind: switch (kind) {
         InferenceFailureKind.contextExhausted =>
           ChatFailureKind.contextExhausted,
         InferenceFailureKind.outOfMemory => ChatFailureKind.outOfMemory,
         InferenceFailureKind.insufficientMemory =>
           ChatFailureKind.insufficientMemory,
-        InferenceFailureKind.engine ||
         InferenceFailureKind.budgetExhaustedBeforeAnswer =>
-          ChatFailureKind.generic,
+          ChatFailureKind.budgetExhaustedBeforeAnswer,
+        InferenceFailureKind.modelUnavailable =>
+          ChatFailureKind.modelUnavailable,
+        InferenceFailureKind.unsupportedModel =>
+          ChatFailureKind.unsupportedModel,
+        InferenceFailureKind.attachmentUnavailable =>
+          ChatFailureKind.attachmentUnavailable,
+        InferenceFailureKind.unsupportedImages =>
+          ChatFailureKind.unsupportedImages,
+        InferenceFailureKind.invalidModelArtifact =>
+          ChatFailureKind.invalidModelArtifact,
+        InferenceFailureKind.unsupportedDevice =>
+          ChatFailureKind.unsupportedDevice,
+        InferenceFailureKind.engine => ChatFailureKind.generic,
       },
-      message: message,
+      contextTokens: contextTokens,
     ),
-    _ => const ChatFailure(
-      kind: ChatFailureKind.generic,
-      message: 'Something went wrong while generating a response.',
-    ),
+    _ => const ChatFailure(kind: ChatFailureKind.generic),
   };
 
   /// Null when model state is unavailable — generation then proceeds and
@@ -1226,6 +1255,28 @@ class ChatController extends _$ChatController {
     if (active == null) return;
     final messages = [...active.messages];
     if (messages.lastOrNull?.role == MessageRole.assistant) {
+      messages.removeLast();
+    }
+    final next = _replaceActive(active.copyWith(messages: messages)).copyWith(
+      generation: GenerationPhase.idle,
+      clearFailure: true,
+      hasUnsavedAssistant: false,
+    );
+    state = AsyncData(next);
+    await _persist(next);
+  }
+
+  /// Removes the failed assistant draft and the user turn that deterministically
+  /// cannot be replayed, such as one whose attachment disappeared. This is an
+  /// explicit recovery action; ordinary Discard keeps the user's message.
+  Future<void> removeFailedTurn() async {
+    final active = _value.active;
+    if (active == null) return;
+    final messages = [...active.messages];
+    if (messages.lastOrNull?.role == MessageRole.assistant) {
+      messages.removeLast();
+    }
+    if (messages.lastOrNull?.role == MessageRole.user) {
       messages.removeLast();
     }
     final next = _replaceActive(active.copyWith(messages: messages)).copyWith(
@@ -1451,7 +1502,13 @@ class ModelController extends _$ModelController {
         artifactKey,
         current
             .statusOf(artifactKey)
-            .copyWith(phase: ArtifactPhase.failed, failure: '$error'),
+            .copyWith(
+              phase: ArtifactPhase.failed,
+              failure: '$error',
+              failureReason: const ArtifactFailure(
+                ArtifactFailureKind.transfer,
+              ),
+            ),
       ),
     );
   }

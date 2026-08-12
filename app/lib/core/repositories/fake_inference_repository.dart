@@ -116,6 +116,7 @@ final class FakeInferenceRepository implements InferenceRepository {
         InferenceFailureKind.outOfMemory,
         'Ran out of memory at 4,096 tokens. Lower the context length or '
         'pick a smaller model.',
+        contextTokens: 4096,
       );
     }
     if (prompt.contains('[context]')) {

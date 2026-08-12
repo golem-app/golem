@@ -341,6 +341,16 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('advanced-mode-switch')));
     await tester.pumpAndSettle();
+    expect(
+      container.read(preferencesControllerProvider).requireValue.advancedMode,
+      isTrue,
+    );
+    await tester.fling(
+      find.byKey(const Key('settings-list')),
+      const Offset(0, 1000),
+      1000,
+    );
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('settings-system-prompt-row')), findsOneWidget);
     await tester.scrollUntilVisible(
       find.byKey(const Key('settings-style-row')),
@@ -361,6 +371,37 @@ void main() {
       ResponseStyle.precise,
     );
     expect(find.byKey(const Key('gen-temperature-gemma4')), findsOneWidget);
+    await _pageBack(tester);
+    await tester.pumpAndSettle();
+
+    // Language selection applies immediately and persists without restarting.
+    // Return to English so the rest of this long-lived journey remains a
+    // stable source-language smoke test as Polish grows.
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('settings-language-row')),
+      -240,
+      scrollable: settingsScrollable,
+    );
+    await tester.tap(find.byKey(const Key('settings-language-row')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('language-polish')));
+    await tester.pumpAndSettle();
+    expect(find.text('Język'), findsWidgets);
+    expect(
+      container.read(preferencesControllerProvider).requireValue.language,
+      AppLanguage.polish,
+    );
+    await _pageBack(tester);
+    await tester.pumpAndSettle();
+    expect(find.text('Ustawienia'), findsWidgets);
+    await tester.tap(find.byKey(const Key('settings-language-row')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('language-english')));
+    await tester.pumpAndSettle();
+    expect(
+      container.read(preferencesControllerProvider).requireValue.language,
+      AppLanguage.english,
+    );
     await _pageBack(tester);
     await tester.pumpAndSettle();
 
@@ -515,7 +556,10 @@ final class _JourneyPicker extends AttachmentPicker {
   const _JourneyPicker();
 
   @override
-  Future<PreparedImage?> pick(AttachSource source) async => PreparedImage(
+  Future<PreparedImage?> pick(
+    AttachSource source, {
+    String filesLabel = 'Images',
+  }) async => PreparedImage(
     bytes: tinyPngBytes,
     mimeType: 'image/png',
     width: 2,

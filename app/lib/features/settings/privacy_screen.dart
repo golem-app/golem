@@ -10,6 +10,7 @@ import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
 import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
+import '../../l10n/l10n.dart';
 
 /// Privacy & data: the no-network statement, chat-history retention, and
 /// the user's own-data actions.
@@ -22,8 +23,8 @@ class PrivacyScreen extends ConsumerWidget {
     final notifier = ref.read(preferencesControllerProvider.notifier);
     return CupertinoPageScaffold(
       navigationBar: GolemNavBar(
-        title: 'Privacy & data',
-        previousPageTitle: 'Settings',
+        title: context.l10n.settingsPrivacyData,
+        previousPageTitle: context.l10n.settingsTitle,
       ),
       child: SafeArea(
         bottom: false,
@@ -53,9 +54,7 @@ class PrivacyScreen extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Golem holds no account, sends no analytics, and '
-                      'drops its network permission once a model is '
-                      'downloaded. There is nothing to opt out of.',
+                      context.l10n.privacyStatement,
                       style: GolemText.footnote.copyWith(
                         height: 1.4,
                         color: CupertinoDynamicColor.resolve(
@@ -69,16 +68,15 @@ class PrivacyScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 24),
-            const SectionHeader('On this phone'),
+            SectionHeader(context.l10n.onThisPhone),
             const SizedBox(height: 8),
             SettingsCard(
               children: [
                 SettingsToggleRow(
                   toggleKey: const Key('toggle-save-history'),
-                  label: 'Save chat history',
+                  label: context.l10n.saveChatHistory,
                   value: preferences?.saveHistory ?? true,
-                  footnote:
-                      'Off means every chat disappears when you close it.',
+                  footnote: context.l10n.saveHistoryOffDetail,
                   onChanged: (value) => value
                       ? announceFailedSave(
                           context,
@@ -89,19 +87,19 @@ class PrivacyScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 24),
-            const SectionHeader('Your data'),
+            SectionHeader(context.l10n.yourData),
             const SizedBox(height: 8),
             SettingsCard(
               children: [
                 SettingsNavRow(
                   key: const Key('export-chats'),
-                  label: 'Export all chats',
+                  label: context.l10n.exportAllChats,
                   value: 'JSON',
                   onTap: () => _exportChats(context, ref),
                 ),
                 SettingsNavRow(
                   key: const Key('delete-all-chats'),
-                  label: 'Delete all chats',
+                  label: context.l10n.deleteAllChats,
                   destructive: true,
                   onTap: () => _confirmDeleteAll(context, ref),
                 ),
@@ -120,26 +118,23 @@ class PrivacyScreen extends ConsumerWidget {
     showGolemAlert(
       context: context,
       dialogKey: const Key('confirm-history-off-dialog'),
-      title: 'Stop saving chats?',
-      message:
-          'Chats already saved on this device are deleted now. Open chats '
-          'stay until you close the app, and nothing new is written to '
-          'disk.',
+      title: context.l10n.stopSavingChatsTitle,
+      message: context.l10n.stopSavingChatsMessage,
       actions: [
         GolemAlertAction(
-          label: 'Keep saving',
+          label: context.l10n.keepSaving,
           onPressed: () => Navigator.pop(context),
         ),
         GolemAlertAction(
           key: const Key('confirm-history-off'),
-          label: 'Stop and delete',
+          label: context.l10n.stopAndDelete,
           isDestructive: true,
           onPressed: () {
             Navigator.pop(context);
             announceFailedSave(
               context,
               notifier.setSaveHistory(false),
-              message: "Couldn't delete the saved chats. Try again.",
+              message: context.l10n.deleteSavedChatsFailed,
             );
           },
         ),
@@ -154,7 +149,7 @@ class PrivacyScreen extends ConsumerWidget {
     await SharePlus.instance.share(
       ShareParams(
         text: json,
-        subject: 'Golem chats export',
+        subject: context.l10n.chatsExportSubject,
         sharePositionOrigin: box == null
             ? null
             : box.localToGlobal(Offset.zero) & box.size,
@@ -166,18 +161,16 @@ class PrivacyScreen extends ConsumerWidget {
     showGolemAlert(
       context: context,
       dialogKey: const Key('confirm-delete-all-dialog'),
-      title: 'Delete all chats?',
-      message:
-          'Every conversation is removed from this device. Downloaded '
-          'models are kept.',
+      title: context.l10n.deleteAllChatsTitle,
+      message: context.l10n.deleteAllChatsMessage,
       actions: [
         GolemAlertAction(
-          label: 'Cancel',
+          label: context.l10n.cancel,
           onPressed: () => Navigator.pop(context),
         ),
         GolemAlertAction(
           key: const Key('confirm-delete-all'),
-          label: 'Delete all',
+          label: context.l10n.deleteAllChats,
           isDestructive: true,
           onPressed: () async {
             Navigator.pop(context);
@@ -187,7 +180,9 @@ class PrivacyScreen extends ConsumerWidget {
             if (!context.mounted) return;
             showGolemToast(
               context,
-              deleted ? 'Chats deleted' : "Couldn't delete chats. Try again.",
+              deleted
+                  ? context.l10n.chatsDeleted
+                  : context.l10n.deleteChatsFailed,
             );
           },
         ),

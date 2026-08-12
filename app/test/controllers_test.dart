@@ -71,10 +71,12 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   _RecordingInferenceRepository({
     this.failPrepare = false,
     this.failUnload = false,
+    this.generationFailure,
   });
 
   final bool failPrepare;
   final bool failUnload;
+  final InferenceFailureKind? generationFailure;
   SamplingOverrides? lastOverrides;
   String? lastModelKey;
   String? lastPrepareModelKey;
@@ -123,6 +125,9 @@ final class _RecordingInferenceRepository implements InferenceRepository {
     lastModelKey = modelKey;
     lastSystemPrompt = systemPrompt;
     yield const AnswerDelta('ok');
+    if (generationFailure case final kind?) {
+      throw InferenceException(kind, 'diagnostic ${kind.name}');
+    }
     final gate = generateGate;
     if (gate != null) await gate.future;
     yield const CompletedEvent();
@@ -1175,7 +1180,7 @@ void main() {
     expect(inference.lastPrepareModelKey, 'qwen35-gguf');
   });
 
-  test('the OOM injection surfaces the design failure copy', () async {
+  test('the OOM injection surfaces a semantic failure', () async {
     final container = containerWith();
     addTearDown(container.dispose);
     await container.read(chatControllerProvider.future);
@@ -1183,13 +1188,46 @@ void main() {
     await controller.send('please [oom] now');
     final state = container.read(chatControllerProvider).requireValue;
     expect(state.generation, GenerationPhase.failed);
-    expect(
-      state.failure?.message,
-      'Ran out of memory at 4,096 tokens. Lower the context length or '
-      'pick a smaller model.',
-    );
     expect(state.failure?.kind, ChatFailureKind.outOfMemory);
   });
+
+  test(
+    'deterministic engine refusals retain semantic recovery kinds',
+    () async {
+      const expected = {
+        InferenceFailureKind.modelUnavailable: ChatFailureKind.modelUnavailable,
+        InferenceFailureKind.unsupportedModel: ChatFailureKind.unsupportedModel,
+        InferenceFailureKind.attachmentUnavailable:
+            ChatFailureKind.attachmentUnavailable,
+        InferenceFailureKind.unsupportedImages:
+            ChatFailureKind.unsupportedImages,
+        InferenceFailureKind.invalidModelArtifact:
+            ChatFailureKind.invalidModelArtifact,
+        InferenceFailureKind.unsupportedDevice:
+            ChatFailureKind.unsupportedDevice,
+      };
+      for (final MapEntry(:key, :value) in expected.entries) {
+        final container = ProviderContainer(
+          overrides: [
+            chatHistoryRepositoryProvider.overrideWithValue(
+              InMemoryChatHistoryRepository(),
+            ),
+            inferenceRepositoryProvider.overrideWithValue(
+              _RecordingInferenceRepository(generationFailure: key),
+            ),
+          ],
+        );
+        await container.read(chatControllerProvider.future);
+        await container.read(chatControllerProvider.notifier).send('Hello');
+        expect(
+          container.read(chatControllerProvider).requireValue.failure?.kind,
+          value,
+          reason: key.name,
+        );
+        container.dispose();
+      }
+    },
+  );
 
   test('a real backend without its model fails fast into the CTA', () async {
     final directory = Directory.systemTemp.createTempSync('golem-cta-test-');
@@ -1224,7 +1262,6 @@ void main() {
     expect(state.generation, GenerationPhase.failed);
     expect(state.failure?.kind, ChatFailureKind.missingModel);
     expect(state.failure?.artifactKey, 'test-mlx');
-    expect(state.failure?.message, contains('not downloaded'));
     // The engine was never touched: no hang-like prepare, no cryptic error.
     expect(inference.prepares, 0);
     await container.read(chatControllerProvider.notifier).discardFailure();
@@ -1753,7 +1790,6 @@ void main() {
         final state = container.read(chatControllerProvider).requireValue;
         expect(state.generation, GenerationPhase.failed);
         expect(state.failure?.kind, ChatFailureKind.unsupportedDevice);
-        expect(state.failure?.message, refusal.message);
         // No artifact key means the banner has no download CTA to render: the
         // refusal must never turn into an offer to fetch gigabytes.
         expect(state.failure?.artifactKey, isNull);

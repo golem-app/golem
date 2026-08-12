@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import 'application/search_providers.dart';
 import 'domain/chat_search.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
+import '../../l10n/l10n.dart';
 
 /// Full-screen search across every chat. The raw field text is
 /// widget-local; a 350 ms debounce publishes the normalized query, and
@@ -93,7 +95,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       key: const Key('search-field'),
                       controller: _controller,
                       autofocus: true,
-                      placeholder: 'Search chats',
+                      placeholder: context.l10n.searchChats,
                       onChanged: _onChanged,
                       onSubmitted: (text) => _query.publish(text),
                     ),
@@ -106,7 +108,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     minimumSize: const Size(44, 44),
                     onPressed: _cancel,
                     child: Text(
-                      'Cancel',
+                      context.l10n.cancel,
                       style: GolemText.body.copyWith(
                         color: CupertinoDynamicColor.resolve(
                           GolemTheme.accent,
@@ -124,7 +126,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   : results.isEmpty
                   ? Center(
                       child: Text(
-                        'No chats match your search.',
+                        context.l10n.noChatsMatchSearch,
                         key: const Key('search-empty'),
                         style: GolemText.footnote.copyWith(
                           color: CupertinoDynamicColor.resolve(
@@ -151,8 +153,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             bottom: GolemSpace.s2,
                           ),
                           child: Text(
-                            '${results.length} '
-                            '${results.length == 1 ? 'CHAT' : 'CHATS'}',
+                            context.l10n.searchResultCount(results.length),
                             style: GolemText.overline.copyWith(
                               color: CupertinoDynamicColor.resolve(
                                 GolemTheme.mutedInk,
@@ -166,8 +167,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         Padding(
                           padding: const EdgeInsets.only(top: GolemSpace.s4),
                           child: Text(
-                            'Search runs against the local database. '
-                            'No index is uploaded.',
+                            context.l10n.localSearchPrivacy,
                             textAlign: TextAlign.center,
                             style: GolemText.caption.copyWith(
                               color: CupertinoDynamicColor.resolve(
@@ -192,28 +192,15 @@ final class _ResultCard extends StatelessWidget {
   final ChatSearchResult result;
   final ValueChanged<String> onTap;
 
-  static const _months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-
-  String _dateLabel(DateTime date, DateTime now) {
+  String _dateLabel(BuildContext context, DateTime date, DateTime now) {
     final startOfToday = DateTime(now.year, now.month, now.day);
-    if (!date.isBefore(startOfToday)) return 'Today';
+    if (!date.isBefore(startOfToday)) return context.l10n.today;
     if (!date.isBefore(startOfToday.subtract(const Duration(days: 1)))) {
-      return 'Yesterday';
+      return context.l10n.yesterday;
     }
-    return '${date.day} ${_months[date.month - 1]}';
+    return DateFormat.MMMd(
+      Localizations.localeOf(context).toLanguageTag(),
+    ).format(date);
   }
 
   @override
@@ -285,9 +272,10 @@ final class _ResultCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              '${_dateLabel(result.updatedAt, DateTime.now())} · '
-              '${result.matchCount} '
-              '${result.matchCount == 1 ? 'match' : 'matches'}',
+              context.l10n.searchMatchSummary(
+                _dateLabel(context, result.updatedAt, DateTime.now()),
+                result.matchCount,
+              ),
               style: GolemText.caption.copyWith(
                 color: CupertinoDynamicColor.resolve(
                   GolemTheme.tertiaryInk,

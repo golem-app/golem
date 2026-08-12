@@ -15,6 +15,7 @@ import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
+import '../../l10n/l10n.dart';
 import '../chat/model_label.dart';
 import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
@@ -36,8 +37,8 @@ class ResponseStyleScreen extends ConsumerWidget {
     final modelLabel = chatModelLabel(backend: backend, catalog: catalog);
     return CupertinoPageScaffold(
       navigationBar: GolemNavBar(
-        title: 'Response style',
-        previousPageTitle: 'Settings',
+        title: context.l10n.responseStyle,
+        previousPageTitle: context.l10n.settings,
       ),
       child: SafeArea(
         bottom: false,
@@ -48,8 +49,7 @@ class ResponseStyleScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(2, 0, 2, 18),
               child: Text(
-                'How much room $modelLabel has to improvise. This only '
-                'affects new responses.',
+                context.l10n.responseStyleDescription(modelLabel),
                 style: GolemText.body.copyWith(
                   color: CupertinoDynamicColor.resolve(
                     GolemTheme.mutedInk,
@@ -72,16 +72,13 @@ class ResponseStyleScreen extends ConsumerWidget {
               const SizedBox(height: 10),
             ],
             if (!preferences.advancedMode)
-              const Padding(
-                padding: EdgeInsets.only(top: 16),
-                child: SettingsFootnote(
-                  'Turn on Advanced mode in Settings to set temperature, '
-                  'top-p and token budgets by hand.',
-                ),
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: SettingsFootnote(context.l10n.advancedSamplingHint),
               )
             else ...[
               const SizedBox(height: 14),
-              const SectionHeader('Sampling'),
+              SectionHeader(context.l10n.sampling),
               const SizedBox(height: 8),
               GenerationCard(profileKey: profileKey),
             ],
@@ -102,17 +99,6 @@ class _StyleCard extends StatelessWidget {
   final ResponseStyle style;
   final bool selected;
   final VoidCallback onTap;
-
-  static const _titles = {
-    ResponseStyle.precise: 'Precise',
-    ResponseStyle.balanced: 'Balanced',
-    ResponseStyle.creative: 'Creative',
-  };
-  static const _captions = {
-    ResponseStyle.precise: 'Sticks to the facts. Best for code and summaries.',
-    ResponseStyle.balanced: 'The model\'s own defaults. Recommended.',
-    ResponseStyle.creative: 'Looser and more varied. Occasionally wrong.',
-  };
 
   @override
   Widget build(BuildContext context) {
@@ -143,7 +129,7 @@ class _StyleCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _titles[style]!,
+                    _styleTitle(context, style),
                     // Explicit ink: CupertinoButton would otherwise tint
                     // the title accent-blue.
                     style: GolemText.bodyStrong.copyWith(
@@ -155,7 +141,7 @@ class _StyleCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    _captions[style]!,
+                    _styleDetail(context, style),
                     style: GolemText.footnote.copyWith(
                       color: CupertinoDynamicColor.resolve(
                         GolemTheme.mutedInk,
@@ -168,7 +154,7 @@ class _StyleCard extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Semantics(
-              label: '${_titles[style]} selected',
+              label: context.l10n.selectedOption(_styleTitle(context, style)),
               checked: selected,
               child: Container(
                 width: 23,
@@ -202,6 +188,27 @@ class _StyleCard extends StatelessWidget {
   }
 }
 
+String _styleTitle(BuildContext context, ResponseStyle style) =>
+    switch (style) {
+      ResponseStyle.precise => context.l10n.stylePrecise,
+      ResponseStyle.balanced => context.l10n.styleBalanced,
+      ResponseStyle.creative => context.l10n.styleCreative,
+    };
+
+String _styleDetail(BuildContext context, ResponseStyle style) =>
+    switch (style) {
+      ResponseStyle.precise => context.l10n.stylePreciseDetail,
+      ResponseStyle.balanced => context.l10n.styleBalancedDetail,
+      ResponseStyle.creative => context.l10n.styleCreativeDetail,
+    };
+
+String _styleSource(BuildContext context, ResponseStyle style) =>
+    switch (style) {
+      ResponseStyle.precise => context.l10n.stylePreciseLowercase,
+      ResponseStyle.balanced => context.l10n.styleBalancedLowercase,
+      ResponseStyle.creative => context.l10n.styleCreativeLowercase,
+    };
+
 /// Context tokens the budget controls must always leave for the rendered
 /// prompt: the engines reject any request whose prompt plus budget exceeds
 /// the context, so a budget equal to the context would fail every send.
@@ -223,9 +230,7 @@ class GenerationCard extends ConsumerWidget {
     if (profile == null) {
       // A custom model runs on the generic style table and has no profile
       // registry entry to hand-tune yet.
-      return const SettingsFootnote(
-        'This model has no tunable profile on this build.',
-      );
+      return SettingsFootnote(context.l10n.noTunableProfile);
     }
     // The direct-mode defaults are the editable surface; thinking-mode
     // sampling can be pinned by the profile (see the footnote).
@@ -238,7 +243,8 @@ class GenerationCard extends ConsumerWidget {
       // holds on the next successful write; surface the failed read instead.
       return RetryPane(
         key: const Key('settings-load-error'),
-        message: "Couldn't load settings.",
+        message: context.l10n.settingsLoadFailed,
+        actionLabel: context.l10n.tryAgain,
         onRetry: () => ref.invalidate(settingsControllerProvider),
       );
     }
@@ -254,8 +260,8 @@ class GenerationCard extends ConsumerWidget {
     String? caption(Object? manual, Object? styled) => manual != null
         ? null
         : styled != null
-        ? '· ${style.name}'
-        : '· default';
+        ? context.l10n.styleSource(_styleSource(context, style))
+        : context.l10n.defaultSource;
     // Persisted values are sanitized into the controls' ranges before
     // rendering: the store's leaves are deliberately tolerant, and a
     // hand-edited file must not be able to make the steppers throw.
@@ -296,12 +302,15 @@ class GenerationCard extends ConsumerWidget {
                       .read(settingsControllerProvider.notifier)
                       .resetModel(profileKey),
                 ),
-                child: const Text('Reset', style: TextStyle(fontSize: 14)),
+                child: Text(
+                  context.l10n.reset,
+                  style: const TextStyle(fontSize: 14),
+                ),
               ),
             ),
           _SliderRow(
             sliderKey: Key('gen-temperature-$profileKey'),
-            label: 'Temperature',
+            label: context.l10n.samplingTemperature,
             value:
                 overrides.temperature ??
                 styleOverrides.temperature ??
@@ -315,7 +324,7 @@ class GenerationCard extends ConsumerWidget {
           ),
           _SliderRow(
             sliderKey: Key('gen-top-p-$profileKey'),
-            label: 'Top-p',
+            label: context.l10n.samplingTopP,
             value: overrides.topP ?? styleOverrides.topP ?? defaults.topP,
             caption: caption(overrides.topP, styleOverrides.topP),
             min: 0.05,
@@ -325,13 +334,14 @@ class GenerationCard extends ConsumerWidget {
           ),
           _SliderRow(
             sliderKey: Key('gen-top-k-$profileKey'),
-            label: 'Top-k',
+            label: context.l10n.samplingTopK,
             value: (overrides.topK ?? styleOverrides.topK ?? defaults.topK ?? 0)
                 .toDouble(),
             caption: caption(overrides.topK, styleOverrides.topK),
             min: 0,
             max: 100,
-            display: (value) => value.round() == 0 ? 'Off' : '${value.round()}',
+            display: (value) =>
+                value.round() == 0 ? context.l10n.off : '${value.round()}',
             onCommit: (value) => update(
               overrides.copyWith(
                 topK: () => value.round() == 0 ? null : value.round(),
@@ -341,7 +351,7 @@ class GenerationCard extends ConsumerWidget {
           const SizedBox(height: 6),
           _StepperRow(
             stepperKey: ValueKey<String>('gen-max-tokens-$profileKey'),
-            label: 'Max tokens',
+            label: context.l10n.maxTokens,
             value: maxTokens,
             isDefault: overrides.maxTokens == null,
             step: 256,
@@ -355,7 +365,7 @@ class GenerationCard extends ConsumerWidget {
           const SizedBox(height: 6),
           _StepperRow(
             stepperKey: ValueKey<String>('gen-context-$profileKey'),
-            label: 'Context length',
+            label: context.l10n.contextLength,
             value: contextLength,
             isDefault: overrides.contextLength == null,
             step: 1024,
@@ -382,11 +392,8 @@ class GenerationCard extends ConsumerWidget {
             // Value-free on purpose: the pinned recipe lives with the
             // profile, and a hardcoded copy of it has already drifted once.
             thinkingPinned
-                ? 'Token budgets always leave 512 context tokens free for '
-                      'the prompt. Thinking mode keeps this model\'s pinned '
-                      'sampling; budgets apply to both modes.'
-                : 'Token budgets always leave 512 context tokens free for '
-                      'the prompt.',
+                ? context.l10n.pinnedTokenBudgetFootnote
+                : context.l10n.tokenBudgetFootnote,
             style: TextStyle(
               color: CupertinoDynamicColor.resolve(
                 GolemTheme.mutedInk,
@@ -521,7 +528,10 @@ class _StepperRow extends StatelessWidget {
             children: [
               Text('$value', style: const TextStyle(fontSize: 14)),
               if (isDefault)
-                Text('default', style: TextStyle(fontSize: 11, color: muted)),
+                Text(
+                  context.l10n.defaultLowercase,
+                  style: TextStyle(fontSize: 11, color: muted),
+                ),
             ],
           ),
         ),

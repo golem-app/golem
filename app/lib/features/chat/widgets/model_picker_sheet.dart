@@ -10,6 +10,7 @@ import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../../../core/widgets/progress_track.dart';
+import '../../../l10n/l10n.dart';
 import '../../onboarding/model_download_consent.dart';
 import '../model_choice.dart';
 
@@ -58,6 +59,7 @@ final class _ModelPickerContent extends ConsumerWidget {
       deviceRefusal: ref.watch(deviceRefusalProvider),
       advanced: preferences?.advancedMode ?? false,
       simulatedTransfers: simulatedTransfers,
+      localizations: context.l10n,
       selectedKey: effectiveModelKey(
         backend: backend,
         catalog: catalog,
@@ -82,7 +84,7 @@ final class _ModelPickerContent extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Model for this chat',
+              context.l10n.modelForChat,
               textAlign: TextAlign.center,
               style: GolemText.cardTitle,
             ),
@@ -132,7 +134,7 @@ final class _ModelPickerContent extends ConsumerWidget {
                 context.push('/settings');
               },
               child: Text(
-                'Manage models',
+                context.l10n.manageModels,
                 style: GolemText.footnoteStrong.copyWith(
                   color: CupertinoDynamicColor.resolve(
                     GolemTheme.accent,
@@ -255,7 +257,7 @@ final class _ModelRow extends StatelessWidget {
                             // sharing the line squeezes a long model name into
                             // three wrapped ones.
                             if (choice.recommendation != null) ...[
-                              const GolemBadge(label: 'RECOMMENDED'),
+                              GolemBadge(label: context.l10n.recommended),
                               const SizedBox(height: 5),
                             ],
                             Text(
@@ -280,7 +282,7 @@ final class _ModelRow extends StatelessWidget {
                           CupertinoIcons.checkmark_circle_fill,
                           size: 22,
                           color: accent,
-                          semanticLabel: 'Selected model',
+                          semanticLabel: context.l10n.selectedModel,
                         ),
                     ],
                   ),
@@ -312,14 +314,14 @@ final class _ModelRow extends StatelessWidget {
                 ],
               ),
             ),
-            ..._transfer(muted, accent),
+            ..._transfer(context, muted, accent),
           ],
         ),
       ),
     );
   }
 
-  List<Widget> _transfer(Color muted, Color accent) =>
+  List<Widget> _transfer(BuildContext context, Color muted, Color accent) =>
       switch (choice.transfer) {
         null => const [],
         final ModelTransferProgress progress => [
@@ -353,7 +355,7 @@ final class _ModelRow extends StatelessWidget {
               minimumSize: const Size.fromHeight(GolemSize.hitTarget),
               onPressed: onTransfer,
               child: Text(
-                'Pause',
+                context.l10n.pause,
                 style: GolemText.footnoteStrong.copyWith(color: accent),
               ),
             ),

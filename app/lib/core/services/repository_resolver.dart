@@ -16,55 +16,26 @@ import 'chat_template_fingerprint.dart';
 import 'gguf_header.dart';
 import 'hugging_face_api.dart';
 
-/// Why a repository cannot become a model, with the copy the user sees. No
-/// catch-all "invalid repository": that tells a user nothing to change.
+/// Why a repository cannot become a model. Presentation maps each stable
+/// reason to localized copy; no catch-all "invalid repository" is allowed,
+/// because that would tell the user nothing to change.
 enum RepositoryRejection {
-  malformedIdentifier(
-    'Enter a public repository as owner/name, for example '
-    'unsloth/gemma-4-E2B-it-qat-GGUF.',
-  ),
-  notFoundOrPrivate(
-    'That repository could not be read. Check the name, and note that private '
-    'repositories are not supported.',
-  ),
-  gated(
-    'That repository requires accepting its licence on Hugging Face. Gated '
-    'repositories are not supported.',
-  ),
-  disabled('That repository has been disabled on Hugging Face.'),
-  rateLimited('Hugging Face is rate limiting this device. Try again shortly.'),
-  network('Could not reach Hugging Face. Check your connection and try again.'),
-  malformedMetadata(
-    'Hugging Face returned something unexpected for that '
-    'repository. Try again shortly.',
-  ),
-  unsafePath('That repository contains a file path this app will not write.'),
-  noWeights('No weights this engine can load were found in that repository.'),
-  shardedWeights(
-    'That model is split across multiple weight files, which is not supported '
-    'yet. Choose a single-file version.',
-  ),
-  unsafeWeightFormat(
-    'That repository publishes its weights in a format this app will not load. '
-    'Only safetensors and GGUF are supported.',
-  ),
-  missingRequiredFile(
-    'That repository is missing files the engine needs to load it.',
-  ),
-  inconsistentMetadata(
-    'That repository\'s file listing disagrees with itself, so it cannot be '
-    'pinned safely.',
-  ),
-  unsupportedArchitecture(
-    'This version of Golem cannot run that model architecture.',
-  ),
-  headerTooLarge('That model\'s metadata is larger than this app will read.'),
-  duplicateEntry('That repository has already been added.');
-
-  const RepositoryRejection(this.message);
-
-  /// Never an identifier, a URL or a status code — those belong on the cause.
-  final String message;
+  malformedIdentifier,
+  notFoundOrPrivate,
+  gated,
+  disabled,
+  rateLimited,
+  network,
+  malformedMetadata,
+  unsafePath,
+  noWeights,
+  shardedWeights,
+  unsafeWeightFormat,
+  missingRequiredFile,
+  inconsistentMetadata,
+  unsupportedArchitecture,
+  headerTooLarge,
+  duplicateEntry,
 }
 
 sealed class RepositoryResolution {
@@ -111,8 +82,6 @@ final class RepositoryRejected extends RepositoryResolution {
 
   /// Internal detail for logs — never shown.
   final Object? cause;
-
-  String get message => reason.message;
 }
 
 /// The architectures each engine has been *proven* to load here, from the

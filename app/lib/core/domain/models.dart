@@ -30,7 +30,7 @@ int _nextId = 0;
 
 String normalizeTitle(String value) {
   final normalized = value.trim().replaceAll(RegExp(r'\s+'), ' ');
-  if (normalized.isEmpty) return 'New chat';
+  if (normalized.isEmpty) return '';
   return normalized.length <= 48
       ? normalized
       : '${normalized.substring(0, 47)}…';
@@ -308,10 +308,18 @@ final class ChatConversation {
   );
 
   /// Shareable transcript; reasoning stays private, like [promptContext].
-  String transcriptMarkdown() {
-    final buffer = StringBuffer('## $title\n');
+  String transcriptMarkdown({
+    required String untitledTitle,
+    required String userSpeaker,
+    required String assistantSpeaker,
+  }) {
+    final buffer = StringBuffer(
+      '## ${title.isEmpty ? untitledTitle : title}\n',
+    );
     for (final message in _messages.where((message) => !message.isStreaming)) {
-      final speaker = message.role == MessageRole.user ? 'You' : 'Golem';
+      final speaker = message.role == MessageRole.user
+          ? userSpeaker
+          : assistantSpeaker;
       buffer.write('\n**$speaker:** ${message.text}\n');
     }
     return buffer.toString();
@@ -345,21 +353,34 @@ final class ChatConversation {
     'modelKey': modelKey,
   };
 
-  factory ChatConversation.fromJson(Map<String, Object?> json) =>
-      ChatConversation(
-        id: json['id']! as String,
-        title: normalizeTitle(json['title']! as String),
-        messages: (json['messages']! as List)
-            .map(
-              (item) =>
-                  ChatMessage.fromJson(Map<String, Object?>.from(item as Map)),
-            )
-            .toList(growable: false),
-        updatedAt: DateTime.parse(json['updatedAt']! as String),
-        reasoningEnabled: json['reasoningEnabled'] as bool? ?? false,
-        pinned: json['pinned'] as bool? ?? false,
-        modelKey: json['modelKey'] as String?,
-      );
+  factory ChatConversation.fromJson(
+    Map<String, Object?> json, {
+    bool migrateGeneratedPlaceholder = false,
+  }) {
+    final messages = (json['messages']! as List)
+        .map(
+          (item) =>
+              ChatMessage.fromJson(Map<String, Object?>.from(item as Map)),
+        )
+        .toList(growable: false);
+    final storedTitle = json['title']! as String;
+    final generatedPlaceholder =
+        migrateGeneratedPlaceholder &&
+        (storedTitle == 'New chat' && messages.isEmpty ||
+            storedTitle == 'Image' &&
+                messages.firstOrNull?.role == MessageRole.user &&
+                messages.firstOrNull?.text.isEmpty == true &&
+                messages.firstOrNull?.hasImages == true);
+    return ChatConversation(
+      id: json['id']! as String,
+      title: generatedPlaceholder ? '' : normalizeTitle(storedTitle),
+      messages: messages,
+      updatedAt: DateTime.parse(json['updatedAt']! as String),
+      reasoningEnabled: json['reasoningEnabled'] as bool? ?? false,
+      pinned: json['pinned'] as bool? ?? false,
+      modelKey: json['modelKey'] as String?,
+    );
+  }
 }
 
 final class ChatHistorySnapshot {
@@ -371,9 +392,9 @@ final class ChatHistorySnapshot {
   List<ChatConversation> get conversations =>
       UnmodifiableListView(_conversations);
 
-  /// v2 replaced each message's flat `text` with ordered `parts` (#18); a v1
-  /// file loads unchanged and is rewritten as v2 on the next save.
-  static const schemaVersion = 2;
+  /// v2 replaced message text with ordered parts (#18); v3 made generated
+  /// untitled placeholders semantic (#71).
+  static const schemaVersion = 3;
 
   Set<String> get referencedAttachmentIds => {
     for (final conversation in _conversations) ...conversation.attachmentIds,
@@ -387,13 +408,15 @@ final class ChatHistorySnapshot {
 
   factory ChatHistorySnapshot.fromJson(Map<String, Object?> json) {
     final version = json['schemaVersion'];
-    if (version != 1 && version != schemaVersion) {
+    if (version != 1 && version != 2 && version != schemaVersion) {
       throw const FormatException('Unsupported chat history schema');
     }
     final conversations = (json['conversations']! as List)
         .map(
-          (item) =>
-              ChatConversation.fromJson(Map<String, Object?>.from(item as Map)),
+          (item) => ChatConversation.fromJson(
+            Map<String, Object?>.from(item as Map),
+            migrateGeneratedPlaceholder: version != schemaVersion,
+          ),
         )
         .toList();
     final requested = json['activeConversationId'] as String?;
@@ -517,11 +540,66 @@ final class CompletedEvent extends InferenceEvent {
   final int? rawTextLength;
 }
 
+/// A stable model-transfer failure classification. The diagnostic [failure]
+/// string on [ArtifactStatus] remains available for logs, while presentation
+/// localizes this value and its safe parameters without parsing prose.
+enum ArtifactFailureKind {
+  insufficientStorage,
+  hashVerification,
+  unexpectedSize,
+  transfer,
+}
+
+final class ArtifactFailure {
+  const ArtifactFailure(
+    this.kind, {
+    this.requiredBytes,
+    this.availableBytes,
+    this.fileName,
+  });
+
+  final ArtifactFailureKind kind;
+  final int? requiredBytes;
+  final int? availableBytes;
+  final String? fileName;
+
+  Map<String, Object?> toJson() => {
+    'kind': kind.name,
+    'requiredBytes': ?requiredBytes,
+    'availableBytes': ?availableBytes,
+    'fileName': ?fileName,
+  };
+
+  factory ArtifactFailure.fromJson(Map<String, Object?> json) =>
+      ArtifactFailure(
+        ArtifactFailureKind.values.firstWhere(
+          (value) => value.name == json['kind'],
+          orElse: () => ArtifactFailureKind.transfer,
+        ),
+        requiredBytes: json['requiredBytes'] as int?,
+        availableBytes: json['availableBytes'] as int?,
+        fileName: json['fileName'] as String?,
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      other is ArtifactFailure &&
+      other.kind == kind &&
+      other.requiredBytes == requiredBytes &&
+      other.availableBytes == availableBytes &&
+      other.fileName == fileName;
+
+  @override
+  int get hashCode =>
+      Object.hash(kind, requiredBytes, availableBytes, fileName);
+}
+
 final class ArtifactStatus {
   const ArtifactStatus({
     this.phase = ArtifactPhase.notDownloaded,
     this.downloadedBytes = 0,
     this.failure,
+    this.failureReason,
   });
 
   final ArtifactPhase phase;
@@ -530,24 +608,30 @@ final class ArtifactStatus {
   /// catalog's total, so persistence never stores a stale percentage.
   final int downloadedBytes;
 
-  /// Non-null only when [phase] is [ArtifactPhase.failed].
+  /// Internal diagnostic, never rendered directly.
   final String? failure;
+
+  /// Localizable failure classification and safe presentation parameters.
+  final ArtifactFailure? failureReason;
 
   ArtifactStatus copyWith({
     ArtifactPhase? phase,
     int? downloadedBytes,
     String? failure,
+    ArtifactFailure? failureReason,
     bool clearFailure = false,
   }) => ArtifactStatus(
     phase: phase ?? this.phase,
     downloadedBytes: downloadedBytes ?? this.downloadedBytes,
     failure: clearFailure ? null : failure ?? this.failure,
+    failureReason: clearFailure ? null : failureReason ?? this.failureReason,
   );
 
   Map<String, Object?> toJson() => {
     'phase': phase.name,
     'downloadedBytes': downloadedBytes,
     'failure': failure,
+    'failureReason': failureReason?.toJson(),
   };
 
   factory ArtifactStatus.fromJson(Map<String, Object?> json) => ArtifactStatus(
@@ -556,6 +640,11 @@ final class ArtifactStatus {
     ),
     downloadedBytes: json['downloadedBytes'] as int? ?? 0,
     failure: json['failure'] as String?,
+    failureReason: json['failureReason'] is Map
+        ? ArtifactFailure.fromJson(
+            Map<String, Object?>.from(json['failureReason']! as Map),
+          )
+        : null,
   );
 
   @override
@@ -563,10 +652,12 @@ final class ArtifactStatus {
       other is ArtifactStatus &&
       other.phase == phase &&
       other.downloadedBytes == downloadedBytes &&
-      other.failure == failure;
+      other.failure == failure &&
+      other.failureReason == failureReason;
 
   @override
-  int get hashCode => Object.hash(phase, downloadedBytes, failure);
+  int get hashCode =>
+      Object.hash(phase, downloadedBytes, failure, failureReason);
 }
 
 final class ModelState {

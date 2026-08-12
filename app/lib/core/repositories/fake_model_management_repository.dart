@@ -117,6 +117,9 @@ final class FakeModelManagementRepository implements ModelManagementRepository {
               phase: ArtifactPhase.failed,
               downloadedBytes: bytes,
               failure: 'Simulated download failure.',
+              failureReason: const ArtifactFailure(
+                ArtifactFailureKind.transfer,
+              ),
             ),
           ),
         );

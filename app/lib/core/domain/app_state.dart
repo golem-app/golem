@@ -11,6 +11,13 @@ import 'models.dart';
 /// it can never fix ([contextExhausted]) offers a new chat instead.
 enum ChatFailureKind {
   generic,
+  attachmentSave,
+  attachmentUnavailable,
+  modelUnavailable,
+  unsupportedModel,
+  unsupportedImages,
+  invalidModelArtifact,
+  budgetExhaustedBeforeAnswer,
   missingModel,
   contextExhausted,
   outOfMemory,
@@ -21,31 +28,26 @@ enum ChatFailureKind {
   unsupportedDevice,
 }
 
-/// A typed chat failure: the classification that picks banner actions,
-/// the user-presentable message, and — for [ChatFailureKind.missingModel]
-/// — the catalog key whose download the banner can offer. Raw exception
-/// text never lands here; controllers map everything to copy first.
+/// A typed chat failure: the classification that picks banner actions and —
+/// for [ChatFailureKind.missingModel] — the catalog key whose download the
+/// banner can offer. Presentation maps this semantic value to localized copy.
 final class ChatFailure {
-  const ChatFailure({
-    required this.kind,
-    required this.message,
-    this.artifactKey,
-  });
+  const ChatFailure({required this.kind, this.artifactKey, this.contextTokens});
 
   final ChatFailureKind kind;
-  final String message;
   final String? artifactKey;
+  final int? contextTokens;
 
   // Value equality so the recovery banner can select on the failure itself.
   @override
   bool operator ==(Object other) =>
       other is ChatFailure &&
       other.kind == kind &&
-      other.message == message &&
-      other.artifactKey == artifactKey;
+      other.artifactKey == artifactKey &&
+      other.contextTokens == contextTokens;
 
   @override
-  int get hashCode => Object.hash(kind, message, artifactKey);
+  int get hashCode => Object.hash(kind, artifactKey, contextTokens);
 }
 
 /// Whether the live chat session has a known durability problem. This state is
@@ -120,12 +122,11 @@ enum LaunchFailureKind {
   unknown,
 }
 
-/// A launch failure is its classification plus user-presentable copy; the
-/// throwing cause stays in diagnostics, never on a surface.
+/// A launch failure is semantic; presentation maps it to localized copy while
+/// the throwing cause stays in diagnostics.
 final class LaunchFailure {
-  const LaunchFailure({required this.kind, required this.message});
+  const LaunchFailure(this.kind);
   final LaunchFailureKind kind;
-  final String message;
 
   bool get retryable => kind != LaunchFailureKind.invalidConfiguration;
 }

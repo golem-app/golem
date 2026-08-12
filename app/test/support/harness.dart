@@ -21,6 +21,7 @@ import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/core/services/custom_repository_resolver.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/search_screen.dart';
+import 'package:golem_flutter/l10n/l10n.dart';
 
 import 'in_memory_attachment_repository.dart';
 import 'in_memory_chat_history_repository.dart';
@@ -61,9 +62,13 @@ String chromeSuffix() =>
 Widget wrapApp({
   required Widget child,
   Brightness brightness = Brightness.light,
+  Locale locale = const Locale('en'),
 }) => CupertinoApp(
   debugShowCheckedModeBanner: false,
   theme: GolemTheme.theme(brightness),
+  locale: locale,
+  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  supportedLocales: AppLocalizations.supportedLocales,
   home: child,
 );
 
@@ -168,6 +173,7 @@ Future<void> pumpWithRepositories(
   WidgetTester tester, {
   required Widget child,
   Brightness brightness = Brightness.light,
+  Locale locale = const Locale('en'),
   double textScale = 1,
   ChatHistorySnapshot? history,
   ModelState model = const ModelState(),
@@ -198,7 +204,7 @@ Future<void> pumpWithRepositories(
   addTearDown(container.dispose);
   final app = UncontrolledProviderScope(
     container: container,
-    child: wrapApp(brightness: brightness, child: child),
+    child: wrapApp(brightness: brightness, locale: locale, child: child),
   );
   await tester.pumpWidget(
     // The app's own MediaQuery takes its scaler from the ancestor it finds, so
@@ -259,6 +265,9 @@ Future<void> pumpSearchScreen(
       child: CupertinoApp.router(
         debugShowCheckedModeBanner: false,
         theme: GolemTheme.theme(brightness),
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router,
       ),
     ),

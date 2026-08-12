@@ -9,6 +9,7 @@ import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
+import '../../l10n/l10n.dart';
 
 /// The Advanced-mode system prompt editor. The draft is widget-local and
 /// commits debounced on text changes (a TextEditingController also
@@ -74,8 +75,8 @@ class _SystemPromptScreenState extends ConsumerState<SystemPromptScreen> {
       onPopInvokedWithResult: (didPop, result) => _commit(),
       child: CupertinoPageScaffold(
         navigationBar: GolemNavBar(
-          title: 'System prompt',
-          previousPageTitle: 'Settings',
+          title: context.l10n.settingsSystemPrompt,
+          previousPageTitle: context.l10n.settingsTitle,
         ),
         child: SafeArea(
           bottom: false,
@@ -85,9 +86,7 @@ class _SystemPromptScreenState extends ConsumerState<SystemPromptScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(2, 0, 2, 18),
                 child: Text(
-                  'Standing instructions for every new response, sent ahead '
-                  'of the conversation. Leave it empty to keep the model\'s '
-                  'default behavior.',
+                  context.l10n.systemPromptDetail,
                   style: GolemText.body.copyWith(
                     color: CupertinoDynamicColor.resolve(
                       GolemTheme.mutedInk,
@@ -101,7 +100,7 @@ class _SystemPromptScreenState extends ConsumerState<SystemPromptScreen> {
                 controller: _controller,
                 maxLines: 8,
                 minLines: 5,
-                placeholder: 'e.g. Answer briefly, in plain language.',
+                placeholder: context.l10n.systemPromptExample,
                 padding: const EdgeInsets.all(14),
                 style: GolemText.body,
                 decoration: BoxDecoration(
@@ -123,7 +122,7 @@ class _SystemPromptScreenState extends ConsumerState<SystemPromptScreen> {
                 valueListenable: _controller,
                 builder: (context, value, _) => GolemButton.tinted(
                   key: const Key('system-prompt-reset'),
-                  label: 'Reset to default',
+                  label: context.l10n.resetToDefault,
                   onPressed: value.text.trim().isEmpty
                       ? null
                       : () {
@@ -133,9 +132,7 @@ class _SystemPromptScreenState extends ConsumerState<SystemPromptScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              const SettingsFootnote(
-                'The prompt applies to both models and stays on this device.',
-              ),
+              SettingsFootnote(context.l10n.systemPromptLocalFootnote),
             ],
           ),
         ),

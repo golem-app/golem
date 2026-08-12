@@ -16,6 +16,11 @@ void main() {
           phase: ArtifactPhase.failed,
           downloadedBytes: 42,
           failure: 'Needs 3.4 GB free; 1.1 GB available.',
+          failureReason: ArtifactFailure(
+            ArtifactFailureKind.insufficientStorage,
+            requiredBytes: 3400000000,
+            availableBytes: 1100000000,
+          ),
         ),
       },
       runtime: RuntimePhase.loaded,
@@ -35,6 +40,14 @@ void main() {
     expect(decoded.statusOf('gemma4-mlx').downloadedBytes, 123456789);
     expect(decoded.statusOf('qwen35-gguf').phase, ArtifactPhase.failed);
     expect(decoded.statusOf('qwen35-gguf').failure, contains('3.4 GB'));
+    expect(
+      decoded.statusOf('qwen35-gguf').failureReason,
+      const ArtifactFailure(
+        ArtifactFailureKind.insufficientStorage,
+        requiredBytes: 3400000000,
+        availableBytes: 1100000000,
+      ),
+    );
     expect(decoded.runtime, RuntimePhase.loaded);
     expect(decoded.failure, 'runtime message');
     expect(decoded.activeArtifactKey, isNull);

@@ -5,6 +5,7 @@ import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/settings/appearance_screen.dart';
+import 'package:golem_flutter/features/settings/language_screen.dart';
 import 'package:golem_flutter/features/settings/response_style_screen.dart';
 import 'package:golem_flutter/features/settings/storage_screen.dart';
 import 'package:golem_flutter/features/settings/models_screen.dart';
@@ -102,6 +103,29 @@ void main() {
 
     expect(find.byKey(const Key('preferences-load-error')), findsNothing);
     expect(find.byKey(const Key('toggle-metrics')), findsOneWidget);
+  });
+
+  testWidgets('the shared retry action follows the active Polish locale', (
+    tester,
+  ) async {
+    final preferences = InMemoryPreferencesRepository()..failingLoads = 1;
+    await pumpWithRepositories(
+      tester,
+      locale: const Locale('pl'),
+      preferences: preferences,
+      child: const LanguageScreen(),
+    );
+
+    expect(
+      find.byKey(const Key('language-preferences-load-error')),
+      findsOneWidget,
+    );
+    expect(find.text('Spróbuj ponownie'), findsOneWidget);
+    expect(find.text('Try again'), findsNothing);
+
+    await tester.tap(find.text('Spróbuj ponownie'));
+    await tester.pumpAndSettle();
+    expect(find.text('Język'), findsWidgets);
   });
 
   testWidgets('the storage retry leaves a healthy model controller alone', (

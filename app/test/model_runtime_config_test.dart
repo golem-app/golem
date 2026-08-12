@@ -106,8 +106,13 @@ void main() {
         () => resolveModelRuntimeConfig('gemma4-turbofieldfare'),
         throwsA(
           isA<InferenceException>()
-              .having((e) => e.kind, 'kind', InferenceFailureKind.engine)
-              // The banner shows this verbatim, so it must not leak the key.
+              .having(
+                (e) => e.kind,
+                'kind',
+                InferenceFailureKind.modelUnavailable,
+              )
+              // The source diagnostic stays bounded even though presentation
+              // now maps the semantic kind to localized copy.
               .having(
                 (e) => e.message,
                 'message',
