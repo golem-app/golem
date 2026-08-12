@@ -5,13 +5,13 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/chrome/golem_alert.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_toast.dart';
-import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
-import 'save_feedback.dart';
-import 'widgets/settings_rows.dart';
 import '../../l10n/l10n.dart';
 import '../chat/application/chat_providers.dart';
+import 'application/preferences_providers.dart';
+import 'save_feedback.dart';
+import 'widgets/settings_rows.dart';
 
 /// Privacy & data: the no-network statement, chat-history retention, and
 /// the user's own-data actions.

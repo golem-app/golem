@@ -5,7 +5,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/models.dart';
-import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/services/repository_resolver.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/settings/language_screen.dart';
@@ -14,10 +13,11 @@ import 'package:golem_flutter/l10n/generated/app_localizations_pl.dart';
 import 'package:golem_flutter/l10n/l10n.dart';
 import 'package:golem_flutter/l10n/presentation_messages.dart';
 
+import 'package:golem_flutter/features/models/application/model_providers.dart';
+import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
 import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
-import 'package:golem_flutter/features/models/application/model_providers.dart';
 
 void main() {
   test('English and Polish catalogs have identical resources', () {

@@ -1,11 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/features/chat/application/search_providers.dart';
 
+import 'package:golem_flutter/features/chat/application/chat_providers.dart';
+import 'package:golem_flutter/features/models/application/model_providers.dart';
+import 'package:golem_flutter/features/settings/application/storage_providers.dart';
 import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
-import 'package:golem_flutter/features/chat/application/chat_providers.dart';
-import 'package:golem_flutter/features/settings/application/storage_providers.dart';
-import 'package:golem_flutter/features/models/application/model_providers.dart';
 
 /// The #69 lifecycle classification, observably: screen-scoped providers
 /// dispose once unwatched (state resets, queries recompute), while a

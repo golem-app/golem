@@ -11,8 +11,9 @@ import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/progress_track.dart';
 import '../../l10n/l10n.dart';
 import '../../l10n/presentation_messages.dart';
-import 'model_download_consent.dart';
 import '../models/application/model_providers.dart';
+import '../settings/application/preferences_providers.dart';
+import 'model_download_consent.dart';
 
 /// The recoverable path promised when first-run consent is declined. It reads
 /// the same model controller as Settings, so pause, verification, failure, and

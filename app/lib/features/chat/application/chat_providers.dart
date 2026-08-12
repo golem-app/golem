@@ -13,6 +13,8 @@ import '../../../core/providers/retry.dart';
 import '../../../core/repositories/contracts.dart';
 import '../../../core/services/image_intake.dart';
 import '../../models/application/model_providers.dart';
+import '../../settings/application/preferences_providers.dart';
+import '../../settings/application/settings_providers.dart';
 
 part 'chat_providers.g.dart';
 

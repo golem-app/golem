@@ -3,15 +3,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
-import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/features/settings/appearance_screen.dart';
 
+import 'package:golem_flutter/features/chat/application/chat_providers.dart';
+import 'package:golem_flutter/features/models/application/model_providers.dart';
+import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
+import 'package:golem_flutter/features/settings/application/settings_providers.dart';
 import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
 import 'support/in_memory_settings_repository.dart';
-import 'package:golem_flutter/features/chat/application/chat_providers.dart';
-import 'package:golem_flutter/features/models/application/model_providers.dart';
 
 /// A failed save can never keep presenting as saved: commands return false,
 /// state rolls back to a value-equal previous, and nothing is thrown.

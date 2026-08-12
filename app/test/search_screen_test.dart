@@ -5,8 +5,8 @@ import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/search_screen.dart';
 
-import 'support/harness.dart';
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
+import 'support/harness.dart';
 
 ChatHistorySnapshot _twoChats() {
   ChatConversation chat(String id, String title, String body, DateTime at) =>

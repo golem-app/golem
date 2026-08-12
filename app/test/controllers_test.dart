@@ -13,19 +13,21 @@ import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
-import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_model_management_repository.dart';
 import 'package:golem_flutter/core/services/cache_probe.dart';
+import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
+import 'package:golem_flutter/features/chat/application/chat_providers.dart';
+import 'package:golem_flutter/features/models/application/model_providers.dart';
+import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
+import 'package:golem_flutter/features/settings/application/settings_providers.dart';
+import 'package:golem_flutter/features/settings/application/storage_providers.dart';
 import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
 import 'support/in_memory_settings_repository.dart';
 import 'support/scripted_chat_history_repository.dart';
-import 'package:golem_flutter/features/chat/application/chat_providers.dart';
-import 'package:golem_flutter/features/settings/application/storage_providers.dart';
-import 'package:golem_flutter/features/models/application/model_providers.dart';
 
 Future<String> _fixtureAsset(String key) async =>
     '[{"role": "user", "content": "${'x' * 400}"}]';

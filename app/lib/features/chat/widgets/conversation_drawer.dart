@@ -10,16 +10,16 @@ import '../../../core/chrome/golem_menu.dart';
 import '../../../core/chrome/golem_sheet.dart';
 import '../../../core/chrome/golem_toast.dart';
 import '../../../core/domain/app_state.dart';
-import '../domain/chat_sections.dart';
+import '../../../core/domain/byte_format.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
-import '../model_label.dart';
-import '../../../core/domain/byte_format.dart';
 import '../../../l10n/l10n.dart';
-import '../application/chat_providers.dart';
-import '../../settings/application/storage_providers.dart';
 import '../../models/application/model_providers.dart';
+import '../../settings/application/storage_providers.dart';
+import '../application/chat_providers.dart';
+import '../domain/chat_sections.dart';
+import '../model_label.dart';
 
 class ConversationDrawer extends ConsumerStatefulWidget {
   const ConversationDrawer({

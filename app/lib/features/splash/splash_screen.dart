@@ -1,12 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/domain/app_state.dart';
 import '../../core/chrome/golem_button.dart';
-import '../../core/providers/app_providers.dart';
+import '../../core/domain/app_state.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/progress_track.dart';
 import '../../l10n/l10n.dart';
+import 'application/startup_providers.dart';
 
 class StartupGate extends ConsumerWidget {
   const StartupGate({required this.child, super.key});

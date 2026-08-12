@@ -8,6 +8,7 @@ import '../../core/chrome/golem_badge.dart';
 import '../../core/chrome/golem_button.dart';
 import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
+import '../../core/domain/model_admission.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
@@ -16,10 +17,10 @@ import '../../core/widgets/progress_track.dart';
 import '../../l10n/l10n.dart';
 import '../../l10n/presentation_messages.dart';
 import '../legal/ai_disclaimer.dart';
+import '../models/application/model_providers.dart';
+import '../settings/application/preferences_providers.dart';
 import 'application/onboarding_controller.dart';
 import 'model_download_consent.dart';
-import '../../core/domain/model_admission.dart';
-import '../models/application/model_providers.dart';
 
 class FirstRunScreen extends ConsumerWidget {
   const FirstRunScreen({super.key});

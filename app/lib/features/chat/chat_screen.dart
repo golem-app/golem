@@ -8,14 +8,14 @@ import '../../core/domain/app_state.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
-import '../../l10n/l10n.dart';
 import '../../core/widgets/retry_pane.dart';
+import '../../l10n/l10n.dart';
+import '../models/application/model_providers.dart';
+import 'application/chat_providers.dart';
 import 'model_label.dart';
 import 'widgets/attach_sheet.dart';
 import 'widgets/chat_canvas.dart';
 import 'widgets/conversation_drawer.dart';
-import 'application/chat_providers.dart';
-import '../models/application/model_providers.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({this.picker = const AttachmentPicker(), super.key});

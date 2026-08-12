@@ -8,17 +8,18 @@ import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
-import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
 import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_model_management_repository.dart';
 import 'package:golem_flutter/core/repositories/file_chat_history_repository.dart';
 import 'package:golem_flutter/core/repositories/file_settings_repository.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
+import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
 
-import 'support/in_memory_chat_history_repository.dart';
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
+import 'package:golem_flutter/features/splash/application/startup_providers.dart';
+import 'support/in_memory_chat_history_repository.dart';
 
 Future<String> _fixtureAsset(String key) async =>
     '[{"role": "user", "content": "${'x' * 400}"}]';

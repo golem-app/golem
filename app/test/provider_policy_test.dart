@@ -4,13 +4,16 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
-import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
-import 'package:golem_flutter/features/chat/application/search_providers.dart';
 import 'package:golem_flutter/core/providers/retry.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
+import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
-import 'package:golem_flutter/features/settings/application/storage_providers.dart';
+import 'package:golem_flutter/features/chat/application/search_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
+import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
+import 'package:golem_flutter/features/settings/application/settings_providers.dart';
+import 'package:golem_flutter/features/settings/application/storage_providers.dart';
+import 'package:golem_flutter/features/splash/application/startup_providers.dart';
 
 /// Every generated provider, so a new annotation missing `retry: noRetry`
 /// fails here instead of silently inheriting the ten-retry default.

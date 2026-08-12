@@ -11,6 +11,7 @@ import '../../../core/domain/model_catalog.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/retry.dart';
+import '../../settings/application/preferences_providers.dart';
 
 part 'model_providers.g.dart';
 
