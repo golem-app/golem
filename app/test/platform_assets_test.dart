@@ -120,7 +120,20 @@ void main() {
     final project = await File(
       'ios/Runner.xcodeproj/project.pbxproj',
     ).readAsString();
-    for (final locale in ['en', 'pl', 'ar', 'es', 'pt-BR', 'ja', 'id']) {
+    for (final locale in [
+      'en',
+      'pl',
+      'ar',
+      'es',
+      'pt-BR',
+      'ja',
+      'id',
+      'hi',
+      'fr',
+      'vi',
+      'tr',
+      'ko',
+    ]) {
       expect(project, contains('$locale.lproj/InfoPlist.strings'));
       final file = File('ios/Runner/$locale.lproj/InfoPlist.strings');
       expect(file.existsSync(), isTrue, reason: locale);
@@ -139,6 +152,19 @@ void main() {
     expect(arabic, contains('NSCameraUsageDescription'));
     expect(arabic, contains('NSPhotoLibraryUsageDescription'));
     expect(arabic, matches(RegExp(r'[\u0600-\u06ff]')));
+    final scriptSentinels = <String, RegExp>{
+      'hi': RegExp(r'[\u0900-\u097f]'),
+      'fr': RegExp('[éèà]'),
+      'vi': RegExp('[ảẢ]'),
+      'tr': RegExp('[ıİğş]'),
+      'ko': RegExp(r'[\uac00-\ud7af]'),
+    };
+    for (final entry in scriptSentinels.entries) {
+      final contents = await File(
+        'ios/Runner/${entry.key}.lproj/InfoPlist.strings',
+      ).readAsString();
+      expect(contents, matches(entry.value), reason: entry.key);
+    }
 
     final manifest = await File(
       'android/app/src/main/AndroidManifest.xml',

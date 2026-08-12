@@ -597,6 +597,107 @@ void main() {
     );
   }, variant: iosChrome);
 
+  testWidgets('global Hindi language picker golden', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      locale: const Locale('hi'),
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(language: AppLanguage.hindi),
+      ),
+      child: const LanguageScreen(),
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('language-hindi')),
+      240,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('language-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    await expectLater(
+      find.byType(LanguageScreen),
+      matchesGoldenFile('goldens/global-hindi-language.png'),
+    );
+  }, variant: iosChrome);
+
+  testWidgets('global French settings expansion golden', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      locale: const Locale('fr'),
+      textScale: 1.3,
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(language: AppLanguage.french),
+      ),
+      model: settingsModelSeed,
+      child: const SettingsScreen(identity: AppIdentity.qa),
+    );
+    await expectLater(
+      find.byType(SettingsScreen),
+      matchesGoldenFile('goldens/global-french-settings-large.png'),
+    );
+  }, variant: iosChrome);
+
+  testWidgets('global Vietnamese privacy golden', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      locale: const Locale('vi'),
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(language: AppLanguage.vietnamese),
+      ),
+      child: const PrivacyScreen(),
+    );
+    await expectLater(
+      find.byType(PrivacyScreen),
+      matchesGoldenFile('goldens/global-vietnamese-privacy.png'),
+    );
+  }, variant: iosChrome);
+
+  testWidgets('global Turkish model recovery golden', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      brightness: Brightness.dark,
+      locale: const Locale('tr'),
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(language: AppLanguage.turkish),
+      ),
+      model: settingsModelSeed,
+      child: const ModelsScreen(),
+    );
+    await expectLater(
+      find.byType(ModelsScreen),
+      matchesGoldenFile('goldens/global-turkish-model-recovery-dark.png'),
+    );
+  }, variant: iosChrome);
+
+  testWidgets('global Korean language picker golden', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      locale: const Locale('ko'),
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(language: AppLanguage.korean),
+      ),
+      child: const LanguageScreen(),
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('language-korean')),
+      240,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('language-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    await expectLater(
+      find.byType(LanguageScreen),
+      matchesGoldenFile('goldens/global-korean-language-android.png'),
+    );
+  }, variant: androidChrome);
+
   Future<void> revealIn(WidgetTester tester, Key listKey, Key target) async {
     await tester.scrollUntilVisible(
       find.byKey(target),

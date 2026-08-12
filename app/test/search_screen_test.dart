@@ -71,6 +71,22 @@ void main() {
     expect(find.byKey(const Key('search-empty')), findsOneWidget);
   });
 
+  testWidgets('Korean search result heading suppresses Latin tracking', (
+    tester,
+  ) async {
+    await pumpSearchScreen(
+      tester,
+      locale: const Locale('ko'),
+      history: _twoChats(),
+    );
+    await tester.enterText(find.byKey(const Key('search-field')), 'lisbon');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    final heading = tester.widget<Text>(find.text('대화 1개'));
+    expect(heading.style?.letterSpacing, 0);
+  });
+
   testWidgets('a result opens its conversation back on the chat screen', (
     tester,
   ) async {

@@ -22,6 +22,11 @@ enum AppLanguage {
   brazilianPortuguese('pt-BR'),
   japanese('ja'),
   indonesian('id'),
+  hindi('hi'),
+  french('fr'),
+  vietnamese('vi'),
+  turkish('tr'),
+  korean('ko'),
   arabic('ar');
 
   const AppLanguage(this.code);

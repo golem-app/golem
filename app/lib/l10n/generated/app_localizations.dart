@@ -8,10 +8,15 @@ import 'package:intl/intl.dart' as intl;
 import 'app_localizations_ar.dart';
 import 'app_localizations_en.dart';
 import 'app_localizations_es.dart';
+import 'app_localizations_fr.dart';
+import 'app_localizations_hi.dart';
 import 'app_localizations_id.dart';
 import 'app_localizations_ja.dart';
+import 'app_localizations_ko.dart';
 import 'app_localizations_pl.dart';
 import 'app_localizations_pt.dart';
+import 'app_localizations_tr.dart';
+import 'app_localizations_vi.dart';
 
 // ignore_for_file: type=lint
 
@@ -102,11 +107,16 @@ abstract class AppLocalizations {
     Locale('en'),
     Locale('ar'),
     Locale('es'),
+    Locale('fr'),
+    Locale('hi'),
     Locale('id'),
     Locale('ja'),
+    Locale('ko'),
     Locale('pl'),
     Locale('pt'),
     Locale('pt', 'BR'),
+    Locale('tr'),
+    Locale('vi'),
   ];
 
   /// Product name used in accessibility labels.
@@ -348,6 +358,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Bahasa Indonesia'**
   String get languageIndonesian;
+
+  /// Hindi language endonym.
+  ///
+  /// In en, this message translates to:
+  /// **'हिन्दी'**
+  String get languageHindi;
+
+  /// French language endonym.
+  ///
+  /// In en, this message translates to:
+  /// **'Français'**
+  String get languageFrench;
+
+  /// Vietnamese language endonym.
+  ///
+  /// In en, this message translates to:
+  /// **'Tiếng Việt'**
+  String get languageVietnamese;
+
+  /// Turkish language endonym.
+  ///
+  /// In en, this message translates to:
+  /// **'Türkçe'**
+  String get languageTurkish;
+
+  /// Korean language endonym.
+  ///
+  /// In en, this message translates to:
+  /// **'한국어'**
+  String get languageKorean;
 
   /// Arabic language endonym.
   ///
@@ -3080,10 +3120,15 @@ class _AppLocalizationsDelegate
     'ar',
     'en',
     'es',
+    'fr',
+    'hi',
     'id',
     'ja',
+    'ko',
     'pl',
     'pt',
+    'tr',
+    'vi',
   ].contains(locale.languageCode);
 
   @override
@@ -3111,14 +3156,24 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
       return AppLocalizationsEn();
     case 'es':
       return AppLocalizationsEs();
+    case 'fr':
+      return AppLocalizationsFr();
+    case 'hi':
+      return AppLocalizationsHi();
     case 'id':
       return AppLocalizationsId();
     case 'ja':
       return AppLocalizationsJa();
+    case 'ko':
+      return AppLocalizationsKo();
     case 'pl':
       return AppLocalizationsPl();
     case 'pt':
       return AppLocalizationsPt();
+    case 'tr':
+      return AppLocalizationsTr();
+    case 'vi':
+      return AppLocalizationsVi();
   }
 
   throw FlutterError(

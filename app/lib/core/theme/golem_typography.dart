@@ -3,7 +3,24 @@ import 'package:flutter/cupertino.dart';
 abstract final class GolemFont {
   /// Script coverage behind the explicit Apple faces. The active platform
   /// picks the first installed family; Latin glyphs continue to use SF Pro.
-  static const fallbacks = ['SF Arabic', 'Geeza Pro', 'Noto Sans Arabic'];
+  static const fallbacks = [
+    'Kohinoor Devanagari',
+    'Devanagari Sangam MN',
+    // Keep Japanese regional glyph forms ahead of Korean CJK faces. Both
+    // families cover many of the same ideographs, so a Korean font first can
+    // make Japanese kanji use the wrong locale-specific shapes.
+    'Hiragino Sans',
+    'YuGothic',
+    'Noto Sans CJK JP',
+    'Noto Sans JP',
+    'Apple SD Gothic Neo',
+    'SF Arabic',
+    'Geeza Pro',
+    'Noto Sans Devanagari',
+    'Noto Sans CJK KR',
+    'Noto Sans KR',
+    'Noto Sans Arabic',
+  ];
 }
 
 /// The Golem Navy type ramp. Styles are partial (they merge over the

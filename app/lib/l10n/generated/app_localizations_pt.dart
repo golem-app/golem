@@ -133,6 +133,21 @@ class AppLocalizationsPt extends AppLocalizations {
   String get languageIndonesian => 'Bahasa Indonesia';
 
   @override
+  String get languageHindi => 'हिन्दी';
+
+  @override
+  String get languageFrench => 'Français';
+
+  @override
+  String get languageVietnamese => 'Tiếng Việt';
+
+  @override
+  String get languageTurkish => 'Türkçe';
+
+  @override
+  String get languageKorean => '한국어';
+
+  @override
   String get languageArabic => 'العربية';
 
   @override
@@ -1972,6 +1987,21 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get languageIndonesian => 'Bahasa Indonesia';
+
+  @override
+  String get languageHindi => 'हिन्दी';
+
+  @override
+  String get languageFrench => 'Français';
+
+  @override
+  String get languageVietnamese => 'Tiếng Việt';
+
+  @override
+  String get languageTurkish => 'Türkçe';
+
+  @override
+  String get languageKorean => '한국어';
 
   @override
   String get languageArabic => 'العربية';

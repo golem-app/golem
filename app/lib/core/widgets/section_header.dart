@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../theme/golem_theme.dart';
+import '../../l10n/l10n.dart';
 
 /// Screen section heading with an optional muted subtitle, announced as a
 /// header to assistive technology.
@@ -10,30 +11,36 @@ class SectionHeader extends StatelessWidget {
   final String? subtitle;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    header: true,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title.toUpperCase(),
-          style: GolemText.overline.copyWith(
-            color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
-          ),
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 4),
+  Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    return Semantics(
+      header: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Text(
-            subtitle!,
-            style: GolemText.footnote.copyWith(
+            localizedUppercase(title, locale),
+            style: localizedLabelStyle(GolemText.overline, locale).copyWith(
               color: CupertinoDynamicColor.resolve(
                 GolemTheme.mutedInk,
                 context,
               ),
             ),
           ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              subtitle!,
+              style: GolemText.footnote.copyWith(
+                color: CupertinoDynamicColor.resolve(
+                  GolemTheme.mutedInk,
+                  context,
+                ),
+              ),
+            ),
+          ],
         ],
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }

@@ -186,12 +186,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                           ),
                           child: Text(
                             context.l10n.searchResultCount(results.length),
-                            style: GolemText.overline.copyWith(
-                              color: CupertinoDynamicColor.resolve(
-                                GolemTheme.mutedInk,
-                                context,
-                              ),
-                            ),
+                            style:
+                                localizedLabelStyle(
+                                  GolemText.overline,
+                                  Localizations.localeOf(context),
+                                ).copyWith(
+                                  color: CupertinoDynamicColor.resolve(
+                                    GolemTheme.mutedInk,
+                                    context,
+                                  ),
+                                ),
                           ),
                         ),
                         for (final result in results)

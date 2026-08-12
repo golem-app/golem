@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/services/repository_resolver.dart';
+import 'package:golem_flutter/core/theme/golem_typography.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
@@ -14,10 +15,15 @@ import 'package:golem_flutter/l10n/bidi.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_ar.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_en.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_es.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_fr.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_hi.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_id.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_ja.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_ko.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_pl.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_pt.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_tr.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_vi.dart';
 import 'package:golem_flutter/l10n/l10n.dart';
 import 'package:golem_flutter/l10n/presentation_messages.dart';
 
@@ -48,6 +54,11 @@ const _invariantCopyAllowlist = <String>{
   'languageBrazilianPortuguese',
   'languageJapanese',
   'languageIndonesian',
+  'languageHindi',
+  'languageFrench',
+  'languageVietnamese',
+  'languageTurkish',
+  'languageKorean',
   'languageArabic',
   'bytesDecimal',
   'megabytes',
@@ -76,6 +87,11 @@ void main() {
       'pt_BR': _catalog('lib/l10n/app_pt_BR.arb'),
       'ja': _catalog('lib/l10n/app_ja.arb'),
       'id': _catalog('lib/l10n/app_id.arb'),
+      'hi': _catalog('lib/l10n/app_hi.arb'),
+      'fr': _catalog('lib/l10n/app_fr.arb'),
+      'vi': _catalog('lib/l10n/app_vi.arb'),
+      'tr': _catalog('lib/l10n/app_tr.arb'),
+      'ko': _catalog('lib/l10n/app_ko.arb'),
     };
     for (final key in englishKeys) {
       final metadata = english['@$key']! as Map<String, Object?>;
@@ -112,7 +128,17 @@ void main() {
 
   test('new catalogs contain only documented source-identical copy', () {
     final english = _catalog('lib/l10n/app_en.arb');
-    for (final locale in ['es', 'pt_BR', 'ja', 'id']) {
+    for (final locale in [
+      'es',
+      'pt_BR',
+      'ja',
+      'id',
+      'hi',
+      'fr',
+      'vi',
+      'tr',
+      'ko',
+    ]) {
       final translation = _catalog('lib/l10n/app_$locale.arb');
       for (final key in _resourceKeys(english)) {
         if (translation[key] == english[key]) {
@@ -136,6 +162,11 @@ void main() {
       AppLocalizationsPtBr(),
       AppLocalizationsJa(),
       AppLocalizationsId(),
+      AppLocalizationsHi(),
+      AppLocalizationsFr(),
+      AppLocalizationsVi(),
+      AppLocalizationsTr(),
+      AppLocalizationsKo(),
     ];
     for (final l10n in localizations) {
       expect(l10n.languageEnglish, 'English');
@@ -144,8 +175,61 @@ void main() {
       expect(l10n.languageBrazilianPortuguese, 'Português (Brasil)');
       expect(l10n.languageJapanese, '日本語');
       expect(l10n.languageIndonesian, 'Bahasa Indonesia');
+      expect(l10n.languageHindi, 'हिन्दी');
+      expect(l10n.languageFrench, 'Français');
+      expect(l10n.languageVietnamese, 'Tiếng Việt');
+      expect(l10n.languageTurkish, 'Türkçe');
+      expect(l10n.languageKorean, '한국어');
       expect(l10n.languageArabic, 'العربية');
     }
+  });
+
+  test('script-sensitive catalog and presentation rules stay intact', () {
+    expect(
+      localizedUppercase('gizlilik ve indirilenler', const Locale('tr')),
+      'GİZLİLİK VE İNDİRİLENLER',
+    );
+    expect(localizedUppercase('निजता', const Locale('hi')), 'निजता');
+    expect(localizedUppercase('개인정보 보호', const Locale('ko')), '개인정보 보호');
+    expect(
+      localizedLabelStyle(GolemText.overline, const Locale('hi')).letterSpacing,
+      0,
+    );
+    expect(
+      localizedLabelStyle(GolemText.badge, const Locale('ko')).letterSpacing,
+      0,
+    );
+    expect(
+      localizedLabelStyle(GolemText.overline, const Locale('fr')).letterSpacing,
+      GolemText.overline.letterSpacing,
+    );
+
+    final vietnamese = File('lib/l10n/app_vi.arb').readAsStringSync();
+    expect(vietnamese, isNot(matches(RegExp(r'[\u0300-\u036f]'))));
+    expect(vietnamese, contains('Tiếng Việt'));
+
+    final french = _catalog('lib/l10n/app_fr.arb');
+    for (final key in _resourceKeys(french)) {
+      expect(
+        french[key]! as String,
+        isNot(matches(RegExp(r' [?!;:]'))),
+        reason: 'fr:$key must use non-breaking punctuation spacing',
+      );
+    }
+    expect(french['deleteChatTitle'], contains('\u202f?'));
+    expect(french['systemPromptExample'], contains('\u00a0:'));
+  });
+
+  test('Japanese fallback faces precede Korean CJK faces', () {
+    final fallbacks = GolemFont.fallbacks;
+    final appleJapanese = fallbacks.indexOf('Hiragino Sans');
+    final androidJapanese = fallbacks.indexOf('Noto Sans CJK JP');
+    final appleKorean = fallbacks.indexOf('Apple SD Gothic Neo');
+    final androidKorean = fallbacks.indexOf('Noto Sans CJK KR');
+    expect(appleJapanese, isNonNegative);
+    expect(androidJapanese, isNonNegative);
+    expect(appleJapanese, lessThan(appleKorean));
+    expect(androidJapanese, lessThan(androidKorean));
   });
 
   test(
@@ -194,6 +278,20 @@ void main() {
         ], AppLocalizations.supportedLocales),
         const Locale('id'),
       );
+      for (final locale in const [
+        (preferred: Locale('hi', 'IN'), resolved: Locale('hi')),
+        (preferred: Locale('fr', 'CA'), resolved: Locale('fr')),
+        (preferred: Locale('vi', 'VN'), resolved: Locale('vi')),
+        (preferred: Locale('tr', 'TR'), resolved: Locale('tr')),
+        (preferred: Locale('ko', 'KR'), resolved: Locale('ko')),
+      ]) {
+        expect(
+          resolveAppLocale([
+            locale.preferred,
+          ], AppLocalizations.supportedLocales),
+          locale.resolved,
+        );
+      }
       expect(
         resolveAppLocale(const [
           Locale('de', 'DE'),
@@ -223,6 +321,11 @@ void main() {
     final pt = AppLocalizationsPtBr();
     final ja = AppLocalizationsJa();
     final id = AppLocalizationsId();
+    final hi = AppLocalizationsHi();
+    final fr = AppLocalizationsFr();
+    final vi = AppLocalizationsVi();
+    final tr = AppLocalizationsTr();
+    final ko = AppLocalizationsKo();
     expect(es.chatCount(0), 'No hay chats');
     expect(es.chatCount(1), '1 chat');
     expect(es.chatCount(2), '2 chats');
@@ -235,13 +338,39 @@ void main() {
     expect(id.chatCount(0), 'Tidak ada percakapan');
     expect(id.chatCount(1), '1 percakapan');
     expect(id.chatCount(2), '2 percakapan');
+    expect(hi.chatCount(0), 'कोई चैट नहीं');
+    expect(hi.chatCount(1), '1 चैट');
+    expect(hi.chatCount(2), '2 चैट');
+    expect(fr.chatCount(0), 'Aucune conversation');
+    expect(fr.chatCount(1), '1 conversation');
+    expect(fr.chatCount(2), '2 conversations');
+    expect(fr.chatCount(1000000), '1000000 de conversations');
+    expect(vi.chatCount(0), 'Không có cuộc trò chuyện');
+    expect(vi.chatCount(1), '1 cuộc trò chuyện');
+    expect(vi.chatCount(2), '2 cuộc trò chuyện');
+    expect(tr.chatCount(0), 'Sohbet yok');
+    expect(tr.chatCount(1), '1 sohbet');
+    expect(tr.chatCount(2), '2 sohbet');
+    expect(ko.chatCount(0), '대화 없음');
+    expect(ko.chatCount(1), '대화 1개');
+    expect(ko.chatCount(2), '대화 2개');
     for (final locale in ['es', 'pt_BR']) {
       final raw = _catalog('lib/l10n/app_$locale.arb')['chatCount']! as String;
       expect(raw, contains('one{'), reason: locale);
       expect(raw, contains('many{'), reason: locale);
       expect(raw, contains('other{'), reason: locale);
     }
-    for (final locale in ['ja', 'id']) {
+    final french = _catalog('lib/l10n/app_fr.arb')['chatCount']! as String;
+    expect(french, contains('one{'));
+    expect(french, contains('many{'));
+    expect(french, contains('other{'));
+    for (final locale in ['hi', 'tr']) {
+      final raw = _catalog('lib/l10n/app_$locale.arb')['chatCount']! as String;
+      expect(raw, contains('one{'), reason: locale);
+      expect(raw, isNot(contains('many{')), reason: locale);
+      expect(raw, contains('other{'), reason: locale);
+    }
+    for (final locale in ['ja', 'id', 'vi', 'ko']) {
       final raw = _catalog('lib/l10n/app_$locale.arb')['chatCount']! as String;
       expect(raw, isNot(contains('one{')), reason: locale);
       expect(raw, isNot(contains('many{')), reason: locale);
@@ -292,6 +421,11 @@ void main() {
       AppLocalizationsPtBr(),
       AppLocalizationsJa(),
       AppLocalizationsId(),
+      AppLocalizationsHi(),
+      AppLocalizationsFr(),
+      AppLocalizationsVi(),
+      AppLocalizationsTr(),
+      AppLocalizationsKo(),
     ];
     for (final reason in RepositoryRejection.values) {
       final english = repositoryRejectionMessage(en, reason);
@@ -323,6 +457,11 @@ void main() {
     final pt = AppLocalizationsPtBr();
     final ja = AppLocalizationsJa();
     final id = AppLocalizationsId();
+    final hi = AppLocalizationsHi();
+    final fr = AppLocalizationsFr();
+    final vi = AppLocalizationsVi();
+    final tr = AppLocalizationsTr();
+    final ko = AppLocalizationsKo();
     const storage = ArtifactStatus(
       phase: ArtifactPhase.failed,
       failure: 'raw diagnostic must stay hidden',
@@ -374,7 +513,7 @@ void main() {
       'Model memerlukan ruang kosong \u20662.00 GB\u2069, tetapi hanya '
       '\u20660.40 GB\u2069 yang tersedia.',
     );
-    for (final l10n in [pl, es, pt, ja, id]) {
+    for (final l10n in [pl, es, pt, ja, id, hi, fr, vi, tr, ko]) {
       expect(
         artifactFailureMessage(l10n, hash),
         contains('\u2066model.gguf\u2069'),
@@ -395,6 +534,11 @@ void main() {
       AppLocalizationsPtBr(),
       AppLocalizationsJa(),
       AppLocalizationsId(),
+      AppLocalizationsHi(),
+      AppLocalizationsFr(),
+      AppLocalizationsVi(),
+      AppLocalizationsTr(),
+      AppLocalizationsKo(),
     ]) {
       expect(l10n.generationFailed, isNot(en.generationFailed));
       expect(l10n.contextExhausted, isNot(en.contextExhausted));
@@ -431,6 +575,11 @@ void main() {
         'pt-BR': AppLanguage.brazilianPortuguese,
         'ja': AppLanguage.japanese,
         'id': AppLanguage.indonesian,
+        'hi': AppLanguage.hindi,
+        'fr': AppLanguage.french,
+        'vi': AppLanguage.vietnamese,
+        'tr': AppLanguage.turkish,
+        'ko': AppLanguage.korean,
       };
       for (final MapEntry(key: code, value: language) in newCodes.entries) {
         final decoded = AppPreferences.fromJson({

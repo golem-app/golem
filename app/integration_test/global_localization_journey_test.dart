@@ -23,6 +23,23 @@ const _localeCases = [
     locale: Locale('id'),
     systemLabel: 'Bawaan sistem',
   ),
+  (key: 'language-hindi', locale: Locale('hi'), systemLabel: 'सिस्टम डिफ़ॉल्ट'),
+  (
+    key: 'language-french',
+    locale: Locale('fr'),
+    systemLabel: 'Langue du système',
+  ),
+  (
+    key: 'language-vietnamese',
+    locale: Locale('vi'),
+    systemLabel: 'Mặc định hệ thống',
+  ),
+  (
+    key: 'language-turkish',
+    locale: Locale('tr'),
+    systemLabel: 'Sistem varsayılanı',
+  ),
+  (key: 'language-korean', locale: Locale('ko'), systemLabel: '시스템 기본값'),
 ];
 
 void main() {

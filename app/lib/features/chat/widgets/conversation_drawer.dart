@@ -253,14 +253,15 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
     List<ChatConversation> items,
   ) {
     if (items.isEmpty) return const SizedBox.shrink();
+    final locale = Localizations.localeOf(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 14, 12, 8),
           child: Text(
-            title.toUpperCase(),
-            style: GolemText.overline.copyWith(
+            localizedUppercase(title, locale),
+            style: localizedLabelStyle(GolemText.overline, locale).copyWith(
               color: CupertinoDynamicColor.resolve(
                 GolemTheme.drawerFaintInk,
                 context,

@@ -225,9 +225,10 @@ const arabicSmokeEvalPrompts = <EvalPrompt>[
   ),
 ];
 
-/// Bounded instruction-following coverage for the first global locale wave.
-/// Each prompt asks the same arithmetic question and requires one native
-/// answer phrase; this is a compatibility smoke, not a fluency claim.
+/// Bounded instruction-following coverage for the global locale waves.
+/// Each prompt asks the same arithmetic question and requires a native-language
+/// signal; this is a compatibility smoke, not a fluency claim. Script checks
+/// deliberately accept natural wording variants instead of grading one phrase.
 const globalLanguageSmokeEvalPrompts = <EvalPrompt>[
   EvalPrompt(
     id: 'spanish-arithmetic-17x23',
@@ -285,6 +286,82 @@ const globalLanguageSmokeEvalPrompts = <EvalPrompt>[
     checks: [
       EvalCheck.regexp(r'\b391\b'),
       EvalCheck.contains('Hasilnya adalah'),
+    ],
+  ),
+  EvalPrompt(
+    id: 'hindi-arithmetic-17x23',
+    messages: [
+      {
+        'role': 'user',
+        'content':
+            'केवल यह हिंदी वाक्य अक्षरशः लिखें, और कुछ नहीं: “परिणाम 391 है।”',
+      },
+    ],
+    maxTokens: 64,
+    checks: [
+      EvalCheck.regexp(r'\b391\b'),
+      EvalCheck.regexp(r'[\u0900-\u097f]'),
+    ],
+  ),
+  EvalPrompt(
+    id: 'french-arithmetic-17x23',
+    messages: [
+      {
+        'role': 'user',
+        'content':
+            'Combien font 17 × 23 ? Répondez uniquement par une courte phrase '
+            'en français contenant « Le résultat est » et le nombre 391.',
+      },
+    ],
+    maxTokens: 64,
+    checks: [
+      EvalCheck.regexp(r'\b391\b'),
+      EvalCheck.contains('Le résultat est'),
+    ],
+  ),
+  EvalPrompt(
+    id: 'vietnamese-arithmetic-17x23',
+    messages: [
+      {
+        'role': 'user',
+        'content':
+            '17 × 23 bằng bao nhiêu? Chỉ trả lời bằng một câu tiếng Việt ngắn '
+            'có cụm từ “Kết quả là” và số 391.',
+      },
+    ],
+    maxTokens: 64,
+    checks: [
+      EvalCheck.regexp(r'\b391\b'),
+      EvalCheck.regexp(r'(?:Kết quả|bằng|nhân|với)'),
+    ],
+  ),
+  EvalPrompt(
+    id: 'turkish-arithmetic-17x23',
+    messages: [
+      {
+        'role': 'user',
+        'content':
+            'Yalnızca şu Türkçe cümleyi harfiyen yazın, başka hiçbir şey '
+            'yazmayın: “Sonuç 391’dir.”',
+      },
+    ],
+    maxTokens: 64,
+    checks: [EvalCheck.regexp(r'\b391\b'), EvalCheck.regexp(r'[çğıöşüÇĞİÖŞÜ]')],
+  ),
+  EvalPrompt(
+    id: 'korean-arithmetic-17x23',
+    messages: [
+      {
+        'role': 'user',
+        'content':
+            '17 × 23은 얼마인가요? “결과는”과 숫자 391을 포함한 짧은 '
+            '한국어 문장 하나로만 답하세요.',
+      },
+    ],
+    maxTokens: 64,
+    checks: [
+      EvalCheck.regexp(r'\b391\b'),
+      EvalCheck.regexp(r'[\uac00-\ud7af]'),
     ],
   ),
 ];

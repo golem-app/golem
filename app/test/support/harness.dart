@@ -48,6 +48,9 @@ void setViewport(WidgetTester tester) {
 /// these framework-managed variants (a bare override trips the foundation
 /// debug-variable invariant at test end).
 const iosChrome = TargetPlatformVariant(<TargetPlatform>{TargetPlatform.iOS});
+const androidChrome = TargetPlatformVariant(<TargetPlatform>{
+  TargetPlatform.android,
+});
 const bothChromes = TargetPlatformVariant(<TargetPlatform>{
   TargetPlatform.iOS,
   TargetPlatform.android,
