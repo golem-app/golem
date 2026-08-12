@@ -54,15 +54,11 @@ class ChatController extends _$ChatController {
       _persistenceEpoch++;
     });
     // Bound before the first await so commands arriving during hydration see
-    // it; a rebuild re-binds the same bridge instance (#88).
-    final bridge = ref.read(chatSessionBridgeProvider);
+    // it. Watched, not read: if the bridge is ever refreshed, this rebuild
+    // re-binds the fresh instance instead of leaving readers unbound (#88).
+    final bridge = ref.watch(chatSessionBridgeProvider);
     bridge.bindPersistCurrent(persistCurrent);
-    bridge.bindSessionFacts(
-      activeModelKey: () => state.value?.active?.modelKey,
-      generationActive: () =>
-          (state.value?.generation ?? GenerationPhase.idle) !=
-          GenerationPhase.idle,
-    );
+    bridge.bindSessionState(() => state.value);
     final snapshot = await ref.read(chatHistoryRepositoryProvider).load();
     await _retainReferenced(_attachments, snapshot.conversations);
     return ChatState(

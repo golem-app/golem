@@ -119,9 +119,10 @@ class ModelController extends _$ModelController {
 
   @override
   Future<ModelState> build() {
-    // Bound before any await so commands arriving during hydration see it; a
-    // rebuild re-binds the same bridge instance (#88).
-    final bridge = ref.read(modelSessionBridgeProvider);
+    // Bound before any await so commands arriving during hydration see it.
+    // Watched, not read: if the bridge is ever refreshed, this rebuild
+    // re-binds the fresh instance instead of leaving readers unbound (#88).
+    final bridge = ref.watch(modelSessionBridgeProvider);
     bridge.bindReflectEngineLoaded(reflectEngineLoaded);
     bridge.bindRegisterCustomModel(registerCustomModel);
     return ref.read(modelManagementRepositoryProvider).load();

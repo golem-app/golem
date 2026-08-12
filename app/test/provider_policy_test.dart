@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // ProviderOrFamily is exported only by the secondary misc.dart entrypoint.
@@ -65,6 +67,31 @@ final class _FailingSettingsRepository implements SettingsRepository {
 }
 
 void main() {
+  test('the registry names every generated provider', () {
+    // The registry above is hand-maintained and has rotted before (#88 had
+    // to add three providers that already existed). This scan keeps it
+    // complete: every @ProviderFor in a committed .g.dart must appear.
+    final generated = <String>{};
+    final pattern = RegExp(r'@ProviderFor\((\w+)\)');
+    final files = Directory('lib')
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((file) => file.path.endsWith('.g.dart'));
+    for (final file in files) {
+      for (final match in pattern.allMatches(file.readAsStringSync())) {
+        final name = match.group(1)!;
+        generated.add(name[0].toLowerCase() + name.substring(1));
+      }
+    }
+    expect(generated, isNotEmpty, reason: 'run from app/ so lib/ is visible');
+    expect(
+      generated.difference(_allProviders.keys.toSet()),
+      isEmpty,
+      reason:
+          'add the missing provider(s) to _allProviders with retry: noRetry',
+    );
+  });
+
   test('every provider declares the project no-retry policy', () {
     for (final entry in _allProviders.entries) {
       expect(
