@@ -1,0 +1,2 @@
+"NSCameraUsageDescription" = "Golem은 대화에 첨부할 사진을 촬영할 때만 카메라를 사용합니다. 사진은 이 기기에 남아 있습니다.";
+"NSPhotoLibraryUsageDescription" = "Golem은 대화에 사진을 첨부할 때만 해당 사진을 읽습니다. 사진은 이 기기에 남아 있습니다.";

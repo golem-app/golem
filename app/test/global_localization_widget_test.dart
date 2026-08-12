@@ -14,9 +14,14 @@ import 'package:golem_flutter/features/settings/settings_screen.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_en.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_es.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_fr.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_hi.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_id.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_ja.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_ko.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_pt.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_tr.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_vi.dart';
 
 import 'support/harness.dart';
 import 'support/in_memory_preferences_repository.dart';
@@ -50,6 +55,41 @@ const _localeCases = [
     rowKey: 'language-indonesian',
     endonym: 'Bahasa Indonesia',
   ),
+  (
+    name: 'Hindi',
+    locale: Locale('hi'),
+    language: AppLanguage.hindi,
+    rowKey: 'language-hindi',
+    endonym: 'हिन्दी',
+  ),
+  (
+    name: 'French',
+    locale: Locale('fr'),
+    language: AppLanguage.french,
+    rowKey: 'language-french',
+    endonym: 'Français',
+  ),
+  (
+    name: 'Vietnamese',
+    locale: Locale('vi'),
+    language: AppLanguage.vietnamese,
+    rowKey: 'language-vietnamese',
+    endonym: 'Tiếng Việt',
+  ),
+  (
+    name: 'Turkish',
+    locale: Locale('tr'),
+    language: AppLanguage.turkish,
+    rowKey: 'language-turkish',
+    endonym: 'Türkçe',
+  ),
+  (
+    name: 'Korean',
+    locale: Locale('ko'),
+    language: AppLanguage.korean,
+    rowKey: 'language-korean',
+    endonym: '한국어',
+  ),
 ];
 
 AppLocalizations _localizations(Locale locale) => switch (locale.languageCode) {
@@ -57,13 +97,18 @@ AppLocalizations _localizations(Locale locale) => switch (locale.languageCode) {
   'pt' => AppLocalizationsPtBr(),
   'ja' => AppLocalizationsJa(),
   'id' => AppLocalizationsId(),
+  'hi' => AppLocalizationsHi(),
+  'fr' => AppLocalizationsFr(),
+  'vi' => AppLocalizationsVi(),
+  'tr' => AppLocalizationsTr(),
+  'ko' => AppLocalizationsKo(),
   _ => throw ArgumentError.value(locale),
 };
 
 void main() {
   const progressState = ModelState(
     artifacts: {
-      'gemma4-gguf': ArtifactStatus(
+      'gemma4-mlx': ArtifactStatus(
         phase: ArtifactPhase.downloading,
         downloadedBytes: 1200000000,
       ),
@@ -133,12 +178,19 @@ void main() {
           await _scrollToKey(
             tester,
             listKey: const Key('models-list'),
-            targetKey: const Key('model-progress-gemma4-gguf'),
+            targetKey: const Key('model-progress-gemma4-mlx'),
           );
           expect(
-            find.byKey(const Key('model-progress-gemma4-gguf')),
+            find.byKey(const Key('model-progress-gemma4-mlx')),
             findsOneWidget,
           );
+          if (localeCase.locale.languageCode == 'hi' ||
+              localeCase.locale.languageCode == 'ko') {
+            final activeBadge = tester.widget<Text>(
+              find.text(l10n.activeBadge).first,
+            );
+            expect(activeBadge.style?.letterSpacing, 0);
+          }
           expect(tester.takeException(), isNull);
 
           await pumpWithRepositories(

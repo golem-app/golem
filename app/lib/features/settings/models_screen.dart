@@ -818,12 +818,16 @@ class _ModelCard extends ConsumerWidget {
                   ),
                   child: Text(
                     context.l10n.activeBadge,
-                    style: GolemText.badge.copyWith(
-                      color: CupertinoDynamicColor.resolve(
-                        GolemTheme.accent,
-                        context,
-                      ),
-                    ),
+                    style:
+                        localizedLabelStyle(
+                          GolemText.badge,
+                          Localizations.localeOf(context),
+                        ).copyWith(
+                          color: CupertinoDynamicColor.resolve(
+                            GolemTheme.accent,
+                            context,
+                          ),
+                        ),
                   ),
                 ),
               ],

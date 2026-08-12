@@ -294,7 +294,7 @@ void main() {
       evalPromptsForSuite(globalLanguageSmokeEvalSuite),
       same(globalLanguageSmokeEvalPrompts),
     );
-    expect(globalLanguageSmokeEvalPrompts, hasLength(4));
+    expect(globalLanguageSmokeEvalPrompts, hasLength(9));
     expect(uniformEvalSeed(globalLanguageSmokeEvalPrompts), 7);
     expect(
       globalLanguageSmokeEvalPrompts.map((prompt) => prompt.id),
@@ -303,6 +303,11 @@ void main() {
         'brazilian-portuguese-arithmetic-17x23',
         'japanese-arithmetic-17x23',
         'indonesian-arithmetic-17x23',
+        'hindi-arithmetic-17x23',
+        'french-arithmetic-17x23',
+        'vietnamese-arithmetic-17x23',
+        'turkish-arithmetic-17x23',
+        'korean-arithmetic-17x23',
       ]),
     );
     for (final prompt in globalLanguageSmokeEvalPrompts) {
@@ -315,6 +320,25 @@ void main() {
         reason: prompt.id,
       );
       expect(prompt.checks.where((check) => check.required), hasLength(2));
+    }
+
+    final promptsById = {
+      for (final prompt in globalLanguageSmokeEvalPrompts) prompt.id: prompt,
+    };
+    const naturalVariants = {
+      'hindi-arithmetic-17x23': 'परिणाम 391 है।',
+      'vietnamese-arithmetic-17x23': '17 nhân với 23 bằng 391.',
+      'turkish-arithmetic-17x23': 'Sonuç 391’dir.',
+      'korean-arithmetic-17x23': '17 × 23 는 391 입니다.',
+    };
+    for (final MapEntry(key: id, value: answer) in naturalVariants.entries) {
+      final checks = promptsById[id]!.checks;
+      expect(checks.every((check) => check.passes(answer)), isTrue, reason: id);
+      expect(
+        checks[1].passes('17 × 23 = 391'),
+        isFalse,
+        reason: '$id must retain a native-language signal',
+      );
     }
   });
 }

@@ -190,6 +190,11 @@ class _GolemAppState extends ConsumerState<GolemApp>
       AppLanguage.brazilianPortuguese => const Locale('pt', 'BR'),
       AppLanguage.japanese => const Locale('ja'),
       AppLanguage.indonesian => const Locale('id'),
+      AppLanguage.hindi => const Locale('hi'),
+      AppLanguage.french => const Locale('fr'),
+      AppLanguage.vietnamese => const Locale('vi'),
+      AppLanguage.turkish => const Locale('tr'),
+      AppLanguage.korean => const Locale('ko'),
       AppLanguage.arabic => const Locale('ar'),
     };
     return CupertinoApp.router(

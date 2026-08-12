@@ -459,7 +459,8 @@ derive from the tracked artwork in `assets/source/`.
 
 User-facing copy uses Flutter's source-generated ARB/gen-l10n path. English is
 the source and fallback; Polish, neutral Latin American Spanish, Brazilian
-Portuguese, Japanese, Indonesian, and Modern Standard Arabic are complete and
+Portuguese, Japanese, Indonesian, Hindi, neutral international French,
+Vietnamese, Turkish, Korean, and Modern Standard Arabic are complete and
 selectable from Settings → Language alongside System default. Explicit choices
 are stored in app preferences. See `../docs/localization.md` for each language's
 terminology, exclusions, required Portuguese fallback mirror, plural rules,

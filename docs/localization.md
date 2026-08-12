@@ -2,7 +2,8 @@
 
 English (`app/lib/l10n/app_en.arb`) is the source and fallback catalog. Polish,
 neutral Latin American Spanish, Brazilian Portuguese, Japanese, Indonesian,
-and Modern Standard Arabic are maintained in the repository. Flutter's SDK
+Hindi, neutral international French, Vietnamese, Turkish, Korean, and Modern
+Standard Arabic are maintained in the repository. Flutter's SDK
 `gen-l10n` generator is the only localization framework; there is no runtime
 translation or TMS.
 
@@ -97,6 +98,63 @@ documented here before joining the test allowlist.
 Spanish also retains the ordinary response word *No*, whose spelling matches
 the English source.
 
+Hindi copy uses concise modern Devanagari and avoids gendered forms where an
+impersonal construction is natural. Preserve conjunct clusters during layout;
+never add letter spacing to Devanagari headings.
+
+| English concept | Preferred Hindi |
+| --- | --- |
+| model / download | मॉडल / डाउनलोड |
+| reasoning / system prompt | तर्क / सिस्टम प्रॉम्प्ट |
+| on-device inference / privacy | डिवाइस पर इन्फ़रेंस / निजता |
+| benchmark / token | प्रदर्शन परीक्षण / टोकन |
+| chat / attachment | चैट / अटैचमेंट |
+
+French copy is neutral international French. Use non-breaking punctuation
+spacing and avoid country-specific administrative vocabulary.
+
+| English concept | Preferred French |
+| --- | --- |
+| model / download | modèle / téléchargement |
+| reasoning / system prompt | raisonnement / instruction système |
+| on-device inference / privacy | inférence sur l’appareil / confidentialité |
+| benchmark / token | test de performances / token |
+| chat / attachment | conversation / pièce jointe |
+
+Vietnamese copy uses standard, region-neutral Vietnamese. Catalogs are NFC;
+user and model text may remain in any canonically equivalent representation.
+
+| English concept | Preferred Vietnamese |
+| --- | --- |
+| model / download | mô hình / tải xuống |
+| reasoning / system prompt | lập luận / lời nhắc hệ thống |
+| on-device inference / privacy | suy luận trên thiết bị / quyền riêng tư |
+| benchmark / token | kiểm tra hiệu năng / token |
+| chat / attachment | cuộc trò chuyện / tệp đính kèm |
+
+Turkish copy follows contemporary Türkiye usage. Any presentation casing must
+respect dotted `i/İ` and dotless `ı/I`; never apply locale-blind uppercasing.
+
+| English concept | Preferred Turkish |
+| --- | --- |
+| model / download | model / indirme |
+| reasoning / system prompt | akıl yürütme / sistem istemi |
+| on-device inference / privacy | cihaz üzerinde çıkarım / gizlilik |
+| benchmark / token | performans testi / token |
+| chat / attachment | sohbet / ek |
+
+Korean copy uses concise standard South Korean UI language. Prefer natural
+word wrapping, allow character wrapping where the platform requires it, and
+do not add Latin letter spacing to Hangul headings.
+
+| English concept | Preferred Korean |
+| --- | --- |
+| model / download | 모델 / 다운로드 |
+| reasoning / system prompt | 추론 / 시스템 프롬프트 |
+| on-device inference / privacy | 온디바이스 추론 / 개인정보 보호 |
+| benchmark / token | 벤치마크 / 토큰 |
+| chat / attachment | 대화 / 첨부 파일 |
+
 Arabic copy uses concise Modern Standard Arabic. It does not claim support for
 regional spoken dialects. Use these terms consistently:
 
@@ -152,10 +210,11 @@ flutter test integration_test/model_eval_test.dart -d <device> --flavor qa \
   --dart-define=GOLEM_EVAL_SUITE=arabic-smoke
 ```
 
-The four initial global locales share a smaller `global-language-smoke` suite:
-one non-reasoning arithmetic instruction per language, fixed at seed 7 and 64
-output tokens. Each assertion requires both `391` and the requested native
-answer phrase. Run it against the same two representative GGUF artifacts by
+The nine global locales share the `global-language-smoke` suite: one
+non-reasoning arithmetic instruction per language, fixed at seed 7 and 64
+output tokens. Each assertion requires both `391` and a language-specific
+word or script signal while accepting natural wording variants. Run it against
+the same two representative GGUF artifacts by
 replacing `arabic-smoke` above with `global-language-smoke`.
 
 Localized strings belong only at presentation boundaries. Domain objects,

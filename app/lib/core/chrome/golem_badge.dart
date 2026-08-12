@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../l10n/l10n.dart';
 import '../theme/golem_theme.dart';
 
 /// The small uppercase accent chip — `DEFAULT`, `ACTIVE`, `RECOMMENDED`.
@@ -19,9 +20,13 @@ class GolemBadge extends StatelessWidget {
     ),
     child: Text(
       label,
-      style: GolemText.badge.copyWith(
-        color: CupertinoDynamicColor.resolve(GolemTheme.accent, context),
-      ),
+      style:
+          localizedLabelStyle(
+            GolemText.badge,
+            Localizations.localeOf(context),
+          ).copyWith(
+            color: CupertinoDynamicColor.resolve(GolemTheme.accent, context),
+          ),
     ),
   );
 }
