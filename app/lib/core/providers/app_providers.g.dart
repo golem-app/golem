@@ -1435,7 +1435,7 @@ final class PreferencesControllerProvider
 }
 
 String _$preferencesControllerHash() =>
-    r'f18f6d954fefc020d6931b0c78c379eabc27bf4e';
+    r'f9341d7d71f9fe76a5b604799462a2ea2e27ba05';
 
 /// Persisted app-wide preferences. Every command follows the settings idiom —
 /// drop taps that land in the cold-start load window, publish, then save —
@@ -1549,7 +1549,7 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'2c3c5328c73b069f57ee1065f098016e7c886c6e';
+String _$modelControllerHash() => r'9ff059adeb9d7825226d9c0a23430e47a368c6b8';
 
 /// KeepAlive: a command controller whose downloads, busy guard, and epochs
 /// must survive leaving the Models screen (§3.4 — an autoDispose command

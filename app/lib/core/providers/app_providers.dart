@@ -519,7 +519,7 @@ class PreferencesController extends _$PreferencesController {
     final committed = await _commit((value) => value.withCustomModel(spec));
     if (!committed) return false;
     await ref
-        .read(modelControllerProvider.notifier)
+        .read(modelSessionBridgeProvider)
         .registerCustomModel(spec.toCatalogEntry());
     return true;
   }
@@ -1350,9 +1350,9 @@ class ModelController extends _$ModelController {
   Future<ModelState> build() {
     // Bound before any await so commands arriving during hydration see it; a
     // rebuild re-binds the same bridge instance (#88).
-    ref
-        .read(modelSessionBridgeProvider)
-        .bindReflectEngineLoaded(reflectEngineLoaded);
+    final bridge = ref.read(modelSessionBridgeProvider);
+    bridge.bindReflectEngineLoaded(reflectEngineLoaded);
+    bridge.bindRegisterCustomModel(registerCustomModel);
     return ref.read(modelManagementRepositoryProvider).load();
   }
 

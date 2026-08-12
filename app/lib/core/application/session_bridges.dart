@@ -1,3 +1,5 @@
+import '../domain/model_catalog.dart';
+
 /// Cross-feature controller capabilities (#88). An owning controller binds its
 /// own methods here during `build()`, and dependent controllers read this seam
 /// instead of the owner's provider, so feature ownership points one way.
@@ -35,9 +37,19 @@ final class ChatSessionBridge {
 /// bound by ModelController during `build()`.
 final class ModelSessionBridge {
   Future<void> Function()? _reflectEngineLoaded;
+  Future<void> Function(ModelCatalogEntry)? _registerCustomModel;
 
   void bindReflectEngineLoaded(Future<void> Function() fn) =>
       _reflectEngineLoaded = fn;
+
+  void bindRegisterCustomModel(Future<void> Function(ModelCatalogEntry) fn) =>
+      _registerCustomModel = fn;
+
+  /// Registers a committed custom model with the runtime catalog. No-op while
+  /// the model controller has not built; the stored spec re-merges at the
+  /// next launch either way.
+  Future<void> registerCustomModel(ModelCatalogEntry entry) async =>
+      await _registerCustomModel?.call(entry);
 
   /// Records that the engine holds weights after a lazy prepare. No-op while
   /// the model controller has not built, matching its own empty-state guard.
