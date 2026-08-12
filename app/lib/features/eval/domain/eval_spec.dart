@@ -73,6 +73,7 @@ final class EvalPrompt {
 const evalAnchorPromptId = 'anchor-jupiter';
 const defaultEvalSuite = 'default';
 const arabicSmokeEvalSuite = 'arabic-smoke';
+const globalLanguageSmokeEvalSuite = 'global-language-smoke';
 
 const defaultEvalPrompts = <EvalPrompt>[
   EvalPrompt(
@@ -224,12 +225,78 @@ const arabicSmokeEvalPrompts = <EvalPrompt>[
   ),
 ];
 
+/// Bounded instruction-following coverage for the first global locale wave.
+/// Each prompt asks the same arithmetic question and requires one native
+/// answer phrase; this is a compatibility smoke, not a fluency claim.
+const globalLanguageSmokeEvalPrompts = <EvalPrompt>[
+  EvalPrompt(
+    id: 'spanish-arithmetic-17x23',
+    messages: [
+      {
+        'role': 'user',
+        'content':
+            '¿Cuánto es 17 × 23? Responde con una frase corta en español '
+            'que incluya «El resultado es» y el número.',
+      },
+    ],
+    maxTokens: 64,
+    checks: [
+      EvalCheck.regexp(r'\b391\b'),
+      EvalCheck.contains('El resultado es'),
+    ],
+  ),
+  EvalPrompt(
+    id: 'brazilian-portuguese-arithmetic-17x23',
+    messages: [
+      {
+        'role': 'user',
+        'content':
+            'Quanto é 17 × 23? Responda com uma frase curta em português '
+            'do Brasil que inclua “O resultado é” e o número.',
+      },
+    ],
+    maxTokens: 64,
+    checks: [EvalCheck.regexp(r'\b391\b'), EvalCheck.contains('O resultado é')],
+  ),
+  EvalPrompt(
+    id: 'japanese-arithmetic-17x23',
+    messages: [
+      {
+        'role': 'user',
+        'content':
+            '17 × 23 はいくつですか。必ず「答えは」で始め、数値を含む'
+            '短い日本語の文だけで答えてください。',
+      },
+    ],
+    maxTokens: 64,
+    checks: [EvalCheck.regexp(r'\b391\b'), EvalCheck.contains('答えは')],
+  ),
+  EvalPrompt(
+    id: 'indonesian-arithmetic-17x23',
+    messages: [
+      {
+        'role': 'user',
+        'content':
+            'Berapakah 17 × 23? Jawab dengan kalimat pendek dalam bahasa '
+            'Indonesia yang memuat frasa “Hasilnya adalah” dan angkanya.',
+      },
+    ],
+    maxTokens: 64,
+    checks: [
+      EvalCheck.regexp(r'\b391\b'),
+      EvalCheck.contains('Hasilnya adalah'),
+    ],
+  ),
+];
+
 List<EvalPrompt> evalPromptsForSuite(String suite) => switch (suite) {
   defaultEvalSuite => defaultEvalPrompts,
   arabicSmokeEvalSuite => arabicSmokeEvalPrompts,
+  globalLanguageSmokeEvalSuite => globalLanguageSmokeEvalPrompts,
   _ => throw ArgumentError.value(
     suite,
     'suite',
-    'Expected $defaultEvalSuite or $arabicSmokeEvalSuite',
+    'Expected $defaultEvalSuite, $arabicSmokeEvalSuite, or '
+        '$globalLanguageSmokeEvalSuite',
   ),
 };

@@ -531,6 +531,72 @@ void main() {
     );
   }, variant: bothChromes);
 
+  testWidgets('global Spanish text expansion golden', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      locale: const Locale('es'),
+      textScale: 1.3,
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(language: AppLanguage.spanish),
+      ),
+      model: settingsModelSeed,
+      child: const SettingsScreen(identity: AppIdentity.qa),
+    );
+    await expectLater(
+      find.byType(SettingsScreen),
+      matchesGoldenFile('goldens/global-spanish-settings-large.png'),
+    );
+  }, variant: iosChrome);
+
+  testWidgets('global Brazilian Portuguese model recovery golden', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      brightness: Brightness.dark,
+      locale: const Locale('pt', 'BR'),
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(language: AppLanguage.brazilianPortuguese),
+      ),
+      model: settingsModelSeed,
+      child: const ModelsScreen(),
+    );
+    await expectLater(
+      find.byType(ModelsScreen),
+      matchesGoldenFile('goldens/global-portuguese-model-recovery-dark.png'),
+    );
+  }, variant: iosChrome);
+
+  testWidgets('global Japanese language picker golden', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      locale: const Locale('ja'),
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(language: AppLanguage.japanese),
+      ),
+      child: const LanguageScreen(),
+    );
+    await expectLater(
+      find.byType(LanguageScreen),
+      matchesGoldenFile('goldens/global-japanese-language.png'),
+    );
+  }, variant: iosChrome);
+
+  testWidgets('global Indonesian privacy golden', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      locale: const Locale('id'),
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(language: AppLanguage.indonesian),
+      ),
+      child: const PrivacyScreen(),
+    );
+    await expectLater(
+      find.byType(PrivacyScreen),
+      matchesGoldenFile('goldens/global-indonesian-privacy.png'),
+    );
+  }, variant: iosChrome);
+
   Future<void> revealIn(WidgetTester tester, Key listKey, Key target) async {
     await tester.scrollUntilVisible(
       find.byKey(target),

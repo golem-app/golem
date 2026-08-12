@@ -119,6 +119,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languagePolish => 'Polski';
 
   @override
+  String get languageSpanish => 'Español (Latinoamérica)';
+
+  @override
+  String get languageBrazilianPortuguese => 'Português (Brasil)';
+
+  @override
+  String get languageJapanese => '日本語';
+
+  @override
+  String get languageIndonesian => 'Bahasa Indonesia';
+
+  @override
   String get languageArabic => 'العربية';
 
   @override

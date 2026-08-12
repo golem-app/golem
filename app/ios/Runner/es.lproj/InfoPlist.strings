@@ -1,0 +1,2 @@
+"NSCameraUsageDescription" = "Golem usa la cámara solo cuando tomas una foto para adjuntarla a un chat. Las fotos permanecen en este dispositivo.";
+"NSPhotoLibraryUsageDescription" = "Golem lee una foto solo cuando la adjuntas a un chat. Las fotos permanecen en este dispositivo.";

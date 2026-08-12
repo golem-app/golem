@@ -18,6 +18,10 @@ enum AppLanguage {
   system(null),
   english('en'),
   polish('pl'),
+  spanish('es'),
+  brazilianPortuguese('pt-BR'),
+  japanese('ja'),
+  indonesian('id'),
   arabic('ar');
 
   const AppLanguage(this.code);

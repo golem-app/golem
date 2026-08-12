@@ -13,7 +13,11 @@ import 'package:golem_flutter/features/settings/language_screen.dart';
 import 'package:golem_flutter/l10n/bidi.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_ar.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_en.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_es.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_id.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_ja.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_pl.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_pt.dart';
 import 'package:golem_flutter/l10n/l10n.dart';
 import 'package:golem_flutter/l10n/presentation_messages.dart';
 
@@ -21,37 +25,133 @@ import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
 
+Map<String, Object?> _catalog(String path) =>
+    jsonDecode(File(path).readAsStringSync()) as Map<String, Object?>;
+
+Set<String> _resourceKeys(Map<String, Object?> catalog) => catalog.keys
+    .where((key) => key != '@@locale' && !key.startsWith('@'))
+    .toSet();
+
+Set<String> _placeholders(String message) => RegExp(
+  r'\{([a-z][A-Za-z0-9_]*)\s*(?:,|\})',
+).allMatches(message).map((match) => match.group(1)!).toSet();
+
+/// Source-identical copy is limited to the product/speaker names, stable
+/// endonyms, standardized units and parameters, and documented loanwords in
+/// `docs/localization.md`. A new exception needs a product-language decision.
+const _invariantCopyAllowlist = <String>{
+  'appName',
+  'assistantSpeaker',
+  'languageEnglish',
+  'languagePolish',
+  'languageSpanish',
+  'languageBrazilianPortuguese',
+  'languageJapanese',
+  'languageIndonesian',
+  'languageArabic',
+  'bytesDecimal',
+  'megabytes',
+  'samplingTopP',
+  'samplingTopK',
+  'styleSource',
+  'tokenRate',
+  // The ordinary Spanish negative response is spelled identically.
+  'no',
+  // Standard Indonesian technical loanwords.
+  'settingsSectionModel',
+  'settingsModel',
+  'model',
+  'prompt',
+};
+
 void main() {
-  test('translated catalogs have complete non-empty resources', () {
-    Map<String, Object?> catalog(String path) =>
-        jsonDecode(File(path).readAsStringSync()) as Map<String, Object?>;
-    final english = catalog('lib/l10n/app_en.arb')..remove('@@locale');
-    final polish = catalog('lib/l10n/app_pl.arb')..remove('@@locale');
-    final arabic = catalog('lib/l10n/app_ar.arb')..remove('@@locale');
-    final englishKeys = english.keys
-        .where((key) => !key.startsWith('@'))
-        .toSet();
-    final polishKeys = polish.keys.where((key) => !key.startsWith('@')).toSet();
-    final arabicKeys = arabic.keys.where((key) => !key.startsWith('@')).toSet();
-    for (final translation in [polish, arabic]) {
-      final translatedKeys = translation.keys
-          .where((key) => !key.startsWith('@'))
-          .toSet();
-      expect(translatedKeys, englishKeys);
+  test('translated catalogs have exact keys, metadata, and placeholders', () {
+    final english = _catalog('lib/l10n/app_en.arb');
+    final englishKeys = _resourceKeys(english);
+    final translations = <String, Map<String, Object?>>{
+      'pl': _catalog('lib/l10n/app_pl.arb'),
+      'ar': _catalog('lib/l10n/app_ar.arb'),
+      'es': _catalog('lib/l10n/app_es.arb'),
+      'pt': _catalog('lib/l10n/app_pt.arb'),
+      'pt_BR': _catalog('lib/l10n/app_pt_BR.arb'),
+      'ja': _catalog('lib/l10n/app_ja.arb'),
+      'id': _catalog('lib/l10n/app_id.arb'),
+    };
+    for (final key in englishKeys) {
+      final metadata = english['@$key']! as Map<String, Object?>;
+      final description = metadata['description'];
+      expect(description, isA<String>(), reason: key);
+      expect((description! as String).trim(), isNotEmpty, reason: key);
+      final sourcePlaceholders = _placeholders(english[key]! as String);
+      final documentedPlaceholders =
+          ((metadata['placeholders'] as Map<String, Object?>?)?.keys.toSet() ??
+          const <String>{});
+      expect(documentedPlaceholders, sourcePlaceholders, reason: key);
+    }
+    for (final MapEntry(key: locale, value: translation)
+        in translations.entries) {
+      expect(_resourceKeys(translation), englishKeys, reason: locale);
       for (final key in englishKeys) {
-        expect((translation[key] as String).trim(), isNotEmpty, reason: key);
-        expect(english.containsKey('@$key'), isTrue, reason: key);
+        final translated = translation[key]! as String;
+        expect(translated.trim(), isNotEmpty, reason: '$locale:$key');
+        expect(
+          _placeholders(translated),
+          _placeholders(english[key]! as String),
+          reason: '$locale:$key',
+        );
       }
     }
-    expect(polishKeys, englishKeys);
-    expect(arabicKeys, englishKeys);
-    expect(arabic['settingsTitle'], 'الإعدادات');
-    expect(arabic['privacyStatement'], contains('الخصوصية'));
+    final pt = Map<String, Object?>.from(translations['pt']!)
+      ..remove('@@locale');
+    final ptBr = Map<String, Object?>.from(translations['pt_BR']!)
+      ..remove('@@locale');
+    expect(pt, ptBr, reason: 'Flutter-required pt fallback must mirror pt_BR');
+    expect(translations['ar']!['settingsTitle'], 'الإعدادات');
+    expect(translations['ar']!['privacyStatement'], contains('الخصوصية'));
+  });
+
+  test('new catalogs contain only documented source-identical copy', () {
+    final english = _catalog('lib/l10n/app_en.arb');
+    for (final locale in ['es', 'pt_BR', 'ja', 'id']) {
+      final translation = _catalog('lib/l10n/app_$locale.arb');
+      for (final key in _resourceKeys(english)) {
+        if (translation[key] == english[key]) {
+          expect(
+            _invariantCopyAllowlist,
+            contains(key),
+            reason: '$locale:$key unexpectedly retains English source copy',
+          );
+        }
+      }
+    }
+  });
+
+  test('language endonyms stay stable in every UI locale', () {
+    final localizations = [
+      AppLocalizationsEn(),
+      AppLocalizationsPl(),
+      AppLocalizationsAr(),
+      AppLocalizationsEs(),
+      AppLocalizationsPt(),
+      AppLocalizationsPtBr(),
+      AppLocalizationsJa(),
+      AppLocalizationsId(),
+    ];
+    for (final l10n in localizations) {
+      expect(l10n.languageEnglish, 'English');
+      expect(l10n.languagePolish, 'Polski');
+      expect(l10n.languageSpanish, 'Español (Latinoamérica)');
+      expect(l10n.languageBrazilianPortuguese, 'Português (Brasil)');
+      expect(l10n.languageJapanese, '日本語');
+      expect(l10n.languageIndonesian, 'Bahasa Indonesia');
+      expect(l10n.languageArabic, 'العربية');
+    }
   });
 
   test(
-    'locale resolution chooses Polish and Arabic and falls back to English',
+    'locale resolution handles exact, regional, ordered, and fallback cases',
     () {
+      expect(AppLocalizations.supportedLocales.first, const Locale('en'));
       expect(
         resolveAppLocale(const [
           Locale('pl', 'PL'),
@@ -66,12 +166,88 @@ void main() {
       );
       expect(
         resolveAppLocale(const [
+          Locale('es', 'MX'),
+        ], AppLocalizations.supportedLocales),
+        const Locale('es'),
+      );
+      expect(
+        resolveAppLocale(const [
+          Locale('pt', 'BR'),
+        ], AppLocalizations.supportedLocales),
+        const Locale('pt', 'BR'),
+      );
+      expect(
+        resolveAppLocale(const [
+          Locale('pt', 'PT'),
+        ], AppLocalizations.supportedLocales),
+        const Locale('pt'),
+      );
+      expect(
+        resolveAppLocale(const [
+          Locale('ja', 'JP'),
+        ], AppLocalizations.supportedLocales),
+        const Locale('ja'),
+      );
+      expect(
+        resolveAppLocale(const [
+          Locale('id', 'ID'),
+        ], AppLocalizations.supportedLocales),
+        const Locale('id'),
+      );
+      expect(
+        resolveAppLocale(const [
+          Locale('de', 'DE'),
+          Locale('ja', 'JP'),
+          Locale('es', 'AR'),
+        ], AppLocalizations.supportedLocales),
+        const Locale('ja'),
+      );
+      expect(
+        resolveAppLocale(const [
           Locale('de', 'DE'),
         ], AppLocalizations.supportedLocales),
         const Locale('en'),
       );
+      expect(
+        resolveAppLocale(const [
+          Locale('de', 'BR'),
+        ], AppLocalizations.supportedLocales),
+        const Locale('en'),
+        reason: 'An unsupported language must not match pt-BR by country.',
+      );
     },
   );
+
+  test('global locale plural policy renders the relevant branches', () {
+    final es = AppLocalizationsEs();
+    final pt = AppLocalizationsPtBr();
+    final ja = AppLocalizationsJa();
+    final id = AppLocalizationsId();
+    expect(es.chatCount(0), 'No hay chats');
+    expect(es.chatCount(1), '1 chat');
+    expect(es.chatCount(2), '2 chats');
+    expect(pt.chatCount(0), 'Nenhuma conversa');
+    expect(pt.chatCount(1), '1 conversa');
+    expect(pt.chatCount(2), '2 conversas');
+    expect(ja.chatCount(0), 'チャットはありません');
+    expect(ja.chatCount(1), '1件のチャット');
+    expect(ja.chatCount(2), '2件のチャット');
+    expect(id.chatCount(0), 'Tidak ada percakapan');
+    expect(id.chatCount(1), '1 percakapan');
+    expect(id.chatCount(2), '2 percakapan');
+    for (final locale in ['es', 'pt_BR']) {
+      final raw = _catalog('lib/l10n/app_$locale.arb')['chatCount']! as String;
+      expect(raw, contains('one{'), reason: locale);
+      expect(raw, contains('many{'), reason: locale);
+      expect(raw, contains('other{'), reason: locale);
+    }
+    for (final locale in ['ja', 'id']) {
+      final raw = _catalog('lib/l10n/app_$locale.arb')['chatCount']! as String;
+      expect(raw, isNot(contains('one{')), reason: locale);
+      expect(raw, isNot(contains('many{')), reason: locale);
+      expect(raw, contains('other{'), reason: locale);
+    }
+  });
 
   test('Arabic plural categories render zero, one, two, few, many, other', () {
     final ar = AppLocalizationsAr();
@@ -107,21 +283,29 @@ void main() {
     expect(pl.chatCount(25), '25 czatów');
   });
 
-  test('every repository refusal has actionable English and Polish copy', () {
+  test('every repository refusal has actionable localized copy', () {
     final en = AppLocalizationsEn();
-    final pl = AppLocalizationsPl();
-    final ar = AppLocalizationsAr();
+    final translations = [
+      AppLocalizationsPl(),
+      AppLocalizationsAr(),
+      AppLocalizationsEs(),
+      AppLocalizationsPtBr(),
+      AppLocalizationsJa(),
+      AppLocalizationsId(),
+    ];
     for (final reason in RepositoryRejection.values) {
       final english = repositoryRejectionMessage(en, reason);
-      final polish = repositoryRejectionMessage(pl, reason);
-      final arabic = repositoryRejectionMessage(ar, reason);
       expect(english, isNotEmpty, reason: reason.name);
-      expect(polish, isNotEmpty, reason: reason.name);
       expect(english, endsWith('.'), reason: reason.name);
-      expect(polish, endsWith('.'), reason: reason.name);
-      expect(polish, isNot(english), reason: reason.name);
-      expect(arabic, isNotEmpty, reason: reason.name);
-      expect(arabic, isNot(english), reason: reason.name);
+      for (final l10n in translations) {
+        final translated = repositoryRejectionMessage(l10n, reason);
+        expect(translated, isNotEmpty, reason: '${l10n.localeName}:$reason');
+        expect(
+          translated,
+          isNot(english),
+          reason: '${l10n.localeName}:$reason',
+        );
+      }
       // User copy must not leak URLs or HTTP status codes from diagnostics.
       expect(english, isNot(contains('http')), reason: reason.name);
       expect(
@@ -135,6 +319,10 @@ void main() {
   test('download failures preserve localized actionable parameters', () {
     final en = AppLocalizationsEn();
     final pl = AppLocalizationsPl();
+    final es = AppLocalizationsEs();
+    final pt = AppLocalizationsPtBr();
+    final ja = AppLocalizationsJa();
+    final id = AppLocalizationsId();
     const storage = ArtifactStatus(
       phase: ArtifactPhase.failed,
       failure: 'raw diagnostic must stay hidden',
@@ -166,7 +354,55 @@ void main() {
       'Plik \u2066model.gguf\u2069 nie przeszedł weryfikacji integralności. '
       'Ponów pobieranie.',
     );
-    expect(artifactFailureMessage(pl, storage), isNot(contains('raw')));
+    expect(
+      artifactFailureMessage(es, storage),
+      'El modelo necesita \u20662.00 GB\u2069 libres, pero solo hay '
+      '\u20660.40 GB\u2069 disponibles.',
+    );
+    expect(
+      artifactFailureMessage(pt, storage),
+      'O modelo precisa de \u20662.00 GB\u2069 livres, mas somente '
+      '\u20660.40 GB\u2069 estão disponíveis.',
+    );
+    expect(
+      artifactFailureMessage(ja, storage),
+      'モデルには\u20662.00 GB\u2069の空き容量が必要ですが、利用できるのは'
+      '\u20660.40 GB\u2069のみです。',
+    );
+    expect(
+      artifactFailureMessage(id, storage),
+      'Model memerlukan ruang kosong \u20662.00 GB\u2069, tetapi hanya '
+      '\u20660.40 GB\u2069 yang tersedia.',
+    );
+    for (final l10n in [pl, es, pt, ja, id]) {
+      expect(
+        artifactFailureMessage(l10n, hash),
+        contains('\u2066model.gguf\u2069'),
+        reason: l10n.localeName,
+      );
+      expect(
+        artifactFailureMessage(l10n, storage),
+        isNot(contains('raw')),
+        reason: l10n.localeName,
+      );
+    }
+  });
+
+  test('inference failure copy is localized without diagnostic leakage', () {
+    final en = AppLocalizationsEn();
+    for (final l10n in [
+      AppLocalizationsEs(),
+      AppLocalizationsPtBr(),
+      AppLocalizationsJa(),
+      AppLocalizationsId(),
+    ]) {
+      expect(l10n.generationFailed, isNot(en.generationFailed));
+      expect(l10n.contextExhausted, isNot(en.contextExhausted));
+      expect(l10n.outOfMemory, isNot(en.outOfMemory));
+      expect(l10n.insufficientMemory, isNot(en.insufficientMemory));
+      expect(l10n.budgetExhausted, isNot(en.budgetExhausted));
+      expect(l10n.generationFailed, isNot(contains('raw diagnostic')));
+    }
   });
 
   test(
@@ -190,6 +426,24 @@ void main() {
         }).language,
         AppLanguage.arabic,
       );
+      const newCodes = <String, AppLanguage>{
+        'es': AppLanguage.spanish,
+        'pt-BR': AppLanguage.brazilianPortuguese,
+        'ja': AppLanguage.japanese,
+        'id': AppLanguage.indonesian,
+      };
+      for (final MapEntry(key: code, value: language) in newCodes.entries) {
+        final decoded = AppPreferences.fromJson({
+          'schemaVersion': 5,
+          'language': code,
+        });
+        expect(decoded.language, language, reason: code);
+        expect(
+          AppPreferences(language: language).toJson()['language'],
+          code,
+          reason: code,
+        );
+      }
       expect(
         AppPreferences.fromJson(const {
           'schemaVersion': 5,
@@ -334,6 +588,18 @@ void main() {
     expect(find.text('العربية'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('language-arabic')),
+      180,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('language-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.ensureVisible(find.byKey(const Key('language-arabic')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('language-arabic')));
     await tester.pumpAndSettle();
     expect((await repository.load()).language, AppLanguage.arabic);

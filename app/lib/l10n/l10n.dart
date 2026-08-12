@@ -18,7 +18,13 @@ extension AppLocalizationsContext on BuildContext {
 Locale resolveAppLocale(
   List<Locale>? preferredLocales,
   Iterable<Locale> supportedLocales,
-) => basicLocaleListResolution(
-  preferredLocales ?? const <Locale>[],
-  supportedLocales,
-);
+) {
+  final supported = supportedLocales.toList(growable: false);
+  final supportedLanguageCodes = supported
+      .map((locale) => locale.languageCode)
+      .toSet();
+  final supportedPreferences = (preferredLocales ?? const <Locale>[])
+      .where((locale) => supportedLanguageCodes.contains(locale.languageCode))
+      .toList(growable: false);
+  return basicLocaleListResolution(supportedPreferences, supported);
+}
