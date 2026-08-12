@@ -165,7 +165,7 @@ Future<void> showGolemActions({
                 horizontal: GolemSpace.gutter,
               ),
               minimumSize: const Size.fromHeight(GolemSize.hitTarget),
-              alignment: Alignment.centerLeft,
+              alignment: AlignmentDirectional.centerStart,
               onPressed: action.onPressed,
               child: Text(
                 action.label,

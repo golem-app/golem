@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
+import 'golem_typography.dart';
+
 export '../widgets/glass.dart';
 export '../widgets/golem_card.dart';
 export 'golem_effects.dart';
@@ -227,6 +229,7 @@ abstract final class GolemTheme {
       textStyle: TextStyle(
         inherit: false,
         fontFamily: '.SF Pro Text',
+        fontFamilyFallback: GolemFont.fallbacks,
         fontSize: 17,
         color: ink,
       ),
@@ -234,6 +237,7 @@ abstract final class GolemTheme {
       navTitleTextStyle: TextStyle(
         inherit: false,
         fontFamily: '.SF Pro Display',
+        fontFamilyFallback: GolemFont.fallbacks,
         fontSize: 19,
         fontWeight: FontWeight.w600,
         height: 1.3,

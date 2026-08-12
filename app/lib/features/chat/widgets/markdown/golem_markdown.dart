@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../../core/theme/golem_theme.dart';
+import '../../../../l10n/bidi.dart';
 import 'code_block.dart';
 import 'markdown_blocks.dart';
 
@@ -34,18 +35,24 @@ final class _GolemMarkdownState extends State<GolemMarkdown> {
       if (index > 0) children.add(const SizedBox(height: 10));
       final cursor = widget.streaming && index == _blocks.length - 1;
       children.add(switch (block) {
-        ParagraphData() => _Paragraph(block, cursor: cursor),
+        ParagraphData() => _DirectedBlock(
+          text: block.spans.map((span) => span.text).join(),
+          child: _Paragraph(block, cursor: cursor),
+        ),
         ListData() => _BlockList(block),
-        CodeBlockData() => MarkdownCodeBlock(
-          code: block.code,
-          language: block.language,
+        CodeBlockData() => Directionality(
+          textDirection: TextDirection.ltr,
+          child: MarkdownCodeBlock(code: block.code, language: block.language),
         ),
       });
     }
     if (widget.streaming && _blocks.lastOrNull is! ParagraphData) {
       if (children.isNotEmpty) children.add(const SizedBox(height: 10));
       children.add(
-        const Align(alignment: Alignment.centerLeft, child: _BlinkCursor()),
+        const Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: _BlinkCursor(),
+        ),
       );
     }
     return Column(
@@ -54,6 +61,22 @@ final class _GolemMarkdownState extends State<GolemMarkdown> {
       children: children,
     );
   }
+}
+
+final class _DirectedBlock extends StatelessWidget {
+  const _DirectedBlock({required this.text, required this.child});
+
+  final String text;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Directionality(
+    textDirection: contentTextDirection(
+      text,
+      fallback: Directionality.of(context),
+    ),
+    child: Align(alignment: AlignmentDirectional.centerStart, child: child),
+  );
 }
 
 final class _Paragraph extends StatelessWidget {
@@ -70,7 +93,7 @@ final class _Paragraph extends StatelessWidget {
           const WidgetSpan(
             alignment: PlaceholderAlignment.middle,
             child: Padding(
-              padding: EdgeInsets.only(left: 3),
+              padding: EdgeInsetsDirectional.only(start: 3),
               child: _BlinkCursor(),
             ),
           ),
@@ -85,15 +108,18 @@ final class _BlockList extends StatelessWidget {
   final ListData data;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(left: 4),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (final (index, item) in data.items.indexed)
-          Padding(
-            padding: EdgeInsets.only(top: index == 0 ? 0 : 7),
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      for (final (index, item) in data.items.indexed)
+        _DirectedBlock(
+          text: item.map((span) => span.text).join(),
+          child: Padding(
+            padding: EdgeInsetsDirectional.only(
+              start: 4,
+              top: index == 0 ? 0 : 7,
+            ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -113,8 +139,8 @@ final class _BlockList extends StatelessWidget {
               ],
             ),
           ),
-      ],
-    ),
+        ),
+    ],
   );
 }
 
@@ -137,7 +163,10 @@ List<InlineSpan> inlineSpans(
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-            child: Text(span.text, style: GolemText.code),
+            child: Directionality(
+              textDirection: TextDirection.ltr,
+              child: Text(span.text, style: GolemText.code),
+            ),
           ),
         ),
       )

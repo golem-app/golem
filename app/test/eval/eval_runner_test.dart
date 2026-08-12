@@ -270,4 +270,22 @@ void main() {
     // The broker's profile registry serves the harness template keys.
     expect(modelProfiles.keys, containsAll(['gemma4', 'qwen35']));
   });
+
+  test('the Arabic smoke suite is bounded and requires Arabic answers', () {
+    expect(evalPromptsForSuite(defaultEvalSuite), same(defaultEvalPrompts));
+    expect(
+      evalPromptsForSuite(arabicSmokeEvalSuite),
+      same(arabicSmokeEvalPrompts),
+    );
+    expect(arabicSmokeEvalPrompts, hasLength(2));
+    expect(uniformEvalSeed(arabicSmokeEvalPrompts), 7);
+    for (final prompt in arabicSmokeEvalPrompts) {
+      expect(prompt.messages.single['content'], matches(r'[\u0600-\u06ff]'));
+      expect(
+        prompt.checks.any((check) => check.value == r'[\u0600-\u06ff]'),
+        isTrue,
+      );
+    }
+    expect(() => evalPromptsForSuite('unknown'), throwsArgumentError);
+  });
 }

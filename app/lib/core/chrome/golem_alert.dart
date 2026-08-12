@@ -123,7 +123,7 @@ Future<void> showGolemAlert({
                 ),
                 const SizedBox(height: GolemSpace.s4),
                 Align(
-                  alignment: Alignment.centerRight,
+                  alignment: AlignmentDirectional.centerEnd,
                   child: Wrap(
                     alignment: WrapAlignment.end,
                     crossAxisAlignment: WrapCrossAlignment.center,

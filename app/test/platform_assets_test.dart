@@ -116,6 +116,37 @@ void main() {
     expect(project, contains('TARGETED_DEVICE_FAMILY = 1;'));
   });
 
+  test('native bundles declare Arabic, Polish, and RTL support', () async {
+    final project = await File(
+      'ios/Runner.xcodeproj/project.pbxproj',
+    ).readAsString();
+    for (final locale in ['en', 'pl', 'ar']) {
+      expect(project, contains('$locale.lproj/InfoPlist.strings'));
+      expect(
+        File('ios/Runner/$locale.lproj/InfoPlist.strings').existsSync(),
+        isTrue,
+        reason: locale,
+      );
+    }
+    expect(project, contains('name = InfoPlist.strings;'));
+    final arabic = await File(
+      'ios/Runner/ar.lproj/InfoPlist.strings',
+    ).readAsString();
+    expect(arabic, contains('NSCameraUsageDescription'));
+    expect(arabic, contains('NSPhotoLibraryUsageDescription'));
+    expect(arabic, matches(RegExp(r'[\u0600-\u06ff]')));
+
+    final manifest = await File(
+      'android/app/src/main/AndroidManifest.xml',
+    ).readAsString();
+    expect(manifest, contains('android:supportsRtl="true"'));
+    expect(
+      manifest,
+      contains('locale|layoutDirection|fontScale'),
+      reason: 'locale changes must rebuild Flutter directionality',
+    );
+  });
+
   test('Android flavors own the application identities and labels', () async {
     final gradle = await File('android/app/build.gradle.kts').readAsString();
     // The namespace (Kotlin package / resource namespace) is deliberately

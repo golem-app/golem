@@ -10,6 +10,8 @@ import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
 import 'package:golem_flutter/features/settings/language_screen.dart';
+import 'package:golem_flutter/l10n/bidi.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_ar.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_en.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_pl.dart';
 import 'package:golem_flutter/l10n/l10n.dart';
@@ -20,36 +22,79 @@ import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
 
 void main() {
-  test('English and Polish catalogs have identical resources', () {
+  test('translated catalogs have complete non-empty resources', () {
     Map<String, Object?> catalog(String path) =>
         jsonDecode(File(path).readAsStringSync()) as Map<String, Object?>;
     final english = catalog('lib/l10n/app_en.arb')..remove('@@locale');
     final polish = catalog('lib/l10n/app_pl.arb')..remove('@@locale');
+    final arabic = catalog('lib/l10n/app_ar.arb')..remove('@@locale');
     final englishKeys = english.keys
         .where((key) => !key.startsWith('@'))
         .toSet();
     final polishKeys = polish.keys.where((key) => !key.startsWith('@')).toSet();
-    expect(polishKeys, englishKeys);
-    for (final key in englishKeys) {
-      expect((polish[key] as String).trim(), isNotEmpty, reason: key);
-      expect(english.containsKey('@$key'), isTrue, reason: key);
+    final arabicKeys = arabic.keys.where((key) => !key.startsWith('@')).toSet();
+    for (final translation in [polish, arabic]) {
+      final translatedKeys = translation.keys
+          .where((key) => !key.startsWith('@'))
+          .toSet();
+      expect(translatedKeys, englishKeys);
+      for (final key in englishKeys) {
+        expect((translation[key] as String).trim(), isNotEmpty, reason: key);
+        expect(english.containsKey('@$key'), isTrue, reason: key);
+      }
     }
+    expect(polishKeys, englishKeys);
+    expect(arabicKeys, englishKeys);
+    expect(arabic['settingsTitle'], 'الإعدادات');
+    expect(arabic['privacyStatement'], contains('الخصوصية'));
   });
 
-  test('locale resolution chooses Polish and falls back to English', () {
-    expect(
-      resolveAppLocale(const [
-        Locale('pl', 'PL'),
-      ], AppLocalizations.supportedLocales),
-      const Locale('pl'),
-    );
-    expect(
-      resolveAppLocale(const [
-        Locale('de', 'DE'),
-      ], AppLocalizations.supportedLocales),
-      const Locale('en'),
-    );
+  test(
+    'locale resolution chooses Polish and Arabic and falls back to English',
+    () {
+      expect(
+        resolveAppLocale(const [
+          Locale('pl', 'PL'),
+        ], AppLocalizations.supportedLocales),
+        const Locale('pl'),
+      );
+      expect(
+        resolveAppLocale(const [
+          Locale('ar', 'SA'),
+        ], AppLocalizations.supportedLocales),
+        const Locale('ar'),
+      );
+      expect(
+        resolveAppLocale(const [
+          Locale('de', 'DE'),
+        ], AppLocalizations.supportedLocales),
+        const Locale('en'),
+      );
+    },
+  );
+
+  test('Arabic plural categories render zero, one, two, few, many, other', () {
+    final ar = AppLocalizationsAr();
+    expect(ar.chatCount(0), 'لا محادثات');
+    expect(ar.chatCount(1), 'محادثة واحدة');
+    expect(ar.chatCount(2), 'محادثتان');
+    expect(ar.chatCount(3), '3 محادثات');
+    expect(ar.chatCount(11), '11 محادثة');
+    expect(ar.chatCount(102), '102 محادثة');
   });
+
+  test(
+    'content direction uses first strong text and technical values isolate',
+    () {
+      expect(contentTextDirection('مرحبا API'), TextDirection.rtl);
+      expect(contentTextDirection('API مرحبا'), TextDirection.ltr);
+      expect(
+        contentTextDirection('123', fallback: TextDirection.rtl),
+        TextDirection.rtl,
+      );
+      expect(ltrIsolate('model.gguf'), '\u2066model.gguf\u2069');
+    },
+  );
 
   test('Polish plural categories render correctly', () {
     final pl = AppLocalizationsPl();
@@ -65,14 +110,18 @@ void main() {
   test('every repository refusal has actionable English and Polish copy', () {
     final en = AppLocalizationsEn();
     final pl = AppLocalizationsPl();
+    final ar = AppLocalizationsAr();
     for (final reason in RepositoryRejection.values) {
       final english = repositoryRejectionMessage(en, reason);
       final polish = repositoryRejectionMessage(pl, reason);
+      final arabic = repositoryRejectionMessage(ar, reason);
       expect(english, isNotEmpty, reason: reason.name);
       expect(polish, isNotEmpty, reason: reason.name);
       expect(english, endsWith('.'), reason: reason.name);
       expect(polish, endsWith('.'), reason: reason.name);
       expect(polish, isNot(english), reason: reason.name);
+      expect(arabic, isNotEmpty, reason: reason.name);
+      expect(arabic, isNot(english), reason: reason.name);
       // User copy must not leak URLs or HTTP status codes from diagnostics.
       expect(english, isNot(contains('http')), reason: reason.name);
       expect(
@@ -104,15 +153,17 @@ void main() {
     );
     expect(
       artifactFailureMessage(en, storage),
-      'The model needs 2.00 GB free, but only 0.40 GB is available.',
+      'The model needs \u20662.00 GB\u2069 free, but only '
+      '\u20660.40 GB\u2069 is available.',
     );
     expect(
       artifactFailureMessage(pl, storage),
-      'Model wymaga 2.00 GB wolnego miejsca, ale dostępne jest tylko 0.40 GB.',
+      'Model wymaga \u20662.00 GB\u2069 wolnego miejsca, ale dostępne jest '
+      'tylko \u20660.40 GB\u2069.',
     );
     expect(
       artifactFailureMessage(pl, hash),
-      'Plik model.gguf nie przeszedł weryfikacji integralności. '
+      'Plik \u2066model.gguf\u2069 nie przeszedł weryfikacji integralności. '
       'Ponów pobieranie.',
     );
     expect(artifactFailureMessage(pl, storage), isNot(contains('raw')));
@@ -135,6 +186,13 @@ void main() {
       expect(
         AppPreferences.fromJson(const {
           'schemaVersion': 5,
+          'language': 'ar',
+        }).language,
+        AppLanguage.arabic,
+      );
+      expect(
+        AppPreferences.fromJson(const {
+          'schemaVersion': 5,
           'language': 'xx',
         }).language,
         AppLanguage.system,
@@ -145,6 +203,10 @@ void main() {
           language: AppLanguage.english,
         ).toJson()['language'],
         'en',
+      );
+      expect(
+        const AppPreferences(language: AppLanguage.arabic).toJson()['language'],
+        'ar',
       );
     },
   );
@@ -252,5 +314,28 @@ void main() {
     );
     expect(tester.takeException(), isNull);
     expect(find.text(AppLocalizationsEn().languageEnglish), findsOneWidget);
+  });
+
+  testWidgets('Arabic selection renders RTL and persists immediately', (
+    tester,
+  ) async {
+    final repository = InMemoryPreferencesRepository();
+    await pumpWithRepositories(
+      tester,
+      locale: const Locale('ar'),
+      textScale: 1.6,
+      preferences: repository,
+      child: const LanguageScreen(),
+    );
+    expect(
+      Directionality.of(tester.element(find.byType(LanguageScreen))),
+      TextDirection.rtl,
+    );
+    expect(find.text('العربية'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const Key('language-arabic')));
+    await tester.pumpAndSettle();
+    expect((await repository.load()).language, AppLanguage.arabic);
   });
 }

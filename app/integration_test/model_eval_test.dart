@@ -28,6 +28,7 @@ import 'package:golem_flutter/features/eval/domain/eval_spec.dart';
 /// be omitted to evaluate one engine. `GOLEM_EVAL_OUT` overrides the report
 /// directory (default: the system temp dir; paths are printed at the end).
 /// `GOLEM_EVAL_TEMPLATE` selects the model template (default `gemma4`).
+/// `GOLEM_EVAL_SUITE` selects `default` or the bounded `arabic-smoke` suite.
 ///
 /// This is a deliberate measurement instrument: it runs real models, takes
 /// minutes, and must never be wired into CI. Mac results serve answer
@@ -50,6 +51,10 @@ const _templateKey = String.fromEnvironment(
 ///   --flavor qa --dart-define=GOLEM_EVAL_INSTALLED=gemma4-gguf
 /// ```
 const _installed = String.fromEnvironment('GOLEM_EVAL_INSTALLED');
+const _suite = String.fromEnvironment(
+  'GOLEM_EVAL_SUITE',
+  defaultValue: defaultEvalSuite,
+);
 
 Future<List<EvalCombo>> _installedCombos() async {
   if (_installed.isEmpty) return const [];
@@ -61,6 +66,7 @@ Future<List<EvalCombo>> _installedCombos() async {
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final prompts = evalPromptsForSuite(_suite);
 
   final defineCombos = evalMatrixFromDefines(
     ggufDefine: _gguf,
@@ -144,7 +150,7 @@ void main() {
         fakeStreamDelay: Duration.zero,
         documentsDirectory: '',
         createRuntime: () => adapter,
-        samplingSeed: uniformEvalSeed(defaultEvalPrompts),
+        samplingSeed: uniformEvalSeed(prompts),
         diagnosticSink: debugPrint,
       );
       EvalComboResult result;
@@ -152,7 +158,7 @@ void main() {
         result = await runEvalCombo(
           repository: repository,
           combo: combo,
-          prompts: defaultEvalPrompts,
+          prompts: prompts,
           onProgress: debugPrint,
         );
       } finally {
@@ -205,6 +211,7 @@ void main() {
       // UTC in the evidence; the local stamp only names the run directory.
       createdAt: now.toUtc(),
       host: '${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
+      suite: _suite,
       profile: modelProfiles[_templateKey]!,
       results: results,
       artifacts: {

@@ -112,7 +112,7 @@ class _StyleCard extends StatelessWidget {
       onPressed: onTap,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(17, 15, 15, 15),
+        padding: const EdgeInsetsDirectional.fromSTEB(17, 15, 15, 15),
         decoration: BoxDecoration(
           color: CupertinoDynamicColor.resolve(GolemTheme.surface, context),
           borderRadius: BorderRadius.circular(GolemRadius.card),
@@ -294,7 +294,7 @@ class GenerationCard extends ConsumerWidget {
         children: [
           if (!overrides.isEmpty)
             Align(
-              alignment: Alignment.centerRight,
+              alignment: AlignmentDirectional.centerEnd,
               child: CupertinoButton(
                 key: Key('gen-reset-$profileKey'),
                 padding: const EdgeInsets.symmetric(horizontal: 8),

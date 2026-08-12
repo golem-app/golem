@@ -36,6 +36,7 @@
   "languageSystem": "Domyślny systemu",
   "languageEnglish": "English",
   "languagePolish": "Polski",
+  "languageArabic": "العربية",
   "languageSystemDetail": "Używaj języka wybranego na tym urządzeniu.",
   "languageSaveFailed": "Nie udało się zapisać języka. Przywrócono poprzedni wybór.",
   "preferencesLoadFailed": "Nie udało się wczytać preferencji.",

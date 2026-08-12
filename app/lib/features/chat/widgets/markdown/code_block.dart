@@ -84,81 +84,84 @@ final class _MarkdownCodeBlockState extends State<MarkdownCodeBlock> {
     // resolve walks three inherited widgets, and a long block has thousands
     // of nodes.
     final palette = _CodePalette.of(context);
-    return Container(
-      key: const Key('code-block'),
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: palette.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: palette.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ColoredBox(
-            color: palette.header,
-            child: ConstrainedBox(
-              key: const Key('code-header'),
-              // The band declares its own floor so it does not depend on
-              // the Copy chip's measurement to hold the iOS minimum.
-              constraints: const BoxConstraints(minHeight: 44),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 0, 10, 0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        (widget.language ?? context.l10n.code).toUpperCase(),
-                        style: GolemText.codeLanguage.copyWith(
-                          inherit: false,
-                          color: palette.headerInk,
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Container(
+        key: const Key('code-block'),
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: palette.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: palette.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ColoredBox(
+              color: palette.header,
+              child: ConstrainedBox(
+                key: const Key('code-header'),
+                // The band declares its own floor so it does not depend on
+                // the Copy chip's measurement to hold the iOS minimum.
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 10, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          (widget.language ?? context.l10n.code).toUpperCase(),
+                          style: GolemText.codeLanguage.copyWith(
+                            inherit: false,
+                            color: palette.headerInk,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    _CopyChip(code: widget.code, palette: palette),
-                  ],
+                      _CopyChip(code: widget.code, palette: palette),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          Padding(
-            // Horizontal insets belong to the viewport, not the scrolled
-            // content: inside the scroll view they would slide out of sight
-            // and leave the code flush against the card edge.
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-            child: RawScrollbar(
-              controller: _controller,
-              thumbVisibility: true,
-              thickness: 3,
-              radius: const Radius.circular(1.5),
-              thumbColor: palette.headerInk,
-              // Purely a cue. Interactive scrollbars inflate their 3pt
-              // thumb to a 48pt hit circle, which on a short card blankets
-              // the whole body and beats the transcript's vertical drag to
-              // the gesture arena.
-              interactive: false,
-              child: SingleChildScrollView(
+            Padding(
+              // Horizontal insets belong to the viewport, not the scrolled
+              // content: inside the scroll view they would slide out of sight
+              // and leave the code flush against the card edge.
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+              child: RawScrollbar(
                 controller: _controller,
-                scrollDirection: Axis.horizontal,
-                child: Padding(
-                  // Keeps the thumb clear of the last line's descenders.
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text.rich(
-                    TextSpan(
-                      style: GolemText.codeBlock.copyWith(
-                        inherit: false,
-                        color: palette.ink,
+                thumbVisibility: true,
+                thickness: 3,
+                radius: const Radius.circular(1.5),
+                thumbColor: palette.headerInk,
+                // Purely a cue. Interactive scrollbars inflate their 3pt
+                // thumb to a 48pt hit circle, which on a short card blankets
+                // the whole body and beats the transcript's vertical drag to
+                // the gesture arena.
+                interactive: false,
+                child: SingleChildScrollView(
+                  controller: _controller,
+                  scrollDirection: Axis.horizontal,
+                  child: Padding(
+                    // Keeps the thumb clear of the last line's descenders.
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text.rich(
+                      TextSpan(
+                        style: GolemText.codeBlock.copyWith(
+                          inherit: false,
+                          color: palette.ink,
+                        ),
+                        children: _spansFrom(palette, _nodes, widget.code),
                       ),
-                      children: _spansFrom(palette, _nodes, widget.code),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

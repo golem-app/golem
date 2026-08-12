@@ -7,6 +7,7 @@ import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/services/image_intake.dart';
 import '../../../core/theme/golem_theme.dart';
+import '../../../l10n/bidi.dart';
 import '../../../l10n/l10n.dart';
 import '../../models/application/model_providers.dart';
 import '../../settings/application/preferences_providers.dart';
@@ -122,7 +123,7 @@ class _ComposerState extends ConsumerState<Composer> {
       children: [
         for (var index = 0; index < _pending.length; index++)
           Padding(
-            padding: const EdgeInsets.only(right: GolemSpace.s2),
+            padding: const EdgeInsetsDirectional.only(end: GolemSpace.s2),
             child: Stack(
               children: [
                 ClipRRect(
@@ -137,9 +138,9 @@ class _ComposerState extends ConsumerState<Composer> {
                     excludeFromSemantics: true,
                   ),
                 ),
-                Positioned(
+                PositionedDirectional(
                   top: -6,
-                  right: -6,
+                  end: -6,
                   child: CupertinoButton(
                     key: Key('composer-attachment-remove-$index'),
                     padding: EdgeInsets.zero,
@@ -246,27 +247,34 @@ class _ComposerState extends ConsumerState<Composer> {
           boxShadow: GolemShadow.float(context),
         ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 2, 10, 7),
+          padding: const EdgeInsetsDirectional.fromSTEB(18, 2, 10, 7),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (_pending.isNotEmpty) _tray(context),
-              CupertinoTextField.borderless(
-                key: const Key('chat-composer'),
-                controller: controller,
-                focusNode: focus,
-                // Read-only rather than disabled: a disabled field announces
-                // itself as such to a screen reader, which overstates a state
-                // that lasts one turn, and it takes the in-flight prompt out of
-                // reach for selection and copying.
-                readOnly: generating,
-                minLines: 1,
-                maxLines: 6,
-                placeholder: context.l10n.messagePlaceholder,
-                textInputAction: TextInputAction.newline,
-                // 14pt keeps the single-line field at the 44pt tap target.
-                padding: const EdgeInsets.symmetric(vertical: 14),
+              ListenableBuilder(
+                listenable: controller,
+                builder: (context, _) => CupertinoTextField.borderless(
+                  key: const Key('chat-composer'),
+                  controller: controller,
+                  focusNode: focus,
+                  textDirection: contentTextDirection(
+                    controller.text,
+                    fallback: Directionality.of(context),
+                  ),
+                  // Read-only rather than disabled: a disabled field announces
+                  // itself as such to a screen reader, which overstates a state
+                  // that lasts one turn, and it takes the in-flight prompt out of
+                  // reach for selection and copying.
+                  readOnly: generating,
+                  minLines: 1,
+                  maxLines: 6,
+                  placeholder: context.l10n.messagePlaceholder,
+                  textInputAction: TextInputAction.newline,
+                  // 14pt keeps the single-line field at the 44pt tap target.
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
               ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

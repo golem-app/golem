@@ -17,7 +17,8 @@ enum ThemeSetting { system, light, dark }
 enum AppLanguage {
   system(null),
   english('en'),
-  polish('pl');
+  polish('pl'),
+  arabic('ar');
 
   const AppLanguage(this.code);
   final String? code;

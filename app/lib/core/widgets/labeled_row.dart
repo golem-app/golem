@@ -18,7 +18,7 @@ class LabeledRow extends StatelessWidget {
       Flexible(
         child: Text(
           value,
-          textAlign: TextAlign.right,
+          textAlign: TextAlign.end,
           style: TextStyle(
             color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
           ),

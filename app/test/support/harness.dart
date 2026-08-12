@@ -245,6 +245,7 @@ Future<void> pumpWithRepositories(
 Future<void> pumpSearchScreen(
   WidgetTester tester, {
   Brightness brightness = Brightness.light,
+  Locale locale = const Locale('en'),
   ChatHistorySnapshot? history,
 }) async {
   setViewport(tester);
@@ -265,7 +266,7 @@ Future<void> pumpSearchScreen(
       child: CupertinoApp.router(
         debugShowCheckedModeBanner: false,
         theme: GolemTheme.theme(brightness),
-        locale: const Locale('en'),
+        locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router,

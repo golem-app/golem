@@ -27,10 +27,6 @@ class ChatScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
-  static const _drawerRadius = BorderRadius.horizontal(
-    right: Radius.circular(GolemRadius.drawer),
-  );
-
   /// How far past its own width the closed drawer parks, so that
   /// [GolemShadow.drawer] does not bleed back over the canvas.
   static const _drawerHideMargin = 52.0;
@@ -187,6 +183,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       backgroundColor: GolemTheme.canvas,
       child: LayoutBuilder(
         builder: (context, constraints) {
+          final rtl = Directionality.of(context) == TextDirection.rtl;
+          final drawerRadius = BorderRadius.only(
+            topLeft: rtl
+                ? const Radius.circular(GolemRadius.drawer)
+                : Radius.zero,
+            bottomLeft: rtl
+                ? const Radius.circular(GolemRadius.drawer)
+                : Radius.zero,
+            topRight: rtl
+                ? Radius.zero
+                : const Radius.circular(GolemRadius.drawer),
+            bottomRight: rtl
+                ? Radius.zero
+                : const Radius.circular(GolemRadius.drawer),
+          );
           // Capped at 330pt so a tap-to-dismiss strip of chat stays visible on
           // phone widths — deliberately wider than the handoff's ~307pt, which
           // read cramped on device against the conversation titles.
@@ -292,8 +303,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 ),
               ),
               if (!_drawerOpen && !blocked)
-                Positioned(
-                  left: 0,
+                PositionedDirectional(
+                  start: 0,
                   top: 0,
                   bottom: 0,
                   width: 24,
@@ -301,7 +312,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     key: const Key('drawer-edge-swipe'),
                     behavior: HitTestBehavior.translucent,
                     onHorizontalDragEnd: (details) {
-                      if ((details.primaryVelocity ?? 0) > 280) {
+                      final velocity = details.primaryVelocity ?? 0;
+                      if (rtl ? velocity < -280 : velocity > 280) {
                         _focus.unfocus();
                         setState(() => _drawerOpen = true);
                       }
@@ -333,9 +345,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
                 ),
               ),
-              AnimatedPositioned(
+              AnimatedPositionedDirectional(
                 key: const Key('conversation-drawer'),
-                left: _drawerOpen ? 0 : -drawerWidth - _drawerHideMargin,
+                start: _drawerOpen ? 0 : -drawerWidth - _drawerHideMargin,
                 top: 0,
                 bottom: 0,
                 width: drawerWidth,
@@ -343,7 +355,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 curve: GolemMotion.standard,
                 child: GestureDetector(
                   onHorizontalDragEnd: (details) {
-                    if ((details.primaryVelocity ?? 0) < -280) {
+                    final velocity = details.primaryVelocity ?? 0;
+                    if (rtl ? velocity > 280 : velocity < -280) {
                       setState(() => _drawerOpen = false);
                     }
                   },
@@ -353,13 +366,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         GolemTheme.drawer,
                         context,
                       ),
-                      borderRadius: _drawerRadius,
-                      boxShadow: GolemShadow.drawer,
+                      borderRadius: drawerRadius,
+                      boxShadow: GolemShadow.drawer(context),
                     ),
                     // The panel's own rows round to 12pt, so without this
                     // the topmost and bottommost of them cut the corner.
                     child: ClipRRect(
-                      borderRadius: _drawerRadius,
+                      borderRadius: drawerRadius,
                       child: ExcludeSemantics(
                         excluding: !_drawerOpen,
                         child: ConversationDrawer(
