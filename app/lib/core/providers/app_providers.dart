@@ -476,7 +476,7 @@ class PreferencesController extends _$PreferencesController {
       // The preference commit owns this command's success. Chat persistence
       // reports its own failure through the standing chat notice.
       try {
-        await ref.read(chatControllerProvider.notifier).persistCurrent();
+        await ref.read(chatSessionBridgeProvider).persistCurrent();
       } on Exception {
         // A non-contract failure must not roll back a preference that landed.
       }
@@ -496,7 +496,7 @@ class PreferencesController extends _$PreferencesController {
       // This reaches the history-off branch: no second write, but any standing
       // warning is cleared and attachment ownership follows the live session.
       try {
-        await ref.read(chatControllerProvider.notifier).persistCurrent();
+        await ref.read(chatSessionBridgeProvider).persistCurrent();
       } on Exception {
         // The disk wipe and preference both landed; the toggle stays off.
       }
@@ -505,7 +505,7 @@ class PreferencesController extends _$PreferencesController {
     // The wipe landed but the preference did not: the toggle stays on, so
     // put the chats back on disk to match what the UI now claims.
     try {
-      await ref.read(chatControllerProvider.notifier).persistCurrent();
+      await ref.read(chatSessionBridgeProvider).persistCurrent();
     } on Exception {
       // Disk and toggle disagree until the next chat mutation re-persists.
     }
@@ -540,7 +540,9 @@ class ChatController extends _$ChatController {
     });
     // Bound before the first await so commands arriving during hydration see
     // it; a rebuild re-binds the same bridge instance (#88).
-    ref.read(chatSessionBridgeProvider).bindSessionFacts(
+    final bridge = ref.read(chatSessionBridgeProvider);
+    bridge.bindPersistCurrent(persistCurrent);
+    bridge.bindSessionFacts(
       activeModelKey: () => state.value?.active?.modelKey,
       generationActive: () =>
           (state.value?.generation ?? GenerationPhase.idle) !=

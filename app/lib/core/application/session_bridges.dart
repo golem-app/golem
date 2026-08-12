@@ -6,8 +6,15 @@
 /// capability mirrors what its pre-split call already did against a controller
 /// with empty state — commands no-op, facts report an idle session.
 final class ChatSessionBridge {
+  Future<void> Function()? _persistCurrent;
   String? Function()? _activeModelKey;
   bool Function()? _generationActive;
+
+  void bindPersistCurrent(Future<void> Function() fn) => _persistCurrent = fn;
+
+  /// Persists the live session under the current save-history policy. No-op
+  /// while chat has not built, matching a persist of an empty session.
+  Future<void> persistCurrent() async => await _persistCurrent?.call();
 
   void bindSessionFacts({
     required String? Function() activeModelKey,
