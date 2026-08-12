@@ -116,15 +116,19 @@ void main() {
     expect(project, contains('TARGETED_DEVICE_FAMILY = 1;'));
   });
 
-  test('native bundles declare Arabic, Polish, and RTL support', () async {
+  test('native bundles declare every UI locale and RTL support', () async {
     final project = await File(
       'ios/Runner.xcodeproj/project.pbxproj',
     ).readAsString();
-    for (final locale in ['en', 'pl', 'ar']) {
+    for (final locale in ['en', 'pl', 'ar', 'es', 'pt-BR', 'ja', 'id']) {
       expect(project, contains('$locale.lproj/InfoPlist.strings'));
+      final file = File('ios/Runner/$locale.lproj/InfoPlist.strings');
+      expect(file.existsSync(), isTrue, reason: locale);
+      final contents = await file.readAsString();
+      expect(contents, contains('NSCameraUsageDescription'), reason: locale);
       expect(
-        File('ios/Runner/$locale.lproj/InfoPlist.strings').existsSync(),
-        isTrue,
+        contents,
+        contains('NSPhotoLibraryUsageDescription'),
         reason: locale,
       );
     }

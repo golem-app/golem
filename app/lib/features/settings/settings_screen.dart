@@ -288,6 +288,10 @@ String _languageLabel(AppLanguage language, AppLocalizations l10n) =>
       AppLanguage.system => l10n.languageSystem,
       AppLanguage.english => l10n.languageEnglish,
       AppLanguage.polish => l10n.languagePolish,
+      AppLanguage.spanish => l10n.languageSpanish,
+      AppLanguage.brazilianPortuguese => l10n.languageBrazilianPortuguese,
+      AppLanguage.japanese => l10n.languageJapanese,
+      AppLanguage.indonesian => l10n.languageIndonesian,
       AppLanguage.arabic => l10n.languageArabic,
     };
 

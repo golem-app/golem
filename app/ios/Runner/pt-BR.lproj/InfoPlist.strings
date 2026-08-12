@@ -1,0 +1,2 @@
+"NSCameraUsageDescription" = "O Golem usa a câmera somente quando você tira uma foto para anexá-la a uma conversa. As fotos permanecem neste dispositivo.";
+"NSPhotoLibraryUsageDescription" = "O Golem lê uma foto somente quando você a anexa a uma conversa. As fotos permanecem neste dispositivo.";

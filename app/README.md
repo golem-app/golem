@@ -458,10 +458,12 @@ the unmodified source artwork used for the iOS icon. Both launcher sources
 derive from the tracked artwork in `assets/source/`.
 
 User-facing copy uses Flutter's source-generated ARB/gen-l10n path. English is
-the source and fallback; Polish is complete and selectable from Settings →
-Language alongside System default. Explicit choices are stored in app
-preferences. See `../docs/localization.md` for terminology, exclusions, and
-the checklist future agents follow when adding another language.
+the source and fallback; Polish, neutral Latin American Spanish, Brazilian
+Portuguese, Japanese, Indonesian, and Modern Standard Arabic are complete and
+selectable from Settings → Language alongside System default. Explicit choices
+are stored in app preferences. See `../docs/localization.md` for each language's
+terminology, exclusions, required Portuguese fallback mirror, plural rules,
+and the checklist future agents follow when adding another language.
 
 Golden tests use the iPhone 17 logical viewport (402 × 874). Every surface
 records light and dark under iOS chrome, and the chrome-visible surfaces

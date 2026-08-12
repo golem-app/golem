@@ -7,7 +7,11 @@ import 'package:intl/intl.dart' as intl;
 
 import 'app_localizations_ar.dart';
 import 'app_localizations_en.dart';
+import 'app_localizations_es.dart';
+import 'app_localizations_id.dart';
+import 'app_localizations_ja.dart';
 import 'app_localizations_pl.dart';
+import 'app_localizations_pt.dart';
 
 // ignore_for_file: type=lint
 
@@ -97,7 +101,12 @@ abstract class AppLocalizations {
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
     Locale('ar'),
+    Locale('es'),
+    Locale('id'),
+    Locale('ja'),
     Locale('pl'),
+    Locale('pt'),
+    Locale('pt', 'BR'),
   ];
 
   /// Product name used in accessibility labels.
@@ -315,6 +324,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Polski'**
   String get languagePolish;
+
+  /// Neutral Latin American Spanish language endonym.
+  ///
+  /// In en, this message translates to:
+  /// **'Español (Latinoamérica)'**
+  String get languageSpanish;
+
+  /// Brazilian Portuguese language endonym.
+  ///
+  /// In en, this message translates to:
+  /// **'Português (Brasil)'**
+  String get languageBrazilianPortuguese;
+
+  /// Japanese language endonym.
+  ///
+  /// In en, this message translates to:
+  /// **'日本語'**
+  String get languageJapanese;
+
+  /// Indonesian language endonym.
+  ///
+  /// In en, this message translates to:
+  /// **'Bahasa Indonesia'**
+  String get languageIndonesian;
 
   /// Arabic language endonym.
   ///
@@ -3043,22 +3076,49 @@ class _AppLocalizationsDelegate
   }
 
   @override
-  bool isSupported(Locale locale) =>
-      <String>['ar', 'en', 'pl'].contains(locale.languageCode);
+  bool isSupported(Locale locale) => <String>[
+    'ar',
+    'en',
+    'es',
+    'id',
+    'ja',
+    'pl',
+    'pt',
+  ].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
+  // Lookup logic when language+country codes are specified.
+  switch (locale.languageCode) {
+    case 'pt':
+      {
+        switch (locale.countryCode) {
+          case 'BR':
+            return AppLocalizationsPtBr();
+        }
+        break;
+      }
+  }
+
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
     case 'ar':
       return AppLocalizationsAr();
     case 'en':
       return AppLocalizationsEn();
+    case 'es':
+      return AppLocalizationsEs();
+    case 'id':
+      return AppLocalizationsId();
+    case 'ja':
+      return AppLocalizationsJa();
     case 'pl':
       return AppLocalizationsPl();
+    case 'pt':
+      return AppLocalizationsPt();
   }
 
   throw FlutterError(

@@ -288,4 +288,33 @@ void main() {
     }
     expect(() => evalPromptsForSuite('unknown'), throwsArgumentError);
   });
+
+  test('the global language smoke is fixed, bounded, and non-reasoning', () {
+    expect(
+      evalPromptsForSuite(globalLanguageSmokeEvalSuite),
+      same(globalLanguageSmokeEvalPrompts),
+    );
+    expect(globalLanguageSmokeEvalPrompts, hasLength(4));
+    expect(uniformEvalSeed(globalLanguageSmokeEvalPrompts), 7);
+    expect(
+      globalLanguageSmokeEvalPrompts.map((prompt) => prompt.id),
+      containsAll([
+        'spanish-arithmetic-17x23',
+        'brazilian-portuguese-arithmetic-17x23',
+        'japanese-arithmetic-17x23',
+        'indonesian-arithmetic-17x23',
+      ]),
+    );
+    for (final prompt in globalLanguageSmokeEvalPrompts) {
+      expect(prompt.reasoningEnabled, isFalse, reason: prompt.id);
+      expect(prompt.maxTokens, 64, reason: prompt.id);
+      expect(prompt.seed, 7, reason: prompt.id);
+      expect(
+        prompt.checks.any((check) => check.value == r'\b391\b'),
+        isTrue,
+        reason: prompt.id,
+      );
+      expect(prompt.checks.where((check) => check.required), hasLength(2));
+    }
+  });
 }

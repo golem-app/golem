@@ -73,6 +73,35 @@ class LanguageScreen extends ConsumerWidget {
                   onTap: () => _select(context, notifier, AppLanguage.polish),
                 ),
                 _LanguageRow(
+                  rowKey: const Key('language-spanish'),
+                  label: l10n.languageSpanish,
+                  selected: language == AppLanguage.spanish,
+                  onTap: () => _select(context, notifier, AppLanguage.spanish),
+                ),
+                _LanguageRow(
+                  rowKey: const Key('language-brazilian-portuguese'),
+                  label: l10n.languageBrazilianPortuguese,
+                  selected: language == AppLanguage.brazilianPortuguese,
+                  onTap: () => _select(
+                    context,
+                    notifier,
+                    AppLanguage.brazilianPortuguese,
+                  ),
+                ),
+                _LanguageRow(
+                  rowKey: const Key('language-japanese'),
+                  label: l10n.languageJapanese,
+                  selected: language == AppLanguage.japanese,
+                  onTap: () => _select(context, notifier, AppLanguage.japanese),
+                ),
+                _LanguageRow(
+                  rowKey: const Key('language-indonesian'),
+                  label: l10n.languageIndonesian,
+                  selected: language == AppLanguage.indonesian,
+                  onTap: () =>
+                      _select(context, notifier, AppLanguage.indonesian),
+                ),
+                _LanguageRow(
                   rowKey: const Key('language-arabic'),
                   label: l10n.languageArabic,
                   selected: language == AppLanguage.arabic,
