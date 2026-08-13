@@ -28,8 +28,9 @@ import 'package:golem_flutter/features/eval/domain/eval_spec.dart';
 /// be omitted to evaluate one engine. `GOLEM_EVAL_OUT` overrides the report
 /// directory (default: the system temp dir; paths are printed at the end).
 /// `GOLEM_EVAL_TEMPLATE` selects the model template (default `gemma4`).
-/// `GOLEM_EVAL_SUITE` selects `default`, the bounded `arabic-smoke`, or the
-/// nine-prompt `global-language-smoke` suite.
+/// `GOLEM_EVAL_SUITE` selects `default`, the bounded `arabic-smoke`, the
+/// nine-prompt `global-language-smoke`, or the one-prompt
+/// `simplified-chinese-feasibility` suite.
 ///
 /// This is a deliberate measurement instrument: it runs real models, takes
 /// minutes, and must never be wired into CI. Mac results serve answer

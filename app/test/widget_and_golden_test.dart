@@ -56,16 +56,19 @@ Future<List<OpenSourceLicense>> _goldenLicenses() async => [
 ];
 
 ChatHistorySnapshot _arabicMixedHistory() {
+  // The drawer golden asserts the localized Today bucket. Keep its fixture
+  // current, with a small midnight-race guard while the widget is pumped.
+  final fixtureTime = DateTime.now().add(const Duration(minutes: 1));
   final conversation = ChatConversation(
     id: 'arabic-chat',
     title: 'مشروع API محلي',
-    updatedAt: DateTime.utc(2026, 8, 12),
+    updatedAt: fixtureTime,
     messages: [
       ChatMessage.text(
         id: 'arabic-user',
         role: MessageRole.user,
         text: 'اشرح طريقة قراءة ملف config.json بأمان.',
-        createdAt: DateTime.utc(2026, 8, 12),
+        createdAt: fixtureTime,
       ),
       ChatMessage.text(
         id: 'arabic-assistant',
@@ -81,7 +84,7 @@ ChatHistorySnapshot _arabicMixedHistory() {
           tokenCount: 64,
           elapsedSeconds: 3.5,
         ),
-        createdAt: DateTime.utc(2026, 8, 12),
+        createdAt: fixtureTime,
       ),
     ],
   );

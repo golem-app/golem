@@ -217,6 +217,35 @@ word or script signal while accepting natural wording variants. Run it against
 the same two representative GGUF artifacts by
 replacing `arabic-smoke` above with `global-language-smoke`.
 
+The mainland China distribution spike has a narrower, non-production
+`simplified-chinese-feasibility` suite. It contains one fixed-seed,
+non-reasoning, 64-token arithmetic prompt and requires both `391` and the exact
+Simplified Chinese phrase `计算结果是`. This is a compatibility smoke, not a
+fluency claim. Run the physical-device matrix against installed QA artifacts:
+
+```sh
+# iPhone 17 — never use the production app.golem identity.
+flutter test integration_test/model_eval_test.dart -d <iphone> --flavor qa \
+  --no-uninstall \
+  --dart-define=GOLEM_EVAL_INSTALLED=gemma4-mlx,qwen35-2b-mlx \
+  --dart-define=GOLEM_EVAL_SUITE=simplified-chinese-feasibility
+
+# OnePlus 12R.
+flutter test integration_test/model_eval_test.dart -d <android> --flavor qa \
+  --no-uninstall \
+  --dart-define=GOLEM_EVAL_INSTALLED=gemma4-gguf,qwen35-2b-gguf \
+  --dart-define=GOLEM_EVAL_SUITE=simplified-chinese-feasibility
+```
+
+The separately gated script probe renders representative Simplified Chinese
+through the shipping typography at 1.6x without adding a locale or production
+route. Run `integration_test/simplified_chinese_typography_probe_test.dart` on
+both devices with
+`--dart-define=GOLEM_SIMPLIFIED_CHINESE_TYPOGRAPHY_PROBE=true` and optionally
+`--dart-define=GOLEM_SCRIPT_PROBE_HOLD_SECONDS=20`. Inspect missing glyphs,
+Simplified Chinese versus Japanese/Korean Han forms, wrapping, clipping,
+accessibility semantics, and the platform's native font behavior.
+
 Localized strings belong only at presentation boundaries. Domain objects,
 repositories, broker code, and persisted JSON carry enums, stable codes,
 numbers, and structured arguments; diagnostic causes remain unlocalized.
