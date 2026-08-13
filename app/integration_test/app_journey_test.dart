@@ -10,6 +10,7 @@ import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/widgets/attach_sheet.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
+import 'package:golem_flutter/features/onboarding/first_run_gate.dart';
 import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
 import 'package:golem_flutter/main.dart' as app;
 import 'package:integration_test/integration_test.dart';
@@ -45,17 +46,56 @@ void main() {
       expect(find.byKey(const Key('model-download-consent')), findsOneWidget);
       expect(find.textContaining('no network'), findsOneWidget);
       await tester.tap(find.byKey(const Key('model-download-confirm')));
-      // Cross the fake repository's first artifact-state update. First run
-      // must remain in charge until the user explicitly starts chatting.
-      await tester.pump(const Duration(milliseconds: 150));
+      await _waitForVerifiedFirstRunModel(tester);
       expect(
         find.byKey(const Key('first-run-download-progress')),
         findsOneWidget,
       );
       await tester.tap(find.byKey(const Key('first-run-start-chatting')));
+      final shellDeadline = DateTime.now().add(const Duration(seconds: 10));
+      while (find.byKey(const Key('empty-chat')).evaluate().isEmpty &&
+          find.byKey(const Key('new-chat-header')).evaluate().isEmpty) {
+        if (DateTime.now().isAfter(shellDeadline)) {
+          fail('The verified model did not unlock the app shell.');
+        }
+        await tester.pump(const Duration(milliseconds: 100));
+      }
       await tester.pumpAndSettle(const Duration(seconds: 2));
     }
     if (find.byKey(const Key('empty-chat')).evaluate().isEmpty) {
+      if (find.byKey(const Key('new-chat-header')).evaluate().isEmpty) {
+        final gate = find.byType(FirstRunGate);
+        final diagnostics = gate.evaluate().isEmpty
+            ? 'gate=absent'
+            : (() {
+                final container = ProviderScope.containerOf(
+                  tester.element(gate),
+                );
+                final preferences = container.read(
+                  preferencesControllerProvider,
+                );
+                final models = container.read(modelControllerProvider);
+                final loadable = container.read(loadableModelKeysProvider);
+                final artifacts = models.value?.artifacts.entries
+                    .map(
+                      (entry) =>
+                          '${entry.key}:${entry.value.phase.name}:'
+                          '${entry.value.downloadedBytes}',
+                    )
+                    .join(',');
+                return 'onboarding='
+                    '${preferences.value?.onboardingVersion}/'
+                    '${preferences.value?.onboardingModelKey} '
+                    'artifacts=$artifacts '
+                    'loadable=$loadable';
+              })();
+        fail('The shell disappeared after setup: $diagnostics');
+      }
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const Key('new-chat-header')),
+        timeout: const Duration(seconds: 10),
+      );
       await tester.tap(find.byKey(const Key('new-chat-header')));
       await tester.pumpAndSettle();
     }
@@ -537,6 +577,24 @@ Future<void> _pumpUntilFound(
   final watch = Stopwatch()..start();
   while (finder.evaluate().isEmpty && watch.elapsed < timeout) {
     await tester.pump(const Duration(milliseconds: 10));
+  }
+  if (finder.evaluate().isEmpty) {
+    fail('Timed out waiting for $finder.');
+  }
+}
+
+Future<void> _waitForVerifiedFirstRunModel(WidgetTester tester) async {
+  final button = find.descendant(
+    of: find.byKey(const Key('first-run-start-chatting')),
+    matching: find.byType(CupertinoButton),
+  );
+  final deadline = DateTime.now().add(const Duration(seconds: 10));
+  while (button.evaluate().isEmpty ||
+      tester.widget<CupertinoButton>(button).onPressed == null) {
+    if (DateTime.now().isAfter(deadline)) {
+      fail('The simulated first-run model was never verified.');
+    }
+    await tester.pump(const Duration(milliseconds: 100));
   }
 }
 

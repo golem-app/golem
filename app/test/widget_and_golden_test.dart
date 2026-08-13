@@ -24,6 +24,7 @@ import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
 import 'package:golem_flutter/features/chat/widgets/recovery_banner.dart';
 import 'package:golem_flutter/features/legal/model_attribution_screen.dart';
 import 'package:golem_flutter/features/legal/open_source_licenses_screen.dart';
+import 'package:golem_flutter/features/onboarding/application/onboarding_controller.dart';
 import 'package:golem_flutter/features/onboarding/first_run_screen.dart';
 import 'package:golem_flutter/features/settings/appearance_screen.dart';
 import 'package:golem_flutter/features/settings/language_screen.dart';
@@ -192,6 +193,86 @@ void main() {
     await expectLater(
       find.byType(FirstRunScreen),
       matchesGoldenFile('goldens/first-run-model-dark${chromeSuffix()}.png'),
+    );
+  }, variant: bothChromes);
+
+  for (final setup
+      in <({String name, ArtifactStatus status, Brightness theme})>[
+        (
+          name: 'progress',
+          status: const ArtifactStatus(
+            phase: ArtifactPhase.downloading,
+            downloadedBytes: 900000000,
+          ),
+          theme: Brightness.light,
+        ),
+        (
+          name: 'verifying',
+          status: const ArtifactStatus(
+            phase: ArtifactPhase.verifying,
+            downloadedBytes: 3583086498,
+          ),
+          theme: Brightness.light,
+        ),
+        (
+          name: 'paused',
+          status: const ArtifactStatus(
+            phase: ArtifactPhase.paused,
+            downloadedBytes: 900000000,
+          ),
+          theme: Brightness.dark,
+        ),
+        (
+          name: 'failure',
+          status: const ArtifactStatus(
+            phase: ArtifactPhase.failed,
+            downloadedBytes: 900000000,
+            failureReason: ArtifactFailure(ArtifactFailureKind.transfer),
+          ),
+          theme: Brightness.light,
+        ),
+        (
+          name: 'ready',
+          status: const ArtifactStatus(phase: ArtifactPhase.installed),
+          theme: Brightness.dark,
+        ),
+      ]) {
+    testWidgets('required setup ${setup.name} golden', (tester) async {
+      await pumpWithRepositories(
+        tester,
+        brightness: setup.theme,
+        eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+        model: ModelState(
+          simulated: true,
+          artifacts: {'gemma4-mlx': setup.status},
+        ),
+        child: const FirstRunScreen(initialStep: FirstRunStep.download),
+        settle: setup.status.phase != ArtifactPhase.verifying,
+      );
+      await expectLater(
+        find.byType(FirstRunScreen),
+        matchesGoldenFile(
+          'goldens/first-run-${setup.name}${chromeSuffix()}.png',
+        ),
+      );
+    }, variant: bothChromes);
+  }
+
+  testWidgets('required setup unsupported golden', (tester) async {
+    await pumpWithRepositories(
+      tester,
+      brightness: Brightness.dark,
+      eligibility: const DeviceEligibility(
+        tier: DeviceTier.unsupported,
+        reason: DeviceIneligibilityReason.belowMemoryFloor,
+        message: 'This device cannot run local models.',
+      ),
+      model: const ModelState(simulated: false),
+      child: const FirstRunScreen(initialStep: FirstRunStep.unsupported),
+    );
+    await expectLater(
+      find.byType(FirstRunScreen),
+      matchesGoldenFile('goldens/first-run-unsupported${chromeSuffix()}.png'),
     );
   }, variant: bothChromes);
 
@@ -1243,12 +1324,12 @@ void main() {
     expect(find.textContaining('deterministic simulation'), findsWidgets);
     expect(find.text('Load Runtime'), findsOneWidget);
     expect(find.textContaining('Simulated Runtime'), findsNothing);
-    // The runtime rows: the artifact this build would load, an honest bare
-    // state beside it, and no simulated qualifier anywhere on them. Naming the
-    // model while it is unloaded is the point — "active" is which model, and
-    // "state" is whether the engine holds it (#20).
+    // With no verified artifact the runtime rows name no active model. The
+    // configured download recommendation is not residency and must never be
+    // presented as if the engine could load it (#110).
     expect(find.text('Unloaded'), findsOneWidget);
-    expect(find.text('Gemma 4 E2B'), findsWidgets);
+    expect(find.text('None'), findsOneWidget);
+    expect(find.text('Gemma 4 E2B'), findsNothing);
     expect(find.textContaining('· simulated'), findsNothing);
 
     await pumpWithRepositories(
@@ -1279,10 +1360,15 @@ void main() {
     await pumpWithRepositories(
       tester,
       backend: backend,
+      model: const ModelState(
+        artifacts: {
+          'gemma4-gguf': ArtifactStatus(phase: ArtifactPhase.installed),
+        },
+      ),
       child: const ChatScreen(),
     );
     expect(
-      find.textContaining('is loaded and running on this phone'),
+      find.textContaining('is downloaded and verified on this phone'),
       findsOneWidget,
     );
     expect(find.textContaining('preview simulates'), findsNothing);

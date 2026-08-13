@@ -8,9 +8,10 @@ import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/services/image_intake.dart';
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
-import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/widgets/attach_sheet.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
+import 'package:golem_flutter/features/onboarding/first_run_gate.dart';
+import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
 import 'package:golem_flutter/main.dart' as app;
 import 'package:image/image.dart' as img;
 import 'package:integration_test/integration_test.dart';
@@ -23,8 +24,8 @@ import 'support/acceptance_hud.dart';
 /// flutter test integration_test/device_acceptance_test.dart -d <device> \
 ///   --flavor qa --no-uninstall --dart-define=GOLEM_INFERENCE_BACKEND=auto \
 ///   --dart-define=GOLEM_DEVICE_ACCEPTANCE=true \
-///   --dart-define=GOLEM_ACCEPT_PRIMARY=gemma4-gguf \
-///   --dart-define=GOLEM_ACCEPT_SECONDARY=qwen35-2b-gguf \
+///   --dart-define=GOLEM_ACCEPT_PRIMARY=gemma4-mlx \
+///   --dart-define=GOLEM_ACCEPT_SECONDARY=qwen35-2b-mlx \
 ///   --dart-define=GOLEM_ACCEPT_IMAGE=true
 /// ```
 ///
@@ -105,11 +106,6 @@ void main() {
       await app.launch(picker: _RedImagePicker(_redPng));
       await pumpUntil(
         tester,
-        'the composer to mount',
-        () => find.byKey(const Key('chat-composer')).evaluate().isNotEmpty,
-      );
-      await pumpUntil(
-        tester,
         'the launch splash to dismiss',
         () => find.byKey(const Key('launch-splash')).evaluate().isEmpty,
       );
@@ -119,7 +115,7 @@ void main() {
         '— run with --no-uninstall or teardown deletes these models',
       );
       final providers = ProviderScope.containerOf(
-        tester.element(find.byType(ChatScreen)),
+        tester.element(find.byType(FirstRunGate)),
       );
       final models = providers.read(modelControllerProvider.notifier);
       final chat = providers.read(chatControllerProvider.notifier);
@@ -222,8 +218,8 @@ void main() {
           }
           // Straight off the download layer's own status stream, so the screen
           // can never claim more than the repository has banked. Verification
-          // credits a whole file before hashing it, so a bar there would sit
-          // at 100% for minutes; the byte count is the honest part.
+          // has no trustworthy fractional progress, so present an
+          // indeterminate, user-facing status instead of a false 100% bar.
           AcceptanceHud.progress(
             received: status.phase == ArtifactPhase.verifying
                 ? null
@@ -232,7 +228,7 @@ void main() {
                 ? null
                 : entry.totalBytes,
             detail: status.phase == ArtifactPhase.verifying
-                ? 'hashing ${formatBytes(entry.totalBytes)} against the pins'
+                ? 'Verifying the model download'
                 : status.phase.name,
           );
           return status.phase == ArtifactPhase.installed;
@@ -288,6 +284,18 @@ void main() {
       }
 
       await install(_primary);
+      // Device acceptance provisions through the production repository path,
+      // then proves the app-root invariant observes verification before the
+      // router exists. The model-free journey owns consent-dialog behavior.
+      final setupSaved = await providers
+          .read(preferencesControllerProvider.notifier)
+          .completeOnboarding(modelKey: _primary);
+      expect(setupSaved, isTrue);
+      await pumpUntil(
+        tester,
+        'verified setup to expose the composer',
+        () => find.byKey(const Key('chat-composer')).evaluate().isNotEmpty,
+      );
       await chat.newChat();
       await chat.setConversationModel(
         providers.read(chatControllerProvider).requireValue.active!.id,

@@ -2,6 +2,10 @@
 
 Status: decided on `feat/27-device-floor-admission` (issue #27)
 
+The classification and refusal thresholds remain current. ADR 0012 supersedes
+the refusal's former access to chats and Settings: the explanation now blocks
+the app shell because no supported model can satisfy startup.
+
 Everything before this decision governed the *moment of load*: the
 device-model policy picks a lighter model below 7 GiB (#19), the preflight
 refuses a load that cannot fit free memory (#62), and the llama shim refuses
@@ -69,13 +73,10 @@ rule a third time, in a place with no link to the flag.
 
 ## What the refusal does, and does not, take away
 
-An unsupported device may not download and may not load. Everything that is
-not a model keeps working: chats and their history, settings, export,
-appearance, storage. The chat surface says so in place of the starter chips,
-the model cards replace their download button with the explanation, and the
-runtime card withholds its toggle. The affordances are *withheld*, not
-disabled — a full-width accent button that does nothing when tapped would
-undo the honesty the copy exists to provide.
+An unsupported device may not download and may not load. The all-routes gate
+presents the refusal inside the mounted router, with no download or continue action.
+Persisted chats, preferences, and files remain untouched for a future launch
+on supported hardware or a later compatible release.
 
 ## Store alignment, and what no store can do
 

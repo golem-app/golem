@@ -636,7 +636,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get setupDownloadPrompt =>
-      'भेजने से पहले चुना गया मॉडल डाउनलोड करें। आप फिर भी संदेश का मसौदा बना सकते हैं और Golem के बाकी हिस्से का उपयोग कर सकते हैं।';
+      'Golem का उपयोग करने से पहले चुना गया मॉडल डाउनलोड और सत्यापित करें।';
 
   @override
   String get qaDownloadShort =>
@@ -771,6 +771,16 @@ class AppLocalizationsHi extends AppLocalizations {
   @override
   String localModelPrivacy(String modelName) {
     return '$modelName इस फ़ोन पर लोड होकर चल रहा है। यहाँ लिखा कुछ भी कहीं नहीं जाता।';
+  }
+
+  @override
+  String downloadedModelPrivacy(String modelName) {
+    return '$modelName इस फ़ोन पर डाउनलोड और सत्यापित है। संदेश भेजने पर यह लोड होगा। यहाँ लिखा कुछ भी कहीं नहीं जाता।';
+  }
+
+  @override
+  String validatedModelPrivacy(String modelName) {
+    return '$modelName को इस सत्र के लिए सत्यापित किया गया है और यह केवल इसी फ़ोन पर चलता है। यहाँ लिखा कुछ भी कहीं नहीं जाता।';
   }
 
   @override
@@ -1454,7 +1464,10 @@ class AppLocalizationsHi extends AppLocalizations {
   String get resolveRepository => 'हल करें';
 
   @override
-  String get activeBadge => 'सक्रिय';
+  String get activeBadge => 'चयनित';
+
+  @override
+  String get loadedBadge => 'लोड किया गया';
 
   @override
   String modelStatusLabel(String modelName, String engine) {

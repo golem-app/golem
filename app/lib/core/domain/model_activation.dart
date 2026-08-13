@@ -31,6 +31,32 @@ Set<String> loadableModelKeys({
   };
 }
 
+/// The compatible verified artifact this process should use when a stored
+/// choice is unavailable. Catalog order is stable, so every caller reaches the
+/// same fallback without rewriting historical conversation data.
+String? startupModelKey({
+  required InferenceBackendConfig backend,
+  required List<ModelCatalogEntry> catalog,
+  required Set<String> loadableKeys,
+  String? preferredKey,
+}) {
+  if (backend.sideloaded) return null;
+  if (backend.simulatedInference) {
+    return preferredKey ??
+        backend.artifactKey ??
+        (catalog.any((entry) => entry.key == 'gemma4-mlx')
+            ? 'gemma4-mlx'
+            : catalog.firstOrNull?.key);
+  }
+  for (final key in [preferredKey, backend.artifactKey]) {
+    if (key != null && loadableKeys.contains(key)) return key;
+  }
+  return catalog
+      .where((entry) => loadableKeys.contains(entry.key))
+      .firstOrNull
+      ?.key;
+}
+
 /// The catalog key a conversation effectively runs, or null when a real engine
 /// holds an operator-sideloaded file no catalog entry describes.
 ///
@@ -55,12 +81,20 @@ String? effectiveModelKey({
   } else {
     chosen = null;
   }
-  return chosen ??
-      residentModelKey ??
+  if (chosen != null) return chosen;
+  if (loadableKeys != null) {
+    return startupModelKey(
+      backend: backend,
+      catalog: catalog,
+      loadableKeys: loadableKeys,
+      preferredKey: residentModelKey,
+    );
+  }
+  return residentModelKey ??
       backend.artifactKey ??
       (catalog.any((entry) => entry.key == 'gemma4-mlx')
           ? 'gemma4-mlx'
-          : catalog.first.key);
+          : catalog.firstOrNull?.key);
 }
 
 /// The file or directory an operator pointed the build at — never the path

@@ -24,6 +24,8 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('settings-language-row')));
     await tester.tap(find.byKey(const Key('settings-language-row')));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('language-arabic')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('language-arabic')));
     await tester.pumpAndSettle();
 
@@ -132,11 +134,25 @@ Future<void> _launchToChat(WidgetTester tester) async {
     await tester.tap(find.byKey(const Key('first-run-download')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('model-download-confirm')));
-    await tester.pump(const Duration(milliseconds: 150));
+    await _waitForVerifiedFirstRunModel(tester);
     await tester.tap(find.byKey(const Key('first-run-start-chatting')));
     await tester.pumpAndSettle(const Duration(seconds: 2));
   }
   if (find.byType(ChatScreen).evaluate().isEmpty) {
     fail('Chat screen did not become available.');
+  }
+}
+
+Future<void> _waitForVerifiedFirstRunModel(WidgetTester tester) async {
+  final button = find.descendant(
+    of: find.byKey(const Key('first-run-start-chatting')),
+    matching: find.byType(CupertinoButton),
+  );
+  final deadline = DateTime.now().add(const Duration(seconds: 10));
+  while (tester.widget<CupertinoButton>(button).onPressed == null) {
+    if (DateTime.now().isAfter(deadline)) {
+      fail('The simulated first-run model was never verified.');
+    }
+    await tester.pump(const Duration(milliseconds: 100));
   }
 }

@@ -12,6 +12,7 @@ import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
+import 'package:golem_flutter/core/domain/response_style_mapping.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
@@ -90,10 +91,11 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   int prepares = 0;
   int unloads = 0;
   String initialResidentKey = 'test-mlx';
-  final ValueNotifier<String?> _residentKey = ValueNotifier<String?>(null);
+  final ValueNotifier<InferenceResidency> _residency =
+      ValueNotifier<InferenceResidency>(const InferenceResidency.unloaded());
 
   @override
-  ValueListenable<String?> get residentModelKey => _residentKey;
+  ValueListenable<InferenceResidency> get residency => _residency;
 
   @override
   Future<void> prepare({String? modelKey}) async {
@@ -102,14 +104,17 @@ final class _RecordingInferenceRepository implements InferenceRepository {
     if (failPrepare) throw StateError('injected prepare failure');
     // Mirrors the real repository: a keyless prepare makes the initial
     // configuration resident, sideloaded path or not.
-    _residentKey.value = modelKey ?? initialResidentKey;
+    _residency.value = InferenceResidency(
+      loaded: true,
+      catalogKey: modelKey ?? initialResidentKey,
+    );
   }
 
   @override
   Future<void> unload() async {
     unloads++;
     if (failUnload) throw StateError('injected unload failure');
-    _residentKey.value = null;
+    _residency.value = const InferenceResidency.unloaded();
   }
 
   @override
@@ -299,6 +304,13 @@ void main() {
         ),
         inferenceRepositoryProvider.overrideWithValue(
           FakeInferenceRepository(eventDelay: delay),
+        ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
+        preferencesRepositoryProvider.overrideWithValue(
+          InMemoryPreferencesRepository(),
+        ),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
         ),
         benchmarkRepositoryProvider.overrideWithValue(
           FakeBenchmarkRepository(
@@ -876,6 +888,90 @@ void main() {
   );
 
   test(
+    'fallback generation uses the fallback model sampling profile',
+    () async {
+      final inference = _RecordingInferenceRepository();
+      final history = InMemoryChatHistoryRepository(
+        ChatHistorySnapshot(
+          activeId: 'stale-gemma-chat',
+          conversations: [
+            ChatConversation(
+              id: 'stale-gemma-chat',
+              title: 'Stale Gemma chat',
+              messages: const [],
+              updatedAt: DateTime.utc(2026, 8, 13),
+              modelKey: 'gemma4-gguf',
+            ),
+          ],
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          chatHistoryRepositoryProvider.overrideWithValue(history),
+          inferenceRepositoryProvider.overrideWithValue(inference),
+          inferenceBackendProvider.overrideWithValue(
+            const InferenceBackendConfig(
+              kind: InferenceBackendKind.mlx,
+              profileKey: 'gemma4',
+              artifactKey: 'gemma4-mlx',
+              modelPath: 'documents:models/gemma4-mlx',
+              modelPathFromCatalog: true,
+            ),
+          ),
+          deviceEligibilityProvider.overrideWithValue(
+            const DeviceEligibility(tier: DeviceTier.preferred),
+          ),
+          modelCatalogEntriesProvider.overrideWithValue(modelCatalog),
+          modelManagementRepositoryProvider.overrideWithValue(
+            const _StaticState(
+              ModelState(
+                artifacts: {
+                  'qwen35-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+                },
+              ),
+            ),
+          ),
+          preferencesRepositoryProvider.overrideWithValue(
+            InMemoryPreferencesRepository(
+              const AppPreferences()
+                  .withStyle('gemma4', ResponseStyle.precise)
+                  .withStyle('qwen35', ResponseStyle.creative),
+            ),
+          ),
+          settingsRepositoryProvider.overrideWithValue(
+            InMemorySettingsRepository(
+              const GenerationSettings()
+                  .withModel(
+                    'gemma4',
+                    const SamplingOverrides(temperature: 0.11),
+                  )
+                  .withModel(
+                    'qwen35',
+                    const SamplingOverrides(temperature: 0.77),
+                  ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(modelControllerProvider.future);
+      await container.read(chatControllerProvider.future);
+      await container
+          .read(chatControllerProvider.notifier)
+          .send('Use fallback');
+
+      expect(inference.lastPrepareModelKey, 'qwen35-mlx');
+      expect(inference.lastModelKey, 'qwen35-mlx');
+      expect(inference.lastOverrides?.temperature, 0.77);
+      expect(
+        inference.lastOverrides?.topP,
+        styleOverridesFor('qwen35', ResponseStyle.creative).topP,
+      );
+    },
+  );
+
+  test(
     'history off stops persisting, wipes disk, and re-saves on enable',
     () async {
       final history = InMemoryChatHistoryRepository();
@@ -1247,7 +1343,7 @@ void main() {
         inferenceRepositoryProvider.overrideWithValue(inference),
         inferenceBackendProvider.overrideWithValue(
           const InferenceBackendConfig(
-            kind: InferenceBackendKind.llama,
+            kind: InferenceBackendKind.mlx,
             profileKey: 'gemma4',
             artifactKey: 'test-mlx',
             modelPath: 'documents:models/test-mlx',
@@ -1421,7 +1517,7 @@ void main() {
         inferenceRepositoryProvider.overrideWithValue(inference),
         inferenceBackendProvider.overrideWithValue(
           const InferenceBackendConfig(
-            kind: InferenceBackendKind.llama,
+            kind: InferenceBackendKind.mlx,
             profileKey: 'gemma4',
             artifactKey: 'test-mlx',
             modelPath: 'documents:models/test-mlx',
@@ -1594,7 +1690,7 @@ void main() {
         inferenceRepositoryProvider.overrideWithValue(inference),
         inferenceBackendProvider.overrideWithValue(
           const InferenceBackendConfig(
-            kind: InferenceBackendKind.llama,
+            kind: InferenceBackendKind.mlx,
             profileKey: 'gemma4',
             artifactKey: 'test-mlx',
             modelPath: 'documents:models/test-mlx',
@@ -1749,7 +1845,7 @@ void main() {
       message: 'This device cannot run models.',
     );
     const realBackend = InferenceBackendConfig(
-      kind: InferenceBackendKind.llama,
+      kind: InferenceBackendKind.mlx,
       profileKey: 'gemma4',
       artifactKey: 'test-mlx',
       modelPath: 'documents:models/test-mlx',

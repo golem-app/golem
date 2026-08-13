@@ -29,6 +29,20 @@ resolveConfiguredBackend({required AppIdentity identity}) async {
     backendDefine: backendDefine,
     identity: identity,
   );
+  final platform = switch ((
+    Platform.isIOS,
+    Platform.isAndroid,
+    Platform.isMacOS,
+  )) {
+    (true, _, _) => HostPlatform.ios,
+    (_, true, _) => HostPlatform.android,
+    (_, _, true) => HostPlatform.macos,
+    _ => HostPlatform.other,
+  };
+  final engineName = resolvedEngineName(
+    backendName: backendName,
+    platform: platform,
+  );
   final overrides = deviceCapabilityOverridesFor(
     identity: identity,
     memoryOverrideBytes: const int.fromEnvironment('GOLEM_DEVICE_MEMORY_BYTES'),
@@ -37,7 +51,7 @@ resolveConfiguredBackend({required AppIdentity identity}) async {
     ),
   );
   final capabilities = await probeDeviceCapabilities(
-    backendName: backendName,
+    backendName: engineName,
     physicalMemoryBytes: const DeviceStorageChannel().physicalMemoryBytes,
     // Test-only: both test phones report over 8 GB, so neither the Qwen branch
     // nor the floor is otherwise reachable on hardware. 0 = unset.
@@ -59,6 +73,7 @@ resolveConfiguredBackend({required AppIdentity identity}) async {
       artifactDefine: const String.fromEnvironment('GOLEM_MODEL_ARTIFACT'),
       modelPathDefine: const String.fromEnvironment('GOLEM_MODEL_PATH'),
       tier: eligibility.tier,
+      platform: platform,
     ),
     eligibility: eligibility,
   );

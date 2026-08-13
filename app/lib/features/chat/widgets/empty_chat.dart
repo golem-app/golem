@@ -45,6 +45,7 @@ class EmptyChat extends ConsumerWidget {
             residentModelKey: ref.watch(residentModelKeyProvider),
             loadableKeys: ref.watch(loadableModelKeysProvider),
           );
+    final residency = ref.watch(inferenceResidencyProvider);
     final l10n = context.l10n;
     final starters = [
       (
@@ -109,7 +110,11 @@ class EmptyChat extends ConsumerWidget {
                 refusalMessage ??
                     (backend.simulatedInference
                         ? l10n.simulatedModelPrivacy(label!)
-                        : l10n.localModelPrivacy(label!)),
+                        : backend.sideloaded
+                        ? l10n.validatedModelPrivacy(label!)
+                        : residency.loaded
+                        ? l10n.localModelPrivacy(label!)
+                        : l10n.downloadedModelPrivacy(label!)),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   height: 1.4,

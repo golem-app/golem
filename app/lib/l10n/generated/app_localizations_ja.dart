@@ -618,8 +618,7 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get setupDownloadPrompt =>
-      '送信する前に、選択したモデルをダウンロードしてください。メッセージの下書きやGolemのほかの機能は引き続き使用できます。';
+  String get setupDownloadPrompt => 'Golemを使用する前に、選択したモデルをダウンロードして検証してください。';
 
   @override
   String get qaDownloadShort => '決定論的なQAシミュレーション。ネットワークも重みも使用しません。';
@@ -749,6 +748,16 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String localModelPrivacy(String modelName) {
     return '$modelNameはこの端末に読み込まれ、実行されています。ここに入力した内容はどこにも送信されません。';
+  }
+
+  @override
+  String downloadedModelPrivacy(String modelName) {
+    return '$modelNameはこの端末にダウンロードされ、検証済みです。メッセージを送信すると読み込まれます。ここに入力した内容はどこにも送信されません。';
+  }
+
+  @override
+  String validatedModelPrivacy(String modelName) {
+    return '$modelNameはこのセッション用に検証され、この端末上でのみ実行されます。ここに入力した内容はどこにも送信されません。';
   }
 
   @override
@@ -1406,7 +1415,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get resolveRepository => '解決';
 
   @override
-  String get activeBadge => '使用中';
+  String get activeBadge => '選択中';
+
+  @override
+  String get loadedBadge => '読込済み';
 
   @override
   String modelStatusLabel(String modelName, String engine) {

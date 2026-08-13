@@ -641,7 +641,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get setupDownloadPrompt =>
-      'Baixe o modelo selecionado antes de enviar. Você ainda pode escrever mensagens e usar o restante do Golem.';
+      'Baixe e verifique o modelo selecionado antes de usar o Golem.';
 
   @override
   String get qaDownloadShort =>
@@ -776,6 +776,16 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String localModelPrivacy(String modelName) {
     return '$modelName está carregado e em execução neste celular. Nada do que você digita aqui é enviado para qualquer lugar.';
+  }
+
+  @override
+  String downloadedModelPrivacy(String modelName) {
+    return '$modelName foi baixado e verificado neste celular. Ele será carregado quando você enviar uma mensagem. Nada do que você digita aqui é enviado para qualquer lugar.';
+  }
+
+  @override
+  String validatedModelPrivacy(String modelName) {
+    return '$modelName foi validado para esta sessão e só é executado neste celular. Nada do que você digita aqui é enviado para qualquer lugar.';
   }
 
   @override
@@ -1474,7 +1484,10 @@ class AppLocalizationsPt extends AppLocalizations {
   String get resolveRepository => 'Resolver';
 
   @override
-  String get activeBadge => 'ATIVO';
+  String get activeBadge => 'SELECIONADO';
+
+  @override
+  String get loadedBadge => 'CARREGADO';
 
   @override
   String modelStatusLabel(String modelName, String engine) {
@@ -2497,7 +2510,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get setupDownloadPrompt =>
-      'Baixe o modelo selecionado antes de enviar. Você ainda pode escrever mensagens e usar o restante do Golem.';
+      'Baixe e verifique o modelo selecionado antes de usar o Golem.';
 
   @override
   String get qaDownloadShort =>
@@ -2632,6 +2645,16 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String localModelPrivacy(String modelName) {
     return '$modelName está carregado e em execução neste celular. Nada do que você digita aqui é enviado para qualquer lugar.';
+  }
+
+  @override
+  String downloadedModelPrivacy(String modelName) {
+    return '$modelName foi baixado e verificado neste celular. Ele será carregado quando você enviar uma mensagem. Nada do que você digita aqui é enviado para qualquer lugar.';
+  }
+
+  @override
+  String validatedModelPrivacy(String modelName) {
+    return '$modelName foi validado para esta sessão e só é executado neste celular. Nada do que você digita aqui é enviado para qualquer lugar.';
   }
 
   @override
@@ -3330,7 +3353,10 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get resolveRepository => 'Resolver';
 
   @override
-  String get activeBadge => 'ATIVO';
+  String get activeBadge => 'SELECIONADO';
+
+  @override
+  String get loadedBadge => 'CARREGADO';
 
   @override
   String modelStatusLabel(String modelName, String engine) {

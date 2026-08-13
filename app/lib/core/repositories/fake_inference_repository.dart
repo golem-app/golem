@@ -12,10 +12,11 @@ final class FakeInferenceRepository implements InferenceRepository {
   final Duration eventDelay;
   bool _prepared = true;
   int _generationEpoch = 0;
-  final ValueNotifier<String?> _residentKey = ValueNotifier<String?>(null);
+  final ValueNotifier<InferenceResidency> _residency =
+      ValueNotifier<InferenceResidency>(const InferenceResidency.unloaded());
 
   @override
-  ValueListenable<String?> get residentModelKey => _residentKey;
+  ValueListenable<InferenceResidency> get residency => _residency;
 
   static const _reasoning = <String>[
     'I’ll identify the main idea. ',
@@ -55,14 +56,16 @@ final class FakeInferenceRepository implements InferenceRepository {
   Future<void> prepare({String? modelKey}) async {
     await Future<void>.delayed(eventDelay);
     _prepared = true;
-    if (modelKey != null) _residentKey.value = modelKey;
+    if (modelKey != null) {
+      _residency.value = InferenceResidency(loaded: true, catalogKey: modelKey);
+    }
   }
 
   @override
   Future<void> unload() async {
     _generationEpoch++;
     _prepared = false;
-    _residentKey.value = null;
+    _residency.value = const InferenceResidency.unloaded();
   }
 
   @override
@@ -79,7 +82,9 @@ final class FakeInferenceRepository implements InferenceRepository {
   }) async* {
     if (!_prepared) throw StateError('The simulated runtime is unloaded.');
     final epoch = ++_generationEpoch;
-    if (modelKey != null) _residentKey.value = modelKey;
+    if (modelKey != null) {
+      _residency.value = InferenceResidency(loaded: true, catalogKey: modelKey);
+    }
     final profile = _profileFor(modelKey);
     final last = context.lastOrNull;
     final prompt = last?.text ?? '';

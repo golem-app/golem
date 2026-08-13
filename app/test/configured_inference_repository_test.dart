@@ -117,7 +117,7 @@ void main() {
 
     await repository.prepare();
 
-    expect(repository.residentModelKey.value, 'gemma4-gguf');
+    expect(repository.residency.value.catalogKey, 'gemma4-gguf');
     expect(runtime.loadedModelPath, '/documents/models/gemma4-gguf/model.gguf');
     expect(
       runtime.loadedProjectorPath,
@@ -141,7 +141,7 @@ void main() {
     await repository.prepare();
 
     expect(
-      repository.residentModelKey.value,
+      repository.residency.value.catalogKey,
       isNull,
       reason:
           'reporting a pinned key here is what made the chat header name the '
@@ -183,7 +183,7 @@ void main() {
 
     await repository.prepare(modelKey: custom.key);
 
-    expect(repository.residentModelKey.value, custom.key);
+    expect(repository.residency.value.catalogKey, custom.key);
     expect(
       runtime.loadedModelPath,
       '/documents/${custom.installDirectory}/model.gguf',

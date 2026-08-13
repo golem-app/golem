@@ -637,7 +637,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get setupDownloadPrompt =>
-      'Unduh model yang dipilih sebelum mengirim. Anda masih dapat menulis draf pesan dan menggunakan bagian lain Golem.';
+      'Unduh dan verifikasi model yang dipilih sebelum menggunakan Golem.';
 
   @override
   String get qaDownloadShort =>
@@ -774,6 +774,16 @@ class AppLocalizationsId extends AppLocalizations {
   @override
   String localModelPrivacy(String modelName) {
     return '$modelName dimuat dan berjalan di ponsel ini. Tidak ada yang Anda ketik di sini dikirim ke mana pun.';
+  }
+
+  @override
+  String downloadedModelPrivacy(String modelName) {
+    return '$modelName telah diunduh dan diverifikasi di ponsel ini. Model akan dimuat saat Anda mengirim pesan. Tidak ada yang Anda ketik di sini dikirim ke mana pun.';
+  }
+
+  @override
+  String validatedModelPrivacy(String modelName) {
+    return '$modelName telah divalidasi untuk sesi ini dan hanya berjalan di ponsel ini. Tidak ada yang Anda ketik di sini dikirim ke mana pun.';
   }
 
   @override
@@ -1454,7 +1464,10 @@ class AppLocalizationsId extends AppLocalizations {
   String get resolveRepository => 'Selesaikan';
 
   @override
-  String get activeBadge => 'AKTIF';
+  String get activeBadge => 'DIPILIH';
+
+  @override
+  String get loadedBadge => 'DIMUAT';
 
   @override
   String modelStatusLabel(String modelName, String engine) {

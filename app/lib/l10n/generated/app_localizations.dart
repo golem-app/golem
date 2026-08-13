@@ -1214,7 +1214,7 @@ abstract class AppLocalizations {
   /// Deferred model setup prompt.
   ///
   /// In en, this message translates to:
-  /// **'Download the selected model before sending. You can still draft messages and use the rest of Golem.'**
+  /// **'Download and verify the selected model before using Golem.'**
   String get setupDownloadPrompt;
 
   /// Short QA download explanation.
@@ -1444,6 +1444,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{modelName} is loaded and running on this phone. Nothing you type here goes anywhere.'**
   String localModelPrivacy(String modelName);
+
+  /// Production empty-chat privacy statement before the verified model is resident.
+  ///
+  /// In en, this message translates to:
+  /// **'{modelName} is downloaded and verified on this phone. It loads when you send a message. Nothing you type here goes anywhere.'**
+  String downloadedModelPrivacy(String modelName);
+
+  /// Operator-sideload empty-chat privacy statement.
+  ///
+  /// In en, this message translates to:
+  /// **'{modelName} was validated for this session and runs only on this phone. Nothing you type here goes anywhere.'**
+  String validatedModelPrivacy(String modelName);
 
   /// Starter prompt chip.
   ///
@@ -2525,11 +2537,17 @@ abstract class AppLocalizations {
   /// **'Resolve'**
   String get resolveRepository;
 
-  /// Active model badge.
+  /// Selected model badge.
   ///
   /// In en, this message translates to:
-  /// **'ACTIVE'**
+  /// **'SELECTED'**
   String get activeBadge;
+
+  /// Resident model badge.
+  ///
+  /// In en, this message translates to:
+  /// **'LOADED'**
+  String get loadedBadge;
 
   /// Model download status accessibility label.
   ///

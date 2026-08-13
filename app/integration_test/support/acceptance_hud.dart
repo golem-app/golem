@@ -113,6 +113,9 @@ final class HudProgress {
       ? (received! / total!).clamp(0.0, 1.0)
       : null;
 
+  /// Verification has meaningful activity but no trustworthy fraction.
+  bool get indeterminate => fraction == null && caption.isNotEmpty;
+
   /// The caption under the current step: bytes when they are known, the free
   /// text otherwise, both when both were given. A count without a total still
   /// reads as the count — dropping it would paint an empty line.
@@ -250,6 +253,35 @@ class _ProgressBar extends StatelessWidget {
   );
 }
 
+class _ProgressCaption extends StatelessWidget {
+  const _ProgressCaption(this.progress, {required this.compact});
+
+  final HudProgress progress;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Text(
+      progress.caption,
+      maxLines: compact ? 1 : null,
+      overflow: compact ? TextOverflow.ellipsis : null,
+      style: TextStyle(color: _muted, fontSize: compact ? 12 : 14),
+    );
+    if (!progress.indeterminate) return text;
+    return Row(
+      children: [
+        CupertinoActivityIndicator(
+          key: const Key('acceptance-hud-indeterminate-progress'),
+          radius: compact ? 7 : 9,
+          color: _accent,
+        ),
+        SizedBox(width: compact ? 7 : 9),
+        Expanded(child: text),
+      ],
+    );
+  }
+}
+
 class _HudScreen extends StatelessWidget {
   const _HudScreen();
 
@@ -345,13 +377,7 @@ class _HudScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                progress.caption,
-                                style: const TextStyle(
-                                  color: _muted,
-                                  fontSize: 14,
-                                ),
-                              ),
+                              _ProgressCaption(progress, compact: false),
                               if (progress.fraction case final fraction?) ...[
                                 const SizedBox(height: 8),
                                 _ProgressBar(fraction),
@@ -434,15 +460,7 @@ class _HudBand extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  progress.caption,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: _muted,
-                                    fontSize: 12,
-                                  ),
-                                ),
+                                _ProgressCaption(progress, compact: true),
                                 if (progress.fraction case final fraction?) ...[
                                   const SizedBox(height: 5),
                                   _ProgressBar(fraction),

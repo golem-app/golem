@@ -36,10 +36,9 @@ Future<DeviceCapabilities> probeDeviceCapabilities({
   );
 }
 
-/// Whether the engine this build composed can execute here at all. `auto` is
-/// llama.cpp (ADR 0002), so it asks the same question, and it asks about that
-/// engine alone — the probe otherwise loads every shipped engine's library on
-/// the launch path to answer about one.
+/// Whether the engine this build composed can execute here at all. Automatic
+/// policy is resolved to an exact engine before this probe, so it asks about
+/// that engine alone rather than loading every shipped carrier at launch.
 ///
 /// An engine missing from the payload is unknown, not unsupported: a carrier
 /// this platform does not ship says nothing about the CPU, and answering
@@ -47,7 +46,7 @@ Future<DeviceCapabilities> probeDeviceCapabilities({
 Future<bool?> _engineSupported(String backendName) async {
   final engine = switch (backendName) {
     'mlx' => InfernoEngineKind.mlx,
-    'llama' || 'auto' => InfernoEngineKind.llamaCpp,
+    'llama' => InfernoEngineKind.llamaCpp,
     _ => null,
   };
   if (engine == null) return null;

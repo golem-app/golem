@@ -637,7 +637,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get setupDownloadPrompt =>
-      'Pobierz wybrany model przed wysłaniem wiadomości. Nadal można pisać wersje robocze i korzystać z pozostałych funkcji.';
+      'Pobierz i zweryfikuj wybrany model przed użyciem Golema.';
 
   @override
   String get qaDownloadShort =>
@@ -772,6 +772,16 @@ class AppLocalizationsPl extends AppLocalizations {
   @override
   String localModelPrivacy(String modelName) {
     return 'Model $modelName działa na tym telefonie. Wpisywane treści nie są nigdzie wysyłane.';
+  }
+
+  @override
+  String downloadedModelPrivacy(String modelName) {
+    return 'Model $modelName został pobrany i zweryfikowany na tym telefonie. Zostanie wczytany po wysłaniu wiadomości. Wpisywane treści nie są nigdzie wysyłane.';
+  }
+
+  @override
+  String validatedModelPrivacy(String modelName) {
+    return 'Model $modelName został zweryfikowany dla tej sesji i działa wyłącznie na tym telefonie. Wpisywane treści nie są nigdzie wysyłane.';
   }
 
   @override
@@ -1474,7 +1484,10 @@ class AppLocalizationsPl extends AppLocalizations {
   String get resolveRepository => 'Sprawdź';
 
   @override
-  String get activeBadge => 'AKTYWNY';
+  String get activeBadge => 'WYBRANY';
+
+  @override
+  String get loadedBadge => 'WCZYTANY';
 
   @override
   String modelStatusLabel(String modelName, String engine) {

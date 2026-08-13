@@ -84,6 +84,55 @@ void main() {
     );
   });
 
+  test('startup falls back from stale iOS GGUF state to verified MLX', () {
+    final loadable = loadableModelKeys(
+      backend: real,
+      catalog: modelCatalog,
+      models: installed({'gemma4-gguf', 'qwen35-mlx'}),
+    );
+
+    expect(loadable, {'qwen35-mlx'});
+    expect(
+      startupModelKey(
+        backend: real,
+        catalog: modelCatalog,
+        loadableKeys: loadable,
+        preferredKey: 'gemma4-gguf',
+      ),
+      'qwen35-mlx',
+    );
+    expect(
+      effectiveModelKey(
+        backend: real,
+        catalog: modelCatalog,
+        modelKey: 'gemma4-gguf',
+        residentModelKey: 'gemma4-gguf',
+        loadableKeys: loadable,
+      ),
+      'qwen35-mlx',
+      reason: 'neither stored chat state nor stale residency crosses engines',
+    );
+  });
+
+  test('startup has no model when only incompatible weights are installed', () {
+    final loadable = loadableModelKeys(
+      backend: real,
+      catalog: modelCatalog,
+      models: installed({'gemma4-gguf', 'qwen35-gguf'}),
+    );
+
+    expect(loadable, isEmpty);
+    expect(
+      startupModelKey(
+        backend: real,
+        catalog: modelCatalog,
+        loadableKeys: loadable,
+        preferredKey: 'gemma4-gguf',
+      ),
+      isNull,
+    );
+  });
+
   test('loadable keys are installed and of the composed engine', () {
     expect(
       loadableModelKeys(

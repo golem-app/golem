@@ -23,7 +23,11 @@ import 'application/onboarding_controller.dart';
 import 'model_download_consent.dart';
 
 class FirstRunScreen extends ConsumerWidget {
-  const FirstRunScreen({super.key});
+  const FirstRunScreen({this.initialStep, super.key});
+
+  /// Used by the app-root invariant for upgrades and interrupted setup. The
+  /// controller still owns every transition after the first rendered state.
+  final FirstRunStep? initialStep;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -35,20 +39,22 @@ class FirstRunScreen extends ConsumerWidget {
         .watch(preferencesControllerProvider)
         .value
         ?.onboardingModelKey;
-    final selectedKey =
-        storedKey ??
-        recommendedAdmittedModelKey(
-          catalog: catalog,
-          backend: backend,
-          eligibility: eligibility,
-        );
+    final selectedKey = recommendedAdmittedModelKey(
+      catalog: catalog,
+      backend: backend,
+      eligibility: eligibility,
+      selectedKey: storedKey,
+    );
     final selectedOption = modelAdmissionOptions(
       catalog: catalog,
       backend: backend,
       eligibility: eligibility,
     ).where((option) => option.entry.key == selectedKey).firstOrNull;
     final selected = selectedOption?.entry;
-    return switch (state.step) {
+    final step = state.step == FirstRunStep.welcome && initialStep != null
+        ? initialStep!
+        : state.step;
+    return switch (step) {
       FirstRunStep.welcome => _WelcomeScreen(failure: state.failure),
       FirstRunStep.model => _ModelScreen(
         entry: selected,
@@ -535,25 +541,44 @@ class _DownloadScreen extends ConsumerWidget {
     final progress = selected == null || selected.totalBytes == 0
         ? 0.0
         : (status.downloadedBytes / selected.totalBytes).clamp(0.0, 1.0);
+    final verifying = status.phase == ArtifactPhase.verifying;
     final simulated = model?.simulated ?? false;
     return _FirstRunScaffold(
       key: const Key('first-run-download-progress'),
       body: Column(
         children: [
           const Spacer(),
-          Semantics(
-            label: context.l10n.downloadProgress,
-            value: context.l10n.percentValue((progress * 100).round()),
-            child: Text('${(progress * 100).round()}%', style: GolemText.hero),
-          ),
-          const SizedBox(height: GolemSpace.s4),
-          ProgressTrack(
-            key: const Key('first-run-download-track'),
-            value: progress,
-            trackColor: GolemTheme.divider,
-            fillColor: GolemTheme.accent,
-            height: 8,
-          ),
+          if (verifying)
+            Semantics(
+              key: const Key('first-run-verification-progress'),
+              container: true,
+              liveRegion: true,
+              label: context.l10n.modelVerifying(
+                selected?.displayName ?? context.l10n.model,
+              ),
+              value: context.l10n.checkingDownloadedFiles,
+              child: const ExcludeSemantics(
+                child: CupertinoActivityIndicator(radius: 22),
+              ),
+            )
+          else ...[
+            Semantics(
+              label: context.l10n.downloadProgress,
+              value: context.l10n.percentValue((progress * 100).round()),
+              child: Text(
+                '${(progress * 100).round()}%',
+                style: GolemText.hero,
+              ),
+            ),
+            const SizedBox(height: GolemSpace.s4),
+            ProgressTrack(
+              key: const Key('first-run-download-track'),
+              value: progress,
+              trackColor: GolemTheme.divider,
+              fillColor: GolemTheme.accent,
+              height: 8,
+            ),
+          ],
           const SizedBox(height: GolemSpace.s6),
           Text(
             _downloadHeading(context, selected, status),
@@ -584,8 +609,9 @@ class _DownloadScreen extends ConsumerWidget {
           GolemButton.filled(
             key: const Key('first-run-start-chatting'),
             label: context.l10n.startChatting,
-            onPressed: () =>
-                ref.read(firstRunControllerProvider.notifier).complete(),
+            onPressed: status.phase == ArtifactPhase.installed
+                ? () => ref.read(firstRunControllerProvider.notifier).complete()
+                : null,
           ),
           if (selected != null)
             switch (status.phase) {
@@ -655,6 +681,9 @@ class _DownloadScreen extends ConsumerWidget {
           ? context.l10n.downloadSimulationComplete
           : context.l10n.downloadComplete;
     }
+    if (status.phase == ArtifactPhase.verifying) {
+      return context.l10n.checkingDownloadedFiles;
+    }
     final amount = context.l10n.downloadAmount(
       formatModelBytes(status.downloadedBytes),
       formatModelBytes(entry.totalBytes),
@@ -683,7 +712,7 @@ class _UnsupportedScreen extends ConsumerWidget {
           color: GolemTheme.accentIcon,
         ),
         const SizedBox(height: GolemSpace.s6),
-        Text(context.l10n.chatsStayAvailable, style: GolemText.display),
+        Text(context.l10n.cannotRunModelsHere, style: GolemText.display),
         const SizedBox(height: GolemSpace.s3),
         Text(
           deviceRefusalMessage(
@@ -695,12 +724,6 @@ class _UnsupportedScreen extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: GolemSpace.s4),
-        Text(
-          context.l10n.unsupportedFeaturesRemain,
-          style: GolemText.footnote.copyWith(
-            color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
-          ),
-        ),
         if (failure != null) ...[
           const SizedBox(height: GolemSpace.s4),
           _FailureText(failure!),
@@ -708,13 +731,7 @@ class _UnsupportedScreen extends ConsumerWidget {
         const Spacer(),
       ],
     ),
-    action: GolemButton.filled(
-      key: const Key('first-run-continue-unsupported'),
-      label: context.l10n.continueToGolem,
-      onPressed: () => ref
-          .read(firstRunControllerProvider.notifier)
-          .complete(keepSelection: false),
-    ),
+    action: const SizedBox(height: 44),
   );
 }
 
@@ -820,7 +837,6 @@ Future<void> _requestDownload(
   );
   if (!context.mounted) return;
   if (!approved) {
-    await controller.complete();
     return;
   }
   controller.showDownload();

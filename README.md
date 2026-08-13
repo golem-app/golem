@@ -30,10 +30,11 @@ development; Mac results validate correctness, never mobile performance.
 Backend selection is flavor-coupled with dart-define overrides
 (`docs/decisions/0003-flavor-backend-defaults.md`): `qa` and test builds
 keep the deterministic fake, while `production` and `dev` default to
-`auto` — real llama.cpp inference with the device-policy model (Gemma 4
-E2B at ≥ 7 GiB reported memory, Qwen 3.5 2B below), downloaded on first
-need behind an explicit consent tap. An explicit define always wins in
-any flavor:
+`auto` — MLX on iOS, llama.cpp/GGUF on Android, and the existing llama.cpp
+default on macOS — with the device-policy model (Gemma 4 E2B at ≥ 7 GiB
+reported memory, Qwen 3.5 2B below). The app shell opens only after a
+compatible model is explicitly downloaded and verified. An explicit define
+always wins in any flavor:
 
 ```sh
 flutter run --release \

@@ -37,6 +37,17 @@ void main() {
       );
       expect(
         decide(
+          models: const ModelState(
+            artifacts: {
+              'gemma4-gguf': ArtifactStatus(),
+              'gemma4-mlx': ArtifactStatus(),
+            },
+          ),
+        ),
+        isTrue,
+      );
+      expect(
+        decide(
           chats: ChatState(
             conversations: [
               ChatConversation(

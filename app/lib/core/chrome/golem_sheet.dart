@@ -12,6 +12,7 @@ Future<T?> showGolemSheet<T>({
   Key? sheetKey,
 }) => showCupertinoModalPopup<T>(
   context: context,
+  useRootNavigator: false,
   builder: (context) => GestureDetector(
     // The Android drag handle must deliver what it advertises: a firm
     // downward fling dismisses the sheet (barrier tap and system back
@@ -114,6 +115,7 @@ Future<void> showGolemActions({
   if (GolemChrome.current == GolemChrome.cupertino) {
     return showCupertinoModalPopup<void>(
       context: context,
+      useRootNavigator: false,
       builder: (sheetContext) => CupertinoActionSheet(
         title: title == null ? null : Text(title),
         actions: [

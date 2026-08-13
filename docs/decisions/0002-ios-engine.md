@@ -2,6 +2,11 @@
 
 Status: decided on `feat/3-inferno`
 
+Superseded for the shipping iOS default by
+[ADR 0012](0012-platform-engine-and-required-model-startup.md). The bake-off
+below remains historical evidence; later artifact and full-app acceptance made
+MLX the iOS `auto` engine.
+
 ## Setup
 
 - Device: iPhone 17 (`iPhone18,3`), iOS 26.6, USB, Release builds installed

@@ -34,57 +34,67 @@ GoRouter createAppRouter({
   required AppIdentity identity,
 }) => GoRouter(
   routes: [
-    GoRoute(
-      path: '/',
-      builder: (context, state) =>
-          FirstRunGate(child: ChatScreen(picker: picker)),
+    ShellRoute(
+      // The model invariant owns every route, while remaining below the root
+      // Navigator so setup consent and recovery dialogs have valid route
+      // context. A deep link cannot bypass this shell.
+      builder: (context, state, child) => FirstRunGate(child: child),
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => ChatScreen(picker: picker),
+        ),
+        GoRoute(
+          path: '/search',
+          builder: (context, state) => const SearchScreen(),
+        ),
+        GoRoute(
+          path: '/settings',
+          builder: (context, state) => SettingsScreen(identity: identity),
+        ),
+        GoRoute(
+          path: '/settings/models',
+          builder: (context, state) => const ModelsScreen(),
+        ),
+        GoRoute(
+          path: '/settings/response-style',
+          builder: (context, state) => const ResponseStyleScreen(),
+        ),
+        GoRoute(
+          path: '/settings/system-prompt',
+          builder: (context, state) => const SystemPromptScreen(),
+        ),
+        GoRoute(
+          path: '/settings/appearance',
+          builder: (context, state) => const AppearanceScreen(),
+        ),
+        GoRoute(
+          path: '/settings/language',
+          builder: (context, state) => const LanguageScreen(),
+        ),
+        GoRoute(
+          path: '/settings/privacy',
+          builder: (context, state) => const PrivacyScreen(),
+        ),
+        GoRoute(
+          path: '/settings/storage',
+          builder: (context, state) => const StorageScreen(),
+        ),
+        GoRoute(
+          path: '/settings/model-attribution',
+          builder: (context, state) => const ModelAttributionScreen(),
+        ),
+        GoRoute(
+          path: '/settings/licenses',
+          builder: (context, state) => const OpenSourceLicensesScreen(),
+        ),
+        if (identity.internalToolsEnabled)
+          GoRoute(
+            path: '/benchmark',
+            builder: (context, state) => const BenchmarkScreen(),
+          ),
+      ],
     ),
-    GoRoute(path: '/search', builder: (context, state) => const SearchScreen()),
-    GoRoute(
-      path: '/settings',
-      builder: (context, state) => SettingsScreen(identity: identity),
-    ),
-    GoRoute(
-      path: '/settings/models',
-      builder: (context, state) => const ModelsScreen(),
-    ),
-    GoRoute(
-      path: '/settings/response-style',
-      builder: (context, state) => const ResponseStyleScreen(),
-    ),
-    GoRoute(
-      path: '/settings/system-prompt',
-      builder: (context, state) => const SystemPromptScreen(),
-    ),
-    GoRoute(
-      path: '/settings/appearance',
-      builder: (context, state) => const AppearanceScreen(),
-    ),
-    GoRoute(
-      path: '/settings/language',
-      builder: (context, state) => const LanguageScreen(),
-    ),
-    GoRoute(
-      path: '/settings/privacy',
-      builder: (context, state) => const PrivacyScreen(),
-    ),
-    GoRoute(
-      path: '/settings/storage',
-      builder: (context, state) => const StorageScreen(),
-    ),
-    GoRoute(
-      path: '/settings/model-attribution',
-      builder: (context, state) => const ModelAttributionScreen(),
-    ),
-    GoRoute(
-      path: '/settings/licenses',
-      builder: (context, state) => const OpenSourceLicensesScreen(),
-    ),
-    if (identity.internalToolsEnabled)
-      GoRoute(
-        path: '/benchmark',
-        builder: (context, state) => const BenchmarkScreen(),
-      ),
   ],
 );
 
