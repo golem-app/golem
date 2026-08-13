@@ -10,6 +10,8 @@ import 'package:golem_flutter/core/services/device_storage.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'support/parallel_artifact_downloader.dart';
+
 /// Real-network lifecycle evidence for the download stack:
 ///
 ///   flutter test integration_test/download_lifecycle_test.dart -d DEVICE \
@@ -35,6 +37,32 @@ const _artifactKey = String.fromEnvironment(
   defaultValue: 'qwen35-2b-mlx',
 );
 
+/// `background` (the production plugin transport) or `parallel` (the #36
+/// spike's ParallelDownloadTask prototype), so the same three proofs price a
+/// candidate transport through the real repository. A failure under
+/// `parallel` is a spike finding, not a regression.
+///
+/// Honest scope: this instrument downloads only sub-25 MB files, which all
+/// sit under the prototype's 32 MB chunk floor — necessarily so, because
+/// Hugging Face's small non-LFS files cannot be chunked at all (no
+/// Content-Length, no ranges). A `parallel` run therefore proves the
+/// hybrid's plain-task path and its repository interplay, not chunked-parent
+/// lifecycle behavior; chunked parents are exercised only by the bench's
+/// ≥32 MB weights windows, and their pause/adopt/inspect story remains an
+/// open cost tracked on #114.
+const _transport = String.fromEnvironment(
+  'GOLEM_LIFECYCLE_TRANSPORT',
+  defaultValue: 'background',
+);
+
+ArtifactFileDownloader buildLifecycleDownloader() => _transport == 'parallel'
+    ? ParallelArtifactDownloader()
+    : BackgroundArtifactDownloader(
+        // Short enough that an evidence run does not sit for five minutes
+        // when the network really is gone.
+        stallTimeout: const Duration(seconds: 45),
+      );
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -53,11 +81,7 @@ void main() {
         stateFile: File('${state.path}/flutter-model-v2.json'),
         documentsDirectory: documentsPath,
         catalog: [entry],
-        downloader: BackgroundArtifactDownloader(
-          // Short enough that an evidence run does not sit for five minutes
-          // when the network really is gone.
-          stallTimeout: const Duration(seconds: 45),
-        ),
+        downloader: buildLifecycleDownloader(),
         diskSpace: const DeviceStorageChannel(),
         backupExclusion: const DeviceStorageChannel(),
       );
@@ -149,7 +173,7 @@ void main() {
 
           // The seam must answer about the platform, not about its own memory:
           // a fresh downloader object has no record of the transfer above.
-          final downloader = BackgroundArtifactDownloader();
+          final downloader = buildLifecycleDownloader();
           await downloader.initialize();
           final spec = entry.files.first;
           final snapshot = await downloader.inspect(
