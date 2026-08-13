@@ -508,12 +508,6 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get downloadPaused => '다운로드 일시 정지됨';
-
-  @override
-  String get downloadNeedsAttention => '다운로드를 확인해야 합니다';
-
-  @override
   String modelDownloading(String modelName) {
     return '$modelName 다운로드 중';
   }
@@ -553,14 +547,72 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String downloadSimulationProgress(String amount) {
-    return '$amount · 시뮬레이션. 네트워크 요청이나 모델 가중치 쓰기가 없습니다.';
+  String get downloadNoteTitle => '최고 속도를 위해 Golem을 열어 두세요.';
+
+  @override
+  String downloadNoteBody(
+    String platform,
+    String rate,
+    String backgroundDuration,
+    String foregroundDuration,
+  ) {
+    return '나가도 괜찮습니다. $platform에서는 백그라운드 다운로드 속도가 약 $rate로 제한되어, $foregroundDuration 대신 $backgroundDuration 정도 걸립니다.';
   }
 
   @override
-  String downloadRealProgress(String amount) {
-    return '$amount. 가능하면 Golem을 열어 두세요. 플랫폼이 백그라운드에서 전송을 계속할 수 있습니다.';
+  String aboutMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '약 $count분',
+    );
+    return '$_temp0';
   }
+
+  @override
+  String etaAboutMinutesLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '약 $count분 남음',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String amountLeft(String amount) {
+    return '$amount 남음';
+  }
+
+  @override
+  String stoppedAtPercent(int percent) {
+    return '$percent%에서 중단됨';
+  }
+
+  @override
+  String rateMbs(String rate) {
+    return '$rate MB/s';
+  }
+
+  @override
+  String get paused => '일시 중지됨';
+
+  @override
+  String get gettingGolemReady => 'Golem 준비 중';
+
+  @override
+  String get oneDownloadPitch => '지금 한 번만 다운로드하면 Golem이 이 기기에서만 답합니다.';
+
+  @override
+  String downloadedAmount(String amount) {
+    return '다운로드됨 · $amount';
+  }
+
+  @override
+  String get privacyFootnote => '모델은 이 기기에 저장됩니다. 입력한 내용은 업로드되지 않습니다.';
+
+  @override
+  String get dismissNote => '닫기';
 
   @override
   String get chatsStayAvailable => '대화는 계속 사용할 수 있습니다.';

@@ -521,12 +521,6 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
-  String get downloadPaused => 'Unduhan dijeda';
-
-  @override
-  String get downloadNeedsAttention => 'Unduhan perlu diperiksa';
-
-  @override
   String modelDownloading(String modelName) {
     return 'Mengunduh $modelName';
   }
@@ -567,14 +561,75 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
-  String downloadSimulationProgress(String amount) {
-    return '$amount · simulasi. Tidak ada permintaan jaringan atau penulisan bobot model.';
+  String get downloadNoteTitle =>
+      'Biarkan Golem terbuka untuk kecepatan penuh.';
+
+  @override
+  String downloadNoteBody(
+    String platform,
+    String rate,
+    String backgroundDuration,
+    String foregroundDuration,
+  ) {
+    return 'Keluar tidak masalah — $platform memperlambat unduhan latar belakang menjadi sekitar $rate, jadi prosesnya akan memakan $backgroundDuration, bukan $foregroundDuration.';
   }
 
   @override
-  String downloadRealProgress(String amount) {
-    return '$amount. Biarkan Golem tetap terbuka jika memungkinkan; platform mungkin melanjutkan transfer di latar belakang.';
+  String aboutMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'sekitar $count menit',
+    );
+    return '$_temp0';
   }
+
+  @override
+  String etaAboutMinutesLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Sekitar $count menit lagi',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String amountLeft(String amount) {
+    return 'Tersisa $amount';
+  }
+
+  @override
+  String stoppedAtPercent(int percent) {
+    return 'Berhenti di $percent%';
+  }
+
+  @override
+  String rateMbs(String rate) {
+    return '$rate MB/s';
+  }
+
+  @override
+  String get paused => 'Dijeda';
+
+  @override
+  String get gettingGolemReady => 'Menyiapkan Golem';
+
+  @override
+  String get oneDownloadPitch =>
+      'Satu unduhan sekarang, lalu Golem menjawab sepenuhnya di perangkat ini.';
+
+  @override
+  String downloadedAmount(String amount) {
+    return 'Terunduh · $amount';
+  }
+
+  @override
+  String get privacyFootnote =>
+      'Model disimpan di perangkat ini. Tidak ada yang Anda ketik yang diunggah.';
+
+  @override
+  String get dismissNote => 'Tutup';
 
   @override
   String get chatsStayAvailable => 'Percakapan tetap tersedia.';

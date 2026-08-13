@@ -175,6 +175,11 @@ void main() {
             model: progressState,
             child: const ModelsScreen(),
           );
+          expect(
+            find.byKey(const Key('models-download-note')),
+            findsOneWidget,
+            reason: 'the foreground-speed note renders in every catalog',
+          );
           await _scrollToKey(
             tester,
             listKey: const Key('models-list'),

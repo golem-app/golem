@@ -66,6 +66,7 @@ const _invariantCopyAllowlist = <String>{
   'samplingTopK',
   'styleSource',
   'tokenRate',
+  'rateMbs',
   // The ordinary Spanish negative response is spelled identically.
   'no',
   // Standard Indonesian technical loanwords.

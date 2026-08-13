@@ -197,6 +197,50 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1600));
   }, variant: iosChrome);
 
+  testWidgets('a running download shows the dismissible note above the cards', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      model: const ModelState(
+        simulated: true,
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(
+            phase: ArtifactPhase.downloading,
+            downloadedBytes: 900000000,
+          ),
+        },
+      ),
+      child: const ModelsScreen(),
+    );
+    expect(find.byKey(const Key('models-download-note')), findsOneWidget);
+    expect(find.text('Keep Golem open for full speed.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('download-note-dismiss')));
+    await tester.pump();
+    expect(find.text('Keep Golem open for full speed.'), findsNothing);
+  });
+
+  testWidgets('a paused card quotes the amount left under its bar', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      model: const ModelState(
+        simulated: true,
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(
+            phase: ArtifactPhase.paused,
+            downloadedBytes: 1505735776,
+          ),
+        },
+      ),
+      child: const ModelsScreen(),
+    );
+    expect(find.byKey(const Key('models-download-note')), findsNothing);
+    expect(find.textContaining(' left'), findsOneWidget);
+  });
+
   testWidgets('a custom repository adds through the Advanced card', (
     tester,
   ) async {

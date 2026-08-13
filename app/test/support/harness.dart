@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:golem_flutter/app/launch_composition.dart';
@@ -21,6 +22,7 @@ import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/core/services/custom_repository_resolver.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/search_screen.dart';
+import 'package:golem_flutter/features/models/application/download_pace_providers.dart';
 import 'package:golem_flutter/l10n/l10n.dart';
 
 import 'in_memory_attachment_repository.dart';
@@ -157,24 +159,39 @@ ProviderContainer buildContainer({
   ChatHistoryRepository? chatHistory,
   ModelManagementRepository? models,
   InferenceRepository? inference,
+  List<Override> overrides = const [],
 }) => ProviderContainer(
-  overrides: launchOverrides(
-    launchDependenciesWith(
-      history: history,
-      model: model,
-      catalog: catalog,
-      backend: backend,
-      eligibility: eligibility,
-      settings: settings,
-      preferences: preferences,
-      attachments: attachments,
-      resolver: resolver,
-      chatHistory: chatHistory,
-      models: models,
-      inference: inference,
+  overrides: [
+    ...launchOverrides(
+      launchDependenciesWith(
+        history: history,
+        model: model,
+        catalog: catalog,
+        backend: backend,
+        eligibility: eligibility,
+        settings: settings,
+        preferences: preferences,
+        attachments: attachments,
+        resolver: resolver,
+        chatHistory: chatHistory,
+        models: models,
+        inference: inference,
+      ),
     ),
-  ),
+    ...overrides,
+  ],
 );
+
+/// Pins the live rate/ETA the download surfaces render, so goldens and
+/// widget tests never depend on a ticking clock.
+final class FixedDownloadPace extends DownloadPace {
+  FixedDownloadPace(this.snapshot);
+
+  final DownloadPaceSnapshot? snapshot;
+
+  @override
+  DownloadPaceSnapshot? build() => snapshot;
+}
 
 Future<void> pumpWithRepositories(
   WidgetTester tester, {
@@ -194,6 +211,7 @@ Future<void> pumpWithRepositories(
   ChatHistoryRepository? chatHistory,
   ModelManagementRepository? models,
   InferenceRepository? inference,
+  List<Override> overrides = const [],
   bool settle = true,
 }) async {
   setViewport(tester);
@@ -210,6 +228,7 @@ Future<void> pumpWithRepositories(
     chatHistory: chatHistory,
     models: models,
     inference: inference,
+    overrides: overrides,
   );
   addTearDown(container.dispose);
   final app = UncontrolledProviderScope(

@@ -30,6 +30,7 @@ import 'package:golem_flutter/features/settings/appearance_screen.dart';
 import 'package:golem_flutter/features/settings/language_screen.dart';
 import 'package:golem_flutter/features/settings/models_screen.dart';
 import 'package:golem_flutter/features/settings/privacy_screen.dart';
+import 'package:golem_flutter/features/models/application/download_pace_providers.dart';
 import 'package:golem_flutter/features/settings/response_style_screen.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';
 import 'package:golem_flutter/features/settings/storage_screen.dart';
@@ -241,6 +242,7 @@ void main() {
         ),
       ]) {
     testWidgets('required setup ${setup.name} golden', (tester) async {
+      final verifying = setup.status.phase == ArtifactPhase.verifying;
       await pumpWithRepositories(
         tester,
         brightness: setup.theme,
@@ -249,9 +251,32 @@ void main() {
           simulated: true,
           artifacts: {'gemma4-mlx': setup.status},
         ),
+        overrides: [
+          // A live sampler never feeds a golden; the chip and ETA are pinned.
+          downloadPaceProvider.overrideWith(
+            () => FixedDownloadPace(
+              setup.status.phase == ArtifactPhase.downloading
+                  ? const DownloadPaceSnapshot(
+                      artifactKey: 'gemma4-mlx',
+                      mbPerSecond: 44.0,
+                      eta: Duration(seconds: 54),
+                    )
+                  : null,
+            ),
+          ),
+        ],
         child: const FirstRunScreen(initialStep: FirstRunStep.download),
-        settle: setup.status.phase != ArtifactPhase.verifying,
+        settle: !verifying,
       );
+      final context = tester.element(find.byType(FirstRunScreen));
+      await tester.runAsync(
+        () => precacheImage(AssetImage(AppIdentity.current.iconAsset), context),
+      );
+      if (verifying) {
+        await tester.pump(const Duration(milliseconds: 300));
+      } else {
+        await tester.pumpAndSettle();
+      }
       await expectLater(
         find.byType(FirstRunScreen),
         matchesGoldenFile(
@@ -260,6 +285,33 @@ void main() {
       );
     }, variant: bothChromes);
   }
+
+  testWidgets('chat setup note light golden', (tester) async {
+    final preferences = InMemoryPreferencesRepository(
+      const AppPreferences(
+        onboardingVersion: currentOnboardingVersion,
+        onboardingModelKey: 'gemma4-mlx',
+      ),
+    );
+    await pumpWithRepositories(
+      tester,
+      preferences: preferences,
+      model: const ModelState(
+        simulated: true,
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(
+            phase: ArtifactPhase.downloading,
+            downloadedBytes: 900000000,
+          ),
+        },
+      ),
+      child: const ChatScreen(),
+    );
+    await expectLater(
+      find.byType(ChatScreen),
+      matchesGoldenFile('goldens/chat-setup-note-light${chromeSuffix()}.png'),
+    );
+  }, variant: bothChromes);
 
   testWidgets('required setup unsupported golden', (tester) async {
     await pumpWithRepositories(

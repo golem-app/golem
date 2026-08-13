@@ -89,7 +89,7 @@ Indonesian copy uses standard Indonesian and avoids region-specific slang.
 | chat | percakapan | Use consistently for the durable conversation object. |
 
 Catalog leakage tests allow source-identical copy only for product and speaker
-names, stable language endonyms, standardized units (`GB`, `MB`, `tok/s`), ICU
+names, stable language endonyms, standardized units (`GB`, `MB`, `MB/s`, `tok/s`), ICU
 placeholder-only fragments, and established technical parameter names such as
 `Top-p` and `Top-k`. Indonesian also retains the standard loanwords *model*
 and *prompt*; Brazilian Portuguese retains *download* and *prompt*

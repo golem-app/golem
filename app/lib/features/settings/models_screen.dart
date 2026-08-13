@@ -10,6 +10,7 @@ import '../../core/domain/app_preferences.dart';
 import '../../core/domain/byte_format.dart';
 import '../../core/domain/inference_backend.dart';
 import '../../core/domain/model_activation.dart';
+import '../../core/domain/download_pace.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
@@ -23,7 +24,9 @@ import '../../core/widgets/section_header.dart';
 import '../../l10n/l10n.dart';
 import '../../l10n/presentation_messages.dart';
 import '../chat/application/chat_providers.dart';
+import '../models/application/download_pace_providers.dart';
 import '../models/application/model_providers.dart';
+import '../models/widgets/download_note_banner.dart';
 import '../onboarding/model_download_consent.dart';
 import 'application/custom_repository_workflow.dart';
 import 'application/preferences_providers.dart';
@@ -165,6 +168,19 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
           },
         ),
         const SizedBox(height: 16),
+        if (catalog
+                .where(
+                  (entry) =>
+                      model.statusOf(entry.key).phase ==
+                      ArtifactPhase.downloading,
+                )
+                .firstOrNull
+            case final downloadingEntry?)
+          DownloadNoteBanner(
+            key: const Key('models-download-note'),
+            entry: downloadingEntry,
+            margin: const EdgeInsetsDirectional.only(bottom: 16),
+          ),
         if (visible.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 28),
@@ -804,7 +820,7 @@ class _ModelCard extends ConsumerWidget {
           Text(entry.displayName, style: GolemText.cardTitle),
           const SizedBox(height: 5),
           Text(
-            '${_engineLabel(entry.engine)} · ${entry.quantization}',
+            '${engineLabel(entry.engine)} · ${entry.quantization}',
             style: TextStyle(
               color: CupertinoDynamicColor.resolve(
                 GolemTheme.mutedInk,
@@ -832,7 +848,7 @@ class _ModelCard extends ConsumerWidget {
             key: Key('model-status-${entry.key}'),
             label: context.l10n.modelStatusLabel(
               entry.displayName,
-              _engineLabel(entry.engine),
+              engineLabel(entry.engine),
             ),
             value: statusLabel,
             child: _Status(icon: _statusIcon(), label: statusLabel),
@@ -846,6 +862,7 @@ class _ModelCard extends ConsumerWidget {
                   ? 0
                   : (status.downloadedBytes / entry.totalBytes).clamp(0, 1),
               label: context.l10n.downloadProgressLabel(suffix),
+              detail: _progressDetail(context, ref),
             ),
           ],
           if (status.phase == ArtifactPhase.verifying) ...[
@@ -1051,6 +1068,20 @@ class _ModelCard extends ConsumerWidget {
     ],
   );
 
+  /// The right-aligned line under the bar: live time left while downloading
+  /// (absent until the pace sampler is warm), amount left while paused.
+  String? _progressDetail(BuildContext context, WidgetRef ref) {
+    if (status.phase == ArtifactPhase.paused) {
+      return context.l10n.amountLeft(
+        gigabytes(entry.totalBytes - status.downloadedBytes),
+      );
+    }
+    final pace = ref.watch(downloadPaceProvider);
+    final eta = pace?.artifactKey == entry.key ? pace?.eta : null;
+    if (status.phase != ArtifactPhase.downloading || eta == null) return null;
+    return context.l10n.etaAboutMinutesLeft(aboutMinutesLeft(eta));
+  }
+
   String _statusLabel(BuildContext context, String suffix) =>
       switch (status.phase) {
         ArtifactPhase.notDownloaded => context.l10n.notDownloaded,
@@ -1131,9 +1162,18 @@ class _Status extends StatelessWidget {
 }
 
 class _Progress extends StatelessWidget {
-  const _Progress({required this.value, required this.label, this.progressKey});
+  const _Progress({
+    required this.value,
+    required this.label,
+    this.detail,
+    this.progressKey,
+  });
   final double value;
   final String label;
+
+  /// The time or amount left, shown under the bar. Inside the same excluded
+  /// subtree: the accessible reading stays label plus percent, unchanged.
+  final String? detail;
   final Key? progressKey;
 
   @override
@@ -1167,16 +1207,24 @@ class _Progress extends StatelessWidget {
             trackColor: GolemTheme.divider,
             fillColor: GolemTheme.accent,
           ),
+          if (detail case final detail?) ...[
+            const SizedBox(height: 7),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: Text(
+                detail,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     ),
   );
 }
-
-String _engineLabel(ModelEngine engine) => switch (engine) {
-  ModelEngine.mlx => 'MLX',
-  ModelEngine.gguf => 'GGUF · llama.cpp',
-};
 
 String _runtimeLabel(
   BuildContext context,

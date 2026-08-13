@@ -525,12 +525,6 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get downloadPaused => 'Download pausado';
-
-  @override
-  String get downloadNeedsAttention => 'O download requer atenção';
-
-  @override
   String modelDownloading(String modelName) {
     return 'Baixando $modelName';
   }
@@ -571,14 +565,77 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String downloadSimulationProgress(String amount) {
-    return '$amount · simulado. Nenhuma solicitação de rede ou gravação de pesos do modelo é feita.';
+  String get downloadNoteTitle =>
+      'Mantenha o Golem aberto para velocidade máxima.';
+
+  @override
+  String downloadNoteBody(
+    String platform,
+    String rate,
+    String backgroundDuration,
+    String foregroundDuration,
+  ) {
+    return 'Sair não tem problema — o $platform reduz downloads em segundo plano para cerca de $rate, então isso levaria $backgroundDuration em vez de $foregroundDuration.';
   }
 
   @override
-  String downloadRealProgress(String amount) {
-    return '$amount. Mantenha o Golem aberto quando possível; a plataforma pode continuar a transferência em segundo plano.';
+  String aboutMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'cerca de $count minutos',
+      one: 'cerca de 1 minuto',
+    );
+    return '$_temp0';
   }
+
+  @override
+  String etaAboutMinutesLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Faltam cerca de $count minutos',
+      one: 'Falta cerca de 1 minuto',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String amountLeft(String amount) {
+    return 'Faltam $amount';
+  }
+
+  @override
+  String stoppedAtPercent(int percent) {
+    return 'Parado em $percent%';
+  }
+
+  @override
+  String rateMbs(String rate) {
+    return '$rate MB/s';
+  }
+
+  @override
+  String get paused => 'Pausado';
+
+  @override
+  String get gettingGolemReady => 'Preparando o Golem';
+
+  @override
+  String get oneDownloadPitch =>
+      'Um download agora, e o Golem responde inteiramente neste dispositivo.';
+
+  @override
+  String downloadedAmount(String amount) {
+    return 'Baixado · $amount';
+  }
+
+  @override
+  String get privacyFootnote =>
+      'O modelo fica armazenado neste dispositivo. Nada do que você digita é enviado.';
+
+  @override
+  String get dismissNote => 'Fechar';
 
   @override
   String get chatsStayAvailable => 'As conversas continuam disponíveis.';
@@ -2394,12 +2451,6 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   }
 
   @override
-  String get downloadPaused => 'Download pausado';
-
-  @override
-  String get downloadNeedsAttention => 'O download requer atenção';
-
-  @override
   String modelDownloading(String modelName) {
     return 'Baixando $modelName';
   }
@@ -2440,14 +2491,77 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   }
 
   @override
-  String downloadSimulationProgress(String amount) {
-    return '$amount · simulado. Nenhuma solicitação de rede ou gravação de pesos do modelo é feita.';
+  String get downloadNoteTitle =>
+      'Mantenha o Golem aberto para velocidade máxima.';
+
+  @override
+  String downloadNoteBody(
+    String platform,
+    String rate,
+    String backgroundDuration,
+    String foregroundDuration,
+  ) {
+    return 'Sair não tem problema — o $platform reduz downloads em segundo plano para cerca de $rate, então isso levaria $backgroundDuration em vez de $foregroundDuration.';
   }
 
   @override
-  String downloadRealProgress(String amount) {
-    return '$amount. Mantenha o Golem aberto quando possível; a plataforma pode continuar a transferência em segundo plano.';
+  String aboutMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'cerca de $count minutos',
+      one: 'cerca de 1 minuto',
+    );
+    return '$_temp0';
   }
+
+  @override
+  String etaAboutMinutesLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Faltam cerca de $count minutos',
+      one: 'Falta cerca de 1 minuto',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String amountLeft(String amount) {
+    return 'Faltam $amount';
+  }
+
+  @override
+  String stoppedAtPercent(int percent) {
+    return 'Parado em $percent%';
+  }
+
+  @override
+  String rateMbs(String rate) {
+    return '$rate MB/s';
+  }
+
+  @override
+  String get paused => 'Pausado';
+
+  @override
+  String get gettingGolemReady => 'Preparando o Golem';
+
+  @override
+  String get oneDownloadPitch =>
+      'Um download agora, e o Golem responde inteiramente neste dispositivo.';
+
+  @override
+  String downloadedAmount(String amount) {
+    return 'Baixado · $amount';
+  }
+
+  @override
+  String get privacyFootnote =>
+      'O modelo fica armazenado neste dispositivo. Nada do que você digita é enviado.';
+
+  @override
+  String get dismissNote => 'Fechar';
 
   @override
   String get chatsStayAvailable => 'As conversas continuam disponíveis.';

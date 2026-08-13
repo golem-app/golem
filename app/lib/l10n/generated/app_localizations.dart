@@ -1043,18 +1043,6 @@ abstract class AppLocalizations {
   /// **'Verifying {modelName}'**
   String modelVerifying(String modelName);
 
-  /// Paused download heading.
-  ///
-  /// In en, this message translates to:
-  /// **'Download paused'**
-  String get downloadPaused;
-
-  /// Failed download heading.
-  ///
-  /// In en, this message translates to:
-  /// **'Download needs attention'**
-  String get downloadNeedsAttention;
-
   /// Model download heading.
   ///
   /// In en, this message translates to:
@@ -1109,17 +1097,88 @@ abstract class AppLocalizations {
   /// **'{downloaded} of {total}'**
   String downloadAmount(String downloaded, String total);
 
-  /// QA download progress detail.
+  /// Foreground-speed note headline.
   ///
   /// In en, this message translates to:
-  /// **'{amount} · simulated. No network request or model-weight write occurs.'**
-  String downloadSimulationProgress(String amount);
+  /// **'Keep Golem open for full speed.'**
+  String get downloadNoteTitle;
 
-  /// Production download progress detail.
+  /// Foreground-speed note body quoting measured background pacing.
   ///
   /// In en, this message translates to:
-  /// **'{amount}. Keep Golem open when practical; the platform may continue the transfer in the background.'**
-  String downloadRealProgress(String amount);
+  /// **'Leaving is fine — {platform} slows background downloads to about {rate}, so this would take {backgroundDuration} instead of {foregroundDuration}.'**
+  String downloadNoteBody(
+    String platform,
+    String rate,
+    String backgroundDuration,
+    String foregroundDuration,
+  );
+
+  /// Approximate duration in minutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{about 1 minute} other{about {count} minutes}}'**
+  String aboutMinutes(int count);
+
+  /// Approximate time left on a running download.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{About 1 minute left} other{About {count} minutes left}}'**
+  String etaAboutMinutesLeft(int count);
+
+  /// Remaining bytes on a paused download.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} left'**
+  String amountLeft(String amount);
+
+  /// Failed download stopping point.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped at {percent}%'**
+  String stoppedAtPercent(int percent);
+
+  /// Transfer rate in decimal megabytes per second.
+  ///
+  /// In en, this message translates to:
+  /// **'{rate} MB/s'**
+  String rateMbs(String rate);
+
+  /// Paused transfer chip label.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get paused;
+
+  /// Required-setup download hero title.
+  ///
+  /// In en, this message translates to:
+  /// **'Getting Golem ready'**
+  String get gettingGolemReady;
+
+  /// Required-setup download hero subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'One download now, then Golem answers entirely on this device.'**
+  String get oneDownloadPitch;
+
+  /// Completed download summary with size.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded · {amount}'**
+  String downloadedAmount(String amount);
+
+  /// Download screen privacy reassurance.
+  ///
+  /// In en, this message translates to:
+  /// **'The model is stored on this device. Nothing you type is uploaded.'**
+  String get privacyFootnote;
+
+  /// Dismiss the foreground-speed note.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get dismissNote;
 
   /// Unsupported-device onboarding headline.
   ///

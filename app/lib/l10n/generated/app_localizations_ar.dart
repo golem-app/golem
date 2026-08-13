@@ -518,12 +518,6 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get downloadPaused => 'التنزيل متوقف مؤقتًا';
-
-  @override
-  String get downloadNeedsAttention => 'التنزيل يحتاج إلى انتباه';
-
-  @override
   String modelDownloading(String modelName) {
     return 'جارٍ تنزيل $modelName';
   }
@@ -563,14 +557,82 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String downloadSimulationProgress(String amount) {
-    return '$amount · محاكاة. لا يحدث طلب شبكة أو حفظ لأوزان النموذج.';
+  String get downloadNoteTitle => 'أبقِ Golem مفتوحًا للسرعة الكاملة.';
+
+  @override
+  String downloadNoteBody(
+    String platform,
+    String rate,
+    String backgroundDuration,
+    String foregroundDuration,
+  ) {
+    return 'لا بأس بالمغادرة — يبطئ $platform التنزيلات في الخلفية إلى نحو $rate، لذا سيستغرق الأمر $backgroundDuration بدلًا من $foregroundDuration.';
   }
 
   @override
-  String downloadRealProgress(String amount) {
-    return '$amount. اترك Golem مفتوحًا متى أمكن؛ فقد يواصل النظام النقل في الخلفية.';
+  String aboutMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'نحو $count دقيقة',
+      many: 'نحو $count دقيقة',
+      few: 'نحو $count دقائق',
+      two: 'نحو دقيقتين',
+      one: 'نحو دقيقة واحدة',
+    );
+    return '$_temp0';
   }
+
+  @override
+  String etaAboutMinutesLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'بقيت نحو $count دقيقة',
+      many: 'بقيت نحو $count دقيقة',
+      few: 'بقيت نحو $count دقائق',
+      two: 'بقيت نحو دقيقتين',
+      one: 'بقيت نحو دقيقة واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String amountLeft(String amount) {
+    return 'المتبقي $amount';
+  }
+
+  @override
+  String stoppedAtPercent(int percent) {
+    return 'توقف عند $percent%';
+  }
+
+  @override
+  String rateMbs(String rate) {
+    return '$rate MB/s';
+  }
+
+  @override
+  String get paused => 'متوقف مؤقتًا';
+
+  @override
+  String get gettingGolemReady => 'جارٍ تجهيز Golem';
+
+  @override
+  String get oneDownloadPitch =>
+      'تنزيل واحد الآن، ثم يجيب Golem بالكامل على هذا الجهاز.';
+
+  @override
+  String downloadedAmount(String amount) {
+    return 'تم التنزيل · $amount';
+  }
+
+  @override
+  String get privacyFootnote =>
+      'يُخزَّن النموذج على هذا الجهاز. لا يُرفَع أي شيء تكتبه.';
+
+  @override
+  String get dismissNote => 'إغلاق';
 
   @override
   String get chatsStayAvailable => 'تبقى المحادثات متاحة.';

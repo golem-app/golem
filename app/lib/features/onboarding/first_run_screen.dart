@@ -10,6 +10,7 @@ import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/domain/model_admission.dart';
 import '../../core/domain/model_catalog.dart';
+import '../../core/domain/download_pace.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
@@ -17,7 +18,9 @@ import '../../core/widgets/progress_track.dart';
 import '../../l10n/l10n.dart';
 import '../../l10n/presentation_messages.dart';
 import '../legal/ai_disclaimer.dart';
+import '../models/application/download_pace_providers.dart';
 import '../models/application/model_providers.dart';
+import '../models/widgets/download_note_banner.dart';
 import '../settings/application/preferences_providers.dart';
 import 'application/onboarding_controller.dart';
 import 'model_download_consent.dart';
@@ -538,64 +541,73 @@ class _DownloadScreen extends ConsumerWidget {
     final status = selected == null
         ? const ArtifactStatus()
         : model?.statusOf(selected.key) ?? const ArtifactStatus();
-    final progress = selected == null || selected.totalBytes == 0
-        ? 0.0
-        : (status.downloadedBytes / selected.totalBytes).clamp(0.0, 1.0);
-    final verifying = status.phase == ArtifactPhase.verifying;
     final simulated = model?.simulated ?? false;
+    final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
     return _FirstRunScaffold(
       key: const Key('first-run-download-progress'),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Spacer(),
-          if (verifying)
-            Semantics(
-              key: const Key('first-run-verification-progress'),
-              container: true,
-              liveRegion: true,
-              label: context.l10n.modelVerifying(
-                selected?.displayName ?? context.l10n.model,
-              ),
-              value: context.l10n.checkingDownloadedFiles,
-              child: const ExcludeSemantics(
-                child: CupertinoActivityIndicator(radius: 22),
-              ),
-            )
-          else ...[
-            Semantics(
-              label: context.l10n.downloadProgress,
-              value: context.l10n.percentValue((progress * 100).round()),
-              child: Text(
-                '${(progress * 100).round()}%',
-                style: GolemText.hero,
-              ),
+          Center(
+            child: Image.asset(
+              AppIdentity.current.iconAsset,
+              width: 72,
+              height: 72,
             ),
-            const SizedBox(height: GolemSpace.s4),
-            ProgressTrack(
-              key: const Key('first-run-download-track'),
-              value: progress,
-              trackColor: GolemTheme.divider,
-              fillColor: GolemTheme.accent,
-              height: 8,
-            ),
-          ],
-          const SizedBox(height: GolemSpace.s6),
+          ),
+          const SizedBox(height: GolemSpace.s4),
           Text(
-            _downloadHeading(context, selected, status),
+            context.l10n.gettingGolemReady,
             textAlign: TextAlign.center,
             style: GolemText.display,
           ),
-          const SizedBox(height: GolemSpace.s3),
+          const SizedBox(height: GolemSpace.s2),
           Text(
-            _downloadDetail(context, selected, status, simulated),
+            context.l10n.oneDownloadPitch,
             textAlign: TextAlign.center,
-            style: GolemText.body.copyWith(
-              color: CupertinoDynamicColor.resolve(
-                GolemTheme.mutedInk,
-                context,
-              ),
-            ),
+            style: GolemText.footnote.copyWith(color: muted),
           ),
+          const SizedBox(height: GolemSpace.s6),
+          if (selected == null)
+            Text(
+              context.l10n.selectedCatalogUnavailable,
+              textAlign: TextAlign.center,
+              style: GolemText.body.copyWith(color: muted),
+            )
+          else ...[
+            _DownloadModelCard(
+              entry: selected,
+              status: status,
+              simulated: simulated,
+            ),
+            if (status.phase == ArtifactPhase.installed) ...[
+              const SizedBox(height: GolemSpace.s3),
+              Text(
+                simulated
+                    ? context.l10n.downloadSimulationComplete
+                    : context.l10n.downloadComplete,
+                textAlign: TextAlign.center,
+                style: GolemText.footnote.copyWith(color: muted),
+              ),
+            ] else if (simulated) ...[
+              const SizedBox(height: GolemSpace.s3),
+              Text(
+                context.l10n.qaDownloadShort,
+                textAlign: TextAlign.center,
+                style: GolemText.caption.copyWith(color: muted),
+              ),
+            ],
+            DownloadNoteBanner(
+              key: const Key('first-run-download-note'),
+              entry: selected,
+              margin: const EdgeInsetsDirectional.only(top: GolemSpace.s4),
+            ),
+            if (status.phase == ArtifactPhase.failed) ...[
+              const SizedBox(height: GolemSpace.s4),
+              _DownloadFailureBanner(entry: selected, status: status),
+            ],
+          ],
           if (failure != null) ...[
             const SizedBox(height: GolemSpace.s4),
             _FailureText(failure!),
@@ -615,83 +627,379 @@ class _DownloadScreen extends ConsumerWidget {
           ),
           if (selected != null)
             switch (status.phase) {
-              ArtifactPhase.downloading => CupertinoButton(
-                key: const Key('first-run-pause-download'),
-                minimumSize: Size.fromHeight(
-                  GolemChrome.current.minimumTapTarget,
-                ),
-                onPressed: () => ref
-                    .read(modelControllerProvider.notifier)
-                    .pause(selected.key),
-                child: Text(context.l10n.pauseDownload),
+              ArtifactPhase.downloading => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  CupertinoButton(
+                    key: const Key('first-run-pause-download'),
+                    minimumSize: Size.fromHeight(
+                      GolemChrome.current.minimumTapTarget,
+                    ),
+                    onPressed: () => ref
+                        .read(modelControllerProvider.notifier)
+                        .pause(selected.key),
+                    child: Text(context.l10n.pauseDownload),
+                  ),
+                  _CancelDownloadButton(entry: selected),
+                ],
               ),
-              ArtifactPhase.paused || ArtifactPhase.failed => CupertinoButton(
-                key: const Key('first-run-resume-download'),
-                minimumSize: Size.fromHeight(
-                  GolemChrome.current.minimumTapTarget,
+              ArtifactPhase.paused => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  CupertinoButton(
+                    key: const Key('first-run-resume-download'),
+                    minimumSize: Size.fromHeight(
+                      GolemChrome.current.minimumTapTarget,
+                    ),
+                    onPressed: () => unawaited(
+                      ref
+                          .read(modelControllerProvider.notifier)
+                          .download(selected.key),
+                    ),
+                    child: Text(context.l10n.resumeDownload),
+                  ),
+                  _CancelDownloadButton(entry: selected),
+                ],
+              ),
+              // Cancel and discard land here: without a restart affordance
+              // the required-setup step would be a dead end until relaunch.
+              ArtifactPhase.notDownloaded => GolemButton.tinted(
+                key: const Key('first-run-restart-download'),
+                label: context.l10n.downloadSize(
+                  formatModelBytes(selected.totalBytes),
                 ),
-                onPressed: () => unawaited(
-                  ref
-                      .read(modelControllerProvider.notifier)
-                      .download(selected.key),
-                ),
-                child: Text(
-                  status.phase == ArtifactPhase.failed
-                      ? context.l10n.retryDownload
-                      : context.l10n.resumeDownload,
-                ),
+                onPressed: () =>
+                    unawaited(_requestDownload(context, ref, selected)),
               ),
               _ => const SizedBox(height: 44),
             },
+          // Below the buttons per the handoff, and outside the scroll view so
+          // the reassurance is never clipped mid-sentence by a tall action
+          // column shrinking the body viewport.
+          const SizedBox(height: GolemSpace.s3),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ExcludeSemantics(
+                child: Icon(CupertinoIcons.lock, size: 16, color: muted),
+              ),
+              const SizedBox(width: GolemSpace.s2),
+              Expanded(
+                child: Text(
+                  context.l10n.privacyFootnote,
+                  style: GolemText.caption.copyWith(color: muted),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The download card from the first-download handoff: name and format line,
+/// then the live transfer block — big tabular percent, a rate/state chip, the
+/// progress track, and a bytes row with the time or amount left. Verifying
+/// and installed swap the transfer block for their own rows.
+class _DownloadModelCard extends ConsumerWidget {
+  const _DownloadModelCard({
+    required this.entry,
+    required this.status,
+    required this.simulated,
+  });
+
+  final ModelCatalogEntry entry;
+  final ArtifactStatus status;
+  final bool simulated;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
+    final progress = entry.totalBytes == 0
+        ? 0.0
+        : (status.downloadedBytes / entry.totalBytes).clamp(0.0, 1.0);
+    final percent = (progress * 100).round();
+    final pace = ref.watch(downloadPaceProvider);
+    final snapshot = pace?.artifactKey == entry.key ? pace : null;
+    return Container(
+      padding: const EdgeInsets.all(GolemSpace.s5),
+      decoration: BoxDecoration(
+        color: CupertinoDynamicColor.resolve(GolemTheme.surface, context),
+        borderRadius: BorderRadius.circular(GolemRadius.card),
+        border: Border.all(
+          color: CupertinoDynamicColor.resolve(GolemTheme.divider, context),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(entry.displayName, style: GolemText.cardTitle),
+          const SizedBox(height: 3),
+          Text(
+            '${engineLabel(entry.engine)} · ${entry.quantization} · '
+            '${formatModelBytes(entry.totalBytes)}',
+            style: GolemText.footnote.copyWith(color: muted),
+          ),
+          if (status.phase == ArtifactPhase.verifying)
+            Padding(
+              padding: const EdgeInsetsDirectional.only(top: GolemSpace.s4),
+              child: Semantics(
+                key: const Key('first-run-verification-progress'),
+                container: true,
+                liveRegion: true,
+                label: context.l10n.modelVerifying(entry.displayName),
+                value: context.l10n.checkingDownloadedFiles,
+                child: ExcludeSemantics(
+                  child: Row(
+                    children: [
+                      const CupertinoActivityIndicator(),
+                      const SizedBox(width: GolemSpace.s3),
+                      Expanded(
+                        child: Text(
+                          context.l10n.checkingDownloadedFiles,
+                          style: GolemText.footnote.copyWith(color: muted),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else if (status.phase == ArtifactPhase.installed)
+            Padding(
+              padding: const EdgeInsetsDirectional.only(top: GolemSpace.s4),
+              child: Row(
+                children: [
+                  Icon(
+                    CupertinoIcons.check_mark_circled_solid,
+                    size: 22,
+                    color: CupertinoDynamicColor.resolve(
+                      GolemTheme.accentIcon,
+                      context,
+                    ),
+                  ),
+                  const SizedBox(width: GolemSpace.s2),
+                  Expanded(
+                    child: Text(
+                      context.l10n.downloadedAmount(
+                        formatModelBytes(entry.totalBytes),
+                      ),
+                      style: GolemText.body,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            const SizedBox(height: GolemSpace.s4),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Semantics(
+                    label: context.l10n.downloadProgress,
+                    value: context.l10n.percentValue(percent),
+                    child: Text(
+                      '$percent%',
+                      style: GolemText.hero.copyWith(
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                ),
+                if (_chipLabel(context, snapshot) case final chip?)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: CupertinoDynamicColor.resolve(
+                        status.phase == ArtifactPhase.downloading
+                            ? GolemTheme.accentSoft
+                            : GolemTheme.fillQuiet,
+                        context,
+                      ),
+                      borderRadius: BorderRadius.circular(GolemRadius.pill),
+                    ),
+                    child: Text(
+                      chip,
+                      style: GolemText.captionStrong.copyWith(
+                        color: status.phase == ArtifactPhase.downloading
+                            ? CupertinoDynamicColor.resolve(
+                                GolemTheme.accentIcon,
+                                context,
+                              )
+                            : muted,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: GolemSpace.s3),
+            ProgressTrack(
+              key: const Key('first-run-download-track'),
+              value: progress,
+              trackColor: GolemTheme.divider,
+              fillColor: GolemTheme.accent,
+              height: 10,
+            ),
+            const SizedBox(height: GolemSpace.s3),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    context.l10n.downloadAmount(
+                      formatModelBytes(status.downloadedBytes),
+                      formatModelBytes(entry.totalBytes),
+                    ),
+                    style: GolemText.footnote.copyWith(color: muted),
+                  ),
+                ),
+                if (_remainderLabel(context, snapshot, percent)
+                    case final remainder?)
+                  Text(remainder, style: GolemText.footnoteStrong),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 
-  String _downloadHeading(
-    BuildContext context,
-    ModelCatalogEntry? entry,
-    ArtifactStatus status,
-  ) => switch (status.phase) {
-    ArtifactPhase.installed => context.l10n.modelReady(
-      entry?.displayName ?? context.l10n.model,
-    ),
-    ArtifactPhase.verifying => context.l10n.modelVerifying(
-      entry?.displayName ?? context.l10n.model,
-    ),
-    ArtifactPhase.paused => context.l10n.downloadPaused,
-    ArtifactPhase.failed => context.l10n.downloadNeedsAttention,
-    _ => context.l10n.modelDownloading(
-      entry?.displayName ?? context.l10n.model,
-    ),
-  };
+  String? _chipLabel(BuildContext context, DownloadPaceSnapshot? snapshot) =>
+      switch (status.phase) {
+        ArtifactPhase.downloading when snapshot != null => context.l10n.rateMbs(
+          snapshot.mbPerSecond.toStringAsFixed(1),
+        ),
+        ArtifactPhase.downloading => null,
+        ArtifactPhase.paused => context.l10n.paused,
+        ArtifactPhase.failed => context.l10n.stopped,
+        _ => null,
+      };
 
-  String _downloadDetail(
+  String? _remainderLabel(
     BuildContext context,
-    ModelCatalogEntry? entry,
-    ArtifactStatus status,
-    bool simulated,
-  ) {
-    if (entry == null) return context.l10n.selectedCatalogUnavailable;
-    if (status.phase == ArtifactPhase.failed) {
-      return artifactFailureMessage(context.l10n, status);
-    }
-    if (status.phase == ArtifactPhase.installed) {
-      return simulated
-          ? context.l10n.downloadSimulationComplete
-          : context.l10n.downloadComplete;
-    }
-    if (status.phase == ArtifactPhase.verifying) {
-      return context.l10n.checkingDownloadedFiles;
-    }
-    final amount = context.l10n.downloadAmount(
-      formatModelBytes(status.downloadedBytes),
-      formatModelBytes(entry.totalBytes),
-    );
-    return simulated
-        ? context.l10n.downloadSimulationProgress(amount)
-        : context.l10n.downloadRealProgress(amount);
-  }
+    DownloadPaceSnapshot? snapshot,
+    int percent,
+  ) => switch (status.phase) {
+    ArtifactPhase.downloading when snapshot?.eta != null =>
+      context.l10n.etaAboutMinutesLeft(aboutMinutesLeft(snapshot!.eta!)),
+    ArtifactPhase.paused => context.l10n.amountLeft(
+      formatModelBytes(entry.totalBytes - status.downloadedBytes),
+    ),
+    ArtifactPhase.failed => context.l10n.stoppedAtPercent(percent),
+    _ => null,
+  };
+}
+
+/// Failed transfers keep their explanation and both ways out on one surface,
+/// mirroring the chat recovery banner's shape.
+class _DownloadFailureBanner extends ConsumerWidget {
+  const _DownloadFailureBanner({required this.entry, required this.status});
+
+  final ModelCatalogEntry entry;
+  final ArtifactStatus status;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => Container(
+    key: const Key('first-run-failure-banner'),
+    padding: const EdgeInsets.all(GolemSpace.s3),
+    decoration: BoxDecoration(
+      color: CupertinoDynamicColor.resolve(GolemTheme.errorSurface, context),
+      borderRadius: BorderRadius.circular(GolemRadius.notice),
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const ExcludeSemantics(
+              child: Icon(
+                CupertinoIcons.exclamationmark_triangle_fill,
+                color: GolemTheme.destructive,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  artifactFailureMessage(context.l10n, status),
+                  style: GolemText.footnote,
+                ),
+              ),
+            ),
+          ],
+        ),
+        Align(
+          alignment: AlignmentDirectional.centerEnd,
+          child: Wrap(
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              CupertinoButton(
+                key: const Key('first-run-resume-download'),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                onPressed: () => unawaited(
+                  ref
+                      .read(modelControllerProvider.notifier)
+                      .download(entry.key),
+                ),
+                child: Text(context.l10n.retry),
+              ),
+              CupertinoButton(
+                key: const Key('first-run-discard-download'),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                onPressed: () => unawaited(
+                  ref.read(modelControllerProvider.notifier).cancel(entry.key),
+                ),
+                child: Text(
+                  context.l10n.discard,
+                  style: TextStyle(
+                    color: CupertinoDynamicColor.resolve(
+                      GolemTheme.destructiveText,
+                      context,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// The escape hatch under the transfer buttons: cancel discards the partial
+/// download, the same operation as the Settings card's cancel.
+class _CancelDownloadButton extends ConsumerWidget {
+  const _CancelDownloadButton({required this.entry});
+
+  final ModelCatalogEntry entry;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => CupertinoButton(
+    key: const Key('first-run-cancel-download'),
+    minimumSize: Size.fromHeight(GolemChrome.current.minimumTapTarget),
+    onPressed: () =>
+        unawaited(ref.read(modelControllerProvider.notifier).cancel(entry.key)),
+    child: Text(
+      // The same label Settings uses for this operation: it deletes the
+      // partial download, so a bare "Cancel" undersells it.
+      context.l10n.cancelAndDiscard,
+      style: TextStyle(
+        color: CupertinoDynamicColor.resolve(
+          GolemTheme.destructiveText,
+          context,
+        ),
+      ),
+    ),
+  );
 }
 
 class _UnsupportedScreen extends ConsumerWidget {
