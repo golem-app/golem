@@ -92,7 +92,7 @@ xcrun devicectl device install app --device UUID \
 
 | Condition | How |
 | --- | --- |
-| Backgrounding | No CLI exists. The operator presses the home indicator. `xcrun devicectl device process suspend` sends SIGSTOP, which freezes the process rather than transitioning it, and iOS may jetsam a stopped app — it is not backgrounding evidence |
+| Backgrounding | Launch a harmless app over it: `xcrun devicectl device process launch --device UUID com.apple.Preferences` genuinely backgrounds the app (used for #36's suspended-rate cell); relaunching the app's own bundle id brings it back and flushes the suspended period's events. `xcrun devicectl device process suspend` is **not** equivalent — SIGSTOP freezes rather than transitions, and iOS may jetsam a stopped app |
 | Screen lock | No CLI. The operator presses the side button. Container reads via `ios fsync` fail while locked; unlock before pulling evidence |
 | Process recreation | `ios kill app.golem.qa` (needs `ios tunnel start --userspace`), or SIGKILL via `xcrun devicectl device process signal`. **The user-visible case is the App Switcher swipe, which the plugin documents as stopping all scheduled background downloads outright** — that is the honest iOS limitation and it must be produced by hand |
 | Connection loss | Airplane Mode by hand, or a Network Link Conditioner profile from Developer settings. `ios devicestate` is unverified on iOS 26 |
