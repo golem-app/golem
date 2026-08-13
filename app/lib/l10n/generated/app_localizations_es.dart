@@ -638,7 +638,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get setupDownloadPrompt =>
-      'Descarga el modelo seleccionado antes de enviar. Puedes seguir redactando mensajes y usando el resto de Golem.';
+      'Descarga y verifica el modelo seleccionado antes de usar Golem.';
 
   @override
   String get qaDownloadShort =>
@@ -773,6 +773,16 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String localModelPrivacy(String modelName) {
     return '$modelName está cargado y ejecutándose en este teléfono. Nada de lo que escribas aquí se envía a ningún lugar.';
+  }
+
+  @override
+  String downloadedModelPrivacy(String modelName) {
+    return '$modelName está descargado y verificado en este teléfono. Se cargará cuando envíes un mensaje. Nada de lo que escribas aquí se envía a ningún lugar.';
+  }
+
+  @override
+  String validatedModelPrivacy(String modelName) {
+    return '$modelName se validó para esta sesión y solo se ejecuta en este teléfono. Nada de lo que escribas aquí se envía a ningún lugar.';
   }
 
   @override
@@ -1468,7 +1478,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get resolveRepository => 'Resolver';
 
   @override
-  String get activeBadge => 'ACTIVO';
+  String get activeBadge => 'SELECCIONADO';
+
+  @override
+  String get loadedBadge => 'CARGADO';
 
   @override
   String modelStatusLabel(String modelName, String engine) {

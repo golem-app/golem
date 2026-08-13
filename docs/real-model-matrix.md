@@ -15,17 +15,14 @@ Two rules this document exists to keep honest:
 ## What ships
 
 The engine is a build-time composition, not a runtime choice: `auto` — the
-default on the `production` and `dev` flavors — composes llama.cpp/GGUF on both
-platforms (ADR 0002), selecting Gemma 4 E2B at ≥ 7 GiB reported physical memory
-and the lighter Qwen 3.5 2B below it (ADR 0003). The MLX engine is validated and
-one dart-define away, but no shipping build selects it.
+default on the `production` and `dev` flavors — composes MLX on iOS and
+llama.cpp/GGUF on Android, while macOS retains llama.cpp (ADR 0012). Each
+selects Gemma 4 E2B at ≥ 7 GiB reported physical memory and the lighter Qwen
+3.5 2B below it (ADR 0003).
 
-So a shipping build's chat model picker lists the three GGUF entries, and a user
-switches among *those*. The MLX rows exist for builds that ask for MLX — and
-since #79 an MLX artifact that is already *installed* appears there too: last,
-unselectable, with copy naming the engine this build runs, because a model
-installed in Settings and then missing from chat explains nothing. What is
-neither installed nor loadable here is still left out, but counted.
+The picker lists artifacts for the composed engine. Installed leftovers from
+the other engine stay visible, last and unselectable, with copy naming the
+format mismatch so upgrades never hide or silently delete user files.
 
 The rows lead with plain language and keep the engine and quantization behind
 Advanced mode (`decisions/0008-model-presentation.md`), which is why the family

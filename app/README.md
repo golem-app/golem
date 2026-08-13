@@ -47,33 +47,32 @@ Backend resolution (`lib/broker/backend_policy.dart`, decided in
 `../docs/decisions/0003-flavor-backend-defaults.md`):
 `GOLEM_INFERENCE_BACKEND` accepts `fake`, `llama`, `mlx`, and `auto`;
 unset falls to the flavor default (`auto` on production/dev, `fake` on
-qa). `auto` composes the llama/GGUF artifact of the device-policy model —
-Gemma 4 E2B at ≥ 7 GiB reported physical memory, the lighter Qwen 3.5 2B
-below or when memory is unknown — deriving the model path, broker
+qa). `auto` composes MLX on iOS, llama/GGUF on Android, and llama/GGUF on
+macOS. It selects Gemma 4 E2B at ≥ 7 GiB reported physical memory and the
+lighter Qwen 3.5 2B below or when memory is unknown, deriving the model path, broker
 profile, and active catalog artifact together. A fresh real-backend install
 enters first-run onboarding before chat. It explains that inference stays on
 device, selects a pinned artifact from the same device tier and engine policy
 as launch, states the exact catalog size, and asks for explicit consent with
 the 500 MiB free-space margin plus a static Wi-Fi/cellular warning. Declining
-starts no transfer and enters chat with a persistent setup banner; sending
-stays disabled until that selected model is installed, while drafting,
-history, settings, and navigation remain usable. Settings and missing-model
+starts no transfer and leaves setup blocking the entire app shell. Pause,
+failure, interruption, deletion, and invalidation behave the same way until a
+compatible artifact is verified. Settings and missing-model
 recovery use the same consent dialog, so nothing multi-gigabyte starts
 silently from another UI path. The qa flavor presents the full catalog and
 simulates the flow deterministically with no network or weight files. Existing
-installs with chats or model state, plus builds with an operator-supplied
-`GOLEM_MODEL_PATH`, skip first run; sideloaded paths remain the operator's
-responsibility and go straight to the engine.
+installs skip the introduction but not the usable-model invariant. An
+operator-supplied `GOLEM_MODEL_PATH` skips consumer onboarding only after the
+engine successfully loads it for the current process.
 
 That model choice is one half of a single **device classification** taken once
 at launch (#27, `../docs/decisions/0007-supported-device-policy.md`): the same
 reading decides whether this device is admitted to running a model at all.
 Below the floor — nominal 4 GB, read as 4 GiB on Apple and 3 GiB on Android —
 or on an arm64 Android CPU without the dot-product extension the shipped
-kernels require, the app downloads and loads nothing and says why: the chat
-canvas replaces its starter chips with `device-unsupported-notice`, each model
-card replaces its download button with the reason, and the runtime card
-withholds its toggle. Chats, history, settings, and export are untouched;
+kernels require, the app downloads and loads nothing and says why in a blocking
+startup surface that wraps every route. Persisted chats, preferences, and
+files are untouched;
 memory that cannot be read classifies as supported, never as refused. The
 App Store enforces its half through `UIRequiredDeviceCapabilities`
 (`iphone-ipad-minimum-performance-a12`); Play's RAM floor is a console-side
@@ -267,7 +266,7 @@ chrome layer's `showGolemToast` (iOS pill / Android bar, no actions).
 The per-chat model selection persists on the conversation (`modelKey`) and a
 real engine honors it: the next send unloads and loads the chosen artifact
 through the residency owner. Because the **engine** is a build-time composition
-(`auto` composes llama.cpp/GGUF), only artifacts that engine can load *and*
+(`auto` is MLX on iOS and llama.cpp/GGUF on Android/macOS), only artifacts that engine can load *and*
 that are installed may be chosen — so every label may name the choice
 immediately without promising weights the next send would refuse. Sampling,
 response style, and capability all follow the chosen model's profile, not the
@@ -588,10 +587,12 @@ an image turn, and history read back off disk:
 flutter test integration_test/device_acceptance_test.dart -d <device> \
   --flavor qa --no-uninstall --dart-define=GOLEM_INFERENCE_BACKEND=auto \
   --dart-define=GOLEM_DEVICE_ACCEPTANCE=true \
-  --dart-define=GOLEM_ACCEPT_PRIMARY=gemma4-gguf \
-  --dart-define=GOLEM_ACCEPT_SECONDARY=qwen35-2b-gguf \
+  --dart-define=GOLEM_ACCEPT_PRIMARY=gemma4-mlx \
+  --dart-define=GOLEM_ACCEPT_SECONDARY=qwen35-2b-mlx \
   --dart-define=GOLEM_ACCEPT_IMAGE=true
 ```
+
+Use the corresponding `gemma4-gguf` / `qwen35-2b-gguf` keys on Android.
 
 **`--no-uninstall` is not optional on a phone.** `flutter test` uninstalls the
 app on teardown by default and takes the container's models with it, which is

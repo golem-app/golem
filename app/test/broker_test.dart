@@ -786,7 +786,7 @@ void main() {
       final runtime = _ResidencyRuntime();
       final repository = buildRepository(runtime);
       await repository.prepare();
-      expect(repository.residentModelKey.value, 'gemma4-gguf');
+      expect(repository.residency.value.catalogKey, 'gemma4-gguf');
 
       await repository
           .generate(
@@ -801,7 +801,7 @@ void main() {
         '/docs/models/qwen35-gguf/qwen.gguf',
       ]);
       expect(runtime.unloads, 1);
-      expect(repository.residentModelKey.value, 'qwen35-gguf');
+      expect(repository.residency.value.catalogKey, 'qwen35-gguf');
       // The Qwen profile rendered the prompt: its template, not Gemma's.
       expect(runtime.request?.prompt, contains('<|im_start|>'));
     });
@@ -838,10 +838,10 @@ void main() {
       final runtime = _ResidencyRuntime();
       final repository = buildRepository(runtime);
       await repository.prepare();
-      expect(repository.residentModelKey.value, 'gemma4-gguf');
+      expect(repository.residency.value.catalogKey, 'gemma4-gguf');
 
       await repository.unload();
-      expect(repository.residentModelKey.value, isNull);
+      expect(repository.residency.value.catalogKey, isNull);
       expect(runtime.unloads, 1);
     });
 
@@ -852,7 +852,7 @@ void main() {
       expect(runtime.loadedPaths, ['/local/gemma.gguf']);
 
       await repository.unload();
-      expect(repository.residentModelKey.value, isNull);
+      expect(repository.residency.value.catalogKey, isNull);
 
       await repository
           .generate(
@@ -861,7 +861,7 @@ void main() {
           )
           .drain<void>();
       expect(runtime.loadedPaths, ['/local/gemma.gguf', '/local/gemma.gguf']);
-      expect(repository.residentModelKey.value, 'gemma4-gguf');
+      expect(repository.residency.value.catalogKey, 'gemma4-gguf');
     });
 
     test('concurrent activation of one key joins a single load', () async {
@@ -878,9 +878,9 @@ void main() {
       final runtime = _ResidencyRuntime()..failNextLoad = true;
       final repository = buildRepository(runtime);
       await expectLater(repository.prepare(), throwsStateError);
-      expect(repository.residentModelKey.value, isNull);
+      expect(repository.residency.value.catalogKey, isNull);
       await repository.prepare();
-      expect(repository.residentModelKey.value, 'gemma4-gguf');
+      expect(repository.residency.value.catalogKey, 'gemma4-gguf');
     });
   });
 
@@ -1016,7 +1016,7 @@ void main() {
           ),
         );
         expect(runtime.loadedPaths, isEmpty);
-        expect(repository.residentModelKey.value, isNull);
+        expect(repository.residency.value.catalogKey, isNull);
       },
     );
 
@@ -1035,7 +1035,7 @@ void main() {
       await expectLater(repository.prepare(), throwsA(anything));
       available = 4 << 30;
       await repository.prepare();
-      expect(repository.residentModelKey.value, 'gemma4-gguf');
+      expect(repository.residency.value.catalogKey, 'gemma4-gguf');
     });
 
     test('unknown readings let the load proceed', () async {

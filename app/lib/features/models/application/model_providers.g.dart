@@ -137,6 +137,58 @@ final class LoadableModelKeysProvider
 
 String _$loadableModelKeysHash() => r'12e16f3f980da93856da1aa47fec36b9d9201e01';
 
+/// One effective compatible artifact for startup, chat and runtime controls.
+/// A stale persisted iOS GGUF choice cannot pull those surfaces away from the
+/// MLX artifact the composed engine can actually load.
+
+@ProviderFor(startupModelKey)
+final startupModelKeyProvider = StartupModelKeyProvider._();
+
+/// One effective compatible artifact for startup, chat and runtime controls.
+/// A stale persisted iOS GGUF choice cannot pull those surfaces away from the
+/// MLX artifact the composed engine can actually load.
+
+final class StartupModelKeyProvider
+    extends $FunctionalProvider<String?, String?, String?>
+    with $Provider<String?> {
+  /// One effective compatible artifact for startup, chat and runtime controls.
+  /// A stale persisted iOS GGUF choice cannot pull those surfaces away from the
+  /// MLX artifact the composed engine can actually load.
+  StartupModelKeyProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: noRetry,
+        name: r'startupModelKeyProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$startupModelKeyHash();
+
+  @$internal
+  @override
+  $ProviderElement<String?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String? create(Ref ref) {
+    return startupModelKey(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String?>(value),
+    );
+  }
+}
+
+String _$startupModelKeyHash() => r'2934f5ffc9b100d9467d21df8caccf9e472d76fd';
+
 /// The keys a download may be *started* for: the pinned catalog, plus custom
 /// repositories that resolved against Hugging Face and so have a real file
 /// list. An unresolved entry synthesizes its files, so a request for it could
@@ -236,7 +288,7 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'0144508731d016378df2b183b9e4586997d237ed';
+String _$modelControllerHash() => r'068e53c413eee519f3989905c99cf7db35177f59';
 
 /// KeepAlive: a command controller whose downloads, busy guard, and epochs
 /// must survive leaving the Models screen (§3.4 — an autoDispose command

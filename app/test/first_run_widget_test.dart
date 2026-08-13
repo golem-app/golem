@@ -1,13 +1,17 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
+import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
+import 'package:golem_flutter/features/models/application/model_providers.dart';
+import 'package:golem_flutter/features/onboarding/application/onboarding_controller.dart';
 import 'package:golem_flutter/features/onboarding/first_run_gate.dart';
 import 'package:golem_flutter/features/onboarding/first_run_screen.dart';
 
@@ -15,40 +19,46 @@ import 'support/harness.dart';
 import 'support/in_memory_preferences_repository.dart';
 
 void main() {
-  testWidgets('the root gate distinguishes fresh and legacy installs', (
-    tester,
-  ) async {
-    await pumpWithRepositories(
-      tester,
-      model: const ModelState(simulated: true),
-      child: const FirstRunGate(
-        key: Key('fresh-gate'),
-        child: SizedBox(key: Key('chat-after-first-run')),
-      ),
-    );
-    expect(find.byKey(const Key('first-run-welcome')), findsOneWidget);
-    expect(find.byKey(const Key('chat-after-first-run')), findsNothing);
+  testWidgets(
+    'the root gate requires a model and migrates a usable legacy install',
+    (tester) async {
+      await pumpWithRepositories(
+        tester,
+        model: const ModelState(simulated: true),
+        child: const FirstRunGate(
+          key: Key('fresh-gate'),
+          child: SizedBox(key: Key('chat-after-first-run')),
+        ),
+      );
+      expect(find.byKey(const Key('first-run-welcome')), findsOneWidget);
+      expect(find.byKey(const Key('chat-after-first-run')), findsNothing);
 
-    final legacyPreferences = InMemoryPreferencesRepository();
-    await pumpWithRepositories(
-      tester,
-      history: seedHistory(),
-      preferences: legacyPreferences,
-      model: const ModelState(simulated: true),
-      child: const FirstRunGate(
-        key: Key('legacy-gate'),
-        child: SizedBox(key: Key('chat-after-first-run')),
-      ),
-    );
-    expect(find.byKey(const Key('chat-after-first-run')), findsOneWidget);
-    expect(find.byKey(const Key('first-run-welcome')), findsNothing);
-    expect(
-      legacyPreferences.preferences.onboardingVersion,
-      currentOnboardingVersion,
-    );
-  });
+      final legacyPreferences = InMemoryPreferencesRepository();
+      await pumpWithRepositories(
+        tester,
+        history: seedHistory(),
+        preferences: legacyPreferences,
+        model: const ModelState(
+          simulated: true,
+          artifacts: {
+            'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+          },
+        ),
+        child: const FirstRunGate(
+          key: Key('legacy-gate'),
+          child: SizedBox(key: Key('chat-after-first-run')),
+        ),
+      );
+      expect(find.byKey(const Key('chat-after-first-run')), findsOneWidget);
+      expect(find.byKey(const Key('first-run-welcome')), findsNothing);
+      expect(
+        legacyPreferences.preferences.onboardingVersion,
+        currentOnboardingVersion,
+      );
+    },
+  );
 
-  testWidgets('declining consent completes first run without a download', (
+  testWidgets('declining consent keeps first run blocked without a download', (
     tester,
   ) async {
     final preferences = InMemoryPreferencesRepository();
@@ -72,9 +82,41 @@ void main() {
     await tester.tap(find.byKey(const Key('model-download-not-now')));
     await tester.pumpAndSettle();
 
-    expect(preferences.preferences.onboardingVersion, currentOnboardingVersion);
+    expect(preferences.preferences.onboardingVersion, 0);
     expect(preferences.preferences.onboardingModelKey, 'gemma4-mlx');
-    expect(find.byKey(const Key('first-run-model')), findsNothing);
+    expect(find.byKey(const Key('first-run-model')), findsOneWidget);
+  });
+
+  testWidgets('an operator sideload must load before the shell is exposed', (
+    tester,
+  ) async {
+    final inference = _ValidatingSideload(failuresRemaining: 1);
+    await pumpWithRepositories(
+      tester,
+      inference: inference,
+      backend: const InferenceBackendConfig(
+        kind: InferenceBackendKind.mlx,
+        profileKey: 'gemma4',
+        modelPath: 'documents:operator/model',
+      ),
+      child: const FirstRunGate(
+        child: SizedBox(key: Key('chat-after-first-run')),
+      ),
+    );
+
+    expect(
+      find.byKey(const Key('sideload-validation-failure')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('chat-after-first-run')), findsNothing);
+    expect(inference.prepareCalls, 1);
+
+    await tester.tap(find.byKey(const Key('startup-gate-retry')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-after-first-run')), findsOneWidget);
+    expect(inference.prepareCalls, 2);
+    expect(inference.residency.value.loaded, isTrue);
+    expect(inference.residency.value.catalogKey, isNull);
   });
 
   testWidgets('download state cannot complete first run implicitly', (
@@ -111,6 +153,141 @@ void main() {
     expect(preferences.preferences.onboardingVersion, currentOnboardingVersion);
   });
 
+  for (final state in <({String name, ArtifactStatus status})>[
+    (
+      name: 'interrupted',
+      status: const ArtifactStatus(
+        phase: ArtifactPhase.paused,
+        downloadedBytes: 400,
+      ),
+    ),
+    (
+      name: 'corrupt',
+      status: const ArtifactStatus(
+        phase: ArtifactPhase.failed,
+        downloadedBytes: 400,
+        failureReason: ArtifactFailure(ArtifactFailureKind.hashVerification),
+      ),
+    ),
+  ]) {
+    testWidgets('${state.name} setup resumes at the blocking download state', (
+      tester,
+    ) async {
+      final preferences = InMemoryPreferencesRepository(
+        const AppPreferences(
+          onboardingVersion: currentOnboardingVersion,
+          onboardingModelKey: 'gemma4-mlx',
+        ),
+      );
+      await pumpWithRepositories(
+        tester,
+        preferences: preferences,
+        model: ModelState(
+          simulated: true,
+          artifacts: {'gemma4-mlx': state.status},
+        ),
+        child: const FirstRunGate(
+          child: SizedBox(key: Key('chat-after-first-run')),
+        ),
+      );
+
+      expect(
+        find.byKey(const Key('first-run-download-progress')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('first-run-resume-download')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('first-run-welcome')), findsNothing);
+      expect(find.byKey(const Key('chat-after-first-run')), findsNothing);
+      expect(
+        preferences.preferences.onboardingVersion,
+        currentOnboardingVersion,
+      );
+    });
+  }
+
+  testWidgets(
+    'an interrupted artifact from the other engine returns to model choice',
+    (tester) async {
+      final preferences = InMemoryPreferencesRepository(
+        const AppPreferences(
+          onboardingVersion: currentOnboardingVersion,
+          onboardingModelKey: 'gemma4-gguf',
+        ),
+      );
+      await pumpWithRepositories(
+        tester,
+        preferences: preferences,
+        backend: const InferenceBackendConfig(
+          kind: InferenceBackendKind.mlx,
+          profileKey: 'gemma4',
+          artifactKey: 'gemma4-mlx',
+          modelPath: 'documents:models/gemma4-mlx',
+          modelPathFromCatalog: true,
+        ),
+        eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+        model: const ModelState(
+          artifacts: {
+            'gemma4-gguf': ArtifactStatus(
+              phase: ArtifactPhase.paused,
+              downloadedBytes: 400,
+            ),
+          },
+        ),
+        child: const FirstRunGate(
+          child: SizedBox(key: Key('chat-after-first-run')),
+        ),
+      );
+
+      expect(find.byKey(const Key('first-run-model')), findsOneWidget);
+      expect(find.byKey(const Key('first-run-download')), findsOneWidget);
+      expect(find.byKey(const Key('first-run-resume-download')), findsNothing);
+      expect(find.textContaining('MLX ·'), findsOneWidget);
+      expect(find.textContaining('GGUF ·'), findsNothing);
+      expect(find.byKey(const Key('chat-after-first-run')), findsNothing);
+    },
+  );
+
+  testWidgets('deleting the last compatible model immediately re-gates shell', (
+    tester,
+  ) async {
+    setViewport(tester);
+    final preferences = InMemoryPreferencesRepository(
+      const AppPreferences(
+        onboardingVersion: currentOnboardingVersion,
+        onboardingModelKey: 'gemma4-mlx',
+      ),
+    );
+    final models = _DeletableModels();
+    final container = buildContainer(
+      history: seedHistory(),
+      preferences: preferences,
+      models: models,
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: wrapApp(
+          child: const FirstRunGate(
+            child: SizedBox(key: Key('chat-after-first-run')),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-after-first-run')), findsOneWidget);
+
+    await container.read(modelControllerProvider.notifier).delete('gemma4-mlx');
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('chat-after-first-run')), findsNothing);
+    expect(find.byKey(const Key('first-run-model')), findsOneWidget);
+    expect(preferences.preferences.onboardingVersion, currentOnboardingVersion);
+  });
+
   testWidgets('an alternate selection is not relabelled as recommended', (
     tester,
   ) async {
@@ -133,6 +310,32 @@ void main() {
 
     expect(find.text('Qwen 3.5 4B'), findsOneWidget);
     expect(find.text('RECOMMENDED'), findsNothing);
+  });
+
+  testWidgets('an incompatible persisted MLX key cannot label Android setup', (
+    tester,
+  ) async {
+    final preferences = InMemoryPreferencesRepository(
+      const AppPreferences(onboardingModelKey: 'gemma4-mlx'),
+    );
+    await pumpWithRepositories(
+      tester,
+      preferences: preferences,
+      backend: const InferenceBackendConfig(
+        kind: InferenceBackendKind.llama,
+        profileKey: 'gemma4',
+        artifactKey: 'gemma4-gguf',
+        modelPath: 'documents:models/gemma4-gguf/model.gguf',
+        modelPathFromCatalog: true,
+      ),
+      eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+      child: const FirstRunScreen(initialStep: FirstRunStep.model),
+    );
+
+    expect(find.textContaining('GGUF ·'), findsOneWidget);
+    expect(find.textContaining('MLX ·'), findsNothing);
+    expect(find.text('3.18 GB'), findsWidgets);
+    expect(find.text('3.58 GB'), findsNothing);
   });
 
   testWidgets('deferred setup is persistent and gates only sending', (
@@ -271,6 +474,97 @@ void main() {
     },
     variant: bothChromes,
   );
+
+  testWidgets(
+    'blocking setup survives large text and announces progress',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pumpWithRepositories(
+        tester,
+        textScale: 1.6,
+        eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+        model: const ModelState(
+          simulated: true,
+          artifacts: {
+            'gemma4-mlx': ArtifactStatus(
+              phase: ArtifactPhase.downloading,
+              downloadedBytes: 900000000,
+            ),
+          },
+        ),
+        child: const FirstRunScreen(initialStep: FirstRunStep.download),
+      );
+
+      expect(tester.takeException(), isNull);
+      final progress = find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.properties.label == 'Download progress',
+      );
+      expect(progress, findsOneWidget);
+      expect(tester.getSemantics(progress).value, isNotEmpty);
+      expect(
+        tester
+            .widget<CupertinoButton>(
+              find.descendant(
+                of: find.byKey(const Key('first-run-start-chatting')),
+                matching: find.byType(CupertinoButton),
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+      semantics.dispose();
+    },
+    variant: bothChromes,
+  );
+
+  testWidgets(
+    'verification uses honest indeterminate progress with accessible status',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pumpWithRepositories(
+        tester,
+        textScale: 1.6,
+        eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+        model: const ModelState(
+          simulated: false,
+          artifacts: {
+            'gemma4-mlx': ArtifactStatus(
+              phase: ArtifactPhase.verifying,
+              downloadedBytes: 3583086498,
+            ),
+          },
+        ),
+        child: const FirstRunScreen(initialStep: FirstRunStep.download),
+        settle: false,
+      );
+
+      expect(tester.takeException(), isNull);
+      final progress = find.byKey(const Key('first-run-verification-progress'));
+      expect(progress, findsOneWidget);
+      expect(find.byKey(const Key('first-run-download-track')), findsNothing);
+      expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
+      expect(tester.getSemantics(progress).label, 'Verifying Gemma 4 E2B');
+      expect(
+        tester.getSemantics(progress).value,
+        'Checking the downloaded files before they can run.',
+      );
+      expect(
+        tester
+            .widget<CupertinoButton>(
+              find.descendant(
+                of: find.byKey(const Key('first-run-start-chatting')),
+                matching: find.byType(CupertinoButton),
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+      semantics.dispose();
+    },
+    variant: bothChromes,
+  );
 }
 
 final class _OnboardingDownloadModels implements ModelManagementRepository {
@@ -310,4 +604,80 @@ final class _OnboardingDownloadModels implements ModelManagementRepository {
     RuntimePhase phase, {
     String? failure,
   }) async => _state;
+}
+
+final class _DeletableModels implements ModelManagementRepository {
+  ModelState _state = const ModelState(
+    simulated: true,
+    artifacts: {'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed)},
+  );
+
+  @override
+  Future<ModelState> load() async => _state;
+
+  @override
+  Future<ModelState> delete(String artifactKey) async {
+    _state = _state.withArtifact(artifactKey, const ArtifactStatus());
+    return _state;
+  }
+
+  @override
+  Stream<ModelState> download(String artifactKey) => Stream.value(_state);
+
+  @override
+  Future<ModelState> pause(String artifactKey) async => _state;
+
+  @override
+  Future<ModelState> cancel(String artifactKey) async => _state;
+
+  @override
+  Future<ModelState> addModel(ModelCatalogEntry entry) async => _state;
+
+  @override
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    String? failure,
+  }) async => _state;
+}
+
+final class _ValidatingSideload implements InferenceRepository {
+  _ValidatingSideload({required this.failuresRemaining});
+
+  int failuresRemaining;
+  int prepareCalls = 0;
+  final ValueNotifier<InferenceResidency> _residency =
+      ValueNotifier<InferenceResidency>(const InferenceResidency.unloaded());
+
+  @override
+  ValueListenable<InferenceResidency> get residency => _residency;
+
+  @override
+  Future<void> prepare({String? modelKey}) async {
+    prepareCalls++;
+    if (failuresRemaining > 0) {
+      failuresRemaining--;
+      throw const InferenceException(
+        InferenceFailureKind.invalidModelArtifact,
+        'injected invalid sideload',
+      );
+    }
+    _residency.value = const InferenceResidency(loaded: true);
+  }
+
+  @override
+  Future<void> unload() async {
+    _residency.value = const InferenceResidency.unloaded();
+  }
+
+  @override
+  Future<void> cancel() async {}
+
+  @override
+  Stream<InferenceEvent> generate({
+    required List<PromptMessage> context,
+    required bool reasoningEnabled,
+    SamplingOverrides? overrides,
+    String? modelKey,
+    String? systemPrompt,
+  }) => const Stream.empty();
 }

@@ -727,8 +727,8 @@ String _$deviceRefusalHash() => r'468361a06ea6560745860b6503ccdea28219b622';
 /// KeepAlive: holds the live ValueListenable subscription onto #42's
 /// residency owner; autoDispose would churn that listener per route.
 
-@ProviderFor(residentModelKey)
-final residentModelKeyProvider = ResidentModelKeyProvider._();
+@ProviderFor(inferenceResidency)
+final inferenceResidencyProvider = InferenceResidencyProvider._();
 
 /// The catalog key of the model resident in the engine, straight from the
 /// residency owner (#42). Null while the engine is empty — label helpers fall
@@ -738,9 +738,14 @@ final residentModelKeyProvider = ResidentModelKeyProvider._();
 /// KeepAlive: holds the live ValueListenable subscription onto #42's
 /// residency owner; autoDispose would churn that listener per route.
 
-final class ResidentModelKeyProvider
-    extends $FunctionalProvider<String?, String?, String?>
-    with $Provider<String?> {
+final class InferenceResidencyProvider
+    extends
+        $FunctionalProvider<
+          InferenceResidency,
+          InferenceResidency,
+          InferenceResidency
+        >
+    with $Provider<InferenceResidency> {
   /// The catalog key of the model resident in the engine, straight from the
   /// residency owner (#42). Null while the engine is empty — label helpers fall
   /// back to the configured artifact, so a lazy first load does not blank the
@@ -748,6 +753,49 @@ final class ResidentModelKeyProvider
   /// repository seam: label-only containers must not need one.
   /// KeepAlive: holds the live ValueListenable subscription onto #42's
   /// residency owner; autoDispose would churn that listener per route.
+  InferenceResidencyProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: noRetry,
+        name: r'inferenceResidencyProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$inferenceResidencyHash();
+
+  @$internal
+  @override
+  $ProviderElement<InferenceResidency> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  InferenceResidency create(Ref ref) {
+    return inferenceResidency(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(InferenceResidency value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<InferenceResidency>(value),
+    );
+  }
+}
+
+String _$inferenceResidencyHash() =>
+    r'21d4215c7575770f376027e1c177d3d8e4448715';
+
+@ProviderFor(residentModelKey)
+final residentModelKeyProvider = ResidentModelKeyProvider._();
+
+final class ResidentModelKeyProvider
+    extends $FunctionalProvider<String?, String?, String?>
+    with $Provider<String?> {
   ResidentModelKeyProvider._()
     : super(
         from: null,
@@ -781,7 +829,7 @@ final class ResidentModelKeyProvider
   }
 }
 
-String _$residentModelKeyHash() => r'a0072e8c58064797a9c045af4114c54a7db92439';
+String _$residentModelKeyHash() => r'80e261b3776ed8d94de5277ad637cb1475f22c85';
 
 /// The chat session's capabilities offered across feature boundaries (#88):
 /// ChatController binds itself in during `build()`, and the model feature

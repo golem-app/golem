@@ -78,6 +78,28 @@ enum InferenceFailureKind {
   budgetExhaustedBeforeAnswer,
 }
 
+/// The runtime's live residency, distinct from durable artifact installation.
+/// A sideload is loaded with no catalog key; a null key therefore cannot stand
+/// in for the much more important question of whether weights are resident.
+final class InferenceResidency {
+  const InferenceResidency({required this.loaded, this.catalogKey})
+    : assert(loaded || catalogKey == null);
+
+  const InferenceResidency.unloaded() : loaded = false, catalogKey = null;
+
+  final bool loaded;
+  final String? catalogKey;
+
+  @override
+  bool operator ==(Object other) =>
+      other is InferenceResidency &&
+      other.loaded == loaded &&
+      other.catalogKey == catalogKey;
+
+  @override
+  int get hashCode => Object.hash(loaded, catalogKey);
+}
+
 /// [message] is diagnostic source-language copy for logs and tests. App
 /// presentation switches exhaustively on [kind] and never displays it.
 class InferenceException implements Exception {
@@ -106,10 +128,10 @@ abstract interface class InferenceRepository {
   Future<void> unload();
   Future<void> cancel();
 
-  /// The catalog key resident in the engine, or null when nothing is loaded.
-  /// This repository is the only component that loads or unloads weights (#42),
-  /// so honesty labels follow this rather than the boot-resolved configuration.
-  ValueListenable<String?> get residentModelKey;
+  /// The live engine state. This repository is the only component that loads
+  /// or unloads weights (#42), so honesty labels follow this rather than the
+  /// boot-resolved configuration or durable download phase.
+  ValueListenable<InferenceResidency> get residency;
 
   /// [overrides] are the user's sparse per-model settings for the profile of
   /// [modelKey]'s model, merged onto that profile's recommended defaults by a

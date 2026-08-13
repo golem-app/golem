@@ -635,7 +635,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get setupDownloadPrompt =>
-      'Hãy tải mô hình đã chọn trước khi gửi. Bạn vẫn có thể soạn tin nhắn và dùng phần còn lại của Golem.';
+      'Hãy tải xuống và xác minh mô hình đã chọn trước khi dùng Golem.';
 
   @override
   String get qaDownloadShort =>
@@ -771,6 +771,16 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String localModelPrivacy(String modelName) {
     return '$modelName được tải và chạy trên điện thoại. Không có nội dung nào bạn nhập ở đây được gửi đi.';
+  }
+
+  @override
+  String downloadedModelPrivacy(String modelName) {
+    return '$modelName đã được tải xuống và xác minh trên điện thoại này. Mô hình sẽ được nạp khi bạn gửi tin nhắn. Không có nội dung nào bạn nhập ở đây được gửi đi.';
+  }
+
+  @override
+  String validatedModelPrivacy(String modelName) {
+    return '$modelName đã được xác minh cho phiên này và chỉ chạy trên điện thoại này. Không có nội dung nào bạn nhập ở đây được gửi đi.';
   }
 
   @override
@@ -1457,7 +1467,10 @@ class AppLocalizationsVi extends AppLocalizations {
   String get resolveRepository => 'Phân giải';
 
   @override
-  String get activeBadge => 'ĐANG DÙNG';
+  String get activeBadge => 'ĐÃ CHỌN';
+
+  @override
+  String get loadedBadge => 'ĐÃ NẠP';
 
   @override
   String modelStatusLabel(String modelName, String engine) {

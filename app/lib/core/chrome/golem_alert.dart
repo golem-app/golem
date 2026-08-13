@@ -37,6 +37,10 @@ Future<void> showGolemAlert({
   if (GolemChrome.current == GolemChrome.cupertino) {
     return showCupertinoDialog<void>(
       context: context,
+      // Action closures pop with the caller context. Keeping the dialog on
+      // that same navigator matters once an all-routes shell owns startup:
+      // a root dialog paired with a shell pop would remove the last app page.
+      useRootNavigator: false,
       builder: (context) => CupertinoAlertDialog(
         key: dialogKey,
         title: Text(title),
@@ -59,6 +63,7 @@ Future<void> showGolemAlert({
   // large text scales (they wrap instead of overflowing a fixed row).
   return showCupertinoDialog<void>(
     context: context,
+    useRootNavigator: false,
     builder: (context) {
       final insets = MediaQuery.viewInsetsOf(context);
       final maxHeight =

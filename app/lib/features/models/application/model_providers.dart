@@ -69,6 +69,20 @@ Set<String> loadableModelKeys(Ref ref) => domain.loadableModelKeys(
   models: ref.watch(modelControllerProvider).value,
 );
 
+/// One effective compatible artifact for startup, chat and runtime controls.
+/// A stale persisted iOS GGUF choice cannot pull those surfaces away from the
+/// MLX artifact the composed engine can actually load.
+@Riverpod(keepAlive: true, retry: noRetry)
+String? startupModelKey(Ref ref) => domain.startupModelKey(
+  backend: ref.watch(inferenceBackendProvider),
+  catalog: ref.watch(effectiveModelCatalogProvider),
+  loadableKeys: ref.watch(loadableModelKeysProvider),
+  preferredKey: ref
+      .watch(preferencesControllerProvider)
+      .value
+      ?.onboardingModelKey,
+);
+
 /// The keys a download may be *started* for: the pinned catalog, plus custom
 /// repositories that resolved against Hugging Face and so have a real file
 /// list. An unresolved entry synthesizes its files, so a request for it could
@@ -142,6 +156,12 @@ class ModelController extends _$ModelController {
       // with the one the launch pass resolved to — leaving the card stale and
       // the busy guard raised, so the user's own tap does nothing.
       await future;
+      // A simulated transfer is owned entirely by this controller's live
+      // stream. Reloading its persisted mid-transfer snapshot on a dialog's
+      // spurious resumed event would normalize it to paused and rewind the
+      // verified result. Real transfers remain eligible here because their
+      // platform worker can advance while Dart is inactive.
+      if (_busy && state.value?.simulated == true) return;
       final value = await ref.read(modelManagementRepositoryProvider).load();
       if (!ref.mounted) return;
       state = AsyncData(value);
@@ -235,7 +255,7 @@ class ModelController extends _$ModelController {
       // Residency decides, since a switch can make any installed artifact the
       // one that is mapped (#20).
       final resident =
-          ref.read(inferenceRepositoryProvider).residentModelKey.value ??
+          ref.read(inferenceRepositoryProvider).residency.value.catalogKey ??
           state.value?.activeArtifactKey;
       if (artifactKey == resident) {
         await ref.read(inferenceRepositoryProvider).unload();
@@ -370,7 +390,7 @@ class ModelController extends _$ModelController {
           // Refuse with a persisted failed phase; the engine is never touched.
           final value = await repository.recordRuntime(
             RuntimePhase.failed,
-            failure: _installFirstFailure(target),
+            failure: _installFirstFailure(),
           );
           if (!ref.mounted) return;
           state = AsyncData(value);
@@ -421,7 +441,7 @@ class ModelController extends _$ModelController {
       // Residency decides, not the catalog phase: a GOLEM_MODEL_PATH load is
       // outside phase tracking, yet just as resident and just as jetsammable.
       final loaded = current.runtime == RuntimePhase.loaded;
-      if (!loaded && inference.residentModelKey.value == null) return;
+      if (!loaded && !inference.residency.value.loaded) return;
       await inference.unload();
       if (!ref.mounted || !loaded) return;
       final value = await ref
@@ -443,15 +463,34 @@ class ModelController extends _$ModelController {
     final backend = ref.read(inferenceBackendProvider);
     if (backend.sideloaded) return null;
     final chatModelKey = ref.read(chatSessionBridgeProvider).activeModelKey();
-    return chatModelKey ?? state.value?.activeArtifactKey;
+    final List<ModelCatalogEntry> catalog;
+    try {
+      catalog = ref.read(effectiveModelCatalogProvider);
+    } catch (_) {
+      return chatModelKey ?? state.value?.activeArtifactKey;
+    }
+    final loadable = domain.loadableModelKeys(
+      backend: backend,
+      catalog: catalog,
+      models: state.value,
+    );
+    if (chatModelKey != null && loadable.contains(chatModelKey)) {
+      return chatModelKey;
+    }
+    return domain.startupModelKey(
+      backend: backend,
+      catalog: catalog,
+      loadableKeys: loadable,
+      preferredKey: ref
+          .read(preferencesControllerProvider)
+          .value
+          ?.onboardingModelKey,
+    );
   }
 
   /// The load-refusal copy for a not-installed target. Owned here since #42:
   /// the management repository no longer knows why a load was refused.
-  String _installFirstFailure(String? target) {
-    if (target == null) {
-      return 'Inference is a build-time opt-in; no backend is configured.';
-    }
+  String _installFirstFailure() {
     return ref.read(inferenceBackendProvider).simulatedInference
         ? 'Install the selected simulated model first.'
         : 'Download and install the active model first.';

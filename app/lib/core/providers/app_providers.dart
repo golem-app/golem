@@ -115,14 +115,20 @@ String? deviceRefusal(Ref ref) =>
 /// KeepAlive: holds the live ValueListenable subscription onto #42's
 /// residency owner; autoDispose would churn that listener per route.
 @Riverpod(keepAlive: true, retry: noRetry)
-String? residentModelKey(Ref ref) {
-  if (ref.watch(inferenceBackendProvider).simulatedInference) return null;
-  final listenable = ref.watch(inferenceRepositoryProvider).residentModelKey;
+InferenceResidency inferenceResidency(Ref ref) {
+  if (ref.watch(inferenceBackendProvider).simulatedInference) {
+    return const InferenceResidency.unloaded();
+  }
+  final listenable = ref.watch(inferenceRepositoryProvider).residency;
   void onChange() => ref.invalidateSelf();
   listenable.addListener(onChange);
   ref.onDispose(() => listenable.removeListener(onChange));
   return listenable.value;
 }
+
+@Riverpod(keepAlive: true, retry: noRetry)
+String? residentModelKey(Ref ref) =>
+    ref.watch(inferenceResidencyProvider).catalogKey;
 
 /// The chat session's capabilities offered across feature boundaries (#88):
 /// ChatController binds itself in during `build()`, and the model feature

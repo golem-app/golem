@@ -15,10 +15,18 @@ bool shouldShowFirstRun({
   if (preferences.onboardingVersion >= currentOnboardingVersion) return false;
   if (backend.sideloaded) return false;
   if (chats.conversations.isNotEmpty) return false;
-  if (models.artifacts.isNotEmpty ||
-      models.runtime != RuntimePhase.unloaded ||
-      models.failure != null) {
-    return false;
-  }
-  return true;
+  return isPristineModelState(models);
 }
+
+/// Reconciliation materializes every catalog key, so map presence cannot be a
+/// legacy-install signal. Only untouched, zero-byte entries are pristine.
+bool isPristineModelState(ModelState models) =>
+    models.runtime == RuntimePhase.unloaded &&
+    models.failure == null &&
+    models.artifacts.values.every(
+      (status) =>
+          status.phase == ArtifactPhase.notDownloaded &&
+          status.downloadedBytes == 0 &&
+          status.failure == null &&
+          status.failureReason == null,
+    );

@@ -104,10 +104,11 @@ final class InfernoInferenceRepository implements InferenceRepository {
   Future<void>? _activating;
   String? _activatingKey;
   int? _lastAvailableReading;
-  final ValueNotifier<String?> _residentKey = ValueNotifier<String?>(null);
+  final ValueNotifier<InferenceResidency> _residency =
+      ValueNotifier<InferenceResidency>(const InferenceResidency.unloaded());
 
   @override
-  ValueListenable<String?> get residentModelKey => _residentKey;
+  ValueListenable<InferenceResidency> get residency => _residency;
 
   @override
   Future<void> prepare({String? modelKey}) =>
@@ -125,7 +126,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
     if (_resident == null) return;
     await _runtime.unload();
     _resident = null;
-    _residentKey.value = null;
+    _residency.value = const InferenceResidency.unloaded();
   }
 
   @override
@@ -171,7 +172,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
       if (_resident != null) {
         await _runtime.unload();
         _resident = null;
-        _residentKey.value = null;
+        _residency.value = const InferenceResidency.unloaded();
       }
       final path = _resolvePath(target.modelPath);
       try {
@@ -194,7 +195,10 @@ final class InfernoInferenceRepository implements InferenceRepository {
         rethrow;
       }
       _resident = target;
-      _residentKey.value = target.catalogKey;
+      _residency.value = InferenceResidency(
+        loaded: true,
+        catalogKey: target.catalogKey,
+      );
     }();
     _activating = activation;
     activation.whenComplete(() {

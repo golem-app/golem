@@ -2,6 +2,11 @@
 
 Status: decided on `feat/19-generation-settings-flavor-defaults` (issue #19)
 
+The mobile `auto` mapping and first-need download behavior are superseded by
+[ADR 0012](0012-platform-engine-and-required-model-startup.md): iOS uses MLX,
+Android uses llama.cpp/GGUF, and a verified compatible model is required before
+any app route content is exposed.
+
 The install-time device floor that complements this composition policy is
 documented in `../device_floor.md` (added with epic #61).
 
@@ -50,11 +55,9 @@ transport is not part of this Dart logging policy.
 
 ## `auto`: engine and model
 
-`auto` composes the **llama.cpp/GGUF** artifact of the device-policy model
-on both platforms, per ADR 0002 (llama.cpp is the single v0 engine:
-equal-or-better decode, no shader-compile cold start, mmap-evictable
-weights on memory-pressure-prone phones). MLX remains one dart-define away.
-The model path, broker profile, and active catalog artifact are resolved
+`auto` composes **MLX on iOS** and **llama.cpp/GGUF on Android**. macOS retains
+llama.cpp. The exact platform engine is resolved before the capability probe,
+then the model path, broker profile, and active catalog artifact are resolved
 together as one value, eliminating the mismatched profile/path hazard.
 
 ## Device-model policy: 7 GiB, and unknown means small
@@ -81,12 +84,10 @@ the lighter **Qwen 3.5 2B** (`qwen35-2b-gguf`, 1.21 GB).
 
 ## First-need downloads require consent
 
-A fresh production/dev install selects its default model but never starts
-a multi-gigabyte download silently. The first generation attempt without
-the installed artifact fails fast into a typed missing-model state, and
-the chat banner offers an explicit sized "Download …" action
-(`download-active-model`) that drives the existing verified download
-machinery and lands on the Settings model card for progress and control.
+A fresh production/dev install selects its default model but never starts a
+multi-gigabyte download silently. Explicit consent begins the verified
+download, and the app-root gate remains until installation succeeds. Decline,
+pause, failure, interruption, or deletion never expose the shell.
 
 ## On-device context caps
 

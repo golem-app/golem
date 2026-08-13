@@ -4,6 +4,23 @@ import '../core/domain/inference_backend.dart';
 import '../core/domain/model_catalog.dart';
 import 'model_catalog.dart';
 
+/// The host family that decides the platform-owned automatic engine. Kept
+/// independent of Flutter's platform enum so broker policy remains pure and
+/// host tests can cover every branch without mutating global platform state.
+enum HostPlatform { ios, android, macos, other }
+
+String resolvedEngineName({
+  required String backendName,
+  required HostPlatform platform,
+}) => backendName != 'auto'
+    ? backendName
+    : switch (platform) {
+        HostPlatform.ios => 'mlx',
+        HostPlatform.android ||
+        HostPlatform.macos ||
+        HostPlatform.other => 'llama',
+      };
+
 /// Which engine this build composes, before any device is classified: the
 /// dart-define when there is one, else the flavor default. Resolved on its own
 /// because the capability probe has to know which engine to ask about, and the
@@ -18,9 +35,9 @@ String resolveBackendName({
         AppIdentity.qa || AppIdentity.flutter => 'fake',
       };
 
-/// Pure. `auto` is the llama/GGUF artifact of the device-policy model (ADR 0002
-/// makes llama.cpp the v0 engine); an operator-supplied `GOLEM_MODEL_PATH` is
-/// the separate, capability-unproven sideload contract. Passing `auto`
+/// Pure. `auto` is the platform engine's artifact of the device-policy model
+/// (ADR 0012); an operator-supplied `GOLEM_MODEL_PATH` is the separate,
+/// capability-unproven sideload contract. Passing `auto`
 /// explicitly lets a qa build exercise the exact production composition — the
 /// only route on the physical iPhone, where production/dev bundle ids are
 /// off-limits.
@@ -39,6 +56,7 @@ InferenceBackendConfig resolveBackendPolicy({
   required String artifactDefine,
   required String modelPathDefine,
   required DeviceTier tier,
+  HostPlatform platform = HostPlatform.other,
 }) {
   final explicitProfile = profileDefine.isEmpty ? null : profileDefine;
   final explicitArtifact = artifactDefine.isEmpty ? null : artifactDefine;
@@ -84,9 +102,15 @@ InferenceBackendConfig resolveBackendPolicy({
         modelPathFromCatalog: modelPathDefine.isEmpty,
       );
     case 'auto':
+      final engineName = resolvedEngineName(
+        backendName: backendName,
+        platform: platform,
+      );
+      final engine = engineName == 'mlx' ? ModelEngine.mlx : ModelEngine.gguf;
+      final artifactSuffix = engine == ModelEngine.mlx ? 'mlx' : 'gguf';
       final selected = explicitArtifact == null
           ? null
-          : _catalogArtifact(explicitArtifact, ModelEngine.gguf);
+          : _catalogArtifact(explicitArtifact, engine);
       final profileKey =
           explicitProfile ??
           selected?.profileKey ??
@@ -97,10 +121,12 @@ InferenceBackendConfig resolveBackendPolicy({
       final artifactKey =
           selected?.key ??
           (explicitProfile == null && profileKey == 'qwen35'
-              ? 'qwen35-2b-gguf'
-              : '$profileKey-gguf');
+              ? 'qwen35-2b-$artifactSuffix'
+              : '$profileKey-$artifactSuffix');
       return InferenceBackendConfig(
-        kind: InferenceBackendKind.llama,
+        kind: engineName == 'mlx'
+            ? InferenceBackendKind.mlx
+            : InferenceBackendKind.llama,
         profileKey: profileKey,
         artifactKey: artifactKey,
         modelPath: modelPathDefine.isNotEmpty

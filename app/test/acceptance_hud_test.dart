@@ -44,6 +44,7 @@ void main() {
       const progress = HudProgress(detail: 'turn 7 of 12');
       expect(progress.caption, 'turn 7 of 12');
       expect(progress.fraction, isNull);
+      expect(progress.indeterminate, isTrue);
     });
 
     test('joins bytes and detail when both are given', () {
@@ -68,6 +69,7 @@ void main() {
 
     test('is empty only when it was given nothing', () {
       expect(const HudProgress().caption, isEmpty);
+      expect(const HudProgress().indeterminate, isFalse);
     });
 
     test('clamps a total that under-reports the bytes on disk', () {
@@ -95,6 +97,14 @@ void main() {
     expect(find.text('Text turn'), findsOneWidget);
     // The previous step's bytes must not linger under the new one.
     expect(find.text('1.84 GB / 3.18 GB'), findsNothing);
+
+    AcceptanceHud.progress(detail: 'Verifying the model download');
+    await tester.pump();
+    expect(find.text('Verifying the model download'), findsOneWidget);
+    expect(
+      find.byKey(const Key('acceptance-hud-indeterminate-progress')),
+      findsOneWidget,
+    );
 
     AcceptanceHud.finish('Done');
     await tester.pump();

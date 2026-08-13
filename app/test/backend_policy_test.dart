@@ -20,12 +20,14 @@ InferenceBackendConfig _resolve({
   String modelPath = '',
   AppIdentity identity = AppIdentity.production,
   DeviceTier tier = DeviceTier.preferred,
+  HostPlatform platform = HostPlatform.other,
 }) => resolveBackendPolicy(
   backendName: resolveBackendName(backendDefine: backend, identity: identity),
   profileDefine: profile,
   artifactDefine: artifact,
   modelPathDefine: modelPath,
   tier: tier,
+  platform: platform,
 );
 
 /// The capability read that produces that tier, with both seams injected so no
@@ -56,23 +58,42 @@ void main() {
     }
   });
 
-  test(
-    'production and dev default to auto: llama plus device policy',
-    () async {
-      for (final identity in [AppIdentity.production, AppIdentity.dev]) {
-        final config = _resolve(identity: identity);
-        expect(config.kind, InferenceBackendKind.llama);
-        expect(config.simulatedInference, isFalse);
-        expect(config.profileKey, 'gemma4');
-        expect(config.artifactKey, 'gemma4-gguf');
-        expect(
-          config.modelPath,
-          'documents:models/gemma4-gguf/gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf',
-        );
-        expect(config.modelPathFromCatalog, isTrue);
-      }
-    },
-  );
+  test('production and dev default to automatic platform policy', () async {
+    for (final identity in [AppIdentity.production, AppIdentity.dev]) {
+      final config = _resolve(identity: identity);
+      expect(config.kind, InferenceBackendKind.llama);
+      expect(config.simulatedInference, isFalse);
+      expect(config.profileKey, 'gemma4');
+      expect(config.artifactKey, 'gemma4-gguf');
+      expect(
+        config.modelPath,
+        'documents:models/gemma4-gguf/gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf',
+      );
+      expect(config.modelPathFromCatalog, isTrue);
+    }
+  });
+
+  test('automatic policy selects MLX on iOS and GGUF on Android', () {
+    final ios = _resolve(platform: HostPlatform.ios);
+    expect(ios.kind, InferenceBackendKind.mlx);
+    expect(ios.artifactKey, 'gemma4-mlx');
+    expect(ios.modelPath, 'documents:models/gemma4-mlx');
+
+    final iosLight = _resolve(
+      platform: HostPlatform.ios,
+      tier: DeviceTier.light,
+    );
+    expect(iosLight.artifactKey, 'qwen35-2b-mlx');
+
+    final android = _resolve(platform: HostPlatform.android);
+    expect(android.kind, InferenceBackendKind.llama);
+    expect(android.artifactKey, 'gemma4-gguf');
+    final androidLight = _resolve(
+      platform: HostPlatform.android,
+      tier: DeviceTier.light,
+    );
+    expect(androidLight.artifactKey, 'qwen35-2b-gguf');
+  });
 
   test('the light tier selects the lighter Qwen', () async {
     final config = _resolve(tier: DeviceTier.light);

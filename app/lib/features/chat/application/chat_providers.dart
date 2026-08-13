@@ -4,8 +4,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/domain/app_state.dart';
 import '../../../core/domain/generation_settings.dart';
-import '../../../core/domain/inference_backend.dart';
 import '../../../core/domain/model_catalog.dart';
+import '../../../core/domain/model_activation.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/domain/response_style_mapping.dart';
 import '../../../core/providers/app_providers.dart';
@@ -239,16 +239,10 @@ class ChatController extends _$ChatController {
   Future<void> newChat() async {
     stop();
     final now = DateTime.now();
-    final onboardingModelKey = ref
-        .read(preferencesControllerProvider)
-        .value
-        ?.onboardingModelKey;
     final backend = ref.read(inferenceBackendProvider);
-    final selectedEntry = onboardingModelKey == null
-        ? null
-        : _catalog()
-              .where((entry) => entry.key == onboardingModelKey)
-              .firstOrNull;
+    final selectedKey = backend.simulatedInference
+        ? ref.read(preferencesControllerProvider).value?.onboardingModelKey
+        : ref.read(startupModelKeyProvider);
     final conversation = ChatConversation(
       id: newId(),
       title: '',
@@ -258,12 +252,7 @@ class ChatController extends _$ChatController {
       // finish downloading. Sending remains gated in the composer and again in
       // _startGeneration; after installation the existing loadable-key rule
       // makes every model label follow this persisted choice.
-      modelKey:
-          selectedEntry != null &&
-              (backend.simulatedInference ||
-                  backend.kind.loads(selectedEntry.engine))
-          ? selectedEntry.key
-          : null,
+      modelKey: selectedKey,
     );
     final next = ChatState(
       conversations: [conversation, ..._value.conversations],
@@ -530,10 +519,42 @@ class ChatController extends _$ChatController {
       );
       return;
     }
-    final target = active.modelKey ?? backend.artifactKey;
+    Set<String>? loadable;
+    try {
+      loadable = ref.read(loadableModelKeysProvider);
+    } catch (_) {
+      // Narrow controller tests and degraded containers may omit the catalog
+      // seams. The repository remains the final authority in that case.
+    }
+    final catalog = _catalog();
+    final resolvedTarget = effectiveModelKey(
+      backend: backend,
+      catalog: catalog,
+      modelKey: active.modelKey,
+      residentModelKey: ref.read(residentModelKeyProvider),
+      loadableKeys: loadable,
+    );
+    // A known empty compatible set is authoritative. Only a deliberately
+    // narrow/degraded container that could not expose that set delegates the
+    // old key to the repository as a final typed-failure boundary.
+    final target =
+        resolvedTarget ??
+        (loadable == null ? active.modelKey ?? backend.artifactKey : null);
     final entry = target == null
         ? null
         : _catalog().where((item) => item.key == target).firstOrNull;
+    if (!backend.simulatedInference && !backend.sideloaded && target == null) {
+      state = AsyncData(
+        _value.copyWith(
+          generation: GenerationPhase.failed,
+          failure: ChatFailure(
+            kind: ChatFailureKind.missingModel,
+            artifactKey: backend.artifactKey,
+          ),
+        ),
+      );
+      return;
+    }
     if (!backend.simulatedInference && !backend.sideloaded && entry != null) {
       final installed = await _modelInstalled(entry.key);
       if (!ref.mounted || epoch != _generationEpoch) return;
@@ -568,12 +589,11 @@ class ChatController extends _$ChatController {
       ),
     );
     try {
-      // The conversation's own model, not the boot configuration: generate()
-      // below activates `active.modelKey`, so a keyless prepare would cost two
-      // multi-gigabyte loads per send.
-      await ref
-          .read(inferenceRepositoryProvider)
-          .prepare(modelKey: active.modelKey);
+      // The effective target, not blindly the boot or historical chat key:
+      // generate() below activates the same target, so a keyless prepare would
+      // cost two multi-gigabyte loads per send and a stale key could cross
+      // model profiles.
+      await ref.read(inferenceRepositoryProvider).prepare(modelKey: target);
       if (!ref.mounted || epoch != _generationEpoch) return;
       // After this prepare() the engine holds weights, so Settings may not keep
       // claiming "Unloaded". Awaited on purpose: a recorded phase must not race
@@ -584,7 +604,7 @@ class ChatController extends _$ChatController {
       }
       state = AsyncData(_value.copyWith(generation: GenerationPhase.streaming));
       final context = active.promptContext;
-      final overrides = await _samplingOverrides();
+      final overrides = await _samplingOverrides(target);
       final systemPrompt = await _systemPrompt();
       if (!ref.mounted || epoch != _generationEpoch) return;
       await for (final event
@@ -594,7 +614,7 @@ class ChatController extends _$ChatController {
                 context: context,
                 reasoningEnabled: active.reasoningEnabled,
                 overrides: overrides,
-                modelKey: active.modelKey,
+                modelKey: target,
                 systemPrompt: systemPrompt,
               )) {
         if (!ref.mounted || epoch != _generationEpoch) return;
@@ -687,8 +707,8 @@ class ChatController extends _$ChatController {
   /// The response style's values with the user's hand-set Advanced overrides
   /// layered on top, knob by knob. Settings that fail to surface must never
   /// block chat, so each layer degrades independently to nothing.
-  Future<SamplingOverrides?> _samplingOverrides() async {
-    final profileKey = _activeProfileKey();
+  Future<SamplingOverrides?> _samplingOverrides(String? modelKey) async {
+    final profileKey = _profileKeyFor(modelKey);
     var manual = const SamplingOverrides();
     try {
       final settings = await ref.read(settingsControllerProvider.future);
@@ -706,8 +726,7 @@ class ChatController extends _$ChatController {
   /// The profile of the model this chat runs, so hand-set sampling and the
   /// response style follow a switch instead of staying on the build's boot
   /// profile — switching Gemma to Qwen otherwise applies Gemma's numbers (#20).
-  String _activeProfileKey() {
-    final modelKey = _value.active?.modelKey;
+  String _profileKeyFor(String? modelKey) {
     final entry = modelKey == null
         ? null
         : _catalog().where((item) => item.key == modelKey).firstOrNull;

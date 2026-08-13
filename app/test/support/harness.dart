@@ -108,6 +108,7 @@ LaunchDependencies launchDependenciesWith({
   CustomRepositoryResolver? resolver,
   ChatHistoryRepository? chatHistory,
   ModelManagementRepository? models,
+  InferenceRepository? inference,
   bool includeBenchmark = true,
 }) {
   final scratch =
@@ -125,7 +126,8 @@ LaunchDependencies launchDependenciesWith({
     attachmentRepository: attachments ?? InMemoryAttachmentRepository(),
     cacheProbe: FakeCacheProbe(),
     diskFreeSpaceProbe: const FakeDiskSpace(),
-    inferenceRepository: FakeInferenceRepository(eventDelay: Duration.zero),
+    inferenceRepository:
+        inference ?? FakeInferenceRepository(eventDelay: Duration.zero),
     modelCatalogEntries: catalog ?? modelCatalog,
     customRepositoryResolver:
         resolver ?? const DeterministicRepositoryResolver(),
@@ -154,6 +156,7 @@ ProviderContainer buildContainer({
   CustomRepositoryResolver? resolver,
   ChatHistoryRepository? chatHistory,
   ModelManagementRepository? models,
+  InferenceRepository? inference,
 }) => ProviderContainer(
   overrides: launchOverrides(
     launchDependenciesWith(
@@ -168,6 +171,7 @@ ProviderContainer buildContainer({
       resolver: resolver,
       chatHistory: chatHistory,
       models: models,
+      inference: inference,
     ),
   ),
 );
@@ -189,6 +193,8 @@ Future<void> pumpWithRepositories(
   CustomRepositoryResolver? resolver,
   ChatHistoryRepository? chatHistory,
   ModelManagementRepository? models,
+  InferenceRepository? inference,
+  bool settle = true,
 }) async {
   setViewport(tester);
   final container = buildContainer(
@@ -203,6 +209,7 @@ Future<void> pumpWithRepositories(
     resolver: resolver,
     chatHistory: chatHistory,
     models: models,
+    inference: inference,
   );
   addTearDown(container.dispose);
   final app = UncontrolledProviderScope(
@@ -239,7 +246,14 @@ Future<void> pumpWithRepositories(
     });
     await tester.pump();
   }
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    // Advance provider microtasks and entrance animations without waiting for
+    // an intentional indeterminate activity indicator to stop.
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+  }
 }
 
 /// Pumps a routed app (chat at `/`, search at `/search`) already

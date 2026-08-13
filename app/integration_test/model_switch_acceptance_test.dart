@@ -138,7 +138,7 @@ void main() {
         'switch-gemma',
         'Name the capital of France. Answer with one word.',
       );
-      expect(repository.residentModelKey.value, 'switch-gemma');
+      expect(repository.residency.value.catalogKey, 'switch-gemma');
       expect(first, contains('Paris'), reason: first);
 
       // Turn two on Qwen, same process: the engine must unload and reload, and
@@ -148,7 +148,7 @@ void main() {
         'Name the capital of Japan. Answer with one word.',
       );
       expect(
-        repository.residentModelKey.value,
+        repository.residency.value.catalogKey,
         'switch-qwen',
         reason:
             'residency must follow the switch, or every label built on it '
@@ -161,7 +161,7 @@ void main() {
         'switch-gemma',
         'Name the capital of Italy. Answer with one word.',
       );
-      expect(repository.residentModelKey.value, 'switch-gemma');
+      expect(repository.residency.value.catalogKey, 'switch-gemma');
       expect(third, contains('Rome'), reason: third);
 
       AcceptanceHud.step('Checking each turn sampled under its own profile');

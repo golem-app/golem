@@ -634,7 +634,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get setupDownloadPrompt =>
-      'Göndermeden önce seçilen modeli indirin. Yine de mesaj taslağı oluşturabilir ve Golem’in geri kalanını kullanabilirsiniz.';
+      'Golem’i kullanmadan önce seçilen modeli indirin ve doğrulayın.';
 
   @override
   String get qaDownloadShort =>
@@ -769,6 +769,16 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String localModelPrivacy(String modelName) {
     return '$modelName bu telefona yüklendi ve burada çalışıyor. Buraya yazdığınız hiçbir şey başka yere gitmez.';
+  }
+
+  @override
+  String downloadedModelPrivacy(String modelName) {
+    return '$modelName bu telefona indirildi ve doğrulandı. Mesaj gönderdiğinizde yüklenecek. Buraya yazdığınız hiçbir şey başka yere gitmez.';
+  }
+
+  @override
+  String validatedModelPrivacy(String modelName) {
+    return '$modelName bu oturum için doğrulandı ve yalnızca bu telefonda çalışır. Buraya yazdığınız hiçbir şey başka yere gitmez.';
   }
 
   @override
@@ -1454,7 +1464,10 @@ class AppLocalizationsTr extends AppLocalizations {
   String get resolveRepository => 'Çözümle';
 
   @override
-  String get activeBadge => 'ETKİN';
+  String get activeBadge => 'SEÇİLİ';
+
+  @override
+  String get loadedBadge => 'YÜKLENDİ';
 
   @override
   String modelStatusLabel(String modelName, String engine) {

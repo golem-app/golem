@@ -11,8 +11,16 @@ import 'package:golem_flutter/features/settings/settings_screen.dart';
 
 import 'support/harness.dart';
 
-Iterable<String> _routePaths(GoRouter router) =>
-    router.configuration.routes.whereType<GoRoute>().map((route) => route.path);
+Iterable<String> _routePaths(GoRouter router) sync* {
+  Iterable<String> walk(List<RouteBase> routes) sync* {
+    for (final route in routes) {
+      if (route is GoRoute) yield route.path;
+      yield* walk(route.routes);
+    }
+  }
+
+  yield* walk(router.configuration.routes);
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

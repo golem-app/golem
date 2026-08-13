@@ -619,8 +619,7 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get setupDownloadPrompt =>
-      '보내기 전에 선택한 모델을 다운로드하세요. 메시지 초안을 작성하고 Golem의 나머지 기능은 계속 사용할 수 있습니다.';
+  String get setupDownloadPrompt => 'Golem을 사용하기 전에 선택한 모델을 다운로드하고 검증하세요.';
 
   @override
   String get qaDownloadShort => '결정론적 QA 시뮬레이션. 네트워크 및 가중치 없음.';
@@ -750,6 +749,16 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String localModelPrivacy(String modelName) {
     return '$modelName이(가) 이 휴대전화에서 불러와져 실행 중입니다. 여기에 입력한 내용은 외부로 전송되지 않습니다.';
+  }
+
+  @override
+  String downloadedModelPrivacy(String modelName) {
+    return '$modelName이(가) 이 휴대전화에 다운로드되어 검증되었습니다. 메시지를 보내면 불러옵니다. 여기에 입력한 내용은 외부로 전송되지 않습니다.';
+  }
+
+  @override
+  String validatedModelPrivacy(String modelName) {
+    return '$modelName이(가) 이 세션용으로 검증되었으며 이 휴대전화에서만 실행됩니다. 여기에 입력한 내용은 외부로 전송되지 않습니다.';
   }
 
   @override
@@ -1411,7 +1420,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get resolveRepository => '확인';
 
   @override
-  String get activeBadge => '활성';
+  String get activeBadge => '선택됨';
+
+  @override
+  String get loadedBadge => '불러옴';
 
   @override
   String modelStatusLabel(String modelName, String engine) {

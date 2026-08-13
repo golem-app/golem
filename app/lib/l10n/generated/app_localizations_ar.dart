@@ -631,7 +631,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get setupDownloadPrompt =>
-      'نزّل النموذج المحدد قبل الإرسال. ما زال بإمكانك كتابة مسودات الرسائل واستخدام بقية Golem.';
+      'نزّل النموذج المحدد وتحقق منه قبل استخدام Golem.';
 
   @override
   String get qaDownloadShort => 'محاكاة QA حتمية بلا شبكة أو أوزان.';
@@ -763,6 +763,16 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String localModelPrivacy(String modelName) {
     return 'تم تحميل $modelName وهو يعمل على هذا الهاتف. لا يذهب ما تكتبه هنا إلى أي مكان.';
+  }
+
+  @override
+  String downloadedModelPrivacy(String modelName) {
+    return 'تم تنزيل $modelName والتحقق منه على هذا الهاتف. سيُحمّل عند إرسال رسالة. لا يذهب ما تكتبه هنا إلى أي مكان.';
+  }
+
+  @override
+  String validatedModelPrivacy(String modelName) {
+    return 'تم التحقق من $modelName لهذه الجلسة، ولا يعمل إلا على هذا الهاتف. لا يذهب ما تكتبه هنا إلى أي مكان.';
   }
 
   @override
@@ -1469,7 +1479,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get resolveRepository => 'فحص';
 
   @override
-  String get activeBadge => 'نشط';
+  String get activeBadge => 'محدد';
+
+  @override
+  String get loadedBadge => 'محمّل';
 
   @override
   String modelStatusLabel(String modelName, String engine) {

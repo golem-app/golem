@@ -127,6 +127,7 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
       residentModelKey: ref.watch(residentModelKeyProvider),
       loadableKeys: ref.watch(loadableModelKeysProvider),
     );
+    final residentKey = ref.watch(inferenceResidencyProvider).catalogKey;
     final loadable = catalog
         .where(
           (entry) =>
@@ -180,6 +181,7 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
             status: model.statusOf(entry.key),
             simulated: model.simulated,
             active: entry.key == activeKey,
+            resident: entry.key == residentKey,
             otherDownloadActive:
                 downloadingKey != null && downloadingKey != entry.key,
             downloadable: downloadableKeys.contains(entry.key),
@@ -753,6 +755,7 @@ class _ModelCard extends ConsumerWidget {
     required this.status,
     required this.simulated,
     required this.active,
+    required this.resident,
     required this.otherDownloadActive,
     required this.downloadable,
     required this.defaultMeasuredKey,
@@ -763,6 +766,7 @@ class _ModelCard extends ConsumerWidget {
   final ArtifactStatus status;
   final bool simulated;
   final bool active;
+  final bool resident;
   final bool otherDownloadActive;
 
   /// False for hand-added entries on a real download backend, whose
@@ -797,42 +801,7 @@ class _ModelCard extends ConsumerWidget {
         key: Key('model-card-${entry.key}'),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(entry.displayName, style: GolemText.cardTitle),
-              ),
-              if (active) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: CupertinoDynamicColor.resolve(
-                      GolemTheme.accentSoft,
-                      context,
-                    ),
-                    borderRadius: BorderRadius.circular(GolemRadius.badge),
-                  ),
-                  child: Text(
-                    context.l10n.activeBadge,
-                    style:
-                        localizedLabelStyle(
-                          GolemText.badge,
-                          Localizations.localeOf(context),
-                        ).copyWith(
-                          color: CupertinoDynamicColor.resolve(
-                            GolemTheme.accent,
-                            context,
-                          ),
-                        ),
-                  ),
-                ),
-              ],
-            ],
-          ),
+          Text(entry.displayName, style: GolemText.cardTitle),
           const SizedBox(height: 5),
           Text(
             '${_engineLabel(entry.engine)} · ${entry.quantization}',
@@ -843,6 +812,21 @@ class _ModelCard extends ConsumerWidget {
               ),
             ),
           ),
+          if (active || resident) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                if (active)
+                  _ModelStateBadge(
+                    label: context.l10n.activeBadge,
+                    emphasized: true,
+                  ),
+                if (resident) _ModelStateBadge(label: context.l10n.loadedBadge),
+              ],
+            ),
+          ],
           const SizedBox(height: 14),
           Semantics(
             key: Key('model-status-${entry.key}'),
@@ -1092,6 +1076,37 @@ class _ModelCard extends ConsumerWidget {
     ArtifactPhase.installed => CupertinoIcons.check_mark_circled_solid,
     ArtifactPhase.failed => CupertinoIcons.exclamationmark_triangle_fill,
   };
+}
+
+class _ModelStateBadge extends StatelessWidget {
+  const _ModelStateBadge({required this.label, this.emphasized = false});
+
+  final String label;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: CupertinoDynamicColor.resolve(
+        emphasized ? GolemTheme.accentSoft : GolemTheme.fillQuiet,
+        context,
+      ),
+      borderRadius: BorderRadius.circular(GolemRadius.badge),
+    ),
+    child: Text(
+      label,
+      style:
+          localizedLabelStyle(
+            GolemText.badge,
+            Localizations.localeOf(context),
+          ).copyWith(
+            color: emphasized
+                ? CupertinoDynamicColor.resolve(GolemTheme.accent, context)
+                : null,
+          ),
+    ),
+  );
 }
 
 class _Status extends StatelessWidget {

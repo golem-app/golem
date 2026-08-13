@@ -56,8 +56,8 @@ final class InferenceBackendConfig {
 
   /// True only when the policy derived [modelPath] from the catalog's
   /// install location. An operator-supplied `GOLEM_MODEL_PATH` (sideloads,
-  /// the determinism probe) is the operator's responsibility: the
-  /// missing-model download gate must not stand in front of it.
+  /// the determinism probe) is the operator's responsibility and is validated
+  /// by a real engine load before the consumer shell is exposed.
   final bool modelPathFromCatalog;
 
   /// Whether [artifactKey] came from the launch device classification rather
