@@ -612,21 +612,6 @@ class _DownloadScreen extends ConsumerWidget {
             _FailureText(failure!),
           ],
           const Spacer(),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ExcludeSemantics(
-                child: Icon(CupertinoIcons.lock, size: 16, color: muted),
-              ),
-              const SizedBox(width: GolemSpace.s2),
-              Expanded(
-                child: Text(
-                  context.l10n.privacyFootnote,
-                  style: GolemText.caption.copyWith(color: muted),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
       action: Column(
@@ -677,6 +662,25 @@ class _DownloadScreen extends ConsumerWidget {
               ),
               _ => const SizedBox(height: 44),
             },
+          // Below the buttons per the handoff, and outside the scroll view so
+          // the reassurance is never clipped mid-sentence by a tall action
+          // column shrinking the body viewport.
+          const SizedBox(height: GolemSpace.s3),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ExcludeSemantics(
+                child: Icon(CupertinoIcons.lock, size: 16, color: muted),
+              ),
+              const SizedBox(width: GolemSpace.s2),
+              Expanded(
+                child: Text(
+                  context.l10n.privacyFootnote,
+                  style: GolemText.caption.copyWith(color: muted),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
