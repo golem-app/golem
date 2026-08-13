@@ -15,9 +15,7 @@ import 'support/harness.dart';
 /// A repository whose download stream is driven by the test, so byte counts
 /// and phase transitions arrive exactly when the scripted clock says they do.
 final class _ScriptedModels implements ModelManagementRepository {
-  _ScriptedModels([this.initial = const ModelState(simulated: true)]);
-
-  final ModelState initial;
+  final ModelState initial = const ModelState(simulated: true);
   StreamController<ModelState>? _downloads;
 
   void emit(ModelState state) => _downloads!.add(state);

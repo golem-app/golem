@@ -79,6 +79,24 @@ abstract final class GolemTheme {
     color: Color(0xFFEEDCAA),
     darkColor: Color(0xFF4A3B18),
   );
+  // Caution surfaces share the reasoning card's amber tint by value, not by
+  // alias: a reasoning restyle must not silently recolor download advice.
+  static const cautionSurface = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFFFCF3DE),
+    darkColor: Color(0xFF2C2415),
+  );
+  static const cautionBorder = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFFEEDCAA),
+    darkColor: Color(0xFF4A3B18),
+  );
+
+  /// Caution iconography on [cautionSurface]: the brand amber reads ~1.9:1 on
+  /// the pale light tint, under the 3:1 non-text floor, so light mode darkens
+  /// it; dark mode keeps the brand amber. Same trade as [destructiveText].
+  static const cautionIcon = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFF8A5F00),
+    darkColor: Color(0xFFF6AA1B),
+  );
   static const userBubble = Color(0xFF152549);
   static const splash = Color(0xFF060D1F);
   static const amber = Color(0xFFF6AA1B);
