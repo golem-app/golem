@@ -49,6 +49,46 @@ class DownloadNoteDismissal extends _$DownloadNoteDismissal {
   }
 }
 
+/// The byte count each downloading artifact had when its current attempt
+/// began, frozen so the note's "about X instead of about Y" comparison keeps
+/// one pair of figures for the whole attempt instead of counting down under
+/// the reader. Re-recorded at the same boundary that resurrects a dismissed
+/// note; seeded from the current state so a surface opened mid-transfer
+/// still gets a stable figure.
+@Riverpod(keepAlive: true, retry: noRetry)
+class DownloadNoteFigures extends _$DownloadNoteFigures {
+  @override
+  Map<String, int> build() {
+    // listen, not watch: watching would rebuild this notifier per model tick
+    // and re-freeze the figures it exists to hold still.
+    ref.listen(
+      modelControllerProvider,
+      (previous, next) => _onModel(previous?.value, next.value),
+    );
+    final model = ref.read(modelControllerProvider).value;
+    return {
+      if (model != null)
+        for (final entry in model.artifacts.entries)
+          if (entry.value.phase == ArtifactPhase.downloading)
+            entry.key: entry.value.downloadedBytes,
+    };
+  }
+
+  void _onModel(ModelState? previous, ModelState? next) {
+    if (next == null) return;
+    const sameAttempt = {ArtifactPhase.downloading, ArtifactPhase.verifying};
+    final updates = <String, int>{
+      for (final entry in next.artifacts.entries)
+        if (entry.value.phase == ArtifactPhase.downloading &&
+            (!sameAttempt.contains(previous?.statusOf(entry.key).phase) ||
+                !state.containsKey(entry.key)))
+          entry.key: entry.value.downloadedBytes,
+    };
+    if (updates.isEmpty) return;
+    state = {...state, ...updates};
+  }
+}
+
 /// The one statement of the note's visibility rule: an artifact is actively
 /// downloading and its note has not been dismissed this attempt. Applies in
 /// simulated mode too — QA drives the fake backend, and the surfaces already

@@ -53,6 +53,7 @@ final _allProviders = <String, ProviderOrFamily>{
   'paceClock': paceClockProvider,
   'downloadPace': downloadPaceProvider,
   'downloadNoteDismissal': downloadNoteDismissalProvider,
+  'downloadNoteFigures': downloadNoteFiguresProvider,
   'downloadNoteVisible': downloadNoteVisibleProvider,
   'searchQuery': searchQueryProvider,
   'chatSearchResults': chatSearchResultsProvider,

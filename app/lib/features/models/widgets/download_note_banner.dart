@@ -8,7 +8,6 @@ import '../../../core/theme/golem_theme.dart';
 import '../../../l10n/bidi.dart';
 import '../../../l10n/l10n.dart';
 import '../application/download_note_providers.dart';
-import '../application/model_providers.dart';
 
 /// The foreground-speed note from the #36 evidence: while [entry] is actively
 /// downloading, tell the user that keeping Golem open keeps the transfer at
@@ -47,10 +46,10 @@ class DownloadNoteBanner extends ConsumerWidget {
       _ => (null, 0.0),
     };
     if (platform == null) return const SizedBox.shrink();
+    // Frozen at attempt start: the comparison keeps one pair of figures for
+    // the whole attempt instead of counting down under the reader.
     final downloaded = ref.watch(
-      modelControllerProvider.select(
-        (value) => value.value?.statusOf(entry.key).downloadedBytes ?? 0,
-      ),
+      downloadNoteFiguresProvider.select((figures) => figures[entry.key] ?? 0),
     );
     final remaining = entry.totalBytes <= downloaded
         ? 0

@@ -238,6 +238,33 @@ void main() {
       }
     });
 
+    test(
+      'note figures freeze at attempt start and refreeze on resume',
+      () async {
+        container.listen(downloadNoteFiguresProvider, (_, _) {});
+        await startDownload();
+        await tick(Duration.zero, _downloading(key, 5000000));
+        expect(container.read(downloadNoteFiguresProvider)[key], 5000000);
+
+        // Progress ticks and file-boundary verify flips leave the figure alone.
+        await tick(const Duration(seconds: 1), _downloading(key, 44000000));
+        await tick(
+          const Duration(seconds: 1),
+          _phase(key, ArtifactPhase.verifying, 44000000),
+        );
+        await tick(const Duration(seconds: 1), _downloading(key, 50000000));
+        expect(container.read(downloadNoteFiguresProvider)[key], 5000000);
+
+        // A pause ends the attempt; resuming freezes a fresh figure.
+        await tick(
+          const Duration(seconds: 1),
+          _phase(key, ArtifactPhase.paused, 60000000),
+        );
+        await tick(const Duration(seconds: 1), _downloading(key, 60000000));
+        expect(container.read(downloadNoteFiguresProvider)[key], 60000000);
+      },
+    );
+
     test('dismissals are independent per artifact key', () async {
       container.listen(downloadNoteVisibleProvider(key), (_, _) {});
       await startDownload();

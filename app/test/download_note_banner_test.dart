@@ -1,7 +1,9 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
+import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/models/widgets/download_note_banner.dart';
 
 import 'support/harness.dart';
@@ -48,6 +50,44 @@ void main() {
       expect(find.text('Keep Golem open for full speed.'), findsNothing);
     });
   }
+
+  testWidgets('the note copy holds still while bytes advance', (tester) async {
+    final container = buildContainer(
+      models: StaticModels(state(ArtifactPhase.downloading)),
+    );
+    addTearDown(container.dispose);
+    await container.read(modelControllerProvider.future);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: wrapApp(
+          brightness: Brightness.light,
+          child: Column(children: [DownloadNoteBanner(entry: entry)]),
+        ),
+      ),
+    );
+    await tester.pump();
+    final before = tester.widget<Text>(find.textContaining('MB/s')).data;
+
+    // A later progress tick must not rewrite the frozen comparison.
+    container.read(modelControllerProvider.notifier).state = AsyncData(
+      ModelState(
+        simulated: true,
+        artifacts: {
+          entry.key: ArtifactStatus(
+            phase: ArtifactPhase.downloading,
+            downloadedBytes: 2500000000,
+          ),
+        },
+      ),
+    );
+    await tester.pump();
+    expect(
+      tester.widget<Text>(find.textContaining('MB/s')).data,
+      before,
+      reason: 'the note figures are per attempt, not per tick',
+    );
+  });
 
   testWidgets('the note stands down when leaving would cost no extra time', (
     tester,

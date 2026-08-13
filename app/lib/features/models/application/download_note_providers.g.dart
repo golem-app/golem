@@ -95,6 +95,85 @@ abstract class _$DownloadNoteDismissal extends $Notifier<Set<String>> {
   }
 }
 
+/// The byte count each downloading artifact had when its current attempt
+/// began, frozen so the note's "about X instead of about Y" comparison keeps
+/// one pair of figures for the whole attempt instead of counting down under
+/// the reader. Re-recorded at the same boundary that resurrects a dismissed
+/// note; seeded from the current state so a surface opened mid-transfer
+/// still gets a stable figure.
+
+@ProviderFor(DownloadNoteFigures)
+final downloadNoteFiguresProvider = DownloadNoteFiguresProvider._();
+
+/// The byte count each downloading artifact had when its current attempt
+/// began, frozen so the note's "about X instead of about Y" comparison keeps
+/// one pair of figures for the whole attempt instead of counting down under
+/// the reader. Re-recorded at the same boundary that resurrects a dismissed
+/// note; seeded from the current state so a surface opened mid-transfer
+/// still gets a stable figure.
+final class DownloadNoteFiguresProvider
+    extends $NotifierProvider<DownloadNoteFigures, Map<String, int>> {
+  /// The byte count each downloading artifact had when its current attempt
+  /// began, frozen so the note's "about X instead of about Y" comparison keeps
+  /// one pair of figures for the whole attempt instead of counting down under
+  /// the reader. Re-recorded at the same boundary that resurrects a dismissed
+  /// note; seeded from the current state so a surface opened mid-transfer
+  /// still gets a stable figure.
+  DownloadNoteFiguresProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: noRetry,
+        name: r'downloadNoteFiguresProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$downloadNoteFiguresHash();
+
+  @$internal
+  @override
+  DownloadNoteFigures create() => DownloadNoteFigures();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Map<String, int> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Map<String, int>>(value),
+    );
+  }
+}
+
+String _$downloadNoteFiguresHash() =>
+    r'ab26b207f51260312d50e7c7cccb30fa40c5a15e';
+
+/// The byte count each downloading artifact had when its current attempt
+/// began, frozen so the note's "about X instead of about Y" comparison keeps
+/// one pair of figures for the whole attempt instead of counting down under
+/// the reader. Re-recorded at the same boundary that resurrects a dismissed
+/// note; seeded from the current state so a surface opened mid-transfer
+/// still gets a stable figure.
+
+abstract class _$DownloadNoteFigures extends $Notifier<Map<String, int>> {
+  Map<String, int> build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<Map<String, int>, Map<String, int>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<Map<String, int>, Map<String, int>>,
+              Map<String, int>,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
 /// The one statement of the note's visibility rule: an artifact is actively
 /// downloading and its note has not been dismissed this attempt. Applies in
 /// simulated mode too — QA drives the fake backend, and the surfaces already
