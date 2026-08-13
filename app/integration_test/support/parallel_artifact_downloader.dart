@@ -35,8 +35,36 @@ final class ParallelArtifactDownloader implements ArtifactFileDownloader {
   static const _group = 'golem-bench-parallel';
 
   /// Live parent tasks by destination, so pause/cancel/inspect act on the
-  /// exact task download() enqueued.
+  /// exact task download() enqueued — but only as a fast path. The platform
+  /// is the authority: a fresh instance must still be able to cancel or see
+  /// a task another instance enqueued, or teardown hygiene silently breaks.
   final Map<String, DownloadTask> _live = {};
+
+  /// Destinations whose pause was commanded through [pause], so an
+  /// uncommanded pause (network loss, Android's transfer-service timeout)
+  /// reports `userInitiated: false` per the seam contract — the repository
+  /// persists paused state only for uncommanded pauses.
+  final Set<String> _userPaused = {};
+
+  bool _matches(Task task, ArtifactFileRef ref) {
+    try {
+      final meta = jsonDecode(task.metaData) as Map<String, Object?>;
+      return meta['path'] == ref.destination && meta['url'] == ref.sourceUrl;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// The task the platform holds for [ref], regardless of which instance
+  /// enqueued it.
+  Future<Task?> _heldTask(ArtifactFileRef ref) async {
+    final local = _live[ref.destination];
+    if (local != null) return local;
+    for (final task in await FileDownloader().allTasks(group: _group)) {
+      if (_matches(task, ref)) return task;
+    }
+    return null;
+  }
 
   /// The production downloader owns the plugin singleton's construction:
   /// FileDownloader asserts if persistent storage arrives after the singleton
@@ -122,7 +150,11 @@ final class ParallelArtifactDownloader implements ArtifactFileDownloader {
               },
               onStatus: (status) {
                 if (status == TaskStatus.paused) {
-                  finish(const ArtifactFilePaused(userInitiated: true));
+                  finish(
+                    ArtifactFilePaused(
+                      userInitiated: _userPaused.remove(ref.destination),
+                    ),
+                  );
                 }
               },
             ),
@@ -134,7 +166,11 @@ final class ParallelArtifactDownloader implements ArtifactFileDownloader {
               case TaskStatus.canceled:
                 finish(const ArtifactFileCanceled());
               case TaskStatus.paused:
-                finish(const ArtifactFilePaused(userInitiated: true));
+                finish(
+                  ArtifactFilePaused(
+                    userInitiated: _userPaused.remove(ref.destination),
+                  ),
+                );
               default:
                 finish(
                   ArtifactFileFailed(
@@ -153,21 +189,28 @@ final class ParallelArtifactDownloader implements ArtifactFileDownloader {
 
   @override
   Future<bool> pause(ArtifactFileRef ref) async {
-    final task = _live[ref.destination];
-    if (task == null) return false;
-    return FileDownloader().pause(task);
+    await initialize();
+    final task = await _heldTask(ref);
+    if (task == null || task is! DownloadTask) return false;
+    _userPaused.add(ref.destination);
+    final paused = await FileDownloader().pause(task);
+    if (!paused) _userPaused.remove(ref.destination);
+    return paused;
   }
 
   @override
   Future<bool> cancel(ArtifactFileRef ref) async {
-    final task = _live.remove(ref.destination);
+    await initialize();
+    _live.remove(ref.destination);
+    final task = await _heldTask(ref);
     if (task == null) return true;
     return FileDownloader().cancelTaskWithId(task.taskId);
   }
 
   @override
   Future<ArtifactTransferSnapshot> inspect(ArtifactFileRef ref) async {
-    final task = _live[ref.destination];
+    await initialize();
+    final task = await _heldTask(ref);
     if (task == null) return const ArtifactTransferSnapshot();
     final record = await FileDownloader().database.recordForId(task.taskId);
     if (record == null || record.status.isFinalState) {

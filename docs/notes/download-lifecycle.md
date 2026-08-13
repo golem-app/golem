@@ -178,6 +178,14 @@ a shippable parallel transport is therefore a hybrid — ranged chunks for
 large hashed weights, a plain `DownloadTask` for everything else — which is
 what the prototype now does (32 MB floor).
 
+**Scope of that 3/3, stated precisely:** the instrument's sub-25 MB files all
+sit under the 32 MB chunk floor (necessarily — see the constraints above), so
+these runs prove the hybrid's plain-task path and its repository interplay.
+Chunked parents were exercised only by the bench's ≥32 MB weights windows
+(start, progress, cancel, and one verified completion); chunked-parent
+**lifecycle** behavior — pause, crash-recovery adoption, `inspect` of a live
+chunked transfer — remains unproven and is priced into #114.
+
 **The >9-minute auto-resume race (#37 review watch item) was attempted and
 is unreproduced, not disproven.** Two attempts on the OnePlus 12R: (1) a
 local throttling CONNECT proxy at ~2.2 MB/s via the global `http_proxy`

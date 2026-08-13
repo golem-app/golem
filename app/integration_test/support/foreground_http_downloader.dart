@@ -49,6 +49,14 @@ final class ForegroundHttpDownloader implements ArtifactFileDownloader {
     _live[ref.destination] = transfer;
     final controller = StreamController<ArtifactFileEvent>();
 
+    // An abort must still end the stream with a terminal event — a consumer
+    // awaiting one would otherwise hang on every cancel.
+    void emitAborted() => controller.add(
+      transfer.abortKind == _AbortKind.pause
+          ? ArtifactFilePaused(resumable: connections == 1)
+          : const ArtifactFileCanceled(),
+    );
+
     Future<void> run() async {
       final part = File(_partPath(ref));
       await part.parent.create(recursive: true);
@@ -58,7 +66,10 @@ final class ForegroundHttpDownloader implements ArtifactFileDownloader {
         } else {
           await _ranged(ref, part, transfer, controller);
         }
-        if (transfer.aborted) return;
+        if (transfer.aborted) {
+          emitAborted();
+          return;
+        }
         final length = await part.length();
         if (length != ref.expectedBytes) {
           controller.add(
@@ -71,7 +82,9 @@ final class ForegroundHttpDownloader implements ArtifactFileDownloader {
         await part.rename(_destinationPath(ref));
         controller.add(const ArtifactFileComplete());
       } catch (e) {
-        if (!transfer.aborted) {
+        if (transfer.aborted) {
+          emitAborted();
+        } else {
           controller.add(ArtifactFileFailed('$e'));
         }
       }
@@ -80,6 +93,10 @@ final class ForegroundHttpDownloader implements ArtifactFileDownloader {
     unawaited(
       run().whenComplete(() {
         _live.remove(ref.destination);
+        // Also on the success path — abort() force-closes, but a completed
+        // transfer would otherwise leak the client and its keep-alive
+        // sockets for the rest of the process.
+        transfer.client.close(force: true);
         controller.close();
       }),
     );
@@ -175,13 +192,13 @@ final class ForegroundHttpDownloader implements ArtifactFileDownloader {
   Future<bool> pause(ArtifactFileRef ref) async {
     final transfer = _live[ref.destination];
     if (transfer == null) return false;
-    transfer.abort();
+    transfer.abort(_AbortKind.pause);
     return connections == 1;
   }
 
   @override
   Future<bool> cancel(ArtifactFileRef ref) async {
-    _live[ref.destination]?.abort();
+    _live[ref.destination]?.abort(_AbortKind.cancel);
     final part = File(_partPath(ref));
     if (await part.exists()) await part.delete();
     return true;
@@ -207,12 +224,16 @@ final class ForegroundHttpDownloader implements ArtifactFileDownloader {
   }
 }
 
+enum _AbortKind { cancel, pause }
+
 final class _Transfer {
   final HttpClient client = HttpClient();
   bool aborted = false;
+  _AbortKind abortKind = _AbortKind.cancel;
   DateTime _lastEmit = DateTime.fromMillisecondsSinceEpoch(0);
 
-  void abort() {
+  void abort(_AbortKind kind) {
+    abortKind = kind;
     aborted = true;
     client.close(force: true);
   }

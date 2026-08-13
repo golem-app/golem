@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:background_downloader/background_downloader.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -74,7 +76,27 @@ void main() {
       late String documentsPath;
       late ArtifactFileRef ref;
       late String? expectedSha;
+      var ready = false;
       final transports = _transportSpec.split(',');
+
+      /// The `current` transport enqueues into the production `golem-models`
+      /// group, and a killed harness leaves that native transfer alive with
+      /// no catalog entry to reconcile it — so every run starts and ends by
+      /// cancelling any bench-keyed task the platform still holds.
+      Future<void> sweepStrayBenchTasks() async {
+        final production = BackgroundArtifactDownloader();
+        await production.initialize();
+        for (final task in await FileDownloader().allTasks(
+          group: 'golem-models',
+        )) {
+          try {
+            final meta = jsonDecode(task.metaData) as Map<String, Object?>;
+            if ((meta['path'] as String? ?? '').startsWith('bench-')) {
+              await FileDownloader().cancelTaskWithId(task.taskId);
+            }
+          } catch (_) {}
+        }
+      }
 
       ArtifactFileDownloader buildTransport(String name) {
         if (name == 'current') return BackgroundArtifactDownloader();
@@ -93,9 +115,16 @@ void main() {
       }
 
       setUpAll(() async {
-        final entry = modelCatalog.firstWhere(
-          (each) => each.key == _artifactKey,
-        );
+        final matches = modelCatalog
+            .where((each) => each.key == _artifactKey)
+            .toList();
+        if (matches.isEmpty) {
+          fail(
+            'GOLEM_BENCH_ARTIFACT "$_artifactKey" is not a catalog key. '
+            'Known keys: ${modelCatalog.map((each) => each.key).join(', ')}',
+          );
+        }
+        final entry = matches.single;
         // The weights file: the largest one is the only one worth timing.
         final spec = entry.files.reduce((a, b) => a.bytes >= b.bytes ? a : b);
         expectedSha = spec.sha256;
@@ -107,11 +136,17 @@ void main() {
           filename: spec.path.split('/').last,
           expectedBytes: spec.bytes,
         );
+        ready = true;
+        await sweepStrayBenchTasks();
         AcceptanceHud.takeOver();
       });
 
       tearDownAll(() async {
+        // A failed setUpAll leaves the late fields unset; crashing here with
+        // a LateInitializationError would bury the real failure.
+        if (!ready) return;
         // Never leaves partials or weights behind, whatever passed or failed.
+        await sweepStrayBenchTasks();
         for (final name in transports) {
           await buildTransport(name)
               .cancel(ref)
@@ -195,7 +230,7 @@ void main() {
         final line = meter.line(
           transport: name,
           round: round,
-          windowSeconds: backgrounded ? _windowSeconds * 5 : _windowSeconds,
+          capSeconds: backgrounded ? _windowSeconds * 5 : _windowSeconds,
           mode: backgrounded ? 'background-avg' : 'foreground',
           extra: backgrounded
               ? 'gap_mbs=${meter.largestGapMbs.toStringAsFixed(2)}'
@@ -259,6 +294,11 @@ void main() {
           final transport = buildTransport(_complete);
           await transport.initialize();
           await transport.cancel(ref);
+          // A destination completed by an earlier window would make the
+          // production transport resolve alreadyComplete and "verify" a
+          // download of zero bytes.
+          final leftover = File('$documentsPath/${ref.destination}');
+          if (await leftover.exists()) await leftover.delete();
           final meter = RateMeter()..start();
           await for (final event in transport.download(ref)) {
             switch (event) {
@@ -278,7 +318,7 @@ void main() {
           final line = meter.line(
             transport: _complete,
             round: 0,
-            windowSeconds: meter.elapsed.inSeconds,
+            capSeconds: 0,
             mode: 'complete',
           );
           debugPrint(line);

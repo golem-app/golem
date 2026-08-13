@@ -65,18 +65,25 @@ final class RateMeter {
     return rate;
   }
 
+  /// `window_s` is the measured span (last sample's clock), never the
+  /// nominal cap — rates in this line divide by it, and a reader must be
+  /// able to recompute them. The cap goes into [capSeconds] as `cap_s`; a
+  /// backgrounded window can legitimately overrun it (suspension freezes
+  /// the timers, and the flush grace extends the span).
   String line({
     required String transport,
     required int round,
-    required int windowSeconds,
+    required int capSeconds,
     String mode = 'foreground',
     String extra = '',
-  }) =>
-      'DOWNLOAD_BENCH transport=$transport round=$round mode=$mode '
-      'window_s=$windowSeconds bytes=$lastBytes '
-      'rate_mbs=${averageMbs.toStringAsFixed(2)} '
-      'steady_mbs=${steadyMbs.toStringAsFixed(2)}'
-      '${extra.isEmpty ? '' : ' $extra'}';
+  }) {
+    final span = _samples.isEmpty ? elapsed : _samples.last.$1;
+    return 'DOWNLOAD_BENCH transport=$transport round=$round mode=$mode '
+        'window_s=${span.inSeconds} cap_s=$capSeconds bytes=$lastBytes '
+        'rate_mbs=${averageMbs.toStringAsFixed(2)} '
+        'steady_mbs=${steadyMbs.toStringAsFixed(2)}'
+        '${extra.isEmpty ? '' : ' $extra'}';
+  }
 
   String hudDetail(String transport, int round, int rounds) =>
       '${steadyMbs.toStringAsFixed(1)} MB/s · $transport · '

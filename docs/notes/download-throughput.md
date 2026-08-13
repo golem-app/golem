@@ -30,7 +30,7 @@ stream (`DOWNLOAD_BENCH` lines from `app/integration_test/download_bench_test.da
 | iPhone 17 in-app `current`, foreground | 44.4 (steady 54.1) | **~44** |
 | iPhone 17 in-app `parallel4`, foreground | 36.6 (steady 43.3) | ~37 |
 | iPhone 17 in-app `http1` (curl stand-in), foreground | 41.6 | ~42 |
-| iPhone 17 in-app `current`, **backgrounded** | 1.05 GB over 225 s suspension | **~3.8** |
+| iPhone 17 in-app `current`, **backgrounded** | 1.05 GB over a ~270 s span (225 s cap + suspension overrun + flush) | **~3.8** |
 
 In-app Android `http1`/`http4` (in-process dart:io) measured 4–6 MB/s under
 the debug-JIT test harness — recorded as **not comparable** rather than as a
@@ -97,7 +97,10 @@ What to ship instead, as the follow-up ticket:
    their own `inspect`/adoption arithmetic, and the plugin's reserved `chunk`
    group must stay clear of `golem-models`. The spike's
    `ParallelArtifactDownloader` (test support) passes all three lifecycle
-   proofs on both phones in this hybrid shape.
+   proofs on both phones in this hybrid shape — via its plain-task path,
+   since the lifecycle files sit under the chunk floor; chunked-parent
+   lifecycle behavior is exercised only by the bench windows and remains an
+   open cost (see `download-lifecycle.md`).
 
 The winner being the incumbent, the hand-driven lifecycle evidence from the
 2026-08-10 round (backgrounding, lock, SIGKILL, force-stop, connection loss,
