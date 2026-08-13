@@ -577,6 +577,81 @@ class AppLocalizationsHi extends AppLocalizations {
   }
 
   @override
+  String get downloadNoteTitle => 'पूरी गति के लिए Golem को खुला रखें।';
+
+  @override
+  String downloadNoteBody(
+    String platform,
+    String rate,
+    String backgroundDuration,
+    String foregroundDuration,
+  ) {
+    return 'बाहर जाना ठीक है — $platform बैकग्राउंड डाउनलोड को लगभग $rate तक धीमा कर देता है, इसलिए इसमें $foregroundDuration की जगह $backgroundDuration लगेंगे।';
+  }
+
+  @override
+  String aboutMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'लगभग $count मिनट',
+      one: 'लगभग 1 मिनट',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String etaAboutMinutesLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'लगभग $count मिनट बाकी',
+      one: 'लगभग 1 मिनट बाकी',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String amountLeft(String amount) {
+    return '$amount बाकी';
+  }
+
+  @override
+  String stoppedAtPercent(int percent) {
+    return '$percent% पर रुका';
+  }
+
+  @override
+  String rateMbs(String rate) {
+    return '$rate MB/s';
+  }
+
+  @override
+  String get paused => 'रोका गया';
+
+  @override
+  String get gettingGolemReady => 'Golem तैयार हो रहा है';
+
+  @override
+  String get oneDownloadPitch =>
+      'अभी एक डाउनलोड, फिर Golem पूरी तरह इसी डिवाइस पर जवाब देगा।';
+
+  @override
+  String downloadedAmount(String amount) {
+    return 'डाउनलोड हो गया · $amount';
+  }
+
+  @override
+  String get privacyFootnote =>
+      'मॉडल इसी डिवाइस पर रहता है। आप जो लिखते हैं वह कहीं अपलोड नहीं होता।';
+
+  @override
+  String get dismissNote => 'बंद करें';
+
+  @override
+  String get discardDownload => 'हटाएँ';
+
+  @override
   String get chatsStayAvailable => 'चैट उपलब्ध रहती हैं।';
 
   @override

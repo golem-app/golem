@@ -575,6 +575,81 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
+  String get downloadNoteTitle => 'Tam hız için Golem’i açık tutun.';
+
+  @override
+  String downloadNoteBody(
+    String platform,
+    String rate,
+    String backgroundDuration,
+    String foregroundDuration,
+  ) {
+    return 'Çıkmak sorun değil — $platform arka plan indirmelerini yaklaşık $rate hızına düşürür; bu durumda işlem $foregroundDuration yerine $backgroundDuration sürer.';
+  }
+
+  @override
+  String aboutMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'yaklaşık $count dakika',
+      one: 'yaklaşık 1 dakika',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String etaAboutMinutesLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Yaklaşık $count dakika kaldı',
+      one: 'Yaklaşık 1 dakika kaldı',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String amountLeft(String amount) {
+    return '$amount kaldı';
+  }
+
+  @override
+  String stoppedAtPercent(int percent) {
+    return '%$percent seviyesinde durdu';
+  }
+
+  @override
+  String rateMbs(String rate) {
+    return '$rate MB/s';
+  }
+
+  @override
+  String get paused => 'Duraklatıldı';
+
+  @override
+  String get gettingGolemReady => 'Golem hazırlanıyor';
+
+  @override
+  String get oneDownloadPitch =>
+      'Şimdi tek bir indirme, ardından Golem tamamen bu cihazda yanıt verir.';
+
+  @override
+  String downloadedAmount(String amount) {
+    return 'İndirildi · $amount';
+  }
+
+  @override
+  String get privacyFootnote =>
+      'Model bu cihazda saklanır. Yazdıklarınız hiçbir yere yüklenmez.';
+
+  @override
+  String get dismissNote => 'Kapat';
+
+  @override
+  String get discardDownload => 'Sil';
+
+  @override
   String get chatsStayAvailable => 'Sohbetler kullanılabilir kalır.';
 
   @override

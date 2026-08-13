@@ -562,6 +562,77 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get downloadNoteTitle => 'Golem を開いたままにすると全速でダウンロードできます。';
+
+  @override
+  String downloadNoteBody(
+    String platform,
+    String rate,
+    String backgroundDuration,
+    String foregroundDuration,
+  ) {
+    return '離れてもかまいません。$platform はバックグラウンドのダウンロードを約 $rate まで下げるため、所要時間は$foregroundDurationではなく$backgroundDurationになります。';
+  }
+
+  @override
+  String aboutMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '約$count分',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String etaAboutMinutesLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '残り約$count分',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String amountLeft(String amount) {
+    return '残り $amount';
+  }
+
+  @override
+  String stoppedAtPercent(int percent) {
+    return '$percent% で停止しました';
+  }
+
+  @override
+  String rateMbs(String rate) {
+    return '$rate MB/s';
+  }
+
+  @override
+  String get paused => '一時停止中';
+
+  @override
+  String get gettingGolemReady => 'Golem を準備しています';
+
+  @override
+  String get oneDownloadPitch => '今回のダウンロードが済めば、Golem はこの端末上だけで応答します。';
+
+  @override
+  String downloadedAmount(String amount) {
+    return 'ダウンロード済み · $amount';
+  }
+
+  @override
+  String get privacyFootnote => 'モデルはこの端末に保存されます。入力した内容が送信されることはありません。';
+
+  @override
+  String get dismissNote => '閉じる';
+
+  @override
+  String get discardDownload => '破棄';
+
+  @override
   String get chatsStayAvailable => 'チャットは引き続き利用できます。';
 
   @override

@@ -578,6 +578,82 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get downloadNoteTitle =>
+      'Mantén Golem abierto para la velocidad máxima.';
+
+  @override
+  String downloadNoteBody(
+    String platform,
+    String rate,
+    String backgroundDuration,
+    String foregroundDuration,
+  ) {
+    return 'Puedes salir — $platform reduce las descargas en segundo plano a unos $rate, así que tardaría $backgroundDuration en lugar de $foregroundDuration.';
+  }
+
+  @override
+  String aboutMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'alrededor de $count minutos',
+      one: 'alrededor de 1 minuto',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String etaAboutMinutesLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Quedan alrededor de $count minutos',
+      one: 'Queda alrededor de 1 minuto',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String amountLeft(String amount) {
+    return 'Quedan $amount';
+  }
+
+  @override
+  String stoppedAtPercent(int percent) {
+    return 'Detenida en $percent%';
+  }
+
+  @override
+  String rateMbs(String rate) {
+    return '$rate MB/s';
+  }
+
+  @override
+  String get paused => 'En pausa';
+
+  @override
+  String get gettingGolemReady => 'Preparando Golem';
+
+  @override
+  String get oneDownloadPitch =>
+      'Una descarga ahora y Golem responderá por completo en este dispositivo.';
+
+  @override
+  String downloadedAmount(String amount) {
+    return 'Descargado · $amount';
+  }
+
+  @override
+  String get privacyFootnote =>
+      'El modelo se guarda en este dispositivo. Nada de lo que escribes se sube.';
+
+  @override
+  String get dismissNote => 'Cerrar';
+
+  @override
+  String get discardDownload => 'Descartar';
+
+  @override
   String get chatsStayAvailable => 'Los chats siguen disponibles.';
 
   @override

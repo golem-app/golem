@@ -576,6 +576,79 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String get downloadNoteTitle => 'Giữ Golem mở để tải với tốc độ tối đa.';
+
+  @override
+  String downloadNoteBody(
+    String platform,
+    String rate,
+    String backgroundDuration,
+    String foregroundDuration,
+  ) {
+    return 'Rời đi cũng không sao — $platform giảm tốc độ tải xuống trong nền còn khoảng $rate, nên sẽ mất $backgroundDuration thay vì $foregroundDuration.';
+  }
+
+  @override
+  String aboutMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'khoảng $count phút',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String etaAboutMinutesLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Còn khoảng $count phút',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String amountLeft(String amount) {
+    return 'Còn lại $amount';
+  }
+
+  @override
+  String stoppedAtPercent(int percent) {
+    return 'Đã dừng ở $percent%';
+  }
+
+  @override
+  String rateMbs(String rate) {
+    return '$rate MB/s';
+  }
+
+  @override
+  String get paused => 'Đã tạm dừng';
+
+  @override
+  String get gettingGolemReady => 'Đang chuẩn bị Golem';
+
+  @override
+  String get oneDownloadPitch =>
+      'Tải xuống một lần, sau đó Golem trả lời hoàn toàn trên thiết bị này.';
+
+  @override
+  String downloadedAmount(String amount) {
+    return 'Đã tải xuống · $amount';
+  }
+
+  @override
+  String get privacyFootnote =>
+      'Mô hình được lưu trên thiết bị này. Những gì bạn nhập không được tải lên.';
+
+  @override
+  String get dismissNote => 'Đóng';
+
+  @override
+  String get discardDownload => 'Bỏ';
+
+  @override
   String get chatsStayAvailable => 'Các cuộc trò chuyện vẫn khả dụng.';
 
   @override

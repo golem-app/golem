@@ -577,6 +577,86 @@ class AppLocalizationsPl extends AppLocalizations {
   }
 
   @override
+  String get downloadNoteTitle =>
+      'Przy otwartym Golemie pobieranie jest najszybsze.';
+
+  @override
+  String downloadNoteBody(
+    String platform,
+    String rate,
+    String backgroundDuration,
+    String foregroundDuration,
+  ) {
+    return 'Można wyjść — $platform zwalnia pobieranie w tle do około $rate, więc zajęłoby to $backgroundDuration zamiast $foregroundDuration.';
+  }
+
+  @override
+  String aboutMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'około $count minuty',
+      many: 'około $count minut',
+      few: 'około $count minut',
+      one: 'około 1 minuty',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String etaAboutMinutesLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Jeszcze około $count minuty',
+      many: 'Jeszcze około $count minut',
+      few: 'Jeszcze około $count minut',
+      one: 'Jeszcze około 1 minuty',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String amountLeft(String amount) {
+    return 'Pozostało $amount';
+  }
+
+  @override
+  String stoppedAtPercent(int percent) {
+    return 'Zatrzymano na $percent%';
+  }
+
+  @override
+  String rateMbs(String rate) {
+    return '$rate MB/s';
+  }
+
+  @override
+  String get paused => 'Wstrzymano';
+
+  @override
+  String get gettingGolemReady => 'Przygotowywanie Golema';
+
+  @override
+  String get oneDownloadPitch =>
+      'Jedno pobranie teraz, potem Golem odpowiada w całości na tym urządzeniu.';
+
+  @override
+  String downloadedAmount(String amount) {
+    return 'Pobrano · $amount';
+  }
+
+  @override
+  String get privacyFootnote =>
+      'Model jest przechowywany na tym urządzeniu. Nic, co wpisujesz, nie jest wysyłane.';
+
+  @override
+  String get dismissNote => 'Zamknij';
+
+  @override
+  String get discardDownload => 'Odrzuć';
+
+  @override
   String get chatsStayAvailable => 'Czaty pozostają dostępne.';
 
   @override
