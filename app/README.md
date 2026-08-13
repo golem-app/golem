@@ -655,6 +655,32 @@ os_log-privacy-redacted in an `ios syslog` capture, so read `GOLEM_CELL` and
 `INFERNO_METRICS` from the test harness console instead. Results live in
 `../docs/real-model-matrix.md`.
 
+## Download throughput bench
+
+`integration_test/download_bench_test.dart` measures sustained download
+throughput through the `ArtifactFileDownloader` seam — the production plugin
+transport (`current`), a `ParallelDownloadTask` prototype (`parallelN`), and
+an in-process `dart:io` transport (`httpN`, the curl stand-in on iOS) — in
+interleaved time-capped windows against one pinned artifact:
+
+```sh
+flutter test integration_test/download_bench_test.dart -d <device> \
+  --flavor qa --no-uninstall --dart-define=GOLEM_DOWNLOAD_BENCH=true
+```
+
+Optional defines: `GOLEM_BENCH_ARTIFACT` (default `qwen35-2b-gguf`),
+`GOLEM_BENCH_WINDOW_S` (45), `GOLEM_BENCH_ROUNDS` (3),
+`GOLEM_BENCH_TRANSPORTS` (`current,parallel4,http1,http4`),
+`GOLEM_BENCH_COMPLETE=<transport>` (one full download, verified against the
+pinned size and SHA-256), `GOLEM_BENCH_BACKGROUND=true` (device only; the HUD
+asks for the app to be backgrounded and the run reports the average across the
+suspension gap). Results are `DOWNLOAD_BENCH` key=value lines on the harness
+console; bytes land in a throwaway `bench-<key>` directory that teardown
+deletes. The host-side baselines (`curl`, `wget`, URLSession) live in
+`../tool/bench_host_download.dart` and `../tool/urlsession_bench.swift`;
+recorded results in `../docs/notes/download-throughput.md`. CI never sets the
+defines, so the instrument self-skips there and downloads nothing.
+
 ## Model evaluation harness (macOS)
 
 `integration_test/model_eval_test.dart` turns model and quantization

@@ -44,6 +44,12 @@ To exercise the stall probe, drop the network by hand while it runs; the
 instrument's `stallTimeout` is shortened to 45 s so a run does not sit for the
 production five minutes.
 
+`--dart-define=GOLEM_LIFECYCLE_TRANSPORT=parallel` (#36) swaps the production
+downloader for the spike's hybrid `ParallelDownloadTask` prototype
+(`integration_test/support/parallel_artifact_downloader.dart`), so the same
+three proofs price a candidate transport through the real repository. A
+failure under `parallel` is a spike finding, not a regression.
+
 ## Runbook — Android (OnePlus 12R)
 
 Install a standalone build; `flutter install` must never be used, because it
@@ -151,6 +157,41 @@ progress bar that jumps backwards reads as lost work. Resume data records where
 a *resumed* transfer would restart and is frozen at the last pause; the tracking
 record follows a live one. The snapshot now takes the larger of the two, which
 is what the 165 → 212 MB result above verifies.
+
+### #36 round 2 additions (2026-08-13)
+
+The instrument was re-run with `GOLEM_LIFECYCLE_TRANSPORT=parallel` — the
+hybrid ParallelDownloadTask prototype — through the unchanged
+`RealModelManagementRepository`:
+
+| Host | Result |
+| --- | --- |
+| OnePlus 12R | 3/3 |
+| iPhone 17 | 3/3 |
+
+Getting there surfaced two hard constraints, proven on-device, that bound any
+real parallel implementation: Hugging Face serves small non-LFS repo files
+with **no Content-Length** ("cannot chunk download" at enqueue) and, once the
+length is supplied via `Known-Content-Length`, with **no Range support**
+("Server does not accept ranges"). Only LFS/CAS-backed files can be chunked;
+a shippable parallel transport is therefore a hybrid — ranged chunks for
+large hashed weights, a plain `DownloadTask` for everything else — which is
+what the prototype now does (32 MB floor).
+
+**The >9-minute auto-resume race (#37 review watch item) was attempted and
+is unreproduced, not disproven.** Two attempts on the OnePlus 12R: (1) a
+local throttling CONNECT proxy at ~2.2 MB/s via the global `http_proxy`
+setting — the CDN killed the artificially slow tunnel at ~4 minutes and the
+plugin's retry fell back to a direct connection, finishing the 2.54 GB file
+at 7.2 minutes, under the limit; (2) a forced job timeout via
+`cmd jobscheduler stop -s 3` — this OxygenOS build answers "No matching
+executing jobs found" even against the visibly active WorkManager slot. The
+code-path analysis stands (`uncommandedPauseGrace` can finalize Paused while
+the plugin's own auto-resume is live, and `_restart` covers only the
+`taskCanResume == false` arm), and the practical mitigation is that any
+transfer finishing inside 9 minutes never enters the window — which at
+measured foreground rates is every pinned artifact. A genuinely slow network
+(weak cellular) remains the honest repro environment.
 
 ### Not produced
 
