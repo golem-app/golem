@@ -12,6 +12,8 @@ import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/chat/application/search_providers.dart';
+import 'package:golem_flutter/features/models/application/download_note_providers.dart';
+import 'package:golem_flutter/features/models/application/download_pace_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/onboarding/application/onboarding_controller.dart';
 import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
@@ -48,6 +50,10 @@ final _allProviders = <String, ProviderOrFamily>{
   'loadableModelKeys': loadableModelKeysProvider,
   'startupModelKey': startupModelKeyProvider,
   'downloadableModelKeys': downloadableModelKeysProvider,
+  'paceClock': paceClockProvider,
+  'downloadPace': downloadPaceProvider,
+  'downloadNoteDismissal': downloadNoteDismissalProvider,
+  'downloadNoteVisible': downloadNoteVisibleProvider,
   'searchQuery': searchQueryProvider,
   'chatSearchResults': chatSearchResultsProvider,
   'settingsController': settingsControllerProvider,
