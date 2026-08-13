@@ -525,12 +525,6 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get downloadPaused => 'Download pausado';
-
-  @override
-  String get downloadNeedsAttention => 'O download requer atenção';
-
-  @override
   String modelDownloading(String modelName) {
     return 'Baixando $modelName';
   }
@@ -2455,12 +2449,6 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String modelVerifying(String modelName) {
     return 'Verificando $modelName';
   }
-
-  @override
-  String get downloadPaused => 'Download pausado';
-
-  @override
-  String get downloadNeedsAttention => 'O download requer atenção';
 
   @override
   String modelDownloading(String modelName) {

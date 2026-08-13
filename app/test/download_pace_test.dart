@@ -33,11 +33,22 @@ void main() {
       expect(pace.mbPerSecond, closeTo(44.0, 0.001));
     });
 
-    test('keeps two samples even when both have aged out', () {
+    test('a gap longer than the window starts a fresh attempt', () {
+      // Averaging across a stall would quote the stall, not the transfer:
+      // 10 MB over a 10 s silence is not a 1 MB/s link.
       final pace = DownloadPaceEstimator(window: const Duration(seconds: 4))
         ..add(Duration.zero, 0)
         ..add(const Duration(seconds: 10), 10000000);
-      expect(pace.mbPerSecond, closeTo(1.0, 0.001));
+      expect(pace.mbPerSecond, isNull, reason: 'post-stall window is fresh');
+      pace.add(const Duration(seconds: 11), 54000000);
+      expect(pace.mbPerSecond, closeTo(44.0, 0.001));
+    });
+
+    test('a clock step backwards starts a fresh attempt', () {
+      final pace = DownloadPaceEstimator()
+        ..add(const Duration(seconds: 10), 44000000)
+        ..add(const Duration(seconds: 2), 50000000);
+      expect(pace.mbPerSecond, isNull);
     });
 
     test('a byte regression starts a fresh attempt', () {
@@ -91,6 +102,15 @@ void main() {
     test('exact minute boundaries do not round up an extra minute', () {
       // 44 MB/s for exactly 2 minutes: 5,280,000,000 bytes.
       expect(aboutMinutes(downloadForegroundMbs, 5280000000), 2);
+    });
+  });
+
+  group('aboutMinutesLeft', () {
+    test('shares the round-up-floor-one rule with aboutMinutes', () {
+      expect(aboutMinutesLeft(const Duration(seconds: 54)), 1);
+      expect(aboutMinutesLeft(const Duration(seconds: 61)), 2);
+      expect(aboutMinutesLeft(const Duration(minutes: 2)), 2);
+      expect(aboutMinutesLeft(Duration.zero), 1);
     });
   });
 

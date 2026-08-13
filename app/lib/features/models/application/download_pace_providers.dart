@@ -68,9 +68,19 @@ class DownloadPace extends _$DownloadPace {
         .where((entry) => entry.value.phase == ArtifactPhase.downloading)
         .firstOrNull;
     if (downloading == null) {
-      _artifactKey = null;
-      _origin = null;
-      _estimator.reset();
+      // A multi-file artifact verifies each finished file before the next
+      // one starts transferring. Hold the window through those flips — no
+      // surface renders the chip while verifying, and resetting here would
+      // blank and re-warm the readout at every file boundary. Any other
+      // phase ends the attempt.
+      final verifying =
+          _artifactKey != null &&
+          model?.statusOf(_artifactKey!).phase == ArtifactPhase.verifying;
+      if (!verifying) {
+        _artifactKey = null;
+        _origin = null;
+        _estimator.reset();
+      }
       state = null;
       return;
     }

@@ -154,8 +154,6 @@
   "resumeDownload": "Reanudar descarga",
   "modelReady": "{modelName} está listo",
   "modelVerifying": "Verificando {modelName}",
-  "downloadPaused": "Descarga pausada",
-  "downloadNeedsAttention": "La descarga requiere atención",
   "modelDownloading": "Descargando {modelName}",
   "selectedCatalogUnavailable": "La entrada seleccionada del catálogo no está disponible.",
   "downloadFailed": "La descarga falló. Puedes intentarlo de nuevo.",

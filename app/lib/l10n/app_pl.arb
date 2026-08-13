@@ -154,8 +154,6 @@
   "resumeDownload": "Wznów pobieranie",
   "modelReady": "Model {modelName} jest gotowy",
   "modelVerifying": "Weryfikowanie modelu {modelName}",
-  "downloadPaused": "Pobieranie wstrzymane",
-  "downloadNeedsAttention": "Pobieranie wymaga uwagi",
   "modelDownloading": "Pobieranie modelu {modelName}",
   "selectedCatalogUnavailable": "Wybrana pozycja katalogu jest niedostępna.",
   "downloadFailed": "Pobieranie nie powiodło się. Można spróbować ponownie.",

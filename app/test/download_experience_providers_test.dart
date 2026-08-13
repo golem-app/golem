@@ -139,6 +139,26 @@ void main() {
       },
     );
 
+    test('per-file verifying flips do not restart the warm-up', () async {
+      container.listen(downloadPaceProvider, (_, _) {});
+      await startDownload();
+      await tick(Duration.zero, _downloading(key, 0));
+      await tick(const Duration(seconds: 1), _downloading(key, 44000000));
+      expect(container.read(downloadPaceProvider), isNotNull);
+      // A finished file verifies, then the next file starts transferring.
+      await tick(
+        const Duration(seconds: 1),
+        _phase(key, ArtifactPhase.verifying, 44000000),
+      );
+      expect(container.read(downloadPaceProvider), isNull);
+      await tick(const Duration(seconds: 1), _downloading(key, 88000000));
+      expect(
+        container.read(downloadPaceProvider),
+        isNotNull,
+        reason: 'the window survives the file boundary',
+      );
+    });
+
     test('verification and completion clear the snapshot', () async {
       container.listen(downloadPaceProvider, (_, _) {});
       await startDownload();
@@ -191,6 +211,31 @@ void main() {
       // Resume re-enters downloading: the trade-off is live again.
       await tick(const Duration(seconds: 5), _downloading(key, 44000000));
       expect(container.read(downloadNoteVisibleProvider(key)), isTrue);
+    });
+
+    test('a dismissal survives per-file verifying flips', () async {
+      container.listen(downloadNoteVisibleProvider(key), (_, _) {});
+      await startDownload();
+      await tick(Duration.zero, _downloading(key, 0));
+      container.read(downloadNoteDismissalProvider.notifier).dismiss(key);
+
+      // Multi-file artifact: each finished file verifies before the next
+      // file re-enters downloading. Same attempt — the note stays away.
+      for (var i = 1; i <= 3; i++) {
+        await tick(
+          const Duration(seconds: 1),
+          _phase(key, ArtifactPhase.verifying, 44000000 * i),
+        );
+        await tick(
+          const Duration(seconds: 1),
+          _downloading(key, 44000000 * (i + 1)),
+        );
+        expect(
+          container.read(downloadNoteVisibleProvider(key)),
+          isFalse,
+          reason: 'file boundary $i is not a new attempt',
+        );
+      }
     });
 
     test('dismissals are independent per artifact key', () async {

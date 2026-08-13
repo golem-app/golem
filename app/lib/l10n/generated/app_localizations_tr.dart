@@ -518,12 +518,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get downloadPaused => 'İndirme duraklatıldı';
-
-  @override
-  String get downloadNeedsAttention => 'İndirmeyle ilgilenmeniz gerekiyor';
-
-  @override
   String modelDownloading(String modelName) {
     return '$modelName indiriliyor';
   }

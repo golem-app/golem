@@ -1043,18 +1043,6 @@ abstract class AppLocalizations {
   /// **'Verifying {modelName}'**
   String modelVerifying(String modelName);
 
-  /// Paused download heading.
-  ///
-  /// In en, this message translates to:
-  /// **'Download paused'**
-  String get downloadPaused;
-
-  /// Failed download heading.
-  ///
-  /// In en, this message translates to:
-  /// **'Download needs attention'**
-  String get downloadNeedsAttention;
-
   /// Model download heading.
   ///
   /// In en, this message translates to:

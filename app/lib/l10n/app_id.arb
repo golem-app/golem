@@ -154,8 +154,6 @@
   "resumeDownload": "Lanjutkan unduhan",
   "modelReady": "{modelName} siap",
   "modelVerifying": "Memverifikasi {modelName}",
-  "downloadPaused": "Unduhan dijeda",
-  "downloadNeedsAttention": "Unduhan perlu diperiksa",
   "modelDownloading": "Mengunduh {modelName}",
   "selectedCatalogUnavailable": "Entri katalog yang dipilih tidak tersedia.",
   "downloadFailed": "Unduhan gagal. Anda dapat mencobanya lagi.",

@@ -38,6 +38,13 @@ int aboutMinutes(double mbs, int remainingBytes) {
   return rounded < 1 ? 1 : rounded;
 }
 
+/// The same round-up-floor-one rule for an already-computed [eta], so every
+/// surface quoting an ETA shares one minutes policy.
+int aboutMinutesLeft(Duration eta) {
+  final rounded = (eta.inSeconds / 60).ceil();
+  return rounded < 1 ? 1 : rounded;
+}
+
 /// A trailing-window average over `(elapsed, bytes)` observations.
 ///
 /// The window discards samples older than [window] behind the newest one, so
@@ -58,10 +65,19 @@ final class DownloadPaceEstimator {
 
   /// Records a byte count observed [elapsed] after this attempt began. A byte
   /// count lower than the previous one means the transfer was replaced (a new
-  /// attempt, a discard) — the history is cleared and the sample starts a
-  /// fresh window.
+  /// attempt, a discard); a gap longer than [window] means the transfer
+  /// stalled and recovered, and averaging across the silence would quote a
+  /// wildly wrong rate; a decreasing [elapsed] means the clock stepped. All
+  /// three clear the history so the sample starts a fresh window.
   void add(Duration elapsed, int bytes) {
-    if (_samples.isNotEmpty && bytes < _samples.last.bytes) reset();
+    if (_samples.isNotEmpty) {
+      final last = _samples.last;
+      if (bytes < last.bytes ||
+          elapsed < last.elapsed ||
+          elapsed - last.elapsed > window) {
+        reset();
+      }
+    }
     _samples.add((elapsed: elapsed, bytes: bytes));
     final cutoff = elapsed - window;
     while (_samples.length > 2 && _samples.first.elapsed < cutoff) {

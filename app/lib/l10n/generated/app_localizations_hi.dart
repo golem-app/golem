@@ -521,12 +521,6 @@ class AppLocalizationsHi extends AppLocalizations {
   }
 
   @override
-  String get downloadPaused => 'डाउनलोड रुका हुआ है';
-
-  @override
-  String get downloadNeedsAttention => 'डाउनलोड पर ध्यान देना ज़रूरी है';
-
-  @override
   String modelDownloading(String modelName) {
     return '$modelName डाउनलोड हो रहा है';
   }

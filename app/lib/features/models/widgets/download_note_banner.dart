@@ -38,6 +38,15 @@ class DownloadNoteBanner extends ConsumerWidget {
     if (!ref.watch(downloadNoteVisibleProvider(entry.key))) {
       return const SizedBox.shrink();
     }
+    // The advice quotes measured pacing, so it exists only on the two
+    // platforms the #36 spike measured. One switch owns the label/rate pair;
+    // splitting them once let macOS claim iOS's figure.
+    final (platform, backgroundMbs) = switch (defaultTargetPlatform) {
+      TargetPlatform.android => ('Android', androidBackgroundMbs),
+      TargetPlatform.iOS => ('iOS', iosBackgroundMbs),
+      _ => (null, 0.0),
+    };
+    if (platform == null) return const SizedBox.shrink();
     final downloaded = ref.watch(
       modelControllerProvider.select(
         (value) => value.value?.statusOf(entry.key).downloadedBytes ?? 0,
@@ -46,16 +55,20 @@ class DownloadNoteBanner extends ConsumerWidget {
     final remaining = entry.totalBytes <= downloaded
         ? 0
         : entry.totalBytes - downloaded;
-    final platform = defaultTargetPlatform == TargetPlatform.android
-        ? 'Android'
-        : 'iOS';
-    final backgroundMbs = backgroundMbsFor(defaultTargetPlatform);
+    final backgroundMinutes = aboutMinutes(backgroundMbs, remaining);
+    final foregroundMinutes = aboutMinutes(downloadForegroundMbs, remaining);
+    // Near the end both figures floor to the same minute count and the
+    // comparison would read "about 1 minute instead of about 1 minute" —
+    // there is no longer a trade-off worth interrupting for.
+    if (backgroundMinutes <= foregroundMinutes) {
+      return const SizedBox.shrink();
+    }
     final l10n = context.l10n;
     final body = l10n.downloadNoteBody(
       platform,
       ltrIsolate(l10n.rateMbs(backgroundMbs.toStringAsFixed(1))),
-      l10n.aboutMinutes(aboutMinutes(backgroundMbs, remaining)),
-      l10n.aboutMinutes(aboutMinutes(downloadForegroundMbs, remaining)),
+      l10n.aboutMinutes(backgroundMinutes),
+      l10n.aboutMinutes(foregroundMinutes),
     );
     return Container(
       margin: margin,

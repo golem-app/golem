@@ -10,6 +10,7 @@ import '../../core/domain/app_preferences.dart';
 import '../../core/domain/byte_format.dart';
 import '../../core/domain/inference_backend.dart';
 import '../../core/domain/model_activation.dart';
+import '../../core/domain/download_pace.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
@@ -1078,9 +1079,7 @@ class _ModelCard extends ConsumerWidget {
     final pace = ref.watch(downloadPaceProvider);
     final eta = pace?.artifactKey == entry.key ? pace?.eta : null;
     if (status.phase != ArtifactPhase.downloading || eta == null) return null;
-    return context.l10n.etaAboutMinutesLeft(
-      (eta.inSeconds / 60).ceil().clamp(1, 1 << 31),
-    );
+    return context.l10n.etaAboutMinutesLeft(aboutMinutesLeft(eta));
   }
 
   String _statusLabel(BuildContext context, String suffix) =>

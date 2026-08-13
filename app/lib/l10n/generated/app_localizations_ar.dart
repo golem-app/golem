@@ -518,12 +518,6 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get downloadPaused => 'التنزيل متوقف مؤقتًا';
-
-  @override
-  String get downloadNeedsAttention => 'التنزيل يحتاج إلى انتباه';
-
-  @override
   String modelDownloading(String modelName) {
     return 'جارٍ تنزيل $modelName';
   }

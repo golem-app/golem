@@ -508,12 +508,6 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get downloadPaused => 'ダウンロードを一時停止しました';
-
-  @override
-  String get downloadNeedsAttention => 'ダウンロードを確認してください';
-
-  @override
   String modelDownloading(String modelName) {
     return '$modelNameをダウンロード中';
   }

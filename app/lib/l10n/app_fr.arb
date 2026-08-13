@@ -154,8 +154,6 @@
   "resumeDownload": "Reprendre le téléchargement",
   "modelReady": "{modelName} est prêt",
   "modelVerifying": "Vérification de {modelName}",
-  "downloadPaused": "Téléchargement suspendu",
-  "downloadNeedsAttention": "Le téléchargement nécessite votre attention",
   "modelDownloading": "Téléchargement de {modelName}",
   "selectedCatalogUnavailable": "L’entrée de catalogue sélectionnée est indisponible.",
   "downloadFailed": "Le téléchargement a échoué. Vous pouvez réessayer.",

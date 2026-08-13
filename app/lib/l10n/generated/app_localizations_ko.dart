@@ -508,12 +508,6 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get downloadPaused => '다운로드 일시 정지됨';
-
-  @override
-  String get downloadNeedsAttention => '다운로드를 확인해야 합니다';
-
-  @override
   String modelDownloading(String modelName) {
     return '$modelName 다운로드 중';
   }

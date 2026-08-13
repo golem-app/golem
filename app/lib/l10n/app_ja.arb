@@ -154,8 +154,6 @@
   "resumeDownload": "ダウンロードを再開",
   "modelReady": "{modelName}の準備ができました",
   "modelVerifying": "{modelName}を検証中",
-  "downloadPaused": "ダウンロードを一時停止しました",
-  "downloadNeedsAttention": "ダウンロードを確認してください",
   "modelDownloading": "{modelName}をダウンロード中",
   "selectedCatalogUnavailable": "選択したカタログ項目は利用できません。",
   "downloadFailed": "ダウンロードに失敗しました。もう一度試すことができます。",

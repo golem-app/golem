@@ -10,6 +10,7 @@ import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/domain/model_admission.dart';
 import '../../core/domain/model_catalog.dart';
+import '../../core/domain/download_pace.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
@@ -660,6 +661,16 @@ class _DownloadScreen extends ConsumerWidget {
                   _CancelDownloadButton(entry: selected),
                 ],
               ),
+              // Cancel and discard land here: without a restart affordance
+              // the required-setup step would be a dead end until relaunch.
+              ArtifactPhase.notDownloaded => GolemButton.tinted(
+                key: const Key('first-run-restart-download'),
+                label: context.l10n.downloadSize(
+                  formatModelBytes(selected.totalBytes),
+                ),
+                onPressed: () =>
+                    unawaited(_requestDownload(context, ref, selected)),
+              ),
               _ => const SizedBox(height: 44),
             },
           // Below the buttons per the handoff, and outside the scroll view so
@@ -875,9 +886,7 @@ class _DownloadModelCard extends ConsumerWidget {
     int percent,
   ) => switch (status.phase) {
     ArtifactPhase.downloading when snapshot?.eta != null =>
-      context.l10n.etaAboutMinutesLeft(
-        (snapshot!.eta!.inSeconds / 60).ceil().clamp(1, 1 << 31),
-      ),
+      context.l10n.etaAboutMinutesLeft(aboutMinutesLeft(snapshot!.eta!)),
     ArtifactPhase.paused => context.l10n.amountLeft(
       formatModelBytes(entry.totalBytes - status.downloadedBytes),
     ),
@@ -980,7 +989,9 @@ class _CancelDownloadButton extends ConsumerWidget {
     onPressed: () =>
         unawaited(ref.read(modelControllerProvider.notifier).cancel(entry.key)),
     child: Text(
-      context.l10n.cancel,
+      // The same label Settings uses for this operation: it deletes the
+      // partial download, so a bare "Cancel" undersells it.
+      context.l10n.cancelAndDiscard,
       style: TextStyle(
         color: CupertinoDynamicColor.resolve(
           GolemTheme.destructiveText,

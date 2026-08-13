@@ -126,7 +126,7 @@ final class DownloadPaceProvider
   }
 }
 
-String _$downloadPaceHash() => r'4b5476c10d20d7a50d7f6df1c9be5e32ed38e965';
+String _$downloadPaceHash() => r'481d1f397630a12fe4ca4d7054d9e6cf37e96c71';
 
 /// Live rate/ETA for the single in-flight download, derived by sampling
 /// [ModelController]'s byte counts against the injected clock. `null` until

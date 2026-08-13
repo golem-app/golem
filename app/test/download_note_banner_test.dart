@@ -49,6 +49,27 @@ void main() {
     });
   }
 
+  testWidgets('the note stands down when leaving would cost no extra time', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      model: ModelState(
+        simulated: true,
+        artifacts: {
+          entry.key: ArtifactStatus(
+            phase: ArtifactPhase.downloading,
+            // ~50 MB left: background and foreground both round to "about
+            // 1 minute", so the comparison would contradict itself.
+            downloadedBytes: entry.totalBytes - 50000000,
+          ),
+        },
+      ),
+      child: Column(children: [DownloadNoteBanner(entry: entry)]),
+    );
+    expect(find.text('Keep Golem open for full speed.'), findsNothing);
+  });
+
   testWidgets('one dismissal hides every surface sharing the state', (
     tester,
   ) async {

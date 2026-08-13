@@ -154,8 +154,6 @@
   "resumeDownload": "Tiếp tục tải xuống",
   "modelReady": "{modelName} đã sẵn sàng",
   "modelVerifying": "Đang xác minh {modelName}",
-  "downloadPaused": "Đã tạm dừng tải xuống",
-  "downloadNeedsAttention": "Nội dung tải xuống cần được xử lý",
   "modelDownloading": "Đang tải {modelName}",
   "selectedCatalogUnavailable": "Mục danh mục đã chọn không khả dụng.",
   "downloadFailed": "Tải xuống thất bại. Bạn có thể thử lại.",

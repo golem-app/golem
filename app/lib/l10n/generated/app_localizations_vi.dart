@@ -520,12 +520,6 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
-  String get downloadPaused => 'Đã tạm dừng tải xuống';
-
-  @override
-  String get downloadNeedsAttention => 'Nội dung tải xuống cần được xử lý';
-
-  @override
   String modelDownloading(String modelName) {
     return 'Đang tải $modelName';
   }

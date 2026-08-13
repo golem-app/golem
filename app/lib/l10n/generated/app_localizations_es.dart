@@ -522,12 +522,6 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get downloadPaused => 'Descarga pausada';
-
-  @override
-  String get downloadNeedsAttention => 'La descarga requiere atención';
-
-  @override
   String modelDownloading(String modelName) {
     return 'Descargando $modelName';
   }

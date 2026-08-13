@@ -33,10 +33,14 @@ class DownloadNoteDismissal extends _$DownloadNoteDismissal {
 
   void _onModel(ModelState? previous, ModelState? next) {
     if (next == null) return;
+    // A multi-file artifact flips downloading→verifying→downloading at every
+    // file boundary; that is still the same attempt, so a dismissal must
+    // survive it. Every other prior phase means a fresh attempt.
+    const sameAttempt = {ArtifactPhase.downloading, ArtifactPhase.verifying};
     final entering = <String>{
       for (final entry in next.artifacts.entries)
         if (entry.value.phase == ArtifactPhase.downloading &&
-            previous?.statusOf(entry.key).phase != ArtifactPhase.downloading)
+            !sameAttempt.contains(previous?.statusOf(entry.key).phase))
           entry.key,
     };
     if (entering.isEmpty) return;

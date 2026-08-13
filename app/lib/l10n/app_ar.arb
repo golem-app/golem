@@ -154,8 +154,6 @@
   "resumeDownload": "استئناف التنزيل",
   "modelReady": "النموذج {modelName} جاهز",
   "modelVerifying": "جارٍ التحقق من {modelName}",
-  "downloadPaused": "التنزيل متوقف مؤقتًا",
-  "downloadNeedsAttention": "التنزيل يحتاج إلى انتباه",
   "modelDownloading": "جارٍ تنزيل {modelName}",
   "selectedCatalogUnavailable": "عنصر الكتالوج المحدد غير متاح.",
   "downloadFailed": "فشل التنزيل. يمكنك المحاولة مجددًا.",

@@ -66,7 +66,7 @@ final class DownloadNoteDismissalProvider
 }
 
 String _$downloadNoteDismissalHash() =>
-    r'7e596c8f78e383f1b736dd6d6b8e7a7458cc6694';
+    r'2a94bdb6b211b54aa81e22193835724e1f7bb0ed';
 
 /// Which artifacts' foreground-speed notes the user has waved away, scoped to
 /// the download attempt: an artifact re-entering `downloading` — a fresh

@@ -240,6 +240,25 @@ void main() {
     );
   });
 
+  testWidgets('a cancelled download leaves a restart affordance', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+      model: const ModelState(
+        simulated: true,
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.notDownloaded),
+        },
+      ),
+      child: const FirstRunScreen(initialStep: FirstRunStep.download),
+    );
+    // Cancel and Discard both land the artifact here; without this button
+    // the required-setup step would be a dead end until relaunch.
+    expect(find.byKey(const Key('first-run-restart-download')), findsOneWidget);
+  });
+
   testWidgets('a failed download surfaces retry and discard together', (
     tester,
   ) async {

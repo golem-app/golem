@@ -520,12 +520,6 @@ class AppLocalizationsPl extends AppLocalizations {
   }
 
   @override
-  String get downloadPaused => 'Pobieranie wstrzymane';
-
-  @override
-  String get downloadNeedsAttention => 'Pobieranie wymaga uwagi';
-
-  @override
   String modelDownloading(String modelName) {
     return 'Pobieranie modelu $modelName';
   }

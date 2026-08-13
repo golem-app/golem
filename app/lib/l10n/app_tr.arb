@@ -154,8 +154,6 @@
   "resumeDownload": "İndirmeyi sürdür",
   "modelReady": "{modelName} hazır",
   "modelVerifying": "{modelName} doğrulanıyor",
-  "downloadPaused": "İndirme duraklatıldı",
-  "downloadNeedsAttention": "İndirmeyle ilgilenmeniz gerekiyor",
   "modelDownloading": "{modelName} indiriliyor",
   "selectedCatalogUnavailable": "Seçilen katalog girdisi kullanılamıyor.",
   "downloadFailed": "İndirme başarısız oldu. Tekrar deneyebilirsiniz.",

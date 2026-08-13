@@ -154,8 +154,6 @@
   "resumeDownload": "डाउनलोड जारी रखें",
   "modelReady": "{modelName} तैयार है",
   "modelVerifying": "{modelName} की जाँच हो रही है",
-  "downloadPaused": "डाउनलोड रुका हुआ है",
-  "downloadNeedsAttention": "डाउनलोड पर ध्यान देना ज़रूरी है",
   "modelDownloading": "{modelName} डाउनलोड हो रहा है",
   "selectedCatalogUnavailable": "चुनी गई कैटलॉग एंट्री उपलब्ध नहीं है।",
   "downloadFailed": "डाउनलोड विफल रहा। आप फिर कोशिश कर सकते हैं।",

@@ -521,12 +521,6 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
-  String get downloadPaused => 'Unduhan dijeda';
-
-  @override
-  String get downloadNeedsAttention => 'Unduhan perlu diperiksa';
-
-  @override
   String modelDownloading(String modelName) {
     return 'Mengunduh $modelName';
   }

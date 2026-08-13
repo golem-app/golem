@@ -523,13 +523,6 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
-  String get downloadPaused => 'Téléchargement suspendu';
-
-  @override
-  String get downloadNeedsAttention =>
-      'Le téléchargement nécessite votre attention';
-
-  @override
   String modelDownloading(String modelName) {
     return 'Téléchargement de $modelName';
   }
