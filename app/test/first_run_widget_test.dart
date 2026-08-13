@@ -208,6 +208,68 @@ void main() {
     });
   }
 
+  testWidgets('a running download offers the note, pause, and cancel', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+      model: const ModelState(
+        simulated: true,
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(
+            phase: ArtifactPhase.downloading,
+            downloadedBytes: 900000000,
+          ),
+        },
+      ),
+      child: const FirstRunScreen(initialStep: FirstRunStep.download),
+    );
+
+    expect(find.byKey(const Key('first-run-download-note')), findsOneWidget);
+    expect(find.byKey(const Key('first-run-pause-download')), findsOneWidget);
+    expect(find.byKey(const Key('first-run-cancel-download')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('download-note-dismiss')));
+    await tester.pump();
+    expect(find.text('Keep Golem open for full speed.'), findsNothing);
+    expect(
+      find.byKey(const Key('first-run-cancel-download')),
+      findsOneWidget,
+      reason: 'dismissing the note leaves the transfer controls alone',
+    );
+  });
+
+  testWidgets('a failed download surfaces retry and discard together', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+      model: const ModelState(
+        simulated: true,
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(
+            phase: ArtifactPhase.failed,
+            downloadedBytes: 900000000,
+            failureReason: ArtifactFailure(ArtifactFailureKind.transfer),
+          ),
+        },
+      ),
+      child: const FirstRunScreen(initialStep: FirstRunStep.download),
+    );
+
+    expect(find.byKey(const Key('first-run-failure-banner')), findsOneWidget);
+    expect(find.byKey(const Key('first-run-resume-download')), findsOneWidget);
+    expect(find.byKey(const Key('first-run-discard-download')), findsOneWidget);
+    expect(
+      find.byKey(const Key('first-run-download-note')),
+      findsOneWidget,
+      reason: 'the banner widget mounts but renders nothing while failed',
+    );
+    expect(find.text('Keep Golem open for full speed.'), findsNothing);
+  });
+
   testWidgets(
     'an interrupted artifact from the other engine returns to model choice',
     (tester) async {

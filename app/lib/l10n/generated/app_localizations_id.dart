@@ -567,16 +567,6 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
-  String downloadSimulationProgress(String amount) {
-    return '$amount · simulasi. Tidak ada permintaan jaringan atau penulisan bobot model.';
-  }
-
-  @override
-  String downloadRealProgress(String amount) {
-    return '$amount. Biarkan Golem tetap terbuka jika memungkinkan; platform mungkin melanjutkan transfer di latar belakang.';
-  }
-
-  @override
   String get downloadNoteTitle =>
       'Biarkan Golem terbuka untuk kecepatan penuh.';
 
@@ -646,9 +636,6 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get dismissNote => 'Tutup';
-
-  @override
-  String get discardDownload => 'Buang';
 
   @override
   String get chatsStayAvailable => 'Percakapan tetap tersedia.';

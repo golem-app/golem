@@ -552,16 +552,6 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String downloadSimulationProgress(String amount) {
-    return '$amount · シミュレーション。ネットワークリクエストやモデルの重みの書き込みは行いません。';
-  }
-
-  @override
-  String downloadRealProgress(String amount) {
-    return '$amount。できるだけGolemを開いたままにしてください。プラットフォームがバックグラウンドで転送を続ける場合があります。';
-  }
-
-  @override
   String get downloadNoteTitle => 'Golem を開いたままにすると全速でダウンロードできます。';
 
   @override
@@ -628,9 +618,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get dismissNote => '閉じる';
-
-  @override
-  String get discardDownload => '破棄';
 
   @override
   String get chatsStayAvailable => 'チャットは引き続き利用できます。';

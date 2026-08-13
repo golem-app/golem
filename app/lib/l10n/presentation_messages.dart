@@ -7,6 +7,13 @@ import '../core/services/repository_resolver.dart';
 import 'bidi.dart';
 import 'generated/app_localizations.dart';
 
+/// The engine half of a model card's format line. Deliberately unlocalized:
+/// engine and quantization tokens are stable technical labels.
+String engineLabel(ModelEngine engine) => switch (engine) {
+  ModelEngine.mlx => 'MLX',
+  ModelEngine.gguf => 'GGUF · llama.cpp',
+};
+
 String deviceRefusalMessage(
   AppLocalizations l10n,
   DeviceIneligibilityReason? reason,

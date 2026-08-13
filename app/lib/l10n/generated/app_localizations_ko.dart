@@ -553,16 +553,6 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String downloadSimulationProgress(String amount) {
-    return '$amount · 시뮬레이션. 네트워크 요청이나 모델 가중치 쓰기가 없습니다.';
-  }
-
-  @override
-  String downloadRealProgress(String amount) {
-    return '$amount. 가능하면 Golem을 열어 두세요. 플랫폼이 백그라운드에서 전송을 계속할 수 있습니다.';
-  }
-
-  @override
   String get downloadNoteTitle => '최고 속도를 위해 Golem을 열어 두세요.';
 
   @override
@@ -629,9 +619,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get dismissNote => '닫기';
-
-  @override
-  String get discardDownload => '삭제';
 
   @override
   String get chatsStayAvailable => '대화는 계속 사용할 수 있습니다.';

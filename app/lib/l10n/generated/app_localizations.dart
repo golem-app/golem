@@ -1109,18 +1109,6 @@ abstract class AppLocalizations {
   /// **'{downloaded} of {total}'**
   String downloadAmount(String downloaded, String total);
 
-  /// QA download progress detail.
-  ///
-  /// In en, this message translates to:
-  /// **'{amount} · simulated. No network request or model-weight write occurs.'**
-  String downloadSimulationProgress(String amount);
-
-  /// Production download progress detail.
-  ///
-  /// In en, this message translates to:
-  /// **'{amount}. Keep Golem open when practical; the platform may continue the transfer in the background.'**
-  String downloadRealProgress(String amount);
-
   /// Foreground-speed note headline.
   ///
   /// In en, this message translates to:
@@ -1203,12 +1191,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dismiss'**
   String get dismissNote;
-
-  /// Discard a failed download's partial data.
-  ///
-  /// In en, this message translates to:
-  /// **'Discard'**
-  String get discardDownload;
 
   /// Unsupported-device onboarding headline.
   ///

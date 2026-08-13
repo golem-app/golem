@@ -804,7 +804,7 @@ class _ModelCard extends ConsumerWidget {
           Text(entry.displayName, style: GolemText.cardTitle),
           const SizedBox(height: 5),
           Text(
-            '${_engineLabel(entry.engine)} · ${entry.quantization}',
+            '${engineLabel(entry.engine)} · ${entry.quantization}',
             style: TextStyle(
               color: CupertinoDynamicColor.resolve(
                 GolemTheme.mutedInk,
@@ -832,7 +832,7 @@ class _ModelCard extends ConsumerWidget {
             key: Key('model-status-${entry.key}'),
             label: context.l10n.modelStatusLabel(
               entry.displayName,
-              _engineLabel(entry.engine),
+              engineLabel(entry.engine),
             ),
             value: statusLabel,
             child: _Status(icon: _statusIcon(), label: statusLabel),
@@ -1172,11 +1172,6 @@ class _Progress extends StatelessWidget {
     ),
   );
 }
-
-String _engineLabel(ModelEngine engine) => switch (engine) {
-  ModelEngine.mlx => 'MLX',
-  ModelEngine.gguf => 'GGUF · llama.cpp',
-};
 
 String _runtimeLabel(
   BuildContext context,

@@ -571,16 +571,6 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
-  String downloadSimulationProgress(String amount) {
-    return '$amount · simulé. Aucune requête réseau ni écriture de poids de modèle.';
-  }
-
-  @override
-  String downloadRealProgress(String amount) {
-    return '$amount. Gardez Golem ouvert si possible ; la plateforme peut poursuivre le transfert en arrière-plan.';
-  }
-
-  @override
   String get downloadNoteTitle =>
       'Gardez Golem ouvert pour la vitesse maximale.';
 
@@ -652,9 +642,6 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get dismissNote => 'Fermer';
-
-  @override
-  String get discardDownload => 'Abandonner';
 
   @override
   String get chatsStayAvailable => 'Les conversations restent disponibles.';

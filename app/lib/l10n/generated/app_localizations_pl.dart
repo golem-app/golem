@@ -567,16 +567,6 @@ class AppLocalizationsPl extends AppLocalizations {
   }
 
   @override
-  String downloadSimulationProgress(String amount) {
-    return '$amount · symulacja. Bez żądania sieciowego i zapisywania wag modelu.';
-  }
-
-  @override
-  String downloadRealProgress(String amount) {
-    return '$amount. W miarę możliwości pozostaw aplikację Golem otwartą. System może kontynuować transfer w tle.';
-  }
-
-  @override
   String get downloadNoteTitle =>
       'Przy otwartym Golemie pobieranie jest najszybsze.';
 
@@ -652,9 +642,6 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get dismissNote => 'Zamknij';
-
-  @override
-  String get discardDownload => 'Odrzuć';
 
   @override
   String get chatsStayAvailable => 'Czaty pozostają dostępne.';

@@ -564,16 +564,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String downloadSimulationProgress(String amount) {
-    return '$amount · simulated. No network request or model-weight write occurs.';
-  }
-
-  @override
-  String downloadRealProgress(String amount) {
-    return '$amount. Keep Golem open when practical; the platform may continue the transfer in the background.';
-  }
-
-  @override
   String get downloadNoteTitle => 'Keep Golem open for full speed.';
 
   @override
@@ -644,9 +634,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dismissNote => 'Dismiss';
-
-  @override
-  String get discardDownload => 'Discard';
 
   @override
   String get chatsStayAvailable => 'Chats stay available.';

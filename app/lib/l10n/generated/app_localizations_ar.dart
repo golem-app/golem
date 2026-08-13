@@ -563,16 +563,6 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String downloadSimulationProgress(String amount) {
-    return '$amount · محاكاة. لا يحدث طلب شبكة أو حفظ لأوزان النموذج.';
-  }
-
-  @override
-  String downloadRealProgress(String amount) {
-    return '$amount. اترك Golem مفتوحًا متى أمكن؛ فقد يواصل النظام النقل في الخلفية.';
-  }
-
-  @override
   String get downloadNoteTitle => 'أبقِ Golem مفتوحًا للسرعة الكاملة.';
 
   @override
@@ -649,9 +639,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get dismissNote => 'إغلاق';
-
-  @override
-  String get discardDownload => 'تجاهل';
 
   @override
   String get chatsStayAvailable => 'تبقى المحادثات متاحة.';

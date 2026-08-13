@@ -565,16 +565,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String downloadSimulationProgress(String amount) {
-    return '$amount · simüle edildi. Ağ isteği yapılmaz veya model ağırlığı yazılmaz.';
-  }
-
-  @override
-  String downloadRealProgress(String amount) {
-    return '$amount. Mümkünse Golem’i açık tutun; platform aktarımı arka planda sürdürebilir.';
-  }
-
-  @override
   String get downloadNoteTitle => 'Tam hız için Golem’i açık tutun.';
 
   @override
@@ -645,9 +635,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get dismissNote => 'Kapat';
-
-  @override
-  String get discardDownload => 'Sil';
 
   @override
   String get chatsStayAvailable => 'Sohbetler kullanılabilir kalır.';

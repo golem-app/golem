@@ -571,16 +571,6 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String downloadSimulationProgress(String amount) {
-    return '$amount · simulado. Nenhuma solicitação de rede ou gravação de pesos do modelo é feita.';
-  }
-
-  @override
-  String downloadRealProgress(String amount) {
-    return '$amount. Mantenha o Golem aberto quando possível; a plataforma pode continuar a transferência em segundo plano.';
-  }
-
-  @override
   String get downloadNoteTitle =>
       'Mantenha o Golem aberto para velocidade máxima.';
 
@@ -652,9 +642,6 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get dismissNote => 'Fechar';
-
-  @override
-  String get discardDownload => 'Descartar';
 
   @override
   String get chatsStayAvailable => 'As conversas continuam disponíveis.';
@@ -2516,16 +2503,6 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   }
 
   @override
-  String downloadSimulationProgress(String amount) {
-    return '$amount · simulado. Nenhuma solicitação de rede ou gravação de pesos do modelo é feita.';
-  }
-
-  @override
-  String downloadRealProgress(String amount) {
-    return '$amount. Mantenha o Golem aberto quando possível; a plataforma pode continuar a transferência em segundo plano.';
-  }
-
-  @override
   String get downloadNoteTitle =>
       'Mantenha o Golem aberto para velocidade máxima.';
 
@@ -2597,9 +2574,6 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get dismissNote => 'Fechar';
-
-  @override
-  String get discardDownload => 'Descartar';
 
   @override
   String get chatsStayAvailable => 'As conversas continuam disponíveis.';

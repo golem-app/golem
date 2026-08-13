@@ -566,16 +566,6 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
-  String downloadSimulationProgress(String amount) {
-    return '$amount · mô phỏng. Không có yêu cầu mạng hay ghi trọng số mô hình.';
-  }
-
-  @override
-  String downloadRealProgress(String amount) {
-    return '$amount. Hãy giữ Golem mở khi có thể; nền tảng có thể tiếp tục truyền trong nền.';
-  }
-
-  @override
   String get downloadNoteTitle => 'Giữ Golem mở để tải với tốc độ tối đa.';
 
   @override
@@ -644,9 +634,6 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get dismissNote => 'Đóng';
-
-  @override
-  String get discardDownload => 'Bỏ';
 
   @override
   String get chatsStayAvailable => 'Các cuộc trò chuyện vẫn khả dụng.';

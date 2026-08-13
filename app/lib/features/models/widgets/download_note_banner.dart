@@ -20,6 +20,7 @@ class DownloadNoteBanner extends ConsumerWidget {
   const DownloadNoteBanner({
     required this.entry,
     this.compact = false,
+    this.margin,
     super.key,
   });
 
@@ -27,6 +28,10 @@ class DownloadNoteBanner extends ConsumerWidget {
 
   /// Tighter paddings and caption type for the chat setup banner.
   final bool compact;
+
+  /// Applied only while visible, so hidden notes leave no stray spacing in
+  /// the surfaces that embed the banner unconditionally.
+  final EdgeInsetsGeometry? margin;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -53,6 +58,7 @@ class DownloadNoteBanner extends ConsumerWidget {
       l10n.aboutMinutes(aboutMinutes(downloadForegroundMbs, remaining)),
     );
     return Container(
+      margin: margin,
       padding: EdgeInsetsDirectional.fromSTEB(
         compact ? 10 : 14,
         compact ? 8 : 12,

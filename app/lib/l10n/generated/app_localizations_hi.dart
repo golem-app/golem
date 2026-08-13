@@ -567,16 +567,6 @@ class AppLocalizationsHi extends AppLocalizations {
   }
 
   @override
-  String downloadSimulationProgress(String amount) {
-    return '$amount · सिम्युलेटेड। कोई नेटवर्क अनुरोध या मॉडल-वेट राइट नहीं होता।';
-  }
-
-  @override
-  String downloadRealProgress(String amount) {
-    return '$amount। संभव हो तो Golem खुला रखें; प्लेटफ़ॉर्म बैकग्राउंड में ट्रांसफ़र जारी रख सकता है।';
-  }
-
-  @override
   String get downloadNoteTitle => 'पूरी गति के लिए Golem को खुला रखें।';
 
   @override
@@ -647,9 +637,6 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get dismissNote => 'बंद करें';
-
-  @override
-  String get discardDownload => 'हटाएँ';
 
   @override
   String get chatsStayAvailable => 'चैट उपलब्ध रहती हैं।';
