@@ -74,6 +74,7 @@ const evalAnchorPromptId = 'anchor-jupiter';
 const defaultEvalSuite = 'default';
 const arabicSmokeEvalSuite = 'arabic-smoke';
 const globalLanguageSmokeEvalSuite = 'global-language-smoke';
+const simplifiedChineseFeasibilityEvalSuite = 'simplified-chinese-feasibility';
 
 const defaultEvalPrompts = <EvalPrompt>[
   EvalPrompt(
@@ -366,14 +367,38 @@ const globalLanguageSmokeEvalPrompts = <EvalPrompt>[
   ),
 ];
 
+/// One bounded Simplified Chinese compatibility check for the mainland China
+/// distribution spike. This is deliberately narrower than a language-quality
+/// evaluation: it proves only that a shipping model can follow one simple
+/// non-reasoning instruction and emit the requested phrase and arithmetic
+/// result under the harness's fixed sampling policy.
+const simplifiedChineseFeasibilityEvalPrompts = <EvalPrompt>[
+  EvalPrompt(
+    id: 'simplified-chinese-arithmetic-17x23',
+    messages: [
+      {
+        'role': 'user',
+        'content':
+            '17 × 23 等于多少？请只用一个简短的简体中文句子回答，'
+            '句中必须包含“计算结果是”和数字 391。',
+      },
+    ],
+    maxTokens: 64,
+    checks: [EvalCheck.regexp(r'\b391\b'), EvalCheck.contains('计算结果是')],
+  ),
+];
+
 List<EvalPrompt> evalPromptsForSuite(String suite) => switch (suite) {
   defaultEvalSuite => defaultEvalPrompts,
   arabicSmokeEvalSuite => arabicSmokeEvalPrompts,
   globalLanguageSmokeEvalSuite => globalLanguageSmokeEvalPrompts,
+  simplifiedChineseFeasibilityEvalSuite =>
+    simplifiedChineseFeasibilityEvalPrompts,
   _ => throw ArgumentError.value(
     suite,
     'suite',
     'Expected $defaultEvalSuite, $arabicSmokeEvalSuite, or '
-        '$globalLanguageSmokeEvalSuite',
+        '$globalLanguageSmokeEvalSuite, or '
+        '$simplifiedChineseFeasibilityEvalSuite',
   ),
 };

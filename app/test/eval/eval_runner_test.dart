@@ -341,4 +341,31 @@ void main() {
       );
     }
   });
+
+  test('the Simplified Chinese feasibility suite is exact and bounded', () {
+    expect(
+      evalPromptsForSuite(simplifiedChineseFeasibilityEvalSuite),
+      same(simplifiedChineseFeasibilityEvalPrompts),
+    );
+    expect(simplifiedChineseFeasibilityEvalPrompts, hasLength(1));
+    expect(uniformEvalSeed(simplifiedChineseFeasibilityEvalPrompts), 7);
+
+    final prompt = simplifiedChineseFeasibilityEvalPrompts.single;
+    expect(prompt.id, 'simplified-chinese-arithmetic-17x23');
+    expect(prompt.reasoningEnabled, isFalse);
+    expect(prompt.maxTokens, 64);
+    expect(prompt.seed, 7);
+    expect(prompt.temperature, isNull);
+    expect(prompt.topP, isNull);
+    expect(prompt.messages, hasLength(1));
+    expect(prompt.messages.single['role'], 'user');
+    expect(prompt.messages.single['content'], contains('计算结果是'));
+    expect(prompt.checks.where((check) => check.required), hasLength(2));
+    expect(prompt.checks.map((check) => check.value), [r'\b391\b', '计算结果是']);
+    expect(prompt.checks.every((check) => check.passes('计算结果是 391。')), isTrue);
+    expect(
+      prompt.checks.every((check) => check.passes('The result is 391.')),
+      isFalse,
+    );
+  });
 }
