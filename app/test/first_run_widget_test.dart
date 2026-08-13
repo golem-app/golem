@@ -400,6 +400,43 @@ void main() {
     expect(find.text('3.58 GB'), findsNothing);
   });
 
+  testWidgets('deferred setup shows the compact note while downloading', (
+    tester,
+  ) async {
+    final preferences = InMemoryPreferencesRepository(
+      const AppPreferences(
+        onboardingVersion: currentOnboardingVersion,
+        onboardingModelKey: 'gemma4-mlx',
+      ),
+    );
+    await pumpWithRepositories(
+      tester,
+      preferences: preferences,
+      model: const ModelState(
+        simulated: true,
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(
+            phase: ArtifactPhase.downloading,
+            downloadedBytes: 900000000,
+          ),
+        },
+      ),
+      child: const ChatScreen(),
+    );
+    expect(find.byKey(const Key('model-setup-banner')), findsOneWidget);
+    expect(find.byKey(const Key('chat-download-note')), findsOneWidget);
+    expect(find.text('Keep Golem open for full speed.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('download-note-dismiss')));
+    await tester.pump();
+    expect(find.text('Keep Golem open for full speed.'), findsNothing);
+    expect(
+      find.byKey(const Key('model-setup-pause')),
+      findsOneWidget,
+      reason: 'dismissing the note keeps the banner controls',
+    );
+  });
+
   testWidgets('deferred setup is persistent and gates only sending', (
     tester,
   ) async {

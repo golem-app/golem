@@ -12,6 +12,7 @@ import '../../core/widgets/progress_track.dart';
 import '../../l10n/l10n.dart';
 import '../../l10n/presentation_messages.dart';
 import '../models/application/model_providers.dart';
+import '../models/widgets/download_note_banner.dart';
 import '../settings/application/preferences_providers.dart';
 import 'model_download_consent.dart';
 
@@ -88,6 +89,12 @@ class ModelSetupBanner extends ConsumerWidget {
               ),
             ),
           ],
+          DownloadNoteBanner(
+            key: const Key('chat-download-note'),
+            entry: entry,
+            compact: true,
+            margin: const EdgeInsetsDirectional.only(top: 10),
+          ),
           const SizedBox(height: 10),
           switch (status.phase) {
             ArtifactPhase.notDownloaded => GolemButton.filled(

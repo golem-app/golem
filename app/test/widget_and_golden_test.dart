@@ -283,6 +283,33 @@ void main() {
     }, variant: bothChromes);
   }
 
+  testWidgets('chat setup note light golden', (tester) async {
+    final preferences = InMemoryPreferencesRepository(
+      const AppPreferences(
+        onboardingVersion: currentOnboardingVersion,
+        onboardingModelKey: 'gemma4-mlx',
+      ),
+    );
+    await pumpWithRepositories(
+      tester,
+      preferences: preferences,
+      model: const ModelState(
+        simulated: true,
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(
+            phase: ArtifactPhase.downloading,
+            downloadedBytes: 900000000,
+          ),
+        },
+      ),
+      child: const ChatScreen(),
+    );
+    await expectLater(
+      find.byType(ChatScreen),
+      matchesGoldenFile('goldens/chat-setup-note-light${chromeSuffix()}.png'),
+    );
+  }, variant: bothChromes);
+
   testWidgets('required setup unsupported golden', (tester) async {
     await pumpWithRepositories(
       tester,
