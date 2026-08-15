@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/chrome/golem_alert.dart';
 import '../../core/chrome/golem_button.dart';
+import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_toast.dart';
 import '../../core/domain/app_preferences.dart';
@@ -606,7 +607,7 @@ class _CustomRepositoryCard extends ConsumerWidget {
         CupertinoButton(
           key: Key('custom-repo-candidate-${candidate.path}'),
           padding: const EdgeInsets.symmetric(vertical: 6),
-          minimumSize: const Size(44, 44),
+          minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
           onPressed: () => _resolve(ref, weightsFile: candidate.path),
           child: Row(
             children: [
@@ -718,7 +719,7 @@ class _EngineChip extends StatelessWidget {
     final accent = CupertinoDynamicColor.resolve(GolemTheme.accent, context);
     return CupertinoButton(
       padding: EdgeInsets.zero,
-      minimumSize: const Size(44, 44),
+      minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
       onPressed: onTap,
       child: Container(
         height: 32,

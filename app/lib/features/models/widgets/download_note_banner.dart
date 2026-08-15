@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/domain/download_pace.dart';
 import '../../../core/domain/model_catalog.dart';
 import '../../../core/theme/golem_theme.dart';
@@ -139,10 +140,7 @@ class DownloadNoteBanner extends ConsumerWidget {
               child: CupertinoButton(
                 key: const Key('download-note-dismiss'),
                 padding: EdgeInsets.zero,
-                minimumSize: const Size(
-                  GolemSize.hitTarget,
-                  GolemSize.hitTarget,
-                ),
+                minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
                 onPressed: () => ref
                     .read(downloadNoteDismissalProvider.notifier)
                     .dismiss(entry.key),

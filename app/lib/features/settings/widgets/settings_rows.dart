@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/theme/golem_theme.dart';
 
 /// The grouped settings card: surface fill, card radius, hairline border,
@@ -35,7 +36,7 @@ class SettingsCard extends StatelessWidget {
 }
 
 /// A disclosure row: label, muted value, chevron. The whole row is the
-/// tap target and clears the 44pt guideline.
+/// tap target and clears the platform guideline.
 class SettingsNavRow extends StatelessWidget {
   const SettingsNavRow({
     required this.label,
@@ -139,10 +140,10 @@ class SettingsToggleRow extends StatelessWidget {
             children: [
               Expanded(child: Text(label, style: GolemText.body)),
               const SizedBox(width: 12),
-              // A 44pt box so the switch clears the tap-target guideline (its
+              // A platform-minimum box so the switch clears the tap-target guideline (its
               // own chrome is 39pt tall).
               SizedBox(
-                height: GolemSize.hitTarget,
+                height: GolemChrome.current.minimumTapTarget,
                 child: Center(
                   child: CupertinoSwitch(
                     key: toggleKey,
@@ -209,11 +210,11 @@ class GolemSegmented<T extends Object> extends StatelessWidget {
       },
       children: {
         for (final entry in segments.entries)
-          // Sized so each segment clears the 44pt tap-target guideline —
+          // Sized so each segment clears the platform tap-target guideline —
           // the repo picks full hit areas over the handoff's 36pt visual
           // (the #47 precedent).
           entry.key: SizedBox(
-            height: GolemSize.hitTarget,
+            height: GolemChrome.current.minimumTapTarget,
             child: Center(child: entry.value),
           ),
       },

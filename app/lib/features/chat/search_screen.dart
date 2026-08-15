@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/chrome/golem_chrome.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../l10n/bidi.dart';
 import '../../l10n/l10n.dart';
@@ -137,7 +138,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     padding: const EdgeInsets.symmetric(
                       horizontal: GolemSpace.s3,
                     ),
-                    minimumSize: const Size(44, 44),
+                    minimumSize: Size.square(
+                      GolemChrome.current.minimumTapTarget,
+                    ),
                     onPressed: _cancel,
                     child: Text(
                       context.l10n.cancel,

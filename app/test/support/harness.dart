@@ -64,6 +64,16 @@ String chromeSuffix() =>
     ? '-android'
     : '';
 
+/// The tap-target guideline for the chrome this variant runs, so a surface
+/// enrolled under [bothChromes] is measured against the same minimum
+/// `GolemChrome.minimumTapTarget` promises — 48 on Android, 44 on iOS.
+/// Asserting the iOS guideline alone is what let the Android floor ship 4dp
+/// short across the shared chrome (#118).
+AccessibilityGuideline get tapTargetGuideline =>
+    debugDefaultTargetPlatformOverride == TargetPlatform.android
+    ? androidTapTargetGuideline
+    : iOSTapTargetGuideline;
+
 Widget wrapApp({
   required Widget child,
   Brightness brightness = Brightness.light,

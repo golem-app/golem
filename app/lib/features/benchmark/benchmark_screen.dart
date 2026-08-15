@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_sheet.dart';
 import '../../core/domain/app_state.dart';
@@ -86,15 +87,18 @@ class BenchmarkScreen extends ConsumerWidget {
                   CupertinoSlidingSegmentedControl<BenchmarkPhase>(
                     key: const Key('benchmark-phase-picker'),
                     groupValue: benchmark.phase,
+                    // Sized like GolemSegmented's boxes rather than by
+                    // padding: this control is built here directly, so it
+                    // owned no tap-target floor of its own.
                     children: {
-                      BenchmarkPhase.warmup: Padding(
-                        padding: const EdgeInsets.all(9),
-                        child: Text(context.l10n.warmup),
-                      ),
-                      BenchmarkPhase.measured: Padding(
-                        padding: const EdgeInsets.all(9),
-                        child: Text(context.l10n.measured),
-                      ),
+                      for (final (phase, label) in <(BenchmarkPhase, String)>[
+                        (BenchmarkPhase.warmup, context.l10n.warmup),
+                        (BenchmarkPhase.measured, context.l10n.measured),
+                      ])
+                        phase: SizedBox(
+                          height: GolemChrome.current.minimumTapTarget,
+                          child: Center(child: Text(label)),
+                        ),
                     },
                     onValueChanged: (value) {
                       if (!benchmark.isRunning && value != null) {

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/chrome/golem_badge.dart';
 import '../../../core/chrome/golem_button.dart';
+import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/chrome/golem_sheet.dart';
 import '../../../core/domain/model_activation.dart';
 import '../../../core/domain/models.dart';
@@ -130,7 +131,9 @@ final class _ModelPickerContent extends ConsumerWidget {
             CupertinoButton(
               key: const Key('model-picker-manage'),
               padding: EdgeInsets.zero,
-              minimumSize: const Size.fromHeight(GolemSize.hitTarget),
+              minimumSize: Size.fromHeight(
+                GolemChrome.current.minimumTapTarget,
+              ),
               alignment: AlignmentDirectional.centerStart,
               onPressed: () {
                 Navigator.pop(context);
@@ -245,7 +248,9 @@ final class _ModelRow extends StatelessWidget {
             CupertinoButton(
               key: Key('model-picker-${choice.entry.key}'),
               padding: const EdgeInsets.symmetric(vertical: GolemSpace.s2),
-              minimumSize: const Size.fromHeight(GolemSize.hitTarget),
+              minimumSize: Size.fromHeight(
+                GolemChrome.current.minimumTapTarget,
+              ),
               onPressed: onSelect,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -355,7 +360,9 @@ final class _ModelRow extends StatelessWidget {
             CupertinoButton(
               key: Key('model-picker-pause-${choice.entry.key}'),
               padding: EdgeInsets.zero,
-              minimumSize: const Size.fromHeight(GolemSize.hitTarget),
+              minimumSize: Size.fromHeight(
+                GolemChrome.current.minimumTapTarget,
+              ),
               onPressed: onTransfer,
               child: Text(
                 context.l10n.pause,

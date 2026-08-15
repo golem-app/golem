@@ -1113,11 +1113,11 @@ void main() {
     }, variant: bothChromes);
   }
 
-  testWidgets('iOS targets, labels, contrast, and enlarged text', (
+  testWidgets('platform targets, labels, contrast, and enlarged text', (
     tester,
   ) async {
     await pumpWithRepositories(tester, child: const ChatScreen());
-    await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(tapTargetGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
 
@@ -1133,7 +1133,7 @@ void main() {
         history: markdownHistory(),
         child: const ChatScreen(),
       );
-      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(tapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       await expectLater(tester, meetsGuideline(textContrastGuideline));
     }
@@ -1163,25 +1163,32 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('open-drawer')));
       await tester.pumpAndSettle();
-      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(tapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       if (brightness == Brightness.light) {
         await expectLater(tester, meetsGuideline(textContrastGuideline));
       }
     }
 
-    // The redesigned settings surfaces enroll in the same guidelines.
+    // The redesigned settings surfaces enroll in the same guidelines. The
+    // sampling steppers reach the target check only through Response style,
+    // which is why they sat at 38x30 while the suite stayed green (#118).
     for (final screen in const <Widget>[
       SettingsScreen(identity: AppIdentity.dev),
       AppearanceScreen(),
       PrivacyScreen(),
+      StorageScreen(),
+      ModelsScreen(),
+      SystemPromptScreen(),
+      ResponseStyleScreen(),
+      BenchmarkScreen(),
     ]) {
       await pumpWithRepositories(tester, child: screen);
-      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(tapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       await expectLater(tester, meetsGuideline(textContrastGuideline));
     }
-  }, variant: iosChrome);
+  }, variant: bothChromes);
 
   // A phone at an accessibility text size is a supported configuration, not an
   // edge case: the app's own slider reaches 1.3x and the platform's factor

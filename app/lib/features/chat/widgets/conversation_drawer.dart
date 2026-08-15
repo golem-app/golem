@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/app_identity.dart';
 import '../../../core/chrome/golem_alert.dart';
 import '../../../core/chrome/golem_button.dart';
+import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/chrome/golem_menu.dart';
 import '../../../core/chrome/golem_sheet.dart';
 import '../../../core/chrome/golem_toast.dart';
@@ -142,7 +145,10 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
             child: CupertinoButton(
               key: const Key('drawer-search-button'),
               padding: EdgeInsets.zero,
-              minimumSize: const Size.fromHeight(46),
+              // 46 is the drawn height; the platform floor only ever raises it.
+              minimumSize: Size.fromHeight(
+                math.max(46, GolemChrome.current.minimumTapTarget),
+              ),
               // Gated like the conversation rows: opening a result calls
               // selectConversation, which no-ops mid-generation — search
               // must not offer taps that silently do nothing.

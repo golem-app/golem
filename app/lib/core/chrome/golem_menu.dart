@@ -54,7 +54,7 @@ class GolemMenu extends StatelessWidget {
     ],
     builder: (context, controller, child) => CupertinoButton(
       padding: EdgeInsets.zero,
-      minimumSize: const Size(44, 44),
+      minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
       onPressed: !enabled
           ? null
           : () => controller.isOpen ? controller.close() : controller.open(),

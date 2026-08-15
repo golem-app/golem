@@ -2,6 +2,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/chrome/golem_sheet.dart';
 import '../../../core/services/image_intake.dart';
 import '../../../core/theme/golem_theme.dart';
@@ -174,7 +175,7 @@ class _AttachRow extends StatelessWidget {
       child: CupertinoButton(
         key: rowKey,
         padding: EdgeInsets.zero,
-        minimumSize: const Size.fromHeight(GolemSize.hitTarget),
+        minimumSize: Size.fromHeight(GolemChrome.current.minimumTapTarget),
         alignment: AlignmentDirectional.centerStart,
         onPressed: enabled ? () => Navigator.pop(context, source) : null,
         child: Opacity(

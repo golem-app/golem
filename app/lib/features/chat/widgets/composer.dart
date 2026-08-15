@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/chrome/golem_toast.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
@@ -144,9 +145,8 @@ class _ComposerState extends ConsumerState<Composer> {
                   child: CupertinoButton(
                     key: Key('composer-attachment-remove-$index'),
                     padding: EdgeInsets.zero,
-                    minimumSize: const Size(
-                      GolemSize.hitTarget,
-                      GolemSize.hitTarget,
+                    minimumSize: Size.square(
+                      GolemChrome.current.minimumTapTarget,
                     ),
                     onPressed: () => setState(() => _pending.removeAt(index)),
                     child: Semantics(
@@ -255,25 +255,32 @@ class _ComposerState extends ConsumerState<Composer> {
               if (_pending.isNotEmpty) _tray(context),
               ListenableBuilder(
                 listenable: controller,
-                builder: (context, _) => CupertinoTextField.borderless(
-                  key: const Key('chat-composer'),
-                  controller: controller,
-                  focusNode: focus,
-                  textDirection: contentTextDirection(
-                    controller.text,
-                    fallback: Directionality.of(context),
+                builder: (context, _) => ConstrainedBox(
+                  // The field is the largest tap target in the composer and
+                  // still landed a point under the Android floor on its
+                  // padding alone.
+                  constraints: BoxConstraints(
+                    minHeight: GolemChrome.current.minimumTapTarget,
                   ),
-                  // Read-only rather than disabled: a disabled field announces
-                  // itself as such to a screen reader, which overstates a state
-                  // that lasts one turn, and it takes the in-flight prompt out of
-                  // reach for selection and copying.
-                  readOnly: generating,
-                  minLines: 1,
-                  maxLines: 6,
-                  placeholder: context.l10n.messagePlaceholder,
-                  textInputAction: TextInputAction.newline,
-                  // 14pt keeps the single-line field at the 44pt tap target.
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: CupertinoTextField.borderless(
+                    key: const Key('chat-composer'),
+                    controller: controller,
+                    focusNode: focus,
+                    textDirection: contentTextDirection(
+                      controller.text,
+                      fallback: Directionality.of(context),
+                    ),
+                    // Read-only rather than disabled: a disabled field announces
+                    // itself as such to a screen reader, which overstates a state
+                    // that lasts one turn, and it takes the in-flight prompt out of
+                    // reach for selection and copying.
+                    readOnly: generating,
+                    minLines: 1,
+                    maxLines: 6,
+                    placeholder: context.l10n.messagePlaceholder,
+                    textInputAction: TextInputAction.newline,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
                 ),
               ),
               Row(
@@ -457,7 +464,9 @@ class _ComposerState extends ConsumerState<Composer> {
                       return CupertinoButton(
                         key: Key(generating ? 'stop-button' : 'send-button'),
                         padding: EdgeInsets.zero,
-                        minimumSize: const Size(44, 44),
+                        minimumSize: Size.square(
+                          GolemChrome.current.minimumTapTarget,
+                        ),
                         onPressed: generating
                             ? () => ref
                                   .read(chatControllerProvider.notifier)
@@ -560,7 +569,7 @@ class _ComposerState extends ConsumerState<Composer> {
   );
 }
 
-/// A power-row control with a 34pt visual inside a 44pt hit target.
+/// A power-row control with a 34pt visual inside a platform-minimum hit target.
 final class _PowerButton extends StatelessWidget {
   const _PowerButton({
     required this.buttonKey,
@@ -577,7 +586,7 @@ final class _PowerButton extends StatelessWidget {
   Widget build(BuildContext context) => CupertinoButton(
     key: buttonKey,
     padding: EdgeInsets.zero,
-    minimumSize: const Size(44, 44),
+    minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
     onPressed: onPressed,
     child: Semantics(label: semanticLabel, child: child),
   );

@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/domain/app_state.dart';
 import '../../core/domain/models.dart';
@@ -239,7 +240,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         leading: CupertinoButton(
                           key: const Key('open-drawer'),
                           padding: EdgeInsets.zero,
-                          minimumSize: const Size(44, 44),
+                          minimumSize: Size.square(
+                            GolemChrome.current.minimumTapTarget,
+                          ),
                           onPressed: blocked
                               ? null
                               : () {
@@ -263,7 +266,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         trailing: CupertinoButton(
                           key: const Key('new-chat-header'),
                           padding: EdgeInsets.zero,
-                          minimumSize: const Size(44, 44),
+                          minimumSize: Size.square(
+                            GolemChrome.current.minimumTapTarget,
+                          ),
                           onPressed: blocked
                               ? null
                               : () => ref

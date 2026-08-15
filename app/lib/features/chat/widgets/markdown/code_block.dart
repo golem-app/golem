@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:highlight/highlight.dart' show highlight;
 import 'package:highlight/highlight.dart' as hl show Node;
 
+import '../../../../core/chrome/golem_chrome.dart';
 import '../../../../core/chrome/golem_toast.dart';
 import '../../../../core/theme/golem_theme.dart';
 import '../../../../l10n/l10n.dart';
@@ -102,8 +103,10 @@ final class _MarkdownCodeBlockState extends State<MarkdownCodeBlock> {
               child: ConstrainedBox(
                 key: const Key('code-header'),
                 // The band declares its own floor so it does not depend on
-                // the Copy chip's measurement to hold the iOS minimum.
-                constraints: const BoxConstraints(minHeight: 44),
+                // the Copy chip's measurement to hold the platform minimum.
+                constraints: BoxConstraints(
+                  minHeight: GolemChrome.current.minimumTapTarget,
+                ),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(14, 0, 10, 0),
                   child: Row(
@@ -176,9 +179,9 @@ final class _CopyChip extends StatelessWidget {
   Widget build(BuildContext context) => CupertinoButton(
     key: const Key('code-copy'),
     // The chip paints at its handoff size; `minimumSize` expands only the
-    // tap target around it to the iOS minimum.
+    // tap target around it to the platform minimum.
     padding: const EdgeInsets.symmetric(horizontal: 11),
-    minimumSize: const Size(44, 44),
+    minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
     onPressed: () async {
       await Clipboard.setData(ClipboardData(text: code));
       if (context.mounted) {

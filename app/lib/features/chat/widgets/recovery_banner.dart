@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/domain/app_state.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/theme/golem_theme.dart';
@@ -180,7 +181,7 @@ class _DownloadActiveModelButton extends ConsumerWidget {
       child: CupertinoButton(
         key: const Key('download-active-model'),
         color: GolemTheme.accent,
-        minimumSize: const Size.fromHeight(44),
+        minimumSize: Size.fromHeight(GolemChrome.current.minimumTapTarget),
         padding: const EdgeInsets.symmetric(horizontal: 12),
         onPressed: () async {
           final status = ref

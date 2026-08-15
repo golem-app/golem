@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // knowledge (profiles carry no Inferno import); the Inferno boundary is
 // unchanged — only lib/broker/ touches package:inferno.
 import '../../broker/model_profile.dart';
+import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/domain/app_preferences.dart';
 import '../../core/domain/generation_settings.dart';
@@ -298,7 +299,9 @@ class GenerationCard extends ConsumerWidget {
               child: CupertinoButton(
                 key: Key('gen-reset-$profileKey'),
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                minimumSize: const Size(44, 30),
+                minimumSize: Size.fromHeight(
+                  GolemChrome.current.minimumTapTarget,
+                ),
                 onPressed: () => announceFailedSave(
                   context,
                   ref
@@ -519,7 +522,7 @@ class _StepperRow extends StatelessWidget {
         CupertinoButton(
           key: Key('${stepperKey.value}-minus'),
           padding: EdgeInsets.zero,
-          minimumSize: const Size(38, 30),
+          minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
           onPressed: value <= min
               ? null
               : () => onCommit(lower.clamp(min, max)),
@@ -541,7 +544,7 @@ class _StepperRow extends StatelessWidget {
         CupertinoButton(
           key: Key('${stepperKey.value}-plus'),
           padding: EdgeInsets.zero,
-          minimumSize: const Size(38, 30),
+          minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
           onPressed: value >= max
               ? null
               : () => onCommit(higher.clamp(min, max)),

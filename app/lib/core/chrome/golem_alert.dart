@@ -140,7 +140,9 @@ Future<void> showGolemAlert({
                             horizontal: GolemSpace.s3,
                             vertical: GolemSpace.s2,
                           ),
-                          minimumSize: const Size(44, 44),
+                          minimumSize: Size.square(
+                            GolemChrome.current.minimumTapTarget,
+                          ),
                           onPressed: action.onPressed,
                           child: Text(
                             action.label,
