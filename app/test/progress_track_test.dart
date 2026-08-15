@@ -71,6 +71,9 @@ void main() {
     expect(fill.width, closeTo(50, 0.01));
   });
 
+  // This measures the placement the *stack* makes: the fill shrink-wraps, so
+  // the stack's alignment is what puts it here and moving that is what this
+  // catches.
   testWidgets('the fill grows from the leading edge, not the middle', (
     tester,
   ) async {
@@ -97,5 +100,37 @@ void main() {
     final track = tester.getRect(find.byType(ClipRRect));
     final fill = tester.getRect(find.byType(FractionallySizedBox));
     expect(fill.left, track.left);
+  });
+
+  // Leading, not left: Arabic is a shipped locale, and a bar that filled from
+  // the left there would run backwards against the text beside it.
+  testWidgets('right-to-left grows the fill from the right', (tester) async {
+    await tester.pumpWidget(
+      CupertinoApp(
+        home: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Center(
+            child: SizedBox(
+              width: 200,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: const [
+                  ProgressTrack(
+                    value: 0.5,
+                    trackColor: GolemTheme.divider,
+                    fillColor: GolemTheme.accent,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final track = tester.getRect(find.byType(ClipRRect));
+    final fill = tester.getRect(find.byType(FractionallySizedBox));
+    expect(fill.right, track.right);
+    expect(fill.left, greaterThan(track.left));
   });
 }

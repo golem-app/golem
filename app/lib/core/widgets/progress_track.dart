@@ -26,6 +26,13 @@ class ProgressTrack extends StatelessWidget {
       width: double.infinity,
       height: height,
       child: Stack(
+        // What holds the fill against the leading edge. Under the stack's
+        // default loose fit the FractionallySizedBox shrink-wraps its child, so
+        // its own alignment never applies and this is the only placement that
+        // decides anything — it was written on the inner box for a long time,
+        // where it did nothing at all (#120). Directional so a right-to-left
+        // locale grows the bar from the right.
+        alignment: AlignmentDirectional.topStart,
         children: [
           Positioned.fill(
             child: ColoredBox(
@@ -34,10 +41,8 @@ class ProgressTrack extends StatelessWidget {
           ),
           // heightFactor is not optional: without it the fill's ColoredBox has
           // no child to size to, collapses to zero height, and the track paints
-          // empty at every value. alignment likewise — the default is centre,
-          // which would grow a progress bar outward from its middle.
+          // empty at every value.
           FractionallySizedBox(
-            alignment: AlignmentDirectional.centerStart,
             widthFactor: value,
             heightFactor: 1,
             child: ColoredBox(
