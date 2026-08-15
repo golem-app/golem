@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
+import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
@@ -18,6 +19,7 @@ import 'package:golem_flutter/features/settings/application/preferences_provider
 
 import 'support/harness.dart';
 import 'support/in_memory_attachment_repository.dart';
+import 'support/in_memory_preferences_repository.dart';
 
 void main() {
   testWidgets('picking a model persists it and relabels chip and nav', (
@@ -792,6 +794,133 @@ void main() {
 
     expect(find.textContaining('Downloading'), findsOneWidget);
     expect(find.textContaining('Chat template not recognized'), findsNothing);
+  });
+
+  // The gate used to resolve `modelKey ?? backend.artifactKey` raw while the
+  // header, the picker tick and the send path all resolved through
+  // `effectiveModelKey`. The two disagreed in both directions (#118).
+  group('send is gated on the model the send path would use', () {
+    Future<void> pumpReal(
+      WidgetTester tester, {
+      required String conversationKey,
+      required Map<String, ArtifactStatus> artifacts,
+    }) async {
+      await pumpWithRepositories(
+        tester,
+        backend: const InferenceBackendConfig(
+          kind: InferenceBackendKind.llama,
+          profileKey: 'gemma4',
+          artifactKey: 'gemma4-gguf',
+          modelPath: 'documents:models/gemma4-gguf/weights.gguf',
+          modelPathFromCatalog: true,
+        ),
+        preferences: InMemoryPreferencesRepository(
+          const AppPreferences(
+            onboardingVersion: currentOnboardingVersion,
+            onboardingModelKey: 'gemma4-gguf',
+          ),
+        ),
+        history: ChatHistorySnapshot(
+          activeId: 'chat',
+          conversations: [
+            ChatConversation(
+              id: 'chat',
+              title: 'Upgraded',
+              updatedAt: DateTime.utc(2026, 8, 15),
+              messages: const [],
+              modelKey: conversationKey,
+            ),
+          ],
+        ),
+        model: ModelState(artifacts: artifacts),
+        child: const ChatScreen(),
+      );
+      await tester.enterText(
+        find.byKey(const Key('chat-composer')),
+        'A prompt worth sending',
+      );
+      await tester.pumpAndSettle();
+    }
+
+    VoidCallback? sendAction(WidgetTester tester) => tester
+        .widget<CupertinoButton>(find.byKey(const Key('send-button')))
+        .onPressed;
+
+    testWidgets('a de-pinned conversation model falls back, not off', (
+      tester,
+    ) async {
+      // What the audit hit on an upgrade: the stored key is gone, the setup
+      // key names an artifact this install no longer has, and another
+      // compatible model is installed and is what the next send would load.
+      await pumpReal(
+        tester,
+        conversationKey: 'retired-artifact',
+        artifacts: const {
+          'qwen35-2b-gguf': ArtifactStatus(phase: ArtifactPhase.installed),
+        },
+      );
+      expect(
+        find.textContaining('on device'),
+        findsWidgets,
+        reason: 'the header claims a model is live',
+      );
+      expect(sendAction(tester), isNotNull);
+    });
+
+    testWidgets('nothing loadable still refuses the turn', (tester) async {
+      await pumpReal(
+        tester,
+        conversationKey: 'gemma4-gguf',
+        artifacts: const {},
+      );
+      expect(sendAction(tester), isNull);
+    });
+
+    testWidgets('a simulated setup key that was deleted stops gating', (
+      tester,
+    ) async {
+      // `onboardingModelKey` is never cleared by any production path, so
+      // keying the simulation's gate on that one artifact meant deleting it
+      // locked Send for good — with the rest of the catalog installed.
+      await pumpWithRepositories(
+        tester,
+        preferences: InMemoryPreferencesRepository(
+          const AppPreferences(
+            onboardingVersion: currentOnboardingVersion,
+            onboardingModelKey: 'gemma4-mlx',
+          ),
+        ),
+        model: const ModelState(
+          simulated: true,
+          artifacts: {
+            'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.notDownloaded),
+            'qwen35-2b-gguf': ArtifactStatus(phase: ArtifactPhase.installed),
+          },
+        ),
+        child: const ChatScreen(),
+      );
+      await tester.enterText(
+        find.byKey(const Key('chat-composer')),
+        'A prompt worth sending',
+      );
+      await tester.pumpAndSettle();
+      expect(sendAction(tester), isNotNull);
+    });
+
+    testWidgets('an installed artifact of the other engine does not count', (
+      tester,
+    ) async {
+      // statusOf said installed, so the old gate opened — while the send path
+      // would have resolved something else entirely, or nothing.
+      await pumpReal(
+        tester,
+        conversationKey: 'gemma4-mlx',
+        artifacts: const {
+          'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+        },
+      );
+      expect(sendAction(tester), isNull);
+    });
   });
 }
 
