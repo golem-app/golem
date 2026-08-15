@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_identity.dart';
 import '../../core/app_version.dart';
+import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_sheet.dart';
 import '../../core/domain/app_preferences.dart';
@@ -145,7 +146,7 @@ class SettingsScreen extends ConsumerWidget {
                               ),
                             ),
                             SizedBox(
-                              height: GolemSize.hitTarget,
+                              height: GolemChrome.current.minimumTapTarget,
                               child: Center(
                                 child: CupertinoSwitch(
                                   key: const Key('advanced-mode-switch'),

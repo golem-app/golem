@@ -104,7 +104,7 @@ class GolemSheetAction {
 }
 
 /// The adaptive action list. Cupertino uses the native action sheet with
-/// a cancel button; Android chrome uses a [showGolemSheet] list of 44pt
+/// a cancel button; Android chrome uses a [showGolemSheet] list of
 /// rows dismissed by the scrim.
 Future<void> showGolemActions({
   required BuildContext context,
@@ -166,7 +166,9 @@ Future<void> showGolemActions({
               padding: const EdgeInsets.symmetric(
                 horizontal: GolemSpace.gutter,
               ),
-              minimumSize: const Size.fromHeight(GolemSize.hitTarget),
+              minimumSize: Size.fromHeight(
+                GolemChrome.current.minimumTapTarget,
+              ),
               alignment: AlignmentDirectional.centerStart,
               onPressed: action.onPressed,
               child: Text(

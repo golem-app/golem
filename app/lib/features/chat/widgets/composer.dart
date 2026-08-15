@@ -2,7 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/chrome/golem_toast.dart';
+import '../../../core/domain/model_activation.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/services/image_intake.dart';
@@ -144,9 +146,8 @@ class _ComposerState extends ConsumerState<Composer> {
                   child: CupertinoButton(
                     key: Key('composer-attachment-remove-$index'),
                     padding: EdgeInsets.zero,
-                    minimumSize: const Size(
-                      GolemSize.hitTarget,
-                      GolemSize.hitTarget,
+                    minimumSize: Size.square(
+                      GolemChrome.current.minimumTapTarget,
                     ),
                     onPressed: () => setState(() => _pending.removeAt(index)),
                     child: Semantics(
@@ -215,19 +216,32 @@ class _ComposerState extends ConsumerState<Composer> {
       residentModelKey: resident,
       loadableKeys: loadable,
     );
-    final setupModelKey = ref
-        .watch(preferencesControllerProvider)
-        .value
-        ?.onboardingModelKey;
-    final models = ref.watch(modelControllerProvider).value;
-    final conversationTarget = modelKey ?? backend.artifactKey;
-    final setupModelReady =
-        setupModelKey == null ||
-        (backend.simulatedInference
-            ? models?.statusOf(setupModelKey).phase == ArtifactPhase.installed
-            : conversationTarget != null &&
-                  models?.statusOf(conversationTarget).phase ==
-                      ArtifactPhase.installed);
+    // On a real engine, the exact resolution `ChatController.send` performs,
+    // so the button and the turn cannot disagree. Gating on the raw
+    // `modelKey ?? artifactKey` left Send dark while the header honestly read
+    // "on device" off the fallback the send path would have taken, and lit it
+    // for an artifact of the other engine that `statusOf` called installed
+    // (#118). The loadable set already means installed and compatible.
+    final target = effectiveModelKey(
+      backend: backend,
+      catalog: catalog,
+      modelKey: modelKey,
+      residentModelKey: resident,
+      loadableKeys: loadable,
+    );
+    // The simulation runs the whole catalog without weights, so its send path
+    // never refuses — the only reason to hold Send is first run's deferred
+    // setup. That lifts once setup has produced an installed artifact, not
+    // once one specific key is installed: `onboardingModelKey` is never
+    // cleared, so keying on it left the gate armed for the life of the
+    // install and re-armed it if that one model was later deleted.
+    final setupPending =
+        ref.watch(preferencesControllerProvider).value?.onboardingModelKey !=
+            null &&
+        loadable.isEmpty;
+    final modelReady =
+        backend.sideloaded ||
+        (backend.simulatedInference ? !setupPending : target != null);
     return Padding(
       padding: EdgeInsets.fromLTRB(
         GolemSpace.gutter,
@@ -255,25 +269,32 @@ class _ComposerState extends ConsumerState<Composer> {
               if (_pending.isNotEmpty) _tray(context),
               ListenableBuilder(
                 listenable: controller,
-                builder: (context, _) => CupertinoTextField.borderless(
-                  key: const Key('chat-composer'),
-                  controller: controller,
-                  focusNode: focus,
-                  textDirection: contentTextDirection(
-                    controller.text,
-                    fallback: Directionality.of(context),
+                builder: (context, _) => ConstrainedBox(
+                  // The field is the largest tap target in the composer and
+                  // still landed a point under the Android floor on its
+                  // padding alone.
+                  constraints: BoxConstraints(
+                    minHeight: GolemChrome.current.minimumTapTarget,
                   ),
-                  // Read-only rather than disabled: a disabled field announces
-                  // itself as such to a screen reader, which overstates a state
-                  // that lasts one turn, and it takes the in-flight prompt out of
-                  // reach for selection and copying.
-                  readOnly: generating,
-                  minLines: 1,
-                  maxLines: 6,
-                  placeholder: context.l10n.messagePlaceholder,
-                  textInputAction: TextInputAction.newline,
-                  // 14pt keeps the single-line field at the 44pt tap target.
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: CupertinoTextField.borderless(
+                    key: const Key('chat-composer'),
+                    controller: controller,
+                    focusNode: focus,
+                    textDirection: contentTextDirection(
+                      controller.text,
+                      fallback: Directionality.of(context),
+                    ),
+                    // Read-only rather than disabled: a disabled field announces
+                    // itself as such to a screen reader, which overstates a state
+                    // that lasts one turn, and it takes the in-flight prompt out of
+                    // reach for selection and copying.
+                    readOnly: generating,
+                    minLines: 1,
+                    maxLines: 6,
+                    placeholder: context.l10n.messagePlaceholder,
+                    textInputAction: TextInputAction.newline,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
                 ),
               ),
               Row(
@@ -453,11 +474,13 @@ class _ComposerState extends ConsumerState<Composer> {
                       final canSend =
                           (hasText || _pending.isNotEmpty) &&
                           (_pending.isEmpty || supportsImages) &&
-                          setupModelReady;
+                          modelReady;
                       return CupertinoButton(
                         key: Key(generating ? 'stop-button' : 'send-button'),
                         padding: EdgeInsets.zero,
-                        minimumSize: const Size(44, 44),
+                        minimumSize: Size.square(
+                          GolemChrome.current.minimumTapTarget,
+                        ),
                         onPressed: generating
                             ? () => ref
                                   .read(chatControllerProvider.notifier)
@@ -560,7 +583,7 @@ class _ComposerState extends ConsumerState<Composer> {
   );
 }
 
-/// A power-row control with a 34pt visual inside a 44pt hit target.
+/// A power-row control with a 34pt visual inside a platform-minimum hit target.
 final class _PowerButton extends StatelessWidget {
   const _PowerButton({
     required this.buttonKey,
@@ -577,7 +600,7 @@ final class _PowerButton extends StatelessWidget {
   Widget build(BuildContext context) => CupertinoButton(
     key: buttonKey,
     padding: EdgeInsets.zero,
-    minimumSize: const Size(44, 44),
+    minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
     onPressed: onPressed,
     child: Semantics(label: semanticLabel, child: child),
   );

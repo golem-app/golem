@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/domain/app_state.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/theme/golem_theme.dart';
@@ -32,6 +33,7 @@ class RecoveryBanner extends ConsumerWidget {
       ChatFailureKind.contextExhausted => CupertinoButton(
         key: const Key('start-new-chat'),
         padding: const EdgeInsets.symmetric(horizontal: 8),
+        minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
         onPressed: () => ref
             .read(chatControllerProvider.notifier)
             .startFreshChatFromFailure(),
@@ -43,6 +45,7 @@ class RecoveryBanner extends ConsumerWidget {
         CupertinoButton(
           key: const Key('choose-recovery-model'),
           padding: const EdgeInsets.symmetric(horizontal: 8),
+          minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
           onPressed: () =>
               showModelPickerSheet(context, conversationId: activeId),
           child: Text(context.l10n.chooseDifferentModel),
@@ -51,6 +54,7 @@ class RecoveryBanner extends ConsumerWidget {
       ChatFailureKind.unsupportedImages => CupertinoButton(
         key: const Key('remove-failed-turn'),
         padding: const EdgeInsets.symmetric(horizontal: 8),
+        minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
         onPressed: () =>
             ref.read(chatControllerProvider.notifier).removeFailedTurn(),
         child: Text(context.l10n.deleteMessage),
@@ -58,6 +62,7 @@ class RecoveryBanner extends ConsumerWidget {
       _ => CupertinoButton(
         key: const Key('retry-generation'),
         padding: const EdgeInsets.symmetric(horizontal: 8),
+        minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
         onPressed: () =>
             ref.read(chatControllerProvider.notifier).retryFailure(),
         child: Text(context.l10n.retry),
@@ -107,6 +112,9 @@ class RecoveryBanner extends ConsumerWidget {
                 CupertinoButton(
                   key: const Key('discard-generation'),
                   padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: Size.square(
+                    GolemChrome.current.minimumTapTarget,
+                  ),
                   onPressed: () => ref
                       .read(chatControllerProvider.notifier)
                       .discardFailure(),
@@ -180,7 +188,7 @@ class _DownloadActiveModelButton extends ConsumerWidget {
       child: CupertinoButton(
         key: const Key('download-active-model'),
         color: GolemTheme.accent,
-        minimumSize: const Size.fromHeight(44),
+        minimumSize: Size.fromHeight(GolemChrome.current.minimumTapTarget),
         padding: const EdgeInsets.symmetric(horizontal: 12),
         onPressed: () async {
           final status = ref

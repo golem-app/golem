@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/domain/app_state.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
@@ -110,7 +111,9 @@ class ChatCanvas extends ConsumerWidget {
                     child: CupertinoButton(
                       key: const Key('jump-to-latest'),
                       padding: EdgeInsets.zero,
-                      minimumSize: const Size(44, 44),
+                      minimumSize: Size.square(
+                        GolemChrome.current.minimumTapTarget,
+                      ),
                       onPressed: scrollToLatest,
                       child: const Glass(
                         radius: 22,

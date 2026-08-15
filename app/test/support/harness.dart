@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:golem_flutter/app/launch_composition.dart';
+import 'package:golem_flutter/broker/backend_policy.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
@@ -64,6 +65,30 @@ String chromeSuffix() =>
     ? '-android'
     : '';
 
+/// The fake backend as `resolveBackendPolicy` would build it for the platform
+/// this variant runs, so `simulatedEngine` is set the way a real qa build sets
+/// it.
+InferenceBackendConfig fakeBackendForTestPlatform() => resolveBackendPolicy(
+  backendName: 'fake',
+  profileDefine: '',
+  artifactDefine: '',
+  modelPathDefine: '',
+  tier: DeviceTier.preferred,
+  platform: debugDefaultTargetPlatformOverride == TargetPlatform.android
+      ? HostPlatform.android
+      : HostPlatform.ios,
+);
+
+/// The tap-target guideline for the chrome this variant runs, so a surface
+/// enrolled under [bothChromes] is measured against the same minimum
+/// `GolemChrome.minimumTapTarget` promises — 48 on Android, 44 on iOS.
+/// Asserting the iOS guideline alone is what let the Android floor ship 4dp
+/// short across the shared chrome (#118).
+AccessibilityGuideline get tapTargetGuideline =>
+    debugDefaultTargetPlatformOverride == TargetPlatform.android
+    ? androidTapTargetGuideline
+    : iOSTapTargetGuideline;
+
 Widget wrapApp({
   required Widget child,
   Brightness brightness = Brightness.light,
@@ -116,7 +141,12 @@ LaunchDependencies launchDependenciesWith({
   final scratch =
       directory ?? Directory.systemTemp.createTempSync('golem-widget-test-');
   return LaunchDependencies(
-    backendConfig: backend ?? const InferenceBackendConfig.fake(),
+    // Resolved through the real policy rather than the bare `.fake()`
+    // constant, so the suite exercises the engine a simulation on this
+    // platform would compose — the recommendation differs between chromes,
+    // and a null `simulatedEngine` would quietly fall back to catalog order
+    // and test nothing (#118).
+    backendConfig: backend ?? fakeBackendForTestPlatform(),
     deviceEligibility: eligibility ?? const DeviceEligibility.unclassified(),
     chatHistoryRepository:
         chatHistory ??
@@ -129,7 +159,11 @@ LaunchDependencies launchDependenciesWith({
     cacheProbe: FakeCacheProbe(),
     diskFreeSpaceProbe: const FakeDiskSpace(),
     inferenceRepository:
-        inference ?? FakeInferenceRepository(eventDelay: Duration.zero),
+        inference ??
+        FakeInferenceRepository(
+          eventDelay: Duration.zero,
+          catalog: () => catalog ?? modelCatalog,
+        ),
     modelCatalogEntries: catalog ?? modelCatalog,
     customRepositoryResolver:
         resolver ?? const DeterministicRepositoryResolver(),

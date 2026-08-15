@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/app_identity.dart';
 import '../../../core/chrome/golem_alert.dart';
 import '../../../core/chrome/golem_button.dart';
+import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/chrome/golem_menu.dart';
 import '../../../core/chrome/golem_sheet.dart';
 import '../../../core/chrome/golem_toast.dart';
@@ -142,7 +145,10 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
             child: CupertinoButton(
               key: const Key('drawer-search-button'),
               padding: EdgeInsets.zero,
-              minimumSize: const Size.fromHeight(46),
+              // 46 is the drawn height; the platform floor only ever raises it.
+              minimumSize: Size.fromHeight(
+                math.max(46, GolemChrome.current.minimumTapTarget),
+              ),
               // Gated like the conversation rows: opening a result calls
               // selectConversation, which no-ops mid-generation — search
               // must not offer taps that silently do nothing.
@@ -303,36 +309,44 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
           Row(
             children: [
               Expanded(
-                child: CupertinoButton(
-                  key: Key('conversation-${item.id}'),
-                  padding: const EdgeInsetsDirectional.only(start: 20, end: 4),
-                  minimumSize: const Size.fromHeight(52),
-                  alignment: AlignmentDirectional.centerStart,
-                  onPressed: widget.blocked
-                      ? null
-                      : () {
-                          ref
-                              .read(chatControllerProvider.notifier)
-                              .selectConversation(item.id);
-                          widget.close();
-                        },
-                  child: Text(
-                    item.title.isEmpty ? context.l10n.newChat : item.title,
-                    textDirection: item.title.isEmpty
-                        ? Directionality.of(context)
-                        : contentTextDirection(
-                            item.title,
-                            fallback: Directionality.of(context),
-                          ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: CupertinoDynamicColor.resolve(
-                        GolemTheme.drawerInk,
-                        context,
+                // The open conversation was a background tint and a 4pt bar,
+                // and said nothing.
+                child: Semantics(
+                  selected: selected,
+                  child: CupertinoButton(
+                    key: Key('conversation-${item.id}'),
+                    padding: const EdgeInsetsDirectional.only(
+                      start: 20,
+                      end: 4,
+                    ),
+                    minimumSize: const Size.fromHeight(52),
+                    alignment: AlignmentDirectional.centerStart,
+                    onPressed: widget.blocked
+                        ? null
+                        : () {
+                            ref
+                                .read(chatControllerProvider.notifier)
+                                .selectConversation(item.id);
+                            widget.close();
+                          },
+                    child: Text(
+                      item.title.isEmpty ? context.l10n.newChat : item.title,
+                      textDirection: item.title.isEmpty
+                          ? Directionality.of(context)
+                          : contentTextDirection(
+                              item.title,
+                              fallback: Directionality.of(context),
+                            ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: CupertinoDynamicColor.resolve(
+                          GolemTheme.drawerInk,
+                          context,
+                        ),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),

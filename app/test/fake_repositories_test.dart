@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
@@ -55,6 +56,44 @@ void main() {
       expect(events.last, isA<CompletedEvent>());
     },
   );
+
+  test('the simulation names the artifact it was given', () async {
+    // `startsWith('qwen35')` made every Qwen key answer as the 4B and be
+    // charged its slower rate, so QA claimed the smaller model was the
+    // slower one under a header reading 2B (#118).
+    Future<({String opening, double rate})> turnFor(String modelKey) async {
+      final events =
+          await FakeInferenceRepository(
+                eventDelay: Duration.zero,
+                catalog: () => modelCatalog,
+              )
+              .generate(
+                context: [PromptMessage.text('user', 'Hello')],
+                reasoningEnabled: false,
+                modelKey: modelKey,
+              )
+              .toList();
+      return (
+        opening: events.whereType<AnswerDelta>().first.text,
+        rate: events
+            .whereType<MetricsEvent>()
+            .first
+            .metrics
+            .decodeTokensPerSecond,
+      );
+    }
+
+    final small = await turnFor('qwen35-2b-mlx');
+    final large = await turnFor('qwen35-mlx');
+    final gemma = await turnFor('gemma4-gguf');
+
+    expect(small.opening, startsWith('Simulated Qwen 3.5 2B here.'));
+    expect(large.opening, startsWith('Simulated Qwen 3.5 4B here.'));
+    expect(gemma.opening, startsWith('Simulated Gemma 4 E2B here.'));
+    // Distinct identities, and the smaller artifact is no longer the slower.
+    expect(small.rate, isNot(large.rate));
+    expect(small.rate, greaterThan(large.rate));
+  });
 
   test(
     'the system-prompt note never precedes reasoning or a failure',

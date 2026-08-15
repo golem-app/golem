@@ -1,19 +1,28 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
+import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/settings/appearance_screen.dart';
 import 'package:golem_flutter/features/settings/models_screen.dart';
+import 'package:golem_flutter/features/settings/response_style_screen.dart';
 
 import 'support/harness.dart';
+import 'support/in_memory_preferences_repository.dart';
 
 /// What a screen reader is told. None of it is visible on screen, so no
 /// golden and no other suite here would notice it regressing.
 void main() {
   List<String> announcements(WidgetTester tester) =>
       tester.takeAnnouncements().map((event) => event.message).toList();
+
+  /// Whether the node behind [finder] reports itself selected.
+  bool isSelectedNode(WidgetTester tester, Finder finder) =>
+      tester.getSemantics(finder).flagsCollection.isSelected == Tristate.isTrue;
 
   /// How many nodes in the whole tree carry [label] — the duplicate-reading
   /// count, which a single `getSemantics` assertion cannot see.
@@ -238,6 +247,105 @@ void main() {
       tester.getSemantics(progress),
       isSemantics(label: 'Download', value: '25 percent'),
     );
+    handle.dispose();
+  });
+
+  // Every one of these rows conveyed its selection only by paint — a border,
+  // a tinted disc, a 6pt dot, a 4pt bar — or, worse, claimed it in words on
+  // every row at once (#118).
+  testWidgets('only the chosen response style says it is selected', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await pumpWithRepositories(tester, child: const ResponseStyleScreen());
+
+    for (final (key, title) in const [
+      ('style-precise', 'Precise'),
+      ('style-balanced', 'Balanced'),
+      ('style-creative', 'Creative'),
+    ]) {
+      final node = tester.getSemantics(find.byKey(Key(key)));
+      expect(
+        node,
+        isSemantics(
+          isSelected: title == 'Balanced',
+          value: title == 'Balanced' ? '$title selected' : '',
+        ),
+        reason: '$key at rest',
+      );
+      // The tick used to carry "<title> selected" as its own label, so the
+      // title was read twice on the chosen row and falsely on the other two.
+      expect(nodesLabelled(tester, title), 1, reason: '$key named once');
+    }
+
+    await tester.tap(find.byKey(const Key('style-creative')));
+    await tester.pumpAndSettle();
+    for (final (key, title) in const [
+      ('style-precise', 'Precise'),
+      ('style-balanced', 'Balanced'),
+      ('style-creative', 'Creative'),
+    ]) {
+      expect(
+        tester.getSemantics(find.byKey(Key(key))),
+        isSemantics(
+          isSelected: title == 'Creative',
+          value: title == 'Creative' ? '$title selected' : '',
+        ),
+        reason: '$key after choosing Creative',
+      );
+    }
+    handle.dispose();
+  });
+
+  testWidgets('the active conversation says so, not just paints so', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await pumpWithRepositories(
+      tester,
+      history: seedHistory(),
+      child: const ChatScreen(),
+    );
+    await tester.tap(find.byKey(const Key('open-drawer')));
+    await tester.pumpAndSettle();
+
+    final rows = find.byWidgetPredicate(
+      (widget) => widget is Semantics && widget.properties.selected != null,
+      description: 'conversation rows carrying a selected state',
+    );
+    expect(rows, findsWidgets);
+    final selected = tester
+        .widgetList<Semantics>(rows)
+        .where((row) => row.properties.selected ?? false);
+    expect(selected, hasLength(1));
+    handle.dispose();
+  });
+
+  testWidgets('the engine chips announce which engine is chosen', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await pumpWithRepositories(
+      tester,
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(advancedMode: true),
+      ),
+      child: const ModelsScreen(),
+    );
+    final mlx = find.byKey(const Key('custom-repo-engine-mlx'));
+    await tester.scrollUntilVisible(mlx, 200);
+    await tester.pumpAndSettle();
+    final gguf = find.byKey(const Key('custom-repo-engine-gguf'));
+
+    // The pair is mutually exclusive and its only cue was a 6pt dot: exactly
+    // one must report itself selected, whichever the build defaults to.
+    final states = [isSelectedNode(tester, mlx), isSelectedNode(tester, gguf)];
+    expect(states.where((selected) => selected), hasLength(1));
+
+    await tester.tap(states.first ? gguf : mlx);
+    await tester.pumpAndSettle();
+    expect(isSelectedNode(tester, mlx), !states.first);
+    expect(isSelectedNode(tester, gguf), states.first);
     handle.dispose();
   });
 }

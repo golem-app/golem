@@ -209,7 +209,7 @@ void main() {
     );
     for (final screen in <Widget>[const ModelAttributionScreen(), licenses]) {
       await pumpWithRepositories(tester, child: screen);
-      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(tapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       await expectLater(tester, meetsGuideline(textContrastGuideline));
 
@@ -228,5 +228,5 @@ void main() {
       );
       expect(tester.takeException(), isNull);
     }
-  }, variant: iosChrome);
+  }, variant: bothChromes);
 }

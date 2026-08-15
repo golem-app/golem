@@ -31,6 +31,24 @@ Set<String> loadableModelKeys({
   };
 }
 
+/// What the simulation falls back to when nothing has been chosen: the default
+/// family, of the engine this platform's real build composes. Hardcoding one
+/// engine here would have the chip, the header and the next turn name an
+/// artifact the platform could not run while the picker's badge named another
+/// (#118).
+String? simulatedFallbackKey(
+  InferenceBackendConfig backend,
+  List<ModelCatalogEntry> catalog,
+) {
+  final family = catalog.where((entry) => entry.key.startsWith('gemma4-'));
+  return family
+          .where((entry) => entry.engine == backend.simulatedEngine)
+          .firstOrNull
+          ?.key ??
+      family.firstOrNull?.key ??
+      catalog.firstOrNull?.key;
+}
+
 /// The compatible verified artifact this process should use when a stored
 /// choice is unavailable. Catalog order is stable, so every caller reaches the
 /// same fallback without rewriting historical conversation data.
@@ -44,9 +62,7 @@ String? startupModelKey({
   if (backend.simulatedInference) {
     return preferredKey ??
         backend.artifactKey ??
-        (catalog.any((entry) => entry.key == 'gemma4-mlx')
-            ? 'gemma4-mlx'
-            : catalog.firstOrNull?.key);
+        simulatedFallbackKey(backend, catalog);
   }
   for (final key in [preferredKey, backend.artifactKey]) {
     if (key != null && loadableKeys.contains(key)) return key;
@@ -92,9 +108,7 @@ String? effectiveModelKey({
   }
   return residentModelKey ??
       backend.artifactKey ??
-      (catalog.any((entry) => entry.key == 'gemma4-mlx')
-          ? 'gemma4-mlx'
-          : catalog.firstOrNull?.key);
+      simulatedFallbackKey(backend, catalog);
 }
 
 /// The file or directory an operator pointed the build at — never the path

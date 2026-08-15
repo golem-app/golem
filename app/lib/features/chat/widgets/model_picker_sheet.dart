@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/chrome/golem_badge.dart';
 import '../../../core/chrome/golem_button.dart';
+import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/chrome/golem_sheet.dart';
 import '../../../core/domain/model_activation.dart';
 import '../../../core/domain/models.dart';
@@ -16,6 +17,13 @@ import '../../onboarding/model_download_consent.dart';
 import '../../settings/application/preferences_providers.dart';
 import '../application/chat_providers.dart';
 import '../model_choice.dart';
+
+/// How far a row's text sits inside the sheet's gutter: the card's 14pt
+/// padding plus its hairline. Anything trailing the rows indents by the same
+/// amount so the sheet reads as one column. The selected row's heavier border
+/// puts its text half a point further in; matching that would move the text
+/// every time the selection changed.
+const double _rowTextInset = 15;
 
 /// The per-chat model sheet. What each row says, why it is offered or refused,
 /// and which one is recommended all come from [buildModelPickerView]; this file
@@ -118,10 +126,16 @@ final class _ModelPickerContent extends ConsumerWidget {
                 ),
               ),
             ),
+            // Indented to the rows' text, not to their border: the sheet's
+            // left edge belongs to the cards, and the notes and link that
+            // follow them are read as the same column.
             for (final note in [view.hiddenNote, view.footnote])
               if (note != null)
                 Padding(
-                  padding: const EdgeInsets.only(top: GolemSpace.s1),
+                  padding: const EdgeInsetsDirectional.only(
+                    top: GolemSpace.s1,
+                    start: _rowTextInset,
+                  ),
                   child: Text(
                     note,
                     style: GolemText.caption.copyWith(color: muted),
@@ -129,8 +143,10 @@ final class _ModelPickerContent extends ConsumerWidget {
                 ),
             CupertinoButton(
               key: const Key('model-picker-manage'),
-              padding: EdgeInsets.zero,
-              minimumSize: const Size.fromHeight(GolemSize.hitTarget),
+              padding: const EdgeInsetsDirectional.only(start: _rowTextInset),
+              minimumSize: Size.fromHeight(
+                GolemChrome.current.minimumTapTarget,
+              ),
               alignment: AlignmentDirectional.centerStart,
               onPressed: () {
                 Navigator.pop(context);
@@ -245,7 +261,9 @@ final class _ModelRow extends StatelessWidget {
             CupertinoButton(
               key: Key('model-picker-${choice.entry.key}'),
               padding: const EdgeInsets.symmetric(vertical: GolemSpace.s2),
-              minimumSize: const Size.fromHeight(GolemSize.hitTarget),
+              minimumSize: Size.fromHeight(
+                GolemChrome.current.minimumTapTarget,
+              ),
               onPressed: onSelect,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -355,7 +373,9 @@ final class _ModelRow extends StatelessWidget {
             CupertinoButton(
               key: Key('model-picker-pause-${choice.entry.key}'),
               padding: EdgeInsets.zero,
-              minimumSize: const Size.fromHeight(GolemSize.hitTarget),
+              minimumSize: Size.fromHeight(
+                GolemChrome.current.minimumTapTarget,
+              ),
               onPressed: onTransfer,
               child: Text(
                 context.l10n.pause,

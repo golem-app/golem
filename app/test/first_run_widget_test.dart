@@ -645,12 +645,19 @@ void main() {
         tester,
         textScale: 1.6,
         eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+        // Both engines, because which artifact first run features follows the
+        // platform the variant runs (#118) — the subject here is the
+        // verification pane, not the choice.
         model: const ModelState(
           simulated: false,
           artifacts: {
             'gemma4-mlx': ArtifactStatus(
               phase: ArtifactPhase.verifying,
               downloadedBytes: 3583086498,
+            ),
+            'gemma4-gguf': ArtifactStatus(
+              phase: ArtifactPhase.verifying,
+              downloadedBytes: 3183086498,
             ),
           },
         ),

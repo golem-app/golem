@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/core/chrome/golem_chrome.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/widgets/markdown/code_block.dart';
@@ -145,16 +146,25 @@ void main() {
     expect(tester.getTopLeft(scroller).dx - cardLeft, viewportLeft - cardLeft);
   });
 
-  testWidgets('the header band holds the iOS minimum height on its own', (
-    tester,
-  ) async {
-    await pumpCard(tester, code: python, language: 'python');
-    // The band by key, not `byType(ConstrainedBox).first` — that would
-    // silently retarget the card itself the moment anything above the band
-    // gains constraints.
-    expect(tester.getSize(find.byKey(const Key('code-header'))).height, 44);
-    expect(tester.getSize(find.byKey(const Key('code-copy'))).height, 44);
-  });
+  testWidgets(
+    'the header band holds the platform minimum height on its own',
+    (tester) async {
+      await pumpCard(tester, code: python, language: 'python');
+      final minimum = GolemChrome.current.minimumTapTarget;
+      // The band by key, not `byType(ConstrainedBox).first` — that would
+      // silently retarget the card itself the moment anything above the band
+      // gains constraints.
+      expect(
+        tester.getSize(find.byKey(const Key('code-header'))).height,
+        minimum,
+      );
+      expect(
+        tester.getSize(find.byKey(const Key('code-copy'))).height,
+        minimum,
+      );
+    },
+    variant: bothChromes,
+  );
 
   testWidgets('an untagged fence resolves through the real transcript', (
     tester,

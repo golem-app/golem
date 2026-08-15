@@ -28,9 +28,12 @@ abstract final class GolemSpace {
   static const double gutter = 16;
 }
 
-/// Control sizes shared across surfaces.
+/// Control sizes shared across surfaces. The interactive minimum is
+/// deliberately absent: it is platform-owned and lives on
+/// `GolemChrome.minimumTapTarget` (44 on cupertino, 48 on android). A blind
+/// 44 token here is what put the shared chrome 4dp under the Android floor
+/// (#118).
 abstract final class GolemSize {
-  static const double hitTarget = 44;
   static const double iconButton = 36;
   static const double composer = 56;
   static const double send = 42;

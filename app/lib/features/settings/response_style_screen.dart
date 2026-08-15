@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // knowledge (profiles carry no Inferno import); the Inferno boundary is
 // unchanged — only lib/broker/ touches package:inferno.
 import '../../broker/model_profile.dart';
+import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/domain/app_preferences.dart';
 import '../../core/domain/generation_settings.dart';
@@ -106,60 +107,67 @@ class _StyleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = CupertinoDynamicColor.resolve(GolemTheme.accent, context);
-    return CupertinoButton(
-      key: Key('style-${style.name}'),
-      padding: EdgeInsets.zero,
-      onPressed: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsetsDirectional.fromSTEB(17, 15, 15, 15),
-        decoration: BoxDecoration(
-          color: CupertinoDynamicColor.resolve(GolemTheme.surface, context),
-          borderRadius: BorderRadius.circular(GolemRadius.card),
-          border: Border.all(
-            color: selected
-                ? accent
-                : CupertinoDynamicColor.resolve(GolemTheme.divider, context),
-            width: selected ? 1.5 : 1,
-          ),
-          boxShadow: GolemShadow.card(context),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _styleTitle(context, style),
-                    // Explicit ink: CupertinoButton would otherwise tint
-                    // the title accent-blue.
-                    style: GolemText.bodyStrong.copyWith(
-                      color: CupertinoDynamicColor.resolve(
-                        GolemTheme.ink,
-                        context,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    _styleDetail(context, style),
-                    style: GolemText.footnote.copyWith(
-                      color: CupertinoDynamicColor.resolve(
-                        GolemTheme.mutedInk,
-                        context,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+    // Selection belongs to the row, and only to the row that has it. The tick
+    // used to carry "<title> selected" as its own label unconditionally, so
+    // every option announced itself as chosen and the chosen one said its
+    // title twice (#118). Same shape as the language rows.
+    return Semantics(
+      selected: selected,
+      value: selected
+          ? context.l10n.selectedOption(_styleTitle(context, style))
+          : null,
+      child: CupertinoButton(
+        key: Key('style-${style.name}'),
+        padding: EdgeInsets.zero,
+        onPressed: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsetsDirectional.fromSTEB(17, 15, 15, 15),
+          decoration: BoxDecoration(
+            color: CupertinoDynamicColor.resolve(GolemTheme.surface, context),
+            borderRadius: BorderRadius.circular(GolemRadius.card),
+            border: Border.all(
+              color: selected
+                  ? accent
+                  : CupertinoDynamicColor.resolve(GolemTheme.divider, context),
+              width: selected ? 1.5 : 1,
             ),
-            const SizedBox(width: 12),
-            Semantics(
-              label: context.l10n.selectedOption(_styleTitle(context, style)),
-              checked: selected,
-              child: Container(
+            boxShadow: GolemShadow.card(context),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _styleTitle(context, style),
+                      // Explicit ink: CupertinoButton would otherwise tint
+                      // the title accent-blue.
+                      style: GolemText.bodyStrong.copyWith(
+                        color: CupertinoDynamicColor.resolve(
+                          GolemTheme.ink,
+                          context,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _styleDetail(context, style),
+                      style: GolemText.footnote.copyWith(
+                        color: CupertinoDynamicColor.resolve(
+                          GolemTheme.mutedInk,
+                          context,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Dial face: the row above says what this paints.
+              Container(
                 width: 23,
                 height: 23,
                 decoration: BoxDecoration(
@@ -183,8 +191,8 @@ class _StyleCard extends StatelessWidget {
                       )
                     : null,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -298,7 +306,10 @@ class GenerationCard extends ConsumerWidget {
               child: CupertinoButton(
                 key: Key('gen-reset-$profileKey'),
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                minimumSize: const Size(44, 30),
+                // Square, not `fromHeight`: that sets an infinite minimum
+                // width, which the parent clamps to its own — and a
+                // full-width Reset would ignore the trailing Align above it.
+                minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
                 onPressed: () => announceFailedSave(
                   context,
                   ref
@@ -512,42 +523,59 @@ class _StepperRow extends StatelessWidget {
     final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
     final lower = ((value - step) ~/ step) * step;
     final higher = ((value + step) ~/ step) * step;
-    return Row(
-      key: stepperKey,
-      children: [
-        Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
-        CupertinoButton(
-          key: Key('${stepperKey.value}-minus'),
-          padding: EdgeInsets.zero,
-          minimumSize: const Size(38, 30),
-          onPressed: value <= min
-              ? null
-              : () => onCommit(lower.clamp(min, max)),
-          child: const Icon(CupertinoIcons.minus_circle, size: 22),
+    // One adjustable control rather than two unlabeled glyph buttons — the
+    // same shape the text-size slider uses. The name is the row's own label
+    // and the value is the number already on screen, so nothing new is said;
+    // "increase"/"decrease" come from the platform's own vocabulary.
+    return Semantics(
+      container: true,
+      label: label,
+      value: '$value',
+      // The framework requires the projected readings beside the actions, so
+      // a screen reader can say where a step lands before taking it.
+      increasedValue: '${higher.clamp(min, max)}',
+      decreasedValue: '${lower.clamp(min, max)}',
+      onIncrease: value >= max ? null : () => onCommit(higher.clamp(min, max)),
+      onDecrease: value <= min ? null : () => onCommit(lower.clamp(min, max)),
+      child: ExcludeSemantics(
+        child: Row(
+          key: stepperKey,
+          children: [
+            Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
+            CupertinoButton(
+              key: Key('${stepperKey.value}-minus'),
+              padding: EdgeInsets.zero,
+              minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
+              onPressed: value <= min
+                  ? null
+                  : () => onCommit(lower.clamp(min, max)),
+              child: const Icon(CupertinoIcons.minus_circle, size: 22),
+            ),
+            SizedBox(
+              width: 64,
+              child: Column(
+                children: [
+                  Text('$value', style: const TextStyle(fontSize: 14)),
+                  if (isDefault)
+                    Text(
+                      context.l10n.defaultLowercase,
+                      style: TextStyle(fontSize: 11, color: muted),
+                    ),
+                ],
+              ),
+            ),
+            CupertinoButton(
+              key: Key('${stepperKey.value}-plus'),
+              padding: EdgeInsets.zero,
+              minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
+              onPressed: value >= max
+                  ? null
+                  : () => onCommit(higher.clamp(min, max)),
+              child: const Icon(CupertinoIcons.plus_circle, size: 22),
+            ),
+          ],
         ),
-        SizedBox(
-          width: 64,
-          child: Column(
-            children: [
-              Text('$value', style: const TextStyle(fontSize: 14)),
-              if (isDefault)
-                Text(
-                  context.l10n.defaultLowercase,
-                  style: TextStyle(fontSize: 11, color: muted),
-                ),
-            ],
-          ),
-        ),
-        CupertinoButton(
-          key: Key('${stepperKey.value}-plus'),
-          padding: EdgeInsets.zero,
-          minimumSize: const Size(38, 30),
-          onPressed: value >= max
-              ? null
-              : () => onCommit(higher.clamp(min, max)),
-          child: const Icon(CupertinoIcons.plus_circle, size: 22),
-        ),
-      ],
+      ),
     );
   }
 }

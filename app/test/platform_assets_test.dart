@@ -57,6 +57,29 @@ void main() {
     );
   });
 
+  test('the icon fonts the build references are declared', () async {
+    // Dropping this line brings back the tree-shaker's "Expected to find
+    // fonts for (…, MaterialIcons)" on every release artifact: go_router and
+    // background_downloader reference codepoints the app never draws (#118).
+    final pubspec = await File('pubspec.yaml').readAsString();
+    expect(pubspec, contains('uses-material-design: true'));
+
+    // The declaration is for the dependencies' sake only. Golem's own
+    // surfaces stay Cupertino: a material.dart import here would pull a
+    // second design system into a single-chrome app.
+    final sources = Directory('lib')
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((file) => file.path.endsWith('.dart'));
+    for (final file in sources) {
+      expect(
+        file.readAsStringSync(),
+        isNot(contains('package:flutter/material.dart')),
+        reason: file.path,
+      );
+    }
+  });
+
   test('every shipped flavor identity is covered by these assertions', () {
     // AppIdentity also carries the flavorless legacy identity, which owns no
     // flavor resources — hence its exclusion. A new enum member must either

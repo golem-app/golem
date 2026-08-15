@@ -8,6 +8,7 @@ import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/chrome/golem_button.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
+import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
@@ -40,6 +41,7 @@ import 'package:golem_flutter/features/splash/splash_screen.dart';
 import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
+import 'support/in_memory_settings_repository.dart';
 
 Future<List<OpenSourceLicense>> _goldenLicenses() async => [
   OpenSourceLicense(
@@ -1113,11 +1115,11 @@ void main() {
     }, variant: bothChromes);
   }
 
-  testWidgets('iOS targets, labels, contrast, and enlarged text', (
+  testWidgets('platform targets, labels, contrast, and enlarged text', (
     tester,
   ) async {
     await pumpWithRepositories(tester, child: const ChatScreen());
-    await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(tapTargetGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
 
@@ -1133,7 +1135,7 @@ void main() {
         history: markdownHistory(),
         child: const ChatScreen(),
       );
-      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(tapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       await expectLater(tester, meetsGuideline(textContrastGuideline));
     }
@@ -1163,25 +1165,74 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('open-drawer')));
       await tester.pumpAndSettle();
-      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(tapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       if (brightness == Brightness.light) {
         await expectLater(tester, meetsGuideline(textContrastGuideline));
       }
     }
 
-    // The redesigned settings surfaces enroll in the same guidelines.
+    // The redesigned settings surfaces enroll in the same guidelines. Each
+    // pumps the state that actually builds its controls: Advanced mode gates
+    // the sampling card and the custom-repository loader behind a preference,
+    // and Storage's delete buttons need an installed artifact to belong to.
+    // Enrolling the screens without that state measures their headers and
+    // nothing else — the sampling steppers sat at 38x30 precisely because
+    // nothing ever built them under a guideline (#118).
+    final advanced = InMemoryPreferencesRepository(
+      const AppPreferences(advancedMode: true),
+    );
     for (final screen in const <Widget>[
       SettingsScreen(identity: AppIdentity.dev),
       AppearanceScreen(),
       PrivacyScreen(),
+      StorageScreen(),
+      ModelsScreen(),
+      SystemPromptScreen(),
+      ResponseStyleScreen(),
+      BenchmarkScreen(),
     ]) {
-      await pumpWithRepositories(tester, child: screen);
-      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await pumpWithRepositories(
+        tester,
+        preferences: advanced,
+        settings: InMemorySettingsRepository(
+          const GenerationSettings(
+            // A set override is what renders Reset beside the steppers.
+            models: {'gemma4': SamplingOverrides(temperature: 0.9)},
+          ),
+        ),
+        model: const ModelState(
+          artifacts: {
+            'gemma4-gguf': ArtifactStatus(phase: ArtifactPhase.installed),
+          },
+        ),
+        child: screen,
+      );
+      await expectLater(tester, meetsGuideline(tapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       await expectLater(tester, meetsGuideline(textContrastGuideline));
     }
-  }, variant: iosChrome);
+
+    // Recovery is a whole row of buttons that only exists after a failure, so
+    // no screen state above reaches it. Every kind enrolls: they do not offer
+    // the same actions.
+    for (final kind in ChatFailureKind.values) {
+      await pumpWithRepositories(
+        tester,
+        child: CupertinoPageScaffold(
+          child: RecoveryBanner(
+            key: ValueKey(kind),
+            failure: ChatFailure(kind: kind),
+          ),
+        ),
+      );
+      await expectLater(
+        tester,
+        meetsGuideline(tapTargetGuideline),
+        reason: kind.name,
+      );
+    }
+  }, variant: bothChromes);
 
   // A phone at an accessibility text size is a supported configuration, not an
   // edge case: the app's own slider reaches 1.3x and the platform's factor

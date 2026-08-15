@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/broker/backend_policy.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
@@ -7,6 +8,7 @@ import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/onboarding/domain/onboarding_policy.dart';
+import 'package:golem_flutter/core/domain/model_activation.dart';
 import 'package:golem_flutter/core/domain/model_admission.dart';
 
 void main() {
@@ -116,6 +118,49 @@ void main() {
         ),
         'gemma4-mlx',
       );
+    });
+
+    test('the simulation recommends what this platform would run', () {
+      // The recommendation is hardware-independent by design, but not
+      // platform-independent: the engine is a build composition, so Android
+      // QA featuring an MLX artifact advertised a model that build could
+      // never execute (#118).
+      String? recommendedOn(HostPlatform platform) =>
+          recommendedAdmittedModelKey(
+            catalog: modelCatalog,
+            backend: resolveBackendPolicy(
+              backendName: 'fake',
+              profileDefine: '',
+              artifactDefine: '',
+              modelPathDefine: '',
+              tier: DeviceTier.light,
+              platform: platform,
+            ),
+            eligibility: const DeviceEligibility(tier: DeviceTier.light),
+          );
+      expect(recommendedOn(HostPlatform.ios), 'gemma4-mlx');
+      expect(recommendedOn(HostPlatform.android), 'gemma4-gguf');
+      expect(recommendedOn(HostPlatform.macos), 'gemma4-gguf');
+    });
+
+    test('the simulation falls back to what it recommends', () {
+      // The badge and the label have to agree: a fallback pinned to one engine
+      // let the chip, the header and the next turn name an artifact the
+      // platform could not run while the badge named another.
+      String? fallbackOn(HostPlatform platform) => effectiveModelKey(
+        backend: resolveBackendPolicy(
+          backendName: 'fake',
+          profileDefine: '',
+          artifactDefine: '',
+          modelPathDefine: '',
+          tier: DeviceTier.preferred,
+          platform: platform,
+        ),
+        catalog: modelCatalog,
+        loadableKeys: const <String>{},
+      );
+      expect(fallbackOn(HostPlatform.ios), 'gemma4-mlx');
+      expect(fallbackOn(HostPlatform.android), 'gemma4-gguf');
     });
 
     test('a light real build enables only its configured 2B artifact', () {

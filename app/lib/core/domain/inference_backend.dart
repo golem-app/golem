@@ -29,6 +29,7 @@ final class InferenceBackendConfig {
     this.modelPath,
     this.modelPathFromCatalog = false,
     this.artifactFromDevicePolicy = false,
+    this.simulatedEngine,
   });
 
   const InferenceBackendConfig.fake()
@@ -37,7 +38,8 @@ final class InferenceBackendConfig {
       artifactKey = null,
       artifactFromDevicePolicy = false,
       modelPath = null,
-      modelPathFromCatalog = false;
+      modelPathFromCatalog = false,
+      simulatedEngine = null;
 
   final InferenceBackendKind kind;
 
@@ -65,6 +67,13 @@ final class InferenceBackendConfig {
   /// or profile consults the tier, so only then may copy credit it for the
   /// choice (#79).
   final bool artifactFromDevicePolicy;
+
+  /// Under the fake only: the engine this platform's real build composes. The
+  /// simulation carries no artifact, so its recommendation used to prefer MLX
+  /// on every platform and QA on Android featured a model that build could
+  /// never execute (#118). Resolved once, where every other engine answer is,
+  /// so admission consumes a reading rather than taking a second one.
+  final ModelEngine? simulatedEngine;
 
   bool get simulatedInference => kind == InferenceBackendKind.fake;
 

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/chrome/golem_alert.dart';
+import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_toast.dart';
 import '../../core/domain/byte_format.dart';
@@ -273,7 +274,7 @@ class _DownloadedModels extends ConsumerWidget {
       children: [
         for (final entry in rows)
           Padding(
-            // Natural height, floored by the trash button's 44pt target: the
+            // Natural height, floored by the trash button's target: the
             // test font renders far taller than SF Pro, so a fixed row height
             // would overflow invisibly.
             padding: const EdgeInsets.symmetric(vertical: 7),
@@ -309,7 +310,9 @@ class _DownloadedModels extends ConsumerWidget {
                 CupertinoButton(
                   key: Key('storage-delete-${entry.key}'),
                   padding: EdgeInsets.zero,
-                  minimumSize: const Size(44, 44),
+                  minimumSize: Size.square(
+                    GolemChrome.current.minimumTapTarget,
+                  ),
                   onPressed: () => _confirmDelete(context, ref, entry),
                   child: const Icon(
                     CupertinoIcons.trash,
