@@ -282,3 +282,61 @@ resolved or explicitly proven harmless before relying on clean release logs.
 No fix was made and no ticket was created, per the requested scope. This branch
 is a durable, sanitized QA record; the findings need normal board intake before
 application code changes begin.
+
+## Dispositions
+
+Recorded when the findings were closed under #118, on the same OnePlus 12R and
+on a physical iPhone 17. Every claim below was re-observed on a device unless
+it says otherwise.
+
+- **F1 — fixed, and a decision recorded.** The simulation now recommends the
+  artifact of the engine this platform's real build composes: iOS MLX, Android
+  and macOS GGUF. QA stays deliberately hardware-independent — it still shows
+  and runs the whole catalog on any phone — but the engine is a build
+  composition, identical for qa and production on one platform, so featuring
+  an artifact the build cannot execute made QA a misleading proxy for the
+  product. The engine is resolved once, in `resolveBackendPolicy`, and
+  admission consumes that answer rather than taking a second one. Verified: the
+  Android QA picker's `RECOMMENDED` badge now sits on Gemma 4 E2B · GGUF.
+- **F2 — fixed.** The simulated identity comes from
+  `ModelCatalogEntry.displayName` instead of a three-case prefix match, and the
+  invented decode rate is per family and size. Verified: Qwen 3.5 2B answers
+  "Simulated Qwen 3.5 2B here." at 24.6 tok/s, above Gemma's 21.4 rather than
+  below it.
+- **F3 — fixed.** Only the chosen response style announces itself as selected,
+  and the row is named once rather than twice. Verified in both selection
+  states. The same audit turned up three surfaces that announced *nothing*
+  about selection — the MLX/GGUF engine chips, the first-run model rows, and
+  the drawer's active conversation — and those were closed with it.
+- **F4 — fixed, with one measured exception.** Shared controls resolve
+  `GolemChrome.minimumTapTarget`, and the platform-blind `GolemSize.hitTarget`
+  token is gone. Verified at 144 px (48 dp) across message actions, drawer and
+  new-chat controls, composer controls, menus, search, code-block chips, and
+  the Advanced sampling steppers — which were 38 × 30, below even the iOS
+  minimum. **Exception:** the navigation bar's own controls (Back,
+  `open-drawer`, `new-chat-header`) measure 48 × 44 dp. `CupertinoNavigationBar`
+  fixes its content slot at `kMinInteractiveDimensionCupertino` (44) with no
+  parameter to change it, so their height cannot exceed 44 while the Android
+  chrome uses that widget. This is unchanged by #118 — the audit's "Back was
+  144 pixels" measured its width — and closing it means giving the Android
+  chrome its own taller bar, which is a chrome change rather than a hit-box
+  one. Not attempted here; it needs its own ticket.
+  Note the widget suite cannot catch this class on its own:
+  Flutter's tap-target guidelines skip any node touching the view boundary, and
+  in the test viewport the bar has no status-bar inset to hold it clear.
+- **F5 — fixed.** The composer resolves its gate through `effectiveModelKey`,
+  the same resolution `ChatController.send` performs. Verified on Android with
+  the setup banner still asking to finish Gemma 4 E2B while Qwen 3.5 2B was
+  installed and selected: Send stayed enabled and the turn answered. The
+  original production upgrade path was not re-observed — reproducing it needs a
+  multi-gigabyte re-download and the deletion of a verified model — so the
+  device evidence is the simulated equivalent plus unit coverage of both
+  divergence directions.
+- **F6 — resolved rather than proven harmless.** `uses-material-design: true`
+  declares the font `go_router` and `background_downloader` reference. The
+  warning is gone from a fresh QA release build and the font tree-shakes from
+  1,645,184 bytes to 1,324. `tool/check_android_packaging.dart` still passes.
+- **O1 — unchanged.** Still an observation, still with #114.
+- **O2 — not reclassified.** The duplicated sheet and list nodes were not put
+  through a TalkBack and VoiceOver pass here, so the observation stands as
+  written and is not closed by #118.

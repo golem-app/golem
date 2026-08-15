@@ -427,6 +427,14 @@ build files, which is the only way to catch a toolchain default changing
 underneath. Run it after any llama.cpp or NDK pin bump; the reasoning is in
 [ADR 0010](../docs/decisions/0010-android-native-packaging.md).
 
+The pubspec declares `uses-material-design: true` even though no app surface
+draws a Material glyph: `go_router` and `background_downloader` carry
+MaterialIcons codepoints the icon tree-shaker cannot prove unreachable, so
+without the declaration every release build warned about a font nothing had
+declared. Declaring it costs 1,324 bytes after shaking and silences the
+warning; `platform_assets_test.dart` keeps it, and keeps `lib/` free of any
+`material.dart` import.
+
 `dart run tool/prepare_launcher.dart` derives every flavor's Android
 launcher inputs from the tracked native artwork in `assets/source/`
 (`golem_icon_<flavor>_1024.png`), sampling each adaptive-icon gradient from
@@ -485,11 +493,18 @@ downloads in one seed), and `model-picker-real-<brightness>` under a real
 llama build with Advanced on, which is the only way to record the states an
 engine composition produces — the recommendation's device-tier reason, an
 installed artifact of the other engine explaining itself, the count of what
-is not listed, and the artifact line. The widget suite also runs Flutter's iOS 44-point target,
-semantic-label, and contrast checks; the settings root,
-appearance, privacy, and legal screens are enrolled alongside chat, which is
-why segments and switches carry full 44-point targets and footnotes use
-muted rather than tertiary ink. Every major surface — chat empty, seeded and
+is not listed, and the artifact line. The widget suite also runs Flutter's
+tap-target, semantic-label, and contrast checks. The target check runs under
+**both** chromes against the minimum the running platform promises — 48 on
+Android, 44 on iOS, the same answer `GolemChrome.minimumTapTarget` gives
+widgets — because asserting the iOS guideline alone left the shared chrome 4dp
+short on Android for as long as it existed (#118). Every settings surface is
+enrolled alongside chat, the drawer, and the legal screens, which is why
+segments and switches carry full targets and footnotes use
+muted rather than tertiary ink. One class the guideline cannot see: it skips
+any node touching the view boundary, so the navigation bar's own controls are
+never measured by it — and they are held to 44 regardless, because
+`CupertinoNavigationBar` fixes its content slot at that height. Every major surface — chat empty, seeded and
 with a code card, the open drawer, the composer's sheets, and every settings
 screen — additionally pumps at a 1.6× text scale, because the app's own slider
 reaches 1.3× and the platform factor multiplies on top of it; an overflow
