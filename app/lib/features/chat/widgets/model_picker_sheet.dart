@@ -18,6 +18,11 @@ import '../../settings/application/preferences_providers.dart';
 import '../application/chat_providers.dart';
 import '../model_choice.dart';
 
+/// How far a row's text sits inside the sheet's gutter: the card's own
+/// horizontal padding plus its hairline. Anything trailing the rows indents by
+/// the same amount so the sheet reads as one column.
+const double _rowTextInset = 15;
+
 /// The per-chat model sheet. What each row says, why it is offered or refused,
 /// and which one is recommended all come from [buildModelPickerView]; this file
 /// paints that and forwards taps (#79).
@@ -119,10 +124,16 @@ final class _ModelPickerContent extends ConsumerWidget {
                 ),
               ),
             ),
+            // Indented to the rows' text, not to their border: the sheet's
+            // left edge belongs to the cards, and the notes and link that
+            // follow them are read as the same column.
             for (final note in [view.hiddenNote, view.footnote])
               if (note != null)
                 Padding(
-                  padding: const EdgeInsets.only(top: GolemSpace.s1),
+                  padding: const EdgeInsetsDirectional.only(
+                    top: GolemSpace.s1,
+                    start: _rowTextInset,
+                  ),
                   child: Text(
                     note,
                     style: GolemText.caption.copyWith(color: muted),
@@ -130,7 +141,7 @@ final class _ModelPickerContent extends ConsumerWidget {
                 ),
             CupertinoButton(
               key: const Key('model-picker-manage'),
-              padding: EdgeInsets.zero,
+              padding: const EdgeInsetsDirectional.only(start: _rowTextInset),
               minimumSize: Size.fromHeight(
                 GolemChrome.current.minimumTapTarget,
               ),
@@ -230,7 +241,7 @@ final class _ModelRow extends StatelessWidget {
       opacity: inert ? 0.45 : 1,
       child: Container(
         padding: const EdgeInsets.symmetric(
-          horizontal: 14,
+          horizontal: _rowTextInset - 1,
           vertical: GolemSpace.s1,
         ),
         decoration: BoxDecoration(
