@@ -16,6 +16,10 @@ void main() {
   late HttpServer server;
   late HttpClientHuggingFaceApi api;
 
+  // Cleanup is registered here rather than in a file-level tearDown: the
+  // URL-builder group never starts a server, and an unconditional tearDown
+  // over `late` fields fails those tests with a LateInitializationError that
+  // has nothing to do with what they assert.
   Future<void> serve(
     Future<void> Function(HttpRequest request) handle, {
     Duration timeout = const Duration(seconds: 20),
@@ -23,6 +27,10 @@ void main() {
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     unawaited(server.forEach(handle));
     api = HttpClientHuggingFaceApi(timeout: timeout);
+    addTearDown(() async {
+      api.close();
+      await server.close(force: true);
+    });
   }
 
   Uri url([String path = '/thing']) =>
@@ -32,11 +40,6 @@ void main() {
     // flutter_test installs an HttpOverrides that answers every request with a
     // 400; this suite is the one place that wants a real socket.
     HttpOverrides.global = null;
-  });
-
-  tearDown(() async {
-    api.close();
-    await server.close(force: true);
   });
 
   Future<void> respond(

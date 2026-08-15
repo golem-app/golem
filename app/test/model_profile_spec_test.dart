@@ -357,19 +357,15 @@ void main() {
       ),
     };
 
+    // Through fromJson, not a second const literal: Dart canonicalizes equal
+    // const expressions to one instance, so `operator ==` would compare an
+    // object with itself and a dropped field comparison would still pass.
     test('sampling compares equal to its own copy', () {
-      expect(
-        baseline,
-        const ProfileSampling(
-          maxTokens: 64,
-          temperature: 0.6,
-          topP: 0.95,
-          topK: 20,
-          contextLength: 4096,
-          presencePenalty: 1.5,
-          pinned: true,
-        ),
-      );
+      final copy = ProfileSampling.fromJson(baseline.toJson());
+
+      expect(identical(copy, baseline), isFalse);
+      expect(copy, baseline);
+      expect(copy.hashCode, baseline.hashCode);
     });
 
     variants.forEach((field, variant) {

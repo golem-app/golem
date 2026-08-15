@@ -32,6 +32,11 @@ Future<void> main(List<String> arguments) async {
   for (var i = 0; i < arguments.length; i++) {
     final argument = arguments[i];
     if (argument == '--out') {
+      if (i + 1 >= arguments.length) {
+        stderr.writeln('--out needs a path.');
+        exitCode = 64;
+        return;
+      }
       outPath = arguments[++i];
     } else if (argument.startsWith('--out=')) {
       outPath = argument.substring('--out='.length);
@@ -66,10 +71,15 @@ Future<void> main(List<String> arguments) async {
     ], workingDirectory: '${root.path}/app');
     if (run.exitCode != 0) {
       stderr.writeln('$label FAILED\n${run.stdout}\n${run.stderr}');
+      work.deleteSync(recursive: true);
       exitCode = run.exitCode;
       return;
     }
-    covered[test] = _hitLines(File(lcov));
+    // Parsed once and dropped: one lcov per test file over a full sweep is
+    // hundreds of megabytes of temp nobody reads again.
+    final report = File(lcov);
+    covered[test] = _hitLines(report);
+    report.deleteSync();
     final seconds = DateTime.now().difference(started).inMilliseconds / 1000;
     stdout.writeln(
       '$label — ${covered[test]!.length} lines '
@@ -77,31 +87,33 @@ Future<void> main(List<String> arguments) async {
     );
   }
 
+  // One pass over every line, rather than re-unioning all the other files once
+  // per file: at 73 files that was 73 × 72 unions over sets of thousands.
+  final owners = <String, int>{};
+  for (final lines in covered.values) {
+    for (final line in lines) {
+      owners.update(line, (count) => count + 1, ifAbsent: () => 1);
+    }
+  }
+
   final rows = <_Row>[];
   for (final test in tests) {
     final mine = covered[test]!;
-    final others = <String>{};
-    for (final entry in covered.entries) {
-      if (entry.key != test) others.addAll(entry.value);
+    final unique = mine.where((line) => owners[line] == 1).length;
+    final overlaps = <(String, double)>[];
+    if (mine.isNotEmpty) {
+      for (final entry in covered.entries) {
+        if (entry.key == test) continue;
+        final shared = mine.intersection(entry.value).length;
+        if (shared > 0) overlaps.add((entry.key, shared / mine.length));
+      }
+      overlaps.sort((a, b) => b.$2.compareTo(a.$2));
     }
-    final unique = mine.difference(others);
-    final overlaps =
-        covered.entries
-            .where((entry) => entry.key != test && mine.isNotEmpty)
-            .map(
-              (entry) => (
-                entry.key,
-                mine.intersection(entry.value).length / mine.length,
-              ),
-            )
-            .where((overlap) => overlap.$2 > 0)
-            .toList()
-          ..sort((a, b) => b.$2.compareTo(a.$2));
     rows.add(
       _Row(
         test: test,
         covered: mine.length,
-        unique: unique.length,
+        unique: unique,
         nearest: overlaps.take(3).toList(),
       ),
     );
@@ -163,6 +175,7 @@ Future<void> main(List<String> arguments) async {
     File(outPath).writeAsStringSync(report.toString());
     stdout.writeln('\nWritten to $outPath');
   }
+  work.deleteSync(recursive: true);
 }
 
 class _Row {

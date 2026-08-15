@@ -9,10 +9,17 @@ import 'package:flutter_test/flutter_test.dart';
 /// comparison there only measures the font stack; other hosts skip the
 /// pixel check while CI's macOS job keeps goldens fully enforced.
 ///
-/// Set `GOLEM_GOLDEN_MANIFEST` to have every compared golden appended to that
-/// file. Golden names are interpolated (`'goldens/chat-light${chromeSuffix()}'`),
-/// so running the suite is the only way to learn which files a run reaches —
-/// which is what `tool/check_goldens.dart` needs to find orphans.
+/// Set `GOLEM_GOLDEN_MANIFEST` to a *directory* and every compared golden is
+/// recorded there. Golden names are interpolated
+/// (`'goldens/chat-light${chromeSuffix()}'`), so running the suite is the only
+/// way to learn which files a run reaches — which is what
+/// `tool/check_goldens.dart` needs to find orphans.
+///
+/// A directory rather than one shared file because `flutter test` runs test
+/// files as concurrent processes, and Dart's `FileMode.append` is
+/// open-then-seek-to-end, not `O_APPEND`: two overlapping writers capture the
+/// same offset and one loses its line. A lost line reads as an orphan, and this
+/// manifest authorizes deletions.
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   if (!Platform.isMacOS) {
     goldenFileComparator = _SkipGoldenComparator();
@@ -21,7 +28,7 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   if (manifest != null && manifest.isNotEmpty) {
     goldenFileComparator = _RecordingGoldenComparator(
       goldenFileComparator,
-      File(manifest),
+      File('$manifest/${pid}_${identityHashCode(goldenFileComparator)}.txt'),
     );
   }
   await testMain();
@@ -45,8 +52,7 @@ class _RecordingGoldenComparator extends GoldenFileComparator {
   final Set<String> _seen = {};
 
   void _record(Uri golden) {
-    // Each test file is its own process appending to one manifest; deduping
-    // here keeps every write short enough for O_APPEND to stay atomic.
+    // This process owns this file, so appending to it races with nobody.
     if (_seen.add(golden.path)) {
       _manifest.writeAsStringSync(
         '${golden.path}\n',
