@@ -452,51 +452,44 @@ class _CatalogModelRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = CupertinoDynamicColor.resolve(GolemTheme.accent, context);
-    return CupertinoButton(
-      key: Key('first-run-model-${option.entry.key}'),
-      padding: EdgeInsets.zero,
-      minimumSize: Size.fromHeight(GolemChrome.current.minimumTapTarget),
-      onPressed: onTap,
-      child: Opacity(
-        opacity: option.enabled ? 1 : 0.48,
-        child: GolemCard(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            option.entry.displayName,
-                            style: GolemText.bodyStrong,
+    // The first decision the app asks for, and its only cue was a filled
+    // circle glyph carrying no label.
+    return Semantics(
+      selected: selected,
+      child: CupertinoButton(
+        key: Key('first-run-model-${option.entry.key}'),
+        padding: EdgeInsets.zero,
+        minimumSize: Size.fromHeight(GolemChrome.current.minimumTapTarget),
+        onPressed: onTap,
+        child: Opacity(
+          opacity: option.enabled ? 1 : 0.48,
+          child: GolemCard(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              option.entry.displayName,
+                              style: GolemText.bodyStrong,
+                            ),
                           ),
-                        ),
-                        if (option.recommended) ...[
-                          const SizedBox(width: 8),
-                          GolemBadge(label: context.l10n.recommended),
+                          if (option.recommended) ...[
+                            const SizedBox(width: 8),
+                            GolemBadge(label: context.l10n.recommended),
+                          ],
                         ],
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${option.entry.engine.name.toUpperCase()} · '
-                      '${option.entry.quantization} · '
-                      '${formatModelBytes(option.entry.totalBytes)}',
-                      style: GolemText.caption.copyWith(
-                        color: CupertinoDynamicColor.resolve(
-                          GolemTheme.mutedInk,
-                          context,
-                        ),
                       ),
-                    ),
-                    if (!option.enabled) ...[
                       const SizedBox(height: 3),
                       Text(
-                        modelAdmissionReason(context.l10n, option),
+                        '${option.entry.engine.name.toUpperCase()} · '
+                        '${option.entry.quantization} · '
+                        '${formatModelBytes(option.entry.totalBytes)}',
                         style: GolemText.caption.copyWith(
                           color: CupertinoDynamicColor.resolve(
                             GolemTheme.mutedInk,
@@ -504,23 +497,35 @@ class _CatalogModelRow extends StatelessWidget {
                           ),
                         ),
                       ),
+                      if (!option.enabled) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          modelAdmissionReason(context.l10n, option),
+                          style: GolemText.caption.copyWith(
+                            color: CupertinoDynamicColor.resolve(
+                              GolemTheme.mutedInk,
+                              context,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Icon(
-                selected
-                    ? CupertinoIcons.checkmark_circle_fill
-                    : CupertinoIcons.circle,
-                color: selected
-                    ? accent
-                    : CupertinoDynamicColor.resolve(
-                        GolemTheme.borderStrong,
-                        context,
-                      ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Icon(
+                  selected
+                      ? CupertinoIcons.checkmark_circle_fill
+                      : CupertinoIcons.circle,
+                  color: selected
+                      ? accent
+                      : CupertinoDynamicColor.resolve(
+                          GolemTheme.borderStrong,
+                          context,
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

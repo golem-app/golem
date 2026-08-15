@@ -717,49 +717,53 @@ class _EngineChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = CupertinoDynamicColor.resolve(GolemTheme.accent, context);
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
-      onPressed: onTap,
-      child: Container(
-        height: 32,
-        padding: const EdgeInsets.symmetric(horizontal: 13),
-        decoration: BoxDecoration(
-          color: CupertinoDynamicColor.resolve(
-            selected ? GolemTheme.accentSoft : GolemTheme.fillQuiet,
-            context,
+    // A 6pt dot and a fill were the only cue that this pair is a choice.
+    return Semantics(
+      selected: selected,
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
+        onPressed: onTap,
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 13),
+          decoration: BoxDecoration(
+            color: CupertinoDynamicColor.resolve(
+              selected ? GolemTheme.accentSoft : GolemTheme.fillQuiet,
+              context,
+            ),
+            borderRadius: BorderRadius.circular(16),
           ),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (selected) ...[
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: accent,
-                  borderRadius: BorderRadius.circular(3),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected) ...[
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: accent,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label,
+                style: GolemText.captionStrong.copyWith(
+                  color: selected
+                      ? CupertinoDynamicColor.resolve(
+                          GolemTheme.accentIcon,
+                          context,
+                        )
+                      : CupertinoDynamicColor.resolve(
+                          GolemTheme.mutedInk,
+                          context,
+                        ),
                 ),
               ),
-              const SizedBox(width: 6),
             ],
-            Text(
-              label,
-              style: GolemText.captionStrong.copyWith(
-                color: selected
-                    ? CupertinoDynamicColor.resolve(
-                        GolemTheme.accentIcon,
-                        context,
-                      )
-                    : CupertinoDynamicColor.resolve(
-                        GolemTheme.mutedInk,
-                        context,
-                      ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

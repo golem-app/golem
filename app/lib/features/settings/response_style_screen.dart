@@ -107,60 +107,67 @@ class _StyleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = CupertinoDynamicColor.resolve(GolemTheme.accent, context);
-    return CupertinoButton(
+    // Selection belongs to the row, and only to the row that has it. The tick
+    // used to carry "<title> selected" as its own label unconditionally, so
+    // every option announced itself as chosen and the chosen one said its
+    // title twice (#118). Same shape as the language rows.
+    return Semantics(
       key: Key('style-${style.name}'),
-      padding: EdgeInsets.zero,
-      onPressed: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsetsDirectional.fromSTEB(17, 15, 15, 15),
-        decoration: BoxDecoration(
-          color: CupertinoDynamicColor.resolve(GolemTheme.surface, context),
-          borderRadius: BorderRadius.circular(GolemRadius.card),
-          border: Border.all(
-            color: selected
-                ? accent
-                : CupertinoDynamicColor.resolve(GolemTheme.divider, context),
-            width: selected ? 1.5 : 1,
-          ),
-          boxShadow: GolemShadow.card(context),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _styleTitle(context, style),
-                    // Explicit ink: CupertinoButton would otherwise tint
-                    // the title accent-blue.
-                    style: GolemText.bodyStrong.copyWith(
-                      color: CupertinoDynamicColor.resolve(
-                        GolemTheme.ink,
-                        context,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    _styleDetail(context, style),
-                    style: GolemText.footnote.copyWith(
-                      color: CupertinoDynamicColor.resolve(
-                        GolemTheme.mutedInk,
-                        context,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+      selected: selected,
+      value: selected
+          ? context.l10n.selectedOption(_styleTitle(context, style))
+          : null,
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        onPressed: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsetsDirectional.fromSTEB(17, 15, 15, 15),
+          decoration: BoxDecoration(
+            color: CupertinoDynamicColor.resolve(GolemTheme.surface, context),
+            borderRadius: BorderRadius.circular(GolemRadius.card),
+            border: Border.all(
+              color: selected
+                  ? accent
+                  : CupertinoDynamicColor.resolve(GolemTheme.divider, context),
+              width: selected ? 1.5 : 1,
             ),
-            const SizedBox(width: 12),
-            Semantics(
-              label: context.l10n.selectedOption(_styleTitle(context, style)),
-              checked: selected,
-              child: Container(
+            boxShadow: GolemShadow.card(context),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _styleTitle(context, style),
+                      // Explicit ink: CupertinoButton would otherwise tint
+                      // the title accent-blue.
+                      style: GolemText.bodyStrong.copyWith(
+                        color: CupertinoDynamicColor.resolve(
+                          GolemTheme.ink,
+                          context,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _styleDetail(context, style),
+                      style: GolemText.footnote.copyWith(
+                        color: CupertinoDynamicColor.resolve(
+                          GolemTheme.mutedInk,
+                          context,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Dial face: the row above says what this paints.
+              Container(
                 width: 23,
                 height: 23,
                 decoration: BoxDecoration(
@@ -184,8 +191,8 @@ class _StyleCard extends StatelessWidget {
                       )
                     : null,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
