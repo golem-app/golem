@@ -84,6 +84,13 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 flutter:
   generate: true
+  # The app draws Cupertino glyphs only — no `Icons.` reference or
+  # material.dart import exists in lib/ — but go_router and
+  # background_downloader carry MaterialIcons codepoints, so every
+  # tree-shaken build warned that the font they name was missing. Declaring
+  # it ships the font tree-shaken to exactly those codepoints and the build
+  # stops warning about glyphs it cannot resolve (#118).
+  uses-material-design: true
   # Plain `flutter run`/`build` produce the developer-iteration flavor;
   # automation passes `--flavor qa` explicitly and releases use
   # `--flavor production`.
