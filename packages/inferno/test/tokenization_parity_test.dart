@@ -12,22 +12,6 @@ const _renderedConversation =
     '<|turn>user\nHello from the parity fixture.<turn|>\n'
     '<|turn>model\n';
 
-/// MLX resolves its shader library beside the loaded binary
-/// (`current_binary_dir()/mlx.metallib`) before falling back to app-bundle
-/// lookups. Inside the app the staged `mlx-swift_Cmlx.bundle` provides it,
-/// but `dart test` loads the hook-built dylib from `.dart_tool/lib/`, so CLI
-/// runs colocate the staged metallib there first.
-void _stageMetallibForCliRun() {
-  final dylib = File('.dart_tool/lib/libinferno_mlx.dylib');
-  final metallib = File(
-    'build/apple-resources/macosx/mlx-swift_Cmlx.bundle/'
-    'Contents/Resources/default.metallib',
-  );
-  if (dylib.existsSync() && metallib.existsSync()) {
-    metallib.copySync('${dylib.parent.path}/mlx.metallib');
-  }
-}
-
 void main() {
   final ggufPath = Platform.environment['INFERNO_GEMMA_GGUF'];
   final mlxPath = Platform.environment['INFERNO_GEMMA_MLX'];
@@ -36,7 +20,7 @@ void main() {
       : false;
 
   setUpAll(() {
-    if (Platform.isMacOS) _stageMetallibForCliRun();
+    if (Platform.isMacOS) stageMlxMetallibForCliRun();
   });
 
   test('llama.cpp and MLX produce identical raw prompt token IDs', () async {

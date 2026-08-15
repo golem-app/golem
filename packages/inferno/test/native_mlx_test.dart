@@ -4,20 +4,8 @@ library;
 import 'dart:io';
 
 import 'package:inferno/inferno.dart';
+import 'package:inferno/testing.dart';
 import 'package:test/test.dart';
-
-/// MLX resolves its shader library beside the loaded binary before falling back
-/// to app-bundle lookups, so a CLI run must stage it there.
-void _stageMetallibForCliRun() {
-  final dylib = File('.dart_tool/lib/libinferno_mlx.dylib');
-  final metallib = File(
-    'build/apple-resources/macosx/mlx-swift_Cmlx.bundle/'
-    'Contents/Resources/default.metallib',
-  );
-  if (dylib.existsSync() && metallib.existsSync()) {
-    metallib.copySync('${dylib.parent.path}/mlx.metallib');
-  }
-}
 
 void main() {
   final mlxPath = Platform.environment['INFERNO_GEMMA_MLX'];
@@ -44,7 +32,7 @@ void main() {
     Inferno? inferno;
 
     setUpAll(() async {
-      if (Platform.isMacOS) _stageMetallibForCliRun();
+      if (Platform.isMacOS) stageMlxMetallibForCliRun();
       inferno = Inferno.native();
       await inferno!.load(engine: InfernoEngineKind.mlx, modelPath: mlxPath!);
     });
