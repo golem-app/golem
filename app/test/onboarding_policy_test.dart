@@ -8,6 +8,7 @@ import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/onboarding/domain/onboarding_policy.dart';
+import 'package:golem_flutter/core/domain/model_activation.dart';
 import 'package:golem_flutter/core/domain/model_admission.dart';
 
 void main() {
@@ -140,6 +141,26 @@ void main() {
       expect(recommendedOn(HostPlatform.ios), 'gemma4-mlx');
       expect(recommendedOn(HostPlatform.android), 'gemma4-gguf');
       expect(recommendedOn(HostPlatform.macos), 'gemma4-gguf');
+    });
+
+    test('the simulation falls back to what it recommends', () {
+      // The badge and the label have to agree: a fallback pinned to one engine
+      // let the chip, the header and the next turn name an artifact the
+      // platform could not run while the badge named another.
+      String? fallbackOn(HostPlatform platform) => effectiveModelKey(
+        backend: resolveBackendPolicy(
+          backendName: 'fake',
+          profileDefine: '',
+          artifactDefine: '',
+          modelPathDefine: '',
+          tier: DeviceTier.preferred,
+          platform: platform,
+        ),
+        catalog: modelCatalog,
+        loadableKeys: const <String>{},
+      );
+      expect(fallbackOn(HostPlatform.ios), 'gemma4-mlx');
+      expect(fallbackOn(HostPlatform.android), 'gemma4-gguf');
     });
 
     test('a light real build enables only its configured 2B artifact', () {

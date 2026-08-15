@@ -949,6 +949,7 @@ class _DownloadFailureBanner extends ConsumerWidget {
               CupertinoButton(
                 key: const Key('first-run-resume-download'),
                 padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
                 onPressed: () => unawaited(
                   ref
                       .read(modelControllerProvider.notifier)
@@ -959,6 +960,7 @@ class _DownloadFailureBanner extends ConsumerWidget {
               CupertinoButton(
                 key: const Key('first-run-discard-download'),
                 padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
                 onPressed: () => unawaited(
                   ref.read(modelControllerProvider.notifier).cancel(entry.key),
                 ),

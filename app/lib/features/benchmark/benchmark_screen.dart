@@ -87,9 +87,10 @@ class BenchmarkScreen extends ConsumerWidget {
                   CupertinoSlidingSegmentedControl<BenchmarkPhase>(
                     key: const Key('benchmark-phase-picker'),
                     groupValue: benchmark.phase,
-                    // Sized like GolemSegmented's boxes rather than by
-                    // padding: this control is built here directly, so it
-                    // owned no tap-target floor of its own.
+                    // Height from the platform floor, width from the padding
+                    // that was always here: this control is built directly
+                    // rather than through GolemSegmented — which lives in
+                    // another feature — so it carries its own sizing.
                     children: {
                       for (final (phase, label) in <(BenchmarkPhase, String)>[
                         (BenchmarkPhase.warmup, context.l10n.warmup),
@@ -97,7 +98,10 @@ class BenchmarkScreen extends ConsumerWidget {
                       ])
                         phase: SizedBox(
                           height: GolemChrome.current.minimumTapTarget,
-                          child: Center(child: Text(label)),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 9),
+                            child: Center(child: Text(label)),
+                          ),
                         ),
                     },
                     onValueChanged: (value) {

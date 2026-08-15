@@ -165,7 +165,10 @@ InferenceRepository selectInferenceRepository({
   if (backend == 'fake') {
     return FakeInferenceRepository(
       eventDelay: fakeStreamDelay,
-      catalog: modelCatalog,
+      // The same seam activation reads, not the pinned list: the simulation
+      // must be able to name a repository added after launch, which is a
+      // flow QA supports.
+      catalog: activationCatalog ?? () => modelCatalog,
     );
   }
   // A typo'd dart-define has no recoverable runtime state: fail at launch.

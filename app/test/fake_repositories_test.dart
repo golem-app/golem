@@ -65,7 +65,7 @@ void main() {
       final events =
           await FakeInferenceRepository(
                 eventDelay: Duration.zero,
-                catalog: modelCatalog,
+                catalog: () => modelCatalog,
               )
               .generate(
                 context: [PromptMessage.text('user', 'Hello')],

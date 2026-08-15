@@ -8,6 +8,7 @@ import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/chrome/golem_button.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
+import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
@@ -40,6 +41,7 @@ import 'package:golem_flutter/features/splash/splash_screen.dart';
 import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
+import 'support/in_memory_settings_repository.dart';
 
 Future<List<OpenSourceLicense>> _goldenLicenses() async => [
   OpenSourceLicense(
@@ -1170,9 +1172,16 @@ void main() {
       }
     }
 
-    // The redesigned settings surfaces enroll in the same guidelines. The
-    // sampling steppers reach the target check only through Response style,
-    // which is why they sat at 38x30 while the suite stayed green (#118).
+    // The redesigned settings surfaces enroll in the same guidelines. Each
+    // pumps the state that actually builds its controls: Advanced mode gates
+    // the sampling card and the custom-repository loader behind a preference,
+    // and Storage's delete buttons need an installed artifact to belong to.
+    // Enrolling the screens without that state measures their headers and
+    // nothing else — the sampling steppers sat at 38x30 precisely because
+    // nothing ever built them under a guideline (#118).
+    final advanced = InMemoryPreferencesRepository(
+      const AppPreferences(advancedMode: true),
+    );
     for (final screen in const <Widget>[
       SettingsScreen(identity: AppIdentity.dev),
       AppearanceScreen(),
@@ -1183,10 +1192,45 @@ void main() {
       ResponseStyleScreen(),
       BenchmarkScreen(),
     ]) {
-      await pumpWithRepositories(tester, child: screen);
+      await pumpWithRepositories(
+        tester,
+        preferences: advanced,
+        settings: InMemorySettingsRepository(
+          const GenerationSettings(
+            // A set override is what renders Reset beside the steppers.
+            models: {'gemma4': SamplingOverrides(temperature: 0.9)},
+          ),
+        ),
+        model: const ModelState(
+          artifacts: {
+            'gemma4-gguf': ArtifactStatus(phase: ArtifactPhase.installed),
+          },
+        ),
+        child: screen,
+      );
       await expectLater(tester, meetsGuideline(tapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       await expectLater(tester, meetsGuideline(textContrastGuideline));
+    }
+
+    // Recovery is a whole row of buttons that only exists after a failure, so
+    // no screen state above reaches it. Every kind enrolls: they do not offer
+    // the same actions.
+    for (final kind in ChatFailureKind.values) {
+      await pumpWithRepositories(
+        tester,
+        child: CupertinoPageScaffold(
+          child: RecoveryBanner(
+            key: ValueKey(kind),
+            failure: ChatFailure(kind: kind),
+          ),
+        ),
+      );
+      await expectLater(
+        tester,
+        meetsGuideline(tapTargetGuideline),
+        reason: kind.name,
+      );
     }
   }, variant: bothChromes);
 

@@ -11,15 +11,17 @@ import 'contracts.dart';
 final class FakeInferenceRepository implements InferenceRepository {
   FakeInferenceRepository({
     this.eventDelay = const Duration(milliseconds: 34),
-    this.catalog = const <ModelCatalogEntry>[],
-  });
+    List<ModelCatalogEntry> Function()? catalog,
+  }) : _catalog = catalog ?? _noCatalog;
   final Duration eventDelay;
 
-  /// The pinned catalog, injected by whoever composes this repository: the
-  /// simulation must name the artifact the user picked, and `displayName` is
-  /// the one place that name is declared. Empty in a bare construction, which
-  /// only costs the generic fallback name.
-  final List<ModelCatalogEntry> catalog;
+  /// The catalog to name artifacts from, read per turn so a repository added
+  /// after launch is reachable. The simulation must name the artifact the
+  /// user picked, and `displayName` is the one place that name is declared.
+  /// Empty in a bare construction, which only costs the generic fallback.
+  final List<ModelCatalogEntry> Function() _catalog;
+
+  static List<ModelCatalogEntry> _noCatalog() => const <ModelCatalogEntry>[];
   bool _prepared = true;
   int _generationEpoch = 0;
   final ValueNotifier<InferenceResidency> _residency =
@@ -63,7 +65,7 @@ final class FakeInferenceRepository implements InferenceRepository {
   /// comes from the catalog rather than a prefix match, so it stays correct
   /// for every entry and for any added later.
   ({String name, double decodeRate}) _profileFor(String? modelKey) {
-    final entry = catalog.where((item) => item.key == modelKey).firstOrNull;
+    final entry = _catalog().where((item) => item.key == modelKey).firstOrNull;
     // Longest prefix wins, so `qwen35-2b-*` cannot fall through to `qwen35`.
     final matches =
         _simulatedDecodeRates.keys

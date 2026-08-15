@@ -216,7 +216,6 @@ class _ComposerState extends ConsumerState<Composer> {
       residentModelKey: resident,
       loadableKeys: loadable,
     );
-    final models = ref.watch(modelControllerProvider).value;
     // On a real engine, the exact resolution `ChatController.send` performs,
     // so the button and the turn cannot disagree. Gating on the raw
     // `modelKey ?? artifactKey` left Send dark while the header honestly read
@@ -239,10 +238,7 @@ class _ComposerState extends ConsumerState<Composer> {
     final setupPending =
         ref.watch(preferencesControllerProvider).value?.onboardingModelKey !=
             null &&
-        !(models?.artifacts.values.any(
-              (status) => status.phase == ArtifactPhase.installed,
-            ) ??
-            false);
+        loadable.isEmpty;
     final modelReady =
         backend.sideloaded ||
         (backend.simulatedInference ? !setupPending : target != null);

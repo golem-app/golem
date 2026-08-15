@@ -18,9 +18,11 @@ import '../../settings/application/preferences_providers.dart';
 import '../application/chat_providers.dart';
 import '../model_choice.dart';
 
-/// How far a row's text sits inside the sheet's gutter: the card's own
-/// horizontal padding plus its hairline. Anything trailing the rows indents by
-/// the same amount so the sheet reads as one column.
+/// How far a row's text sits inside the sheet's gutter: the card's 14pt
+/// padding plus its hairline. Anything trailing the rows indents by the same
+/// amount so the sheet reads as one column. The selected row's heavier border
+/// puts its text half a point further in; matching that would move the text
+/// every time the selection changed.
 const double _rowTextInset = 15;
 
 /// The per-chat model sheet. What each row says, why it is offered or refused,
@@ -241,7 +243,7 @@ final class _ModelRow extends StatelessWidget {
       opacity: inert ? 0.45 : 1,
       child: Container(
         padding: const EdgeInsets.symmetric(
-          horizontal: _rowTextInset - 1,
+          horizontal: 14,
           vertical: GolemSpace.s1,
         ),
         decoration: BoxDecoration(
