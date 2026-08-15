@@ -58,6 +58,63 @@ void main() {
     expect(windowed, context.sublist(2));
   });
 
+  // The budgets above all sit exactly on a multiple of the per-message cost,
+  // which means a cost that drifts by a few tokens still evicts the same
+  // number of messages. One token below the exact fit does not.
+  test('one token under the exact fit evicts another message', () {
+    final context = [
+      for (var i = 0; i < 6; i++)
+        _turn(i.isEven ? 'user' : 'assistant', _chars),
+    ];
+    expect(
+      windowedContext(
+        context: context,
+        contextLength: 962 + 512 + 2048,
+        maxTokens: 2048,
+      ),
+      // 3·321 = 963 no longer fits, so only the final two turns survive and
+      // the suffix already opens with the user.
+      context.sublist(4),
+    );
+  });
+
+  test('an image is charged on top of the words beside it', () {
+    final picture = PromptMessage(
+      role: 'user',
+      parts: [
+        const TextPart('look'),
+        ImagePart(
+          attachmentId: 'a1',
+          mimeType: 'image/png',
+          width: 8,
+          height: 8,
+          byteCount: 64,
+        ),
+      ],
+    );
+    // The words alone are trivially affordable; the picture is not, so a
+    // window that subtracted its cost instead of adding it would accept a
+    // turn the engine cannot fit.
+    expect(
+      () => windowedContext(
+        context: [picture],
+        contextLength: 8192,
+        maxTokens: 2048,
+        imageTokenCost: 6000,
+      ),
+      throwsA(isA<InferenceException>()),
+    );
+    expect(
+      windowedContext(
+        context: [picture],
+        contextLength: 8192,
+        maxTokens: 2048,
+        imageTokenCost: 1280,
+      ),
+      hasLength(1),
+    );
+  });
+
   test('the system prompt costs budget', () {
     final context = [
       _turn('user', _chars),

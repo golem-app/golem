@@ -141,6 +141,27 @@ void main() {
     expect(delta.reasoning, isEmpty);
   });
 
+  test('a chunk that opens with a stray close is still visible', () {
+    // The close sits at offset zero, which is the one position a `> 0` test
+    // would miss — and missing it sends the chunk down the open-marker branch
+    // with no open marker to slice on.
+    final parser = Qwen35StreamParser(reasoningEnabled: false);
+    final delta = parser.consume('</think>Answer');
+    expect(delta.answer, 'Answer');
+    expect(delta.reasoning, isEmpty);
+  });
+
+  test('a whole think block inside one chunk splits at its markers', () {
+    // Both markers arrive together and the open comes first, so the open
+    // branch must win; taking the stray-close branch here would publish the
+    // reasoning as the answer.
+    final parser = Qwen35StreamParser(reasoningEnabled: false);
+    final delta = parser.consume('before<think>hidden</think>after');
+    expect(delta.reasoning, 'hidden');
+    expect(delta.answer, 'after');
+    expect(delta.resetAnswer, isTrue);
+  });
+
   test('finish flushes held-back partial markers as literal text', () {
     final parser = Qwen35StreamParser(reasoningEnabled: false);
     expect(parser.consume('tag </thi').answer, 'tag ');

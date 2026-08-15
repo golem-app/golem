@@ -67,6 +67,9 @@ void main() {
         ..add(const Duration(seconds: 1), 44000000);
       expect(pace.eta(880000000), const Duration(seconds: 20));
       expect(pace.eta(0), Duration.zero);
+      // A remaining count below zero is a bookkeeping slip upstream, and it
+      // must still floor at zero rather than quote a negative ETA.
+      expect(pace.eta(-5), Duration.zero);
     });
 
     test('eta is unknown without a rate', () {
@@ -119,6 +122,15 @@ void main() {
       expect(backgroundMbsFor(TargetPlatform.iOS), iosBackgroundMbs);
       expect(backgroundMbsFor(TargetPlatform.android), androidBackgroundMbs);
       expect(backgroundMbsFor(TargetPlatform.macOS), iosBackgroundMbs);
+    });
+
+    // The figures themselves, not just the wiring: they are measurements from
+    // the #36 spike that the foreground-download note quotes, so an edit to one
+    // has to fail here rather than quietly change what the app promises.
+    test('the constants are the figures the note records', () {
+      expect(downloadForegroundMbs, 44.0);
+      expect(iosBackgroundMbs, 3.8);
+      expect(androidBackgroundMbs, 1.2);
     });
   });
 }

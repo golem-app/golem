@@ -79,6 +79,31 @@ void main() {
       expect(config.modelPath, endsWith('.gguf'));
     });
 
+    // Both halves have to hold, and every shipped artifact happens to satisfy
+    // both — so only a text-only entry can show that the artifact's own
+    // capability is what decides, not the template's expressiveness.
+    test('a text-only artifact stays text-only under a vision template', () {
+      final config = resolveModelRuntimeConfig(
+        'custom-text',
+        catalog: [
+          ...modelCatalog,
+          const ModelCatalogEntry(
+            key: 'custom-text',
+            displayName: 'Text only',
+            engine: ModelEngine.gguf,
+            quantization: 'Q4_0',
+            repository: 'someone/text-only',
+            revision: 'main',
+            profileKey: 'gemma4',
+            files: [ModelArtifactFile(path: 'weights.gguf', bytes: 1000)],
+          ),
+        ],
+      );
+
+      expect(config.profile.spec.supportsImages, isTrue);
+      expect(config.supportsImages, isFalse);
+    });
+
     test('the proven MLX vision artifacts declare images', () {
       for (final key in ['gemma4-mlx', 'qwen35-2b-mlx', 'qwen35-mlx']) {
         final config = resolveModelRuntimeConfig(key);

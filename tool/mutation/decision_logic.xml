@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The bounded mutation set: what the app decides, not what it holds.
+
+  Coverage says a line ran; mutation says a test would have noticed if the line
+  were wrong. Both are needed, but mutation costs one test run per mutant, so
+  the set is deliberately narrow — the files that make decisions (admission,
+  activation, eligibility, pacing, engine composition, windowing, startup
+  timing) and not the data classes, whose equality and JSON round-trips are
+  already pinned by domain_equality_test.dart and would generate hundreds of
+  trivial mutants.
+
+  Widgets, goldens and the FFI wrappers are out: their oracle is a rendered
+  frame or a platform channel, not an exit code.
+
+  The command runs only the suites that reach these files, which is what keeps a
+  mutant at ~8s instead of a 30s full suite. Run it against a throwaway git
+  worktree — mutation_test rewrites sources in place, so a crash mid-run leaves
+  a mutated file behind:
+
+    git worktree add --detach /tmp/mutation HEAD
+    cd /tmp/mutation/app && flutter pub get
+    dart pub global activate mutation_test
+    dart pub global run mutation_test ../tool/mutation/decision_logic.xml
+-->
+<mutations version="1.2">
+  <files>
+    <file>lib/core/domain/model_activation.dart</file>
+    <file>lib/core/domain/model_admission.dart</file>
+    <file>lib/core/domain/device_eligibility.dart</file>
+    <file>lib/core/domain/download_pace.dart</file>
+    <file>lib/core/domain/model_speed.dart</file>
+    <file>lib/core/domain/response_style_mapping.dart</file>
+    <file>lib/core/domain/model_profile_spec.dart</file>
+    <file>lib/core/startup/startup_sequence.dart</file>
+    <file>lib/broker/backend_policy.dart</file>
+    <file>lib/broker/context_window.dart</file>
+    <file>lib/broker/history_strip.dart</file>
+    <file>lib/broker/model_runtime_config.dart</file>
+    <file>lib/broker/device_capability.dart</file>
+    <file>lib/broker/gemma4_chat_template.dart</file>
+    <file>lib/broker/qwen35_chat_template.dart</file>
+  </files>
+  <commands>
+    <command group="test" expected-return="0" working-directory="." timeout="600">flutter test test/model_label_test.dart test/model_choice_test.dart test/onboarding_policy_test.dart test/backend_policy_test.dart test/context_window_test.dart test/response_style_test.dart test/device_eligibility_test.dart test/download_pace_test.dart test/model_profile_spec_test.dart test/model_runtime_config_test.dart test/broker_test.dart test/qwen35_broker_test.dart test/startup_sequence_test.dart test/launch_bootstrap_test.dart test/configured_inference_repository_test.dart</command>
+  </commands>
+</mutations>
