@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/broker/backend_policy.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
@@ -116,6 +117,29 @@ void main() {
         ),
         'gemma4-mlx',
       );
+    });
+
+    test('the simulation recommends what this platform would run', () {
+      // The recommendation is hardware-independent by design, but not
+      // platform-independent: the engine is a build composition, so Android
+      // QA featuring an MLX artifact advertised a model that build could
+      // never execute (#118).
+      String? recommendedOn(HostPlatform platform) =>
+          recommendedAdmittedModelKey(
+            catalog: modelCatalog,
+            backend: resolveBackendPolicy(
+              backendName: 'fake',
+              profileDefine: '',
+              artifactDefine: '',
+              modelPathDefine: '',
+              tier: DeviceTier.light,
+              platform: platform,
+            ),
+            eligibility: const DeviceEligibility(tier: DeviceTier.light),
+          );
+      expect(recommendedOn(HostPlatform.ios), 'gemma4-mlx');
+      expect(recommendedOn(HostPlatform.android), 'gemma4-gguf');
+      expect(recommendedOn(HostPlatform.macos), 'gemma4-gguf');
     });
 
     test('a light real build enables only its configured 2B artifact', () {

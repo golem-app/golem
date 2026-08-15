@@ -3,13 +3,23 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
 
 import '../domain/generation_settings.dart';
+import '../domain/model_catalog.dart';
 import '../domain/models.dart';
 import 'contracts.dart';
 
 /// Deterministic UI simulation. It never loads a model or performs inference.
 final class FakeInferenceRepository implements InferenceRepository {
-  FakeInferenceRepository({this.eventDelay = const Duration(milliseconds: 34)});
+  FakeInferenceRepository({
+    this.eventDelay = const Duration(milliseconds: 34),
+    this.catalog = const <ModelCatalogEntry>[],
+  });
   final Duration eventDelay;
+
+  /// The pinned catalog, injected by whoever composes this repository: the
+  /// simulation must name the artifact the user picked, and `displayName` is
+  /// the one place that name is declared. Empty in a bare construction, which
+  /// only costs the generic fallback name.
+  final List<ModelCatalogEntry> catalog;
   bool _prepared = true;
   int _generationEpoch = 0;
   final ValueNotifier<InferenceResidency> _residency =
@@ -38,19 +48,33 @@ final class FakeInferenceRepository implements InferenceRepository {
     '- Swap in **DictReader** if the file has a header row.',
   ];
 
-  /// Simulated per-model voice and speed, so the picker is provable.
-  static ({String name, double decodeRate}) _profileFor(String? modelKey) =>
-      switch (modelKey) {
-        final key? when key.startsWith('qwen35') => (
-          name: 'Qwen 3.5 4B',
-          decodeRate: 14.2,
-        ),
-        final key? when key.startsWith('gemma4') => (
-          name: 'Gemma 4 E2B',
-          decodeRate: 21.4,
-        ),
-        _ => (name: 'the default model', decodeRate: 21.4),
-      };
+  /// Invented, deterministic, and labelled `simulated` wherever it surfaces —
+  /// but ordered like the artifacts they stand for. Keying these on a
+  /// `startsWith('qwen35')` prefix charged Qwen 3.5 2B the 4B's rate, so the
+  /// simulation claimed the smaller model was the slower one, contradicting
+  /// the catalog's own copy for it (#118).
+  static const _simulatedDecodeRates = <String, double>{
+    'gemma4': 21.4,
+    'qwen35-2b': 24.6,
+    'qwen35': 14.2,
+  };
+
+  /// Simulated per-model voice and speed, so the picker is provable. The name
+  /// comes from the catalog rather than a prefix match, so it stays correct
+  /// for every entry and for any added later.
+  ({String name, double decodeRate}) _profileFor(String? modelKey) {
+    final entry = catalog.where((item) => item.key == modelKey).firstOrNull;
+    // Longest prefix wins, so `qwen35-2b-*` cannot fall through to `qwen35`.
+    final matches =
+        _simulatedDecodeRates.keys
+            .where((prefix) => modelKey?.startsWith('$prefix-') ?? false)
+            .toList()
+          ..sort((a, b) => b.length.compareTo(a.length));
+    return (
+      name: entry?.displayName ?? 'the default model',
+      decodeRate: _simulatedDecodeRates[matches.firstOrNull] ?? 21.4,
+    );
+  }
 
   @override
   Future<void> prepare({String? modelKey}) async {

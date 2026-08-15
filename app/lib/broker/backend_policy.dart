@@ -75,6 +75,14 @@ InferenceBackendConfig resolveBackendPolicy({
       return InferenceBackendConfig(
         kind: InferenceBackendKind.fake,
         profileKey: explicitProfile ?? 'gemma4',
+        // QA stays hardware-independent, but not platform-independent: the
+        // engine is a build composition, identical for qa and production on
+        // the same platform, so the simulation may as well feature what the
+        // product would.
+        simulatedEngine:
+            resolvedEngineName(backendName: 'auto', platform: platform) == 'mlx'
+            ? ModelEngine.mlx
+            : ModelEngine.gguf,
       );
     case 'llama' || 'mlx':
       final expectedEngine = backendName == 'llama'

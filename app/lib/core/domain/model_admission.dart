@@ -132,8 +132,12 @@ String? _recommendedKey(
   final family = tier == DeviceTier.light ? 'qwen35-2b-' : 'gemma4-';
   final candidates = enabled.where((entry) => entry.key.startsWith(family));
   if (backend.simulatedInference) {
+    // The simulation enables every engine, so something has to break the tie.
+    // It used to be a hardcoded MLX preference, which made Android QA feature
+    // an artifact that build could not execute while dev on the same phone
+    // recommended GGUF (#118). The platform's composed engine breaks it now.
     return candidates
-            .where((entry) => entry.engine == ModelEngine.mlx)
+            .where((entry) => entry.engine == backend.simulatedEngine)
             .firstOrNull
             ?.key ??
         candidates.firstOrNull?.key ??

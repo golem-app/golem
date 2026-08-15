@@ -163,7 +163,10 @@ InferenceRepository selectInferenceRepository({
   InferenceDiagnosticSink? diagnosticSink,
 }) {
   if (backend == 'fake') {
-    return FakeInferenceRepository(eventDelay: fakeStreamDelay);
+    return FakeInferenceRepository(
+      eventDelay: fakeStreamDelay,
+      catalog: modelCatalog,
+    );
   }
   // A typo'd dart-define has no recoverable runtime state: fail at launch.
   if (modelPath.isEmpty) {

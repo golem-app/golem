@@ -139,7 +139,11 @@ LaunchDependencies launchDependenciesWith({
     cacheProbe: FakeCacheProbe(),
     diskFreeSpaceProbe: const FakeDiskSpace(),
     inferenceRepository:
-        inference ?? FakeInferenceRepository(eventDelay: Duration.zero),
+        inference ??
+        FakeInferenceRepository(
+          eventDelay: Duration.zero,
+          catalog: catalog ?? modelCatalog,
+        ),
     modelCatalogEntries: catalog ?? modelCatalog,
     customRepositoryResolver:
         resolver ?? const DeterministicRepositoryResolver(),
