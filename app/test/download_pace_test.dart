@@ -68,8 +68,9 @@ void main() {
       expect(pace.eta(880000000), const Duration(seconds: 20));
       expect(pace.eta(0), Duration.zero);
       // A remaining count below zero is a bookkeeping slip upstream, and it
-      // must still floor at zero rather than quote a negative ETA.
-      expect(pace.eta(-5), Duration.zero);
+      // must still floor at zero rather than quote a negative ETA. Large
+      // enough that the division does not round it to zero on its own.
+      expect(pace.eta(-880000000), Duration.zero);
     });
 
     test('eta is unknown without a rate', () {
