@@ -47,11 +47,21 @@ third, `tool/mutation/decision_logic.xml`, is described under Mutation below.
 full sweep is ~10 min. It also reports the three files each one overlaps most,
 so a consolidation can be aimed rather than guessed.
 
-**`tool/check_goldens.dart`** runs the suite with `GOLEM_GOLDEN_MANIFEST` set,
-which makes the comparator in `app/test/flutter_test_config.dart` append every
-compared golden name, then diffs that set against `app/test/goldens/`. Golden
-names are interpolated (`'goldens/chat-light${chromeSuffix()}.png'`), so running
-the suite is the only way to know which files a run reaches.
+**`tool/check_goldens.dart`** runs the suite with `GOLEM_GOLDEN_MANIFEST` set to
+a directory, which makes the comparator in `app/test/flutter_test_config.dart`
+record every compared golden name — one file per test process — then diffs that
+set against `app/test/goldens/`. Golden names are interpolated
+(`'goldens/chat-light${chromeSuffix()}.png'`), so running the suite is the only
+way to know which files a run reaches.
+
+A directory rather than one shared file, and no arguments accepted, because the
+tool's output authorizes deletions and three separate paths led to it naming a
+live golden as dead. Dart's `FileMode.append` is open-then-seek-to-end, **not**
+`O_APPEND` — two handles on an empty file writing `AAAA` and `BB` leave `BBAA`,
+four bytes — so concurrent test processes sharing one manifest can lose a line.
+A filtered run reports everything it did not reach. And an empty recorded set
+means the recorder never ran, not that every golden is stale; it is reported as
+such rather than as 102 deletions.
 
 ## What the coverage map found
 
@@ -104,6 +114,11 @@ So the argument is inert and the comment names the wrong guarantee. What
 actually holds the fill at the leading edge is the Stack default — and that *is*
 guarded: mutating the Stack to `topEnd` is caught by `widget_and_golden_test.dart`.
 The test file is sound; the source comment is not.
+
+The inert argument is gone and the placement is stated on the `Stack`. Being
+explicit about it changes no behavior — `AlignmentDirectional.topStart` is
+already `Stack`'s default — so this is a clarification, not a defect fix, and
+the right-to-left case it implies is now asserted, which nothing did before.
 
 ## Coverage gaps closed
 
