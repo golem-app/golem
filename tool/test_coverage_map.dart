@@ -45,9 +45,15 @@ Future<void> main(List<String> arguments) async {
     }
   }
 
-  final tests = requested.isNotEmpty
-      ? requested.map(_relativeToApp).toList()
-      : _testFiles('${root.path}/app/test');
+  // Deduped: `app/test/x_test.dart` and `test/x_test.dart` name the same file
+  // and both normalize to the same path, and running it twice costs a full
+  // suite for a second identical row.
+  final tests =
+      (requested.isNotEmpty
+              ? requested.map(_relativeToApp)
+              : _testFiles('${root.path}/app/test'))
+          .toSet()
+          .toList();
   if (tests.isEmpty) {
     stderr.writeln('No test files found.');
     exitCode = 1;
@@ -199,12 +205,15 @@ String _relativeToApp(String path) {
   return normalized;
 }
 
+// Sliced by length rather than split on '/test/': a suite nested under a
+// directory itself named `test` would otherwise map to a path that does not
+// exist, and the sweep dies on it ten minutes in.
 List<String> _testFiles(String testRoot) => Directory(testRoot)
     .listSync(recursive: true)
     .whereType<File>()
     .map((file) => file.path)
     .where((path) => path.endsWith('_test.dart'))
-    .map((path) => 'test/${path.split('/test/').last}')
+    .map((path) => 'test/${path.substring(testRoot.length + 1)}')
     .toList();
 
 /// Only executed lines matter: a `DA:` entry at zero says the file was loaded,
@@ -216,8 +225,12 @@ Set<String> _hitLines(File lcov) {
     if (line.startsWith('SF:')) {
       source = line.substring(3);
     } else if (line.startsWith('DA:')) {
+      // `>= 2`, not `== 2`: lcov's DA record takes an optional third checksum
+      // field, and dropping every line that carries one would report an empty
+      // covered set — which this tool renders as "every file is a removal
+      // candidate" rather than as a parse failure.
       final parts = line.substring(3).split(',');
-      if (parts.length == 2 && (int.tryParse(parts[1]) ?? 0) > 0) {
+      if (parts.length >= 2 && (int.tryParse(parts[1]) ?? 0) > 0) {
         lines.add('$source:${parts[0]}');
       }
     }

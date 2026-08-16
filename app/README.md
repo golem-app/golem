@@ -523,8 +523,9 @@ The suite is audited rather than trusted (#120). Two instruments answer the
 question a coverage percentage cannot:
 
 ```sh
-dart run tool/test_coverage_map.dart   # what each file covers that no other does
-dart run tool/check_goldens.dart       # every golden on disk is still compared
+# Both live at the repo root, so both are run from there.
+(cd .. && dart run tool/test_coverage_map.dart)  # what each file covers alone
+(cd .. && dart run tool/check_goldens.dart)      # every golden is still compared
 ```
 
 `test_coverage_map.dart` runs the suite one file at a time and reports

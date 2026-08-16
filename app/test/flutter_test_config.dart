@@ -26,6 +26,10 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   }
   final manifest = Platform.environment['GOLEM_GOLDEN_MANIFEST'];
   if (manifest != null && manifest.isNotEmpty) {
+    // Created here rather than assumed: this is a hand-settable variable, and
+    // a directory that does not exist would otherwise surface as a golden
+    // failure with a filesystem error inside the comparator.
+    Directory(manifest).createSync(recursive: true);
     goldenFileComparator = _RecordingGoldenComparator(
       goldenFileComparator,
       File('$manifest/${pid}_${identityHashCode(goldenFileComparator)}.txt'),
