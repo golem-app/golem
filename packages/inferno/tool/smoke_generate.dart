@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:inferno/inferno.dart';
+import 'package:inferno/testing.dart';
 
 /// Bench helper: run one deterministic generation against a local model and
 /// print the decoded text plus metrics. Usage:
@@ -25,7 +26,7 @@ Future<void> main(List<String> arguments) async {
   final rendered = '<bos><|turn>user\n$userPrompt<turn|>\n<|turn>model\n';
 
   if (Platform.isMacOS && engine == InfernoEngineKind.mlx) {
-    _stageMetallibForCliRun();
+    stageMlxMetallibForCliRun(warnOnMissing: true);
   }
   final inferno = Inferno.native();
   await inferno.load(engine: engine, modelPath: arguments[1]);
@@ -61,24 +62,4 @@ Future<void> main(List<String> arguments) async {
   }
   stdout.writeln('OUTPUT: $buffer');
   await inferno.dispose();
-}
-
-/// MLX resolves its shader library beside the loaded binary before falling
-/// back to app-bundle lookups; CLI runs stage it there (the native test
-/// suites do the same), so this bench never depends on a prior `dart test`.
-void _stageMetallibForCliRun() {
-  final dylib = File('.dart_tool/lib/libinferno_mlx.dylib');
-  final metallib = File(
-    'build/apple-resources/macosx/mlx-swift_Cmlx.bundle/'
-    'Contents/Resources/default.metallib',
-  );
-  if (dylib.existsSync() && metallib.existsSync()) {
-    metallib.copySync('${dylib.parent.path}/mlx.metallib');
-  } else {
-    stderr.writeln(
-      'warning: could not stage mlx.metallib '
-      '(dylib: ${dylib.existsSync()}, metallib: ${metallib.existsSync()}); '
-      'the MLX load may fail to resolve its shader library.',
-    );
-  }
 }

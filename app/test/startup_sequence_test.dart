@@ -17,14 +17,25 @@ void main() {
     expect(watch.elapsedMilliseconds, greaterThanOrEqualTo(8));
   });
 
+  test('the shipped splash floor is 1.4 seconds', () {
+    // Not the harness's shortened one: this is the figure the splash actually
+    // holds for, and shortening or negating it is invisible to every other
+    // assertion here because they all bound from below.
+    expect(const StartupSequence().minimum, const Duration(milliseconds: 1400));
+  });
+
   test('failure recovers into explicit failed state', () async {
     final result = await sequence.run(StartupScenario.failure);
     expect(result.phase, StartupPhase.failed);
+    // The bar stops where the failure found it; a negative fraction would draw
+    // an empty groove and read as "nothing happened" rather than "it broke".
+    expect(result.progress, 0.42);
   });
 
   test('timeout caps loading with failure', () async {
     final result = await sequence.run(StartupScenario.timeout);
     expect(result.phase, StartupPhase.failed);
+    expect(result.progress, 0.86);
   });
 
   test('missing model holds for injected delay', () async {

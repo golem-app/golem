@@ -1,40 +1,17 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:background_downloader/background_downloader.dart';
 
 import 'artifact_adoption_policy.dart';
+import 'artifact_task_metadata.dart';
 
 export 'artifact_adoption_policy.dart';
-
-/// Identifies one artifact file's transfer, in app terms only.
-///
-/// Deliberately carries no task id: the plugin's identifiers are an adapter
-/// concern, and a stable one would be actively harmful (see
-/// [BackgroundArtifactDownloader]). [sourceUrl] is the resolved
-/// `resolve/<revision>/` URL, which already accounts for a file's per-file
-/// repository and revision overrides, so it identifies both the bytes wanted
-/// and the commit they come from.
-final class ArtifactFileRef {
-  const ArtifactFileRef({
-    required this.artifactKey,
-    required this.sourceUrl,
-    required this.directory,
-    required this.filename,
-    required this.expectedBytes,
-  });
-
-  final String artifactKey;
-  final String sourceUrl;
-
-  /// Relative to the app documents directory.
-  final String directory;
-  final String filename;
-  final int expectedBytes;
-
-  String get destination => '$directory/$filename';
-}
+// Only the ref: the metadata helpers were private statics here before the
+// split, and the whole premise of the file they moved to is that a task's
+// identity is this adapter's business. Re-exporting them would let a
+// repository hand-roll a metadata blob outside the adapter that owns the rule.
+export 'artifact_task_metadata.dart' show ArtifactFileRef;
 
 /// Events emitted while one artifact file downloads.
 sealed class ArtifactFileEvent {
@@ -258,14 +235,8 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
     if (destination != null) _terminal[destination] = update;
   }
 
-  static String? _destinationOf(Task task) {
-    try {
-      final meta = jsonDecode(task.metaData) as Map<String, Object?>;
-      return meta['path'] as String?;
-    } catch (_) {
-      return null;
-    }
-  }
+  static String? _destinationOf(Task task) =>
+      artifactDestinationIn(task.metaData);
 
   DownloadTask _taskFor(ArtifactFileRef ref) => DownloadTask(
     url: ref.sourceUrl,
@@ -273,30 +244,14 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
     filename: ref.filename,
     baseDirectory: BaseDirectory.applicationDocuments,
     group: _group,
-    metaData: jsonEncode({
-      'key': ref.artifactKey,
-      'path': ref.destination,
-      'url': ref.sourceUrl,
-    }),
+    metaData: artifactTaskMetadata(ref),
     updates: Updates.statusAndProgress,
     allowPause: true,
     retries: 3,
   );
 
-  /// Whether [task] is this exact transfer — destination *and* source.
-  ///
-  /// The install directory is keyed by artifact, not by commit, so the
-  /// destination alone is identical across revisions; matching on it would let
-  /// a re-pinned entry adopt a transfer of the previous commit's bytes and then
-  /// fail them against the new hash.
-  bool _matches(Task task, ArtifactFileRef ref) {
-    try {
-      final meta = jsonDecode(task.metaData) as Map<String, Object?>;
-      return meta['path'] == ref.destination && meta['url'] == ref.sourceUrl;
-    } catch (_) {
-      return false;
-    }
-  }
+  bool _matches(Task task, ArtifactFileRef ref) =>
+      artifactTaskMetadataMatches(task.metaData, ref);
 
   /// The task the platform is actually holding for [ref] — running, waiting to
   /// retry, or paused. **Never** a tracking record: the plugin keeps records

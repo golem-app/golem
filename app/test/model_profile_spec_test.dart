@@ -35,6 +35,12 @@ void main() {
       for (final spec in [gemma4ProfileSpec, qwen35ProfileSpec]) {
         final restored = ModelProfileSpec.fromJson(spec.toJson());
         expect(restored.toJson(), spec.toJson(), reason: spec.key);
+        // The objects, not just their maps: comparing only `toJson()` left
+        // every field comparison in the three `operator ==` implementations
+        // unasserted, and a spec that survives a round-trip while comparing
+        // unequal breaks provider caching rather than anything visible (#120).
+        expect(restored, spec, reason: spec.key);
+        expect(restored.hashCode, spec.hashCode, reason: spec.key);
       }
     });
 
@@ -135,7 +141,6 @@ void main() {
       _validProfile()..['directSampling'] = 7,
     );
     rejects('a missing key', _validProfile()..remove('key'));
-    rejects('an empty key', _validProfile()..['key'] = '');
     rejects(
       'a non-integer stop token id',
       _validProfile()..['stopTokenIds'] = ['7'],
@@ -174,10 +179,6 @@ void main() {
       ),
     );
     rejects(
-      'declared image input with no media marker',
-      _validProfile()..['inputModalities'] = ['text', 'image'],
-    );
-    rejects(
       'channel parsing with no channel markers',
       _validProfile()..['parser'] = 'channels',
     );
@@ -189,11 +190,6 @@ void main() {
       'a non-positive token budget',
       _validProfile()
         ..['directSampling'] = {'maxTokens': 0, 'temperature': 1, 'topP': 0.9},
-    );
-    rejects(
-      'a top-p outside (0, 1]',
-      _validProfile()
-        ..['directSampling'] = {'maxTokens': 8, 'temperature': 1, 'topP': 1.5},
     );
     rejects(
       'a negative temperature',
@@ -282,6 +278,352 @@ void main() {
       final first = parser.consume('weighing it up</think>\n\nDone.');
       expect(first.reasoning, 'weighing it up');
       expect(first.answer, 'Done.');
+    });
+  });
+
+  // Every field of these two carries identity: two specs differing in one knob
+  // are two different profiles, and treating them as one would serve sampling
+  // the model was never evaluated with.
+  group('every field decides identity', () {
+    const baseline = ProfileSampling(
+      maxTokens: 64,
+      temperature: 0.6,
+      topP: 0.95,
+      topK: 20,
+      contextLength: 4096,
+      presencePenalty: 1.5,
+      pinned: true,
+    );
+
+    const variants = <String, ProfileSampling>{
+      'maxTokens': ProfileSampling(
+        maxTokens: 65,
+        temperature: 0.6,
+        topP: 0.95,
+        topK: 20,
+        contextLength: 4096,
+        presencePenalty: 1.5,
+        pinned: true,
+      ),
+      'temperature': ProfileSampling(
+        maxTokens: 64,
+        temperature: 0.7,
+        topP: 0.95,
+        topK: 20,
+        contextLength: 4096,
+        presencePenalty: 1.5,
+        pinned: true,
+      ),
+      'topP': ProfileSampling(
+        maxTokens: 64,
+        temperature: 0.6,
+        topP: 0.9,
+        topK: 20,
+        contextLength: 4096,
+        presencePenalty: 1.5,
+        pinned: true,
+      ),
+      'topK': ProfileSampling(
+        maxTokens: 64,
+        temperature: 0.6,
+        topP: 0.95,
+        contextLength: 4096,
+        presencePenalty: 1.5,
+        pinned: true,
+      ),
+      'contextLength': ProfileSampling(
+        maxTokens: 64,
+        temperature: 0.6,
+        topP: 0.95,
+        topK: 20,
+        presencePenalty: 1.5,
+        pinned: true,
+      ),
+      'presencePenalty': ProfileSampling(
+        maxTokens: 64,
+        temperature: 0.6,
+        topP: 0.95,
+        topK: 20,
+        contextLength: 4096,
+        pinned: true,
+      ),
+      'pinned': ProfileSampling(
+        maxTokens: 64,
+        temperature: 0.6,
+        topP: 0.95,
+        topK: 20,
+        contextLength: 4096,
+        presencePenalty: 1.5,
+      ),
+    };
+
+    // Through fromJson, not a second const literal: Dart canonicalizes equal
+    // const expressions to one instance, so `operator ==` would compare an
+    // object with itself and a dropped field comparison would still pass.
+    test('sampling compares equal to its own copy', () {
+      final copy = ProfileSampling.fromJson(baseline.toJson());
+
+      expect(identical(copy, baseline), isFalse);
+      expect(copy, baseline);
+      expect(copy.hashCode, baseline.hashCode);
+    });
+
+    variants.forEach((field, variant) {
+      test('sampling differing in $field is a different block', () {
+        expect(variant, isNot(baseline));
+        expect(baseline, isNot(variant));
+      });
+    });
+
+    ChatTemplateSpec template([Map<String, Object?> Function()? build]) =>
+        ChatTemplateSpec.fromJson(build?.call() ?? _validChatMl());
+
+    test('a template compares equal to its own copy', () {
+      expect(template(), template());
+      expect(template().hashCode, template().hashCode);
+    });
+
+    // The key *is* the field written. Carrying the name twice would let a
+    // rename touch one and not the other, leaving a test whose name says one
+    // field while it mutates another — the named field silently uncovered.
+    const templateVariants = <String, Object>{
+      'turnOpen': '<|start|>',
+      'turnClose': '<|end|>',
+      'systemRole': 'sys',
+      'userRole': 'human',
+      'assistantRole': 'bot',
+      'historyStrip': 'none',
+      'bos': '<s>',
+      'thoughtControl': '<|think|>',
+      'channelStart': '<|channel>',
+      'channelEnd': '<channel|>',
+      'thinkStart': '<thought>',
+      'thinkEnd': '</thought>',
+      'reasoningPrimer': '<think>\n\n',
+      'directPrimer': '<think></think>',
+      'mediaMarker': '<image>',
+    };
+
+    templateVariants.forEach((field, value) {
+      test('a template differing in $field is a different template', () {
+        final variant = template(() => _validChatMl()..[field] = value);
+        expect(variant, isNot(template()));
+      });
+    });
+
+    test('a template differing in strategy is a different template', () {
+      final gemma = ChatTemplateSpec.fromJson({
+        ..._validChatMl(),
+        'strategy': 'gemmaTurns',
+        'thoughtControl': '<|think|>',
+      });
+      expect(gemma, isNot(template()));
+    });
+  });
+
+  group('the boundaries the parser refuses', () {
+    void rejectsWith(String reason, String message, Map<String, Object?> json) {
+      test(reason, () {
+        expect(
+          () => ModelProfileSpec.fromJson(json),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'message',
+              message,
+            ),
+          ),
+        );
+      });
+    }
+
+    Map<String, Object?> sampling(Map<String, Object?> extra) => {
+      'maxTokens': 64,
+      'temperature': 0.6,
+      'topP': 0.95,
+      ...extra,
+    };
+
+    // topP's window is open at zero and closed at one, so both ends and the
+    // negative side have to be refused — a `< 0` guard would let 0 through and
+    // an `== 0` guard would let -0.5 through, and neither is a probability.
+    rejectsWith(
+      'topP at zero',
+      'topP must be in (0, 1]',
+      _validProfile()..['reasoningSampling'] = sampling({'topP': 0}),
+    );
+    rejectsWith(
+      'topP below zero',
+      'topP must be in (0, 1]',
+      _validProfile()..['reasoningSampling'] = sampling({'topP': -0.5}),
+    );
+    rejectsWith(
+      'topP above one',
+      'topP must be in (0, 1]',
+      _validProfile()..['reasoningSampling'] = sampling({'topP': 1.1}),
+    );
+    test('topP at one is accepted', () {
+      expect(
+        ModelProfileSpec.fromJson(
+          _validProfile()..['reasoningSampling'] = sampling({'topP': 1}),
+        ).reasoningSampling.topP,
+        1,
+      );
+    });
+
+    rejectsWith(
+      'a negative presence penalty',
+      'presencePenalty must be positive',
+      _validProfile()
+        ..['reasoningSampling'] = sampling({'presencePenalty': -1}),
+    );
+
+    rejectsWith(
+      'an empty key',
+      'key must be a non-empty string',
+      _validProfile()..['key'] = '',
+    );
+    rejectsWith(
+      'an empty required marker',
+      'turnOpen must be a non-empty string',
+      _validProfile(template: _validChatMl()..['turnOpen'] = ''),
+    );
+
+    // Half a pair is the interesting case: a parser needs both ends, so an
+    // "either is missing" guard is required and a "both are missing" one would
+    // pass a spec that cannot close what it opens. historyStrip goes to none so
+    // the stripping guard does not fire first and hide the parser's.
+    rejectsWith(
+      'think parsing with only an opening tag',
+      'thinkTags parsing requires thinkStart and thinkEnd',
+      _validProfile(
+        template: _validChatMl()
+          ..remove('thinkEnd')
+          ..['historyStrip'] = 'none',
+      ),
+    );
+    rejectsWith(
+      'think parsing with only a closing tag',
+      'thinkTags parsing requires thinkStart and thinkEnd',
+      _validProfile(
+        template: _validChatMl()
+          ..remove('thinkStart')
+          ..['historyStrip'] = 'none',
+      ),
+    );
+    rejectsWith(
+      'channel parsing with only an opening marker',
+      'channels parsing requires channelStart and channelEnd',
+      _validProfile(template: _validChatMl()..['channelStart'] = '<|channel>')
+        ..['parser'] = 'channels',
+    );
+    rejectsWith(
+      'channel parsing with only a closing marker',
+      'channels parsing requires channelStart and channelEnd',
+      _validProfile(template: _validChatMl()..['channelEnd'] = '<channel|>')
+        ..['parser'] = 'channels',
+    );
+
+    rejectsWith(
+      'stripping think blocks with only an opening tag',
+      'thinkBlocks stripping requires thinkStart and thinkEnd',
+      _validProfile(
+        template: _validChatMl()
+          ..remove('thinkEnd')
+          ..['thinkStart'] = '<think>',
+      )..['parser'] = 'none',
+    );
+    rejectsWith(
+      'stripping reasoning channels with only an opening marker',
+      'reasoningChannels stripping requires channelStart and channelEnd',
+      _validProfile(
+        template: _validChatMl()
+          ..['historyStrip'] = 'reasoningChannels'
+          ..['channelStart'] = '<|channel>',
+      )..['parser'] = 'none',
+    );
+
+    rejectsWith(
+      'image input with no way to mark an image',
+      'a template declaring image input must define mediaMarker',
+      _validProfile()..['inputModalities'] = ['text', 'image'],
+    );
+
+    // fromJson validates on the way in; a const-built spec has to be told to,
+    // and that second entry point had no test at all — every case above
+    // reaches the inline checks instead.
+    group('a const spec validated by hand', () {
+      const template = ChatTemplateSpec(
+        strategy: ChatTemplateStrategy.chatMl,
+        turnOpen: '<|im_start|>',
+        turnClose: '<|im_end|>',
+        systemRole: 'system',
+        userRole: 'user',
+        assistantRole: 'assistant',
+        historyStrip: HistoryStripMode.thinkBlocks,
+        thinkStart: '<think>',
+        thinkEnd: '</think>',
+        reasoningPrimer: '<think>\n',
+        directPrimer: '<think>\n\n</think>\n\n',
+      );
+      const sampling = ProfileSampling(
+        maxTokens: 64,
+        temperature: 0.6,
+        topP: 0.95,
+      );
+
+      ModelProfileSpec spec({
+        String key = 'const-chatml',
+        Set<ModelInputModality> modalities = const {ModelInputModality.text},
+        List<String> stopSequences = const ['<|im_end|>'],
+      }) => ModelProfileSpec(
+        key: key,
+        template: template,
+        parser: ReasoningParserMode.thinkTags,
+        stopSequences: stopSequences,
+        stopTokenIds: const [7],
+        reasoningSampling: sampling,
+        directSampling: sampling,
+        inputModalities: modalities,
+      );
+
+      void refuses(String reason, String message, ModelProfileSpec subject) {
+        test(reason, () {
+          expect(
+            subject.validate,
+            throwsA(
+              isA<FormatException>().having(
+                (error) => error.message,
+                'message',
+                message,
+              ),
+            ),
+          );
+        });
+      }
+
+      test('a sound one validates silently', () {
+        expect(spec().validate, returnsNormally);
+      });
+
+      refuses(
+        'image input with no media marker',
+        'a template declaring image input must define mediaMarker',
+        spec(modalities: {ModelInputModality.text, ModelInputModality.image}),
+      );
+      refuses('an empty key', 'key must be a non-empty string', spec(key: ''));
+      refuses(
+        'an empty stop sequence',
+        'stop sequences must not be empty',
+        spec(stopSequences: const ['<|im_end|>', '']),
+      );
+    });
+    test('image input with a media marker is accepted', () {
+      final spec = ModelProfileSpec.fromJson(
+        _validProfile(template: _validChatMl()..['mediaMarker'] = '<image>')
+          ..['inputModalities'] = ['text', 'image'],
+      );
+      expect(spec.supportsImages, isTrue);
     });
   });
 }

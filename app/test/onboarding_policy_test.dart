@@ -192,6 +192,36 @@ void main() {
       );
     });
 
+    // The un-localized fallback sentence, which is what a build with no
+    // localizations shows. It has to name the engine this build *runs*, which
+    // is the opposite of the one the refused artifact needs.
+    test('a refused artifact names the engine this build runs', () {
+      String reasonFor(InferenceBackendConfig backend, String key) =>
+          modelAdmissionOptions(
+            catalog: modelCatalog,
+            backend: backend,
+            eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+          ).firstWhere((option) => option.entry.key == key).disabledReason!;
+
+      expect(
+        reasonFor(llama, 'gemma4-mlx'),
+        'This build uses the GGUF engine.',
+      );
+      expect(
+        reasonFor(
+          const InferenceBackendConfig(
+            kind: InferenceBackendKind.mlx,
+            profileKey: 'gemma4',
+            artifactKey: 'gemma4-mlx',
+            modelPath: 'documents:models/gemma4-mlx',
+            modelPathFromCatalog: true,
+          ),
+          'gemma4-gguf',
+        ),
+        'This build uses the MLX engine.',
+      );
+    });
+
     test('a configured larger artifact wins on a light device', () {
       final options = modelAdmissionOptions(
         catalog: modelCatalog,

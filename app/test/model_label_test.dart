@@ -84,6 +84,32 @@ void main() {
     );
   });
 
+  // The fallback walks the catalog in order, so a preference that is already
+  // loadable must short-circuit it — otherwise startup silently loads whichever
+  // model the catalog happens to list first and the choice is lost.
+  test('a loadable preference wins over catalog order', () {
+    final loadable = loadableModelKeys(
+      backend: real,
+      catalog: modelCatalog,
+      models: installed({'gemma4-mlx', 'qwen35-mlx'}),
+    );
+
+    expect(
+      modelCatalog.where((entry) => loadable.contains(entry.key)).first.key,
+      'gemma4-mlx',
+      reason: 'the catalog order the fallback would take',
+    );
+    expect(
+      startupModelKey(
+        backend: real,
+        catalog: modelCatalog,
+        loadableKeys: loadable,
+        preferredKey: 'qwen35-mlx',
+      ),
+      'qwen35-mlx',
+    );
+  });
+
   test('startup falls back from stale iOS GGUF state to verified MLX', () {
     final loadable = loadableModelKeys(
       backend: real,

@@ -517,6 +517,53 @@ as read-only rather than disabled, and that switches, the text-size slider, the
 reasoning disclosure, a download's progress, and each message are named exactly
 once.
 
+## What earns a test
+
+The suite is audited rather than trusted (#120). Two instruments answer the
+question a coverage percentage cannot:
+
+```sh
+# Both live at the repo root, so both are run from there.
+(cd .. && dart run tool/test_coverage_map.dart)  # what each file covers alone
+(cd .. && dart run tool/check_goldens.dart)      # every golden is still compared
+```
+
+`test_coverage_map.dart` runs the suite one file at a time and reports
+`unique(F)` — the `lib` lines that file executes and every other file leaves at
+zero — plus the three files it overlaps most, so a consolidation can be aimed.
+Read its output the way it is written: **`unique(F) = 0` is a candidate, never a
+verdict.** Two tests can execute identical lines and assert different things, and
+the audit found that is usually what is happening here. The verdict comes from
+breaking the behavior a file claims and seeing whether anything else fails —
+`provider_policy_test.dart` covers nothing uniquely and still earns its place,
+because dropping one `retry: noRetry` fails 32 suites and it is the one that
+names which provider lost it.
+
+The rules a new test is held to:
+
+- **One behavior, one owner file.** Add to the file that owns the surface. The
+  cross-cutting sweeps — `widget_and_golden_test.dart`, `accessibility_test.dart`,
+  `localization_test.dart`, `bidi_presentation_test.dart` — enrol surfaces
+  wholesale by lens, and that overlap is deliberate: they ask a different
+  question of the same screen.
+- **It must be able to fail.** Break the thing it names and watch it go red
+  before committing. A test that passes either way is worse than no test,
+  because it reads as coverage.
+- **Say what it catches that nothing else does.** Duplication is not
+  automatically waste — a unit test that pins an algebra keeps the failure
+  locus small when the end-to-end controller test would also have caught it —
+  but the second guard should be a choice, not an accident.
+- **Cover the decision, not the plumbing.** Where a rule can be pulled out of a
+  plugin-bound adapter it is (`artifact_adoption_policy.dart`,
+  `artifact_task_metadata.dart`), and the adapter's remaining shell is left
+  uncovered on purpose rather than wrapped in a mock of someone else's plugin.
+- **Delete goldens by evidence.** Golden names are interpolated, so
+  `check_goldens.dart` is the only way to know an image is still reached.
+
+`tool/mutation/decision_logic.xml` holds the bounded mutation set — the files
+that decide things, paired with the suites that reach them. It is the guard
+against tests that cannot fail, and is re-run when that set changes.
+
 ## iPhone 17 simulator verification
 
 Only use the single already-booted iPhone 17 simulator. Never boot or select a

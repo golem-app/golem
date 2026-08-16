@@ -58,6 +58,72 @@ void main() {
     expect(windowed, context.sublist(2));
   });
 
+  // The budgets above all sit exactly on a multiple of the per-message cost,
+  // so a cost that drifts by a few tokens still evicts the same number of
+  // messages. One token under the exact fit does not — and the roles are
+  // arranged so the leading-assistant trim cannot absorb the difference.
+  test('one token under the exact fit evicts another message', () {
+    final context = [
+      for (var i = 0; i < 6; i++) _turn(i.isOdd ? 'user' : 'assistant', _chars),
+    ];
+    expect(
+      windowedContext(
+        context: context,
+        contextLength: 962 + 512 + 2048,
+        maxTokens: 2048,
+      ),
+      // 3·321 = 963 no longer fits. Two turns survive the budget, and the
+      // older of the two is the assistant's, so the trim drops it too.
+      context.sublist(5),
+    );
+    expect(
+      windowedContext(
+        context: context,
+        contextLength: 963 + 512 + 2048,
+        maxTokens: 2048,
+      ),
+      // One token more and three fit, opening with the user: no trim.
+      context.sublist(3),
+    );
+  });
+
+  test('an image is charged on top of the words beside it', () {
+    final picture = PromptMessage(
+      role: 'user',
+      parts: [
+        const TextPart('look'),
+        ImagePart(
+          attachmentId: 'a1',
+          mimeType: 'image/png',
+          width: 8,
+          height: 8,
+          byteCount: 64,
+        ),
+      ],
+    );
+    // The words alone are trivially affordable; the picture is not, so a
+    // window that subtracted its cost instead of adding it would accept a
+    // turn the engine cannot fit.
+    expect(
+      () => windowedContext(
+        context: [picture],
+        contextLength: 8192,
+        maxTokens: 2048,
+        imageTokenCost: 6000,
+      ),
+      throwsA(isA<InferenceException>()),
+    );
+    expect(
+      windowedContext(
+        context: [picture],
+        contextLength: 8192,
+        maxTokens: 2048,
+        imageTokenCost: 1280,
+      ),
+      hasLength(1),
+    );
+  });
+
   test('the system prompt costs budget', () {
     final context = [
       _turn('user', _chars),
@@ -81,6 +147,18 @@ void main() {
         contextLength: 963 + 512 + 2048,
         maxTokens: 2048,
         systemPrompt: 'x' * _chars,
+      ),
+      context.sublist(2),
+    );
+    // A tiny system prompt costs a little, not everything: it is subtracted
+    // from the budget, and a budget *replaced* by that cost would leave no
+    // room for the final message and refuse the turn outright.
+    expect(
+      windowedContext(
+        context: context,
+        contextLength: 963 + 512 + 2048,
+        maxTokens: 2048,
+        systemPrompt: 'xxxx',
       ),
       context.sublist(2),
     );

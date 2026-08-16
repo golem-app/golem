@@ -426,6 +426,35 @@ void main() {
     );
   });
 
+  test('an empty conversation is refused by name', () {
+    expect(
+      () => Gemma4ChatTemplate.render(const [], reasoningEnabled: false),
+      throwsA(
+        isA<ArgumentError>()
+            .having((error) => error.name, 'name', 'messages')
+            .having((error) => error.message, 'message', 'must not be empty'),
+      ),
+    );
+  });
+
+  test('the final and answer channels are the visible ones', () {
+    // Everything else is reasoning, so mixing up which labels are visible
+    // publishes the model's thinking or swallows its answer. The label is
+    // trimmed and lower-cased before the comparison, which this pins too.
+    for (final label in ['final', 'answer', 'FINAL', ' Answer ']) {
+      final parser = ReasoningStreamParser();
+      final delta = parser.consume('<|channel>$label\nVisible');
+      expect(delta.answer, 'Visible', reason: label);
+      expect(delta.reasoning, isEmpty, reason: label);
+    }
+    for (final label in ['thought', 'analysis', '']) {
+      final parser = ReasoningStreamParser();
+      final delta = parser.consume('<|channel>$label\nHidden');
+      expect(delta.answer, isEmpty, reason: label);
+      expect(delta.reasoning, 'Hidden', reason: label);
+    }
+  });
+
   test('late thought channel resets a premature answer', () {
     final parser = ReasoningStreamParser();
     final first = parser.consume('Premature<|channel>thought\nrethinking');

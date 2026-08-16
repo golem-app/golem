@@ -26,6 +26,14 @@ class ProgressTrack extends StatelessWidget {
       width: double.infinity,
       height: height,
       child: Stack(
+        // Stack's own default, restated because this is the placement that
+        // decides where the fill sits: under the default loose fit the
+        // FractionallySizedBox shrink-wraps its child, so the alignment written
+        // on *that* box never applied at all — it read as the guarantee for
+        // years and was not one (#120). Nothing about the layout changed when
+        // it moved here; what changed is that the line you can break is now the
+        // line that matters, and progress_track_test.dart breaks it.
+        alignment: AlignmentDirectional.topStart,
         children: [
           Positioned.fill(
             child: ColoredBox(
@@ -34,10 +42,8 @@ class ProgressTrack extends StatelessWidget {
           ),
           // heightFactor is not optional: without it the fill's ColoredBox has
           // no child to size to, collapses to zero height, and the track paints
-          // empty at every value. alignment likewise — the default is centre,
-          // which would grow a progress bar outward from its middle.
+          // empty at every value.
           FractionallySizedBox(
-            alignment: AlignmentDirectional.centerStart,
             widthFactor: value,
             heightFactor: 1,
             child: ColoredBox(

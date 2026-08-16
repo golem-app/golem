@@ -13,19 +13,6 @@ const _renderedConversation =
     '<|im_start|>user\nHello from the parity fixture.<|im_end|>\n'
     '<|im_start|>assistant\n<think>\n';
 
-/// See tokenization_parity_test.dart: CLI runs colocate the staged metallib
-/// beside the hook-built dylib so MLX resolves its shader library.
-void _stageMetallibForCliRun() {
-  final dylib = File('.dart_tool/lib/libinferno_mlx.dylib');
-  final metallib = File(
-    'build/apple-resources/macosx/mlx-swift_Cmlx.bundle/'
-    'Contents/Resources/default.metallib',
-  );
-  if (dylib.existsSync() && metallib.existsSync()) {
-    metallib.copySync('${dylib.parent.path}/mlx.metallib');
-  }
-}
-
 void main() {
   final ggufPath = Platform.environment['INFERNO_QWEN_GGUF'];
   final mlxPath = Platform.environment['INFERNO_QWEN_MLX'];
@@ -34,7 +21,7 @@ void main() {
       : false;
 
   setUpAll(() {
-    if (Platform.isMacOS) _stageMetallibForCliRun();
+    if (Platform.isMacOS) stageMlxMetallibForCliRun();
   });
 
   test('llama.cpp and MLX produce identical Qwen prompt token IDs', () async {

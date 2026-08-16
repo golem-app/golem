@@ -345,6 +345,34 @@ void main() {
     expect(() => primaryModelPathFor('nope'), throwsArgumentError);
   });
 
+  // The flag exists so a surface can say the tier picked this model. Either
+  // define being present means a human picked it, so "neither was given" is the
+  // condition — an "either was given" reading would credit the device policy
+  // for a choice made on the command line.
+  test('the tier is credited only when nothing else chose', () {
+    const android = HostPlatform.android;
+    expect(_resolve(platform: android).artifactFromDevicePolicy, isTrue);
+    expect(
+      _resolve(platform: android, profile: 'qwen35').artifactFromDevicePolicy,
+      isFalse,
+    );
+    expect(
+      _resolve(
+        platform: android,
+        artifact: 'gemma4-gguf',
+      ).artifactFromDevicePolicy,
+      isFalse,
+    );
+    expect(
+      _resolve(
+        platform: android,
+        profile: 'gemma4',
+        artifact: 'gemma4-gguf',
+      ).artifactFromDevicePolicy,
+      isFalse,
+    );
+  });
+
   test('the backend signal provider defaults to fake under test', () {
     // Host `flutter test` runs as the dev flavor, whose *composition*
     // default is auto/real — but that resolution happens only in main().
