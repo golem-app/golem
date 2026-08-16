@@ -7,7 +7,11 @@ import 'artifact_adoption_policy.dart';
 import 'artifact_task_metadata.dart';
 
 export 'artifact_adoption_policy.dart';
-export 'artifact_task_metadata.dart';
+// Only the ref: the metadata helpers were private statics here before the
+// split, and the whole premise of the file they moved to is that a task's
+// identity is this adapter's business. Re-exporting them would let a
+// repository hand-roll a metadata blob outside the adapter that owns the rule.
+export 'artifact_task_metadata.dart' show ArtifactFileRef;
 
 /// Events emitted while one artifact file downloads.
 sealed class ArtifactFileEvent {
