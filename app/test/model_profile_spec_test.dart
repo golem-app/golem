@@ -383,27 +383,30 @@ void main() {
       expect(template().hashCode, template().hashCode);
     });
 
-    const templateVariants = <String, (String, Object)>{
-      'turnOpen': ('turnOpen', '<|start|>'),
-      'turnClose': ('turnClose', '<|end|>'),
-      'systemRole': ('systemRole', 'sys'),
-      'userRole': ('userRole', 'human'),
-      'assistantRole': ('assistantRole', 'bot'),
-      'historyStrip': ('historyStrip', 'none'),
-      'bos': ('bos', '<s>'),
-      'thoughtControl': ('thoughtControl', '<|think|>'),
-      'channelStart': ('channelStart', '<|channel>'),
-      'channelEnd': ('channelEnd', '<channel|>'),
-      'thinkStart': ('thinkStart', '<thought>'),
-      'thinkEnd': ('thinkEnd', '</thought>'),
-      'reasoningPrimer': ('reasoningPrimer', '<think>\n\n'),
-      'directPrimer': ('directPrimer', '<think></think>'),
-      'mediaMarker': ('mediaMarker', '<image>'),
+    // The key *is* the field written. Carrying the name twice would let a
+    // rename touch one and not the other, leaving a test whose name says one
+    // field while it mutates another — the named field silently uncovered.
+    const templateVariants = <String, Object>{
+      'turnOpen': '<|start|>',
+      'turnClose': '<|end|>',
+      'systemRole': 'sys',
+      'userRole': 'human',
+      'assistantRole': 'bot',
+      'historyStrip': 'none',
+      'bos': '<s>',
+      'thoughtControl': '<|think|>',
+      'channelStart': '<|channel>',
+      'channelEnd': '<channel|>',
+      'thinkStart': '<thought>',
+      'thinkEnd': '</thought>',
+      'reasoningPrimer': '<think>\n\n',
+      'directPrimer': '<think></think>',
+      'mediaMarker': '<image>',
     };
 
-    templateVariants.forEach((field, change) {
+    templateVariants.forEach((field, value) {
       test('a template differing in $field is a different template', () {
-        final variant = template(() => _validChatMl()..[change.$1] = change.$2);
+        final variant = template(() => _validChatMl()..[field] = value);
         expect(variant, isNot(template()));
       });
     });

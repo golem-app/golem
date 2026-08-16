@@ -32,7 +32,11 @@ void main() {
     Inferno? inferno;
 
     setUpAll(() async {
-      if (Platform.isMacOS) stageMlxMetallibForCliRun();
+      // Loud here, unlike the parity suites: this group only runs under
+      // INFERNO_GEMMA_MLX, so a missing metallib is certain to surface as an
+      // opaque failure inside MLX rather than as a shader library nobody
+      // staged.
+      if (Platform.isMacOS) stageMlxMetallibForCliRun(warnOnMissing: true);
       inferno = Inferno.native();
       await inferno!.load(engine: InfernoEngineKind.mlx, modelPath: mlxPath!);
     });

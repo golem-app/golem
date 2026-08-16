@@ -25,7 +25,12 @@ void main() {
     Duration timeout = const Duration(seconds: 20),
   }) async {
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    unawaited(server.forEach(handle));
+    // Swallowed deliberately: two tests make the client abandon a response
+    // mid-flight, so `response.close()` in the handler can fail on a socket
+    // the client already destroyed. Unhandled, that error would surface
+    // against whichever test happens to be running. Every assertion here is
+    // on the client side, so a handler that dies has nothing left to say.
+    unawaited(server.forEach(handle).catchError((Object _) {}));
     api = HttpClientHuggingFaceApi(timeout: timeout);
     addTearDown(() async {
       api.close();
@@ -38,8 +43,12 @@ void main() {
 
   setUp(() {
     // flutter_test installs an HttpOverrides that answers every request with a
-    // 400; this suite is the one place that wants a real socket.
+    // 400; this suite is the one place that wants a real socket. Restored
+    // after each test so a case added here later that is *not* meant to reach
+    // a socket still gets the framework's guard rather than the network.
+    final installed = HttpOverrides.current;
     HttpOverrides.global = null;
+    addTearDown(() => HttpOverrides.global = installed);
   });
 
   Future<void> respond(
@@ -210,23 +219,28 @@ void main() {
   });
 
   group('transport failures fold to one kind', () {
-    test('a refused connection is a network failure', () async {
-      await serve((request) => respond(request));
-      final abandoned = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      final dead = Uri.parse(
-        'http://${abandoned.address.host}:${abandoned.port}/thing',
-      );
-      await abandoned.close(force: true);
+    // Dropped rather than refused: reaching a dead port means binding a server
+    // and closing it, and the OS is free to hand that ephemeral port to
+    // something else before the connect — a real flake for a test that would
+    // then fail on an unrelated status. Destroying the socket under the client
+    // is deterministic and lands in the same catch: no status, kind network.
+    test(
+      'a connection dropped before the reply is a network failure',
+      () async {
+        await serve((request) async {
+          (await request.response.detachSocket(writeHeaders: false)).destroy();
+        });
 
-      await expectLater(
-        api.json(dead),
-        throwsA(
-          isA<HubException>()
-              .having((error) => error.kind, 'kind', HubErrorKind.network)
-              .having((error) => error.status, 'status', isNull),
-        ),
-      );
-    });
+        await expectLater(
+          api.json(url()),
+          throwsA(
+            isA<HubException>()
+                .having((error) => error.kind, 'kind', HubErrorKind.network)
+                .having((error) => error.status, 'status', isNull),
+          ),
+        );
+      },
+    );
 
     test('a server that never answers is a network failure', () async {
       await serve(
