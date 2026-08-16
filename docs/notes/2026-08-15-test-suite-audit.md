@@ -154,8 +154,12 @@ implied away.
 102 referenced, 104 on disk. The two orphans were
 `settings-generation-{light,dark}.png`, recorded by the per-model generation
 settings work in #39 and orphaned by the settings redesign in #51. Deleted.
-`tool/check_goldens.dart` now fails on either an unreferenced PNG or a
-referenced-but-missing one.
+`tool/check_goldens.dart` now fails on an unreferenced PNG and names it. It
+also reports a referenced-but-missing one, but that half only fires off macOS:
+here, a missing golden makes `LocalFileComparator` throw first, so the suite
+goes red and the tool stops at "the recorded set is incomplete" without ever
+reaching the missing list. The tool still fails — the message is just the
+suite's rather than its own.
 
 ## Mutation
 
@@ -163,7 +167,9 @@ Bounded set in `tool/mutation/decision_logic.xml`: the files that decide things 
 model activation and admission, device eligibility, download pacing, model
 speed, response-style mapping, the profile spec, startup sequencing, backend
 policy, context windowing, history stripping, runtime config, device
-capability, and both chat templates. 632 mutants, run against the suites that
+capability, both chat templates, and the artifact task metadata this ticket
+extracted. 632 mutants at baseline and 637 once that extraction joined the set,
+run against the suites that
 reach those files (~8 s per mutant) in a throwaway `git worktree`, because
 `mutation_test` rewrites sources in place. That is not a precaution — an aborted
 run during this audit left a mutated file behind, and a second run started while
@@ -216,9 +222,12 @@ becoming `minimum + elapsed` in the splash timing, which is a real hole. And the
 run cost 1 h 47 m for 632 mutants, so this is a deliberate, occasional
 measurement, not something to put in front of a commit.
 
-**After: 19 undetected (3.01 %) — a mutation score of 97.0 %, 1 h 49 m elapsed.**
-Seventeen of those nineteen are listed and reasoned about below; the other two
-are the run's timeouts.
+**After: 19 undetected of 637 (2.98 %) — a mutation score of 97.0 %, 1 h 49 m
+elapsed.** Seventeen of those nineteen are listed and reasoned about below; the
+other two are the run's timeouts. The five mutants the extracted
+`artifact_task_metadata.dart` contributes are all killed — it was added to the
+set only after review caught that a new decision file had been written without
+one, which is the same omission that invalidated the first pass.
 
 ### What was done about them
 
