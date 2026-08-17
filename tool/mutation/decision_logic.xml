@@ -34,6 +34,7 @@
     <file>lib/core/domain/model_profile_spec.dart</file>
     <file>lib/core/startup/startup_sequence.dart</file>
     <file>lib/core/services/artifact_task_metadata.dart</file>
+    <file>lib/core/services/artifact_stop_policy.dart</file>
     <file>lib/broker/backend_policy.dart</file>
     <file>lib/broker/context_window.dart</file>
     <file>lib/broker/history_strip.dart</file>
@@ -43,6 +44,6 @@
     <file>lib/broker/qwen35_chat_template.dart</file>
   </files>
   <commands>
-    <command group="test" expected-return="0" working-directory="." timeout="600">flutter test test/model_label_test.dart test/model_choice_test.dart test/onboarding_policy_test.dart test/backend_policy_test.dart test/context_window_test.dart test/response_style_test.dart test/device_eligibility_test.dart test/download_pace_test.dart test/model_profile_spec_test.dart test/model_runtime_config_test.dart test/model_speed_test.dart test/history_strip_test.dart test/broker_test.dart test/qwen35_broker_test.dart test/startup_sequence_test.dart test/launch_bootstrap_test.dart test/artifact_task_metadata_test.dart test/configured_inference_repository_test.dart</command>
+    <command group="test" expected-return="0" working-directory="." timeout="600">flutter test test/model_label_test.dart test/model_choice_test.dart test/onboarding_policy_test.dart test/backend_policy_test.dart test/context_window_test.dart test/response_style_test.dart test/device_eligibility_test.dart test/download_pace_test.dart test/model_profile_spec_test.dart test/model_runtime_config_test.dart test/model_speed_test.dart test/history_strip_test.dart test/broker_test.dart test/qwen35_broker_test.dart test/startup_sequence_test.dart test/launch_bootstrap_test.dart test/artifact_task_metadata_test.dart test/artifact_stop_policy_test.dart test/configured_inference_repository_test.dart</command>
   </commands>
 </mutations>

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -162,6 +163,78 @@ void main() {
           expect(again.last.statusOf(entry.key).phase, ArtifactPhase.installed);
         },
         timeout: const Timeout(Duration(minutes: 10)),
+      );
+
+      test(
+        'a pause the user asked for is reported as theirs, not the platform is',
+        () async {
+          // #125: intent was recorded under the plugin's task id and read back
+          // under the destination path, so a commanded pause arrived looking
+          // uncommanded — the adapter then sat out its 15s grace before saying
+          // anything, holding the repository's stream open and the controller's
+          // busy guard raised, and a Resume tapped inside that window was
+          // dropped. Only the real plugin can produce the status this turns on.
+          final downloader = buildLifecycleDownloader();
+          await downloader.initialize();
+          final spec = entry.files.reduce((a, b) => a.bytes >= b.bytes ? a : b);
+          final ref = ArtifactFileRef(
+            artifactKey: entry.key,
+            sourceUrl: entry.resolveUrlFor(spec).toString(),
+            directory: entry.installDirectory,
+            filename: spec.path.split('/').last,
+            expectedBytes: spec.bytes,
+          );
+
+          final events = <ArtifactFileEvent>[];
+          final closed = Completer<void>();
+          final afterPause = Stopwatch();
+          var commanded = false;
+          final subscription = downloader
+              .download(ref)
+              .listen(
+                (event) async {
+                  events.add(event);
+                  if (commanded ||
+                      event is! ArtifactFileProgress ||
+                      event.bytesReceived <= 0) {
+                    return;
+                  }
+                  commanded = true;
+                  await downloader.pause(ref);
+                  afterPause.start();
+                },
+                onDone: () {
+                  afterPause.stop();
+                  if (!closed.isCompleted) closed.complete();
+                },
+              );
+          await closed.future.timeout(const Duration(seconds: 90));
+          await subscription.cancel();
+
+          expect(
+            commanded,
+            isTrue,
+            reason: 'the file finished before a pause could be issued',
+          );
+          expect(
+            events.last,
+            isA<ArtifactFilePaused>().having(
+              (event) => event.userInitiated,
+              'userInitiated',
+              isTrue,
+            ),
+          );
+          // Secondary to the flag above, and deliberately loose: the point is
+          // that the stream ends on the command rather than outliving it by the
+          // uncommanded-pause grace.
+          expect(afterPause.elapsed, lessThan(const Duration(seconds: 10)));
+
+          await downloader.cancel(ref);
+        },
+        // The real bound is the 90s wait above; this only has to cover it plus
+        // plugin start-up and the cancel, and beat the 30s default that would
+        // otherwise kill the run.
+        timeout: const Timeout(Duration(minutes: 3)),
       );
 
       test(
