@@ -20,6 +20,11 @@ version: 1.0.0+1
 
 environment:
   sdk: ^3.12.2
+  # The floor pub itself enforces. .fvmrc is the pin every tool reads;
+  # this is what fails a resolve run against some other SDK on PATH,
+  # with a message that names the version instead of surfacing as an
+  # unrelated intl conflict (#128).
+  flutter: '>=3.44.9'
 
 resolution: workspace
 

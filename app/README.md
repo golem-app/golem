@@ -389,20 +389,24 @@ debug and release builds, while production ignores the defines.
 
 ## Generate and verify
 
-Use the installed Flutter 3.44.8/Dart 3.12.2 SDK as-is:
+Through the pinned SDK — `.fvmrc` names it, `fvm install` materialises it, and
+the repo README's Toolchain section covers setup. Every `flutter`/`dart`
+command below and elsewhere in this file assumes it, whether or not the `fvm`
+prefix is written out.
 
 ```sh
-flutter pub get
-dart run build_runner build
-dart run tool/prepare_launcher.dart
-dart run flutter_launcher_icons
-dart run flutter_native_splash:create
-dart run tool/prepare_ios_launch.dart
-dart format --output=none --set-exit-if-changed .
-flutter analyze
-flutter test
-(cd .. && dart run tool/check_inferno_imports.dart)
-(cd ../packages/inferno && dart test)
+fvm flutter pub get
+fvm dart run build_runner build
+fvm dart run tool/prepare_launcher.dart
+fvm dart run flutter_launcher_icons
+fvm dart run flutter_native_splash:create
+fvm dart run tool/prepare_ios_launch.dart
+fvm dart format --output=none --set-exit-if-changed .
+fvm flutter analyze
+fvm flutter test
+(cd .. && fvm dart run tool/check_inferno_imports.dart)
+(cd .. && fvm dart run tool/check_toolchain.dart)
+(cd ../packages/inferno && fvm dart test)
 ```
 
 Building or running with a real inference backend executes the Inferno build

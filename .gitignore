@@ -7,6 +7,9 @@
 coverage/
 .dart_tool/
 build/
+# The SDK checkout fvm materialises from .fvmrc; the pin is committed,
+# the 1 GB of SDK it names is not.
+.fvm/
 
 # SwiftPM build output and caches for the Inferno MLX carrier. Neither
 # upstream source trees nor compiled libraries belong in git.

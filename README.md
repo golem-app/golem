@@ -56,12 +56,39 @@ Building any flavor with a real backend (including the `dev` default)
 executes the Inferno build hooks and requires
 `flutter config --enable-native-assets` once per machine.
 
+## Toolchain
+
+The Flutter version is pinned in [`.fvmrc`](.fvmrc), and that file is the only
+place it is written: [fvm](https://fvm.app) reads it locally and
+`subosito/flutter-action` reads the same file in CI, so the two cannot drift.
+`tool/check_toolchain.dart` fails a run that leaves the pin, and
+`app/test/toolchain_pin_test.dart` fails a commit that reintroduces a second
+literal. Goldens are rasterized by the SDK, so an unpinned machine silently
+produces pixel diffs that mean nothing.
+
+```sh
+brew tap leoafarias/fvm && brew install fvm   # once per machine
+fvm install                                   # materialises .fvmrc's version
+```
+
+Every `flutter` and `dart` command in this repository's documentation runs
+through that SDK — either prefix it (`fvm flutter test`) or put the checkout on
+PATH for the session:
+
+```sh
+export PATH="$PWD/.fvm/flutter_sdk/bin:$PATH"
+```
+
+Native assets additionally need `flutter config --enable-native-assets` once
+per machine.
+
 Verify (from the repo root):
 
 ```sh
-cd app && flutter pub get && flutter analyze && flutter test && cd ..
-dart run tool/check_inferno_imports.dart
-cd packages/inferno && dart test
+cd app && fvm flutter pub get && fvm flutter analyze && fvm flutter test && cd ..
+fvm dart run tool/check_inferno_imports.dart
+fvm dart run tool/check_toolchain.dart
+cd packages/inferno && fvm dart test
 ```
 
 Before a Play upload, and after any llama.cpp or NDK pin bump, also check the

@@ -1,7 +1,7 @@
 # Dependency blockers
 
 After #74 every direct and transitive package in the workspace sits at the
-newest version that resolves against the pinned Flutter 3.44.8 / Dart 3.12.2
+newest version that resolves against the pinned Flutter 3.44.9 / Dart 3.12.2
 toolchain — `flutter pub outdated` reports `Current == Upgradable ==
 Resolvable` for every row. What remains is the gap to `Latest`, and each of
 those gaps has a cause recorded here.
