@@ -39,12 +39,15 @@ GoRouter createAppRouter({
       // The model invariant owns every route, while remaining below the root
       // Navigator so setup consent and recovery dialogs have valid route
       // context. A deep link cannot bypass this shell.
-      builder: (context, state, child) => FirstRunGate(child: child),
+      // ExitGuard sits above the gate, not on the root route's child: the
+      // gate withholds that child while it validates a sideload, which loads
+      // the engine — the exact window a back press must not leave unguarded.
+      builder: (context, state, child) =>
+          ExitGuard(child: FirstRunGate(child: child)),
       routes: [
         GoRoute(
           path: '/',
-          builder: (context, state) =>
-              ExitGuard(child: ChatScreen(picker: picker)),
+          builder: (context, state) => ChatScreen(picker: picker),
         ),
         GoRoute(
           path: '/search',
@@ -100,28 +103,31 @@ GoRouter createAppRouter({
   ],
 );
 
-/// Wraps the only route a system back can leave the app from, so the engine
-/// is released before the isolate dies. Without it, back-pressing mid-answer
-/// aborts the process from llama.cpp's token trampoline ~5 s later, and Play
-/// counts it as a crash (#124).
+/// Releases the engine before a back press can leave the app, so the isolate
+/// never dies under llama.cpp's token trampoline — an abort Play counts as a
+/// crash (#124).
 ///
-/// Scoped to the root route deliberately: a shell-wide `canPop: false` would
-/// swallow ordinary back navigation out of Settings and Search.
+/// [canPop] tracks the router rather than being pinned false: only the exit
+/// itself is intercepted, so backing out of Settings or Search still pops
+/// normally.
 class ExitGuard extends ConsumerWidget {
   const ExitGuard({required this.child, super.key});
 
   final Widget child;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => PopScope(
-    canPop: false,
-    onPopInvokedWithResult: (didPop, _) async {
-      if (didPop) return;
-      await ref.read(modelControllerProvider.notifier).shutDownEngine();
-      await SystemNavigator.pop();
-    },
-    child: child,
-  );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final popsWithinApp = GoRouter.of(context).canPop();
+    return PopScope(
+      canPop: popsWithinApp,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        await ref.read(modelControllerProvider.notifier).shutDownEngine();
+        await SystemNavigator.pop();
+      },
+      child: child,
+    );
+  }
 }
 
 class GolemApp extends ConsumerStatefulWidget {
@@ -191,7 +197,10 @@ class _GolemAppState extends ConsumerState<GolemApp>
     // Android can finish the activity without ever delivering this, which is
     // why the root route guards its own exit.
     if (state == AppLifecycleState.detached) {
-      ref.read(modelControllerProvider.notifier).shutDownEngine();
+      // Reversible on purpose: Flutter permits detached -> resumed, and
+      // closing the native callback listener here would leave a returning app
+      // with a runtime it can never load again.
+      ref.read(modelControllerProvider.notifier).releaseEngineForTeardown();
     }
     // Returning to the foreground is the only moment the app can notice that
     // the OS finished, paused, or discarded a download while it was away.

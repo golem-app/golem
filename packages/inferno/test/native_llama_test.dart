@@ -25,7 +25,11 @@ void main() {
         modelPath: modelPath!,
       );
 
-      final terminal = <String>[];
+      // One flag, not a list: cancelOnError defaults to false, so an
+      // error-terminated stream delivers onError *and* onDone. Counting both
+      // would read as "a late event arrived after dispose" — the abort
+      // signature — when the stream simply ended the other way.
+      var terminated = 0;
       final firstDelta = Completer<void>();
       final closed = Completer<void>();
       final subscription = inferno
@@ -48,12 +52,14 @@ void main() {
               }
             },
             onError: (Object _) {
-              terminal.add('error');
+              terminated++;
               if (!closed.isCompleted) closed.complete();
             },
             onDone: () {
-              terminal.add('done');
-              if (!closed.isCompleted) closed.complete();
+              if (!closed.isCompleted) {
+                terminated++;
+                closed.complete();
+              }
             },
           );
       addTearDown(subscription.cancel);
@@ -61,15 +67,16 @@ void main() {
       await firstDelta.future;
       // Without this the test would pass vacuously whenever the toy model
       // outruns the teardown: the point is to dispose *under* a live worker.
-      expect(terminal, isEmpty, reason: 'generation must still be running');
+      expect(terminated, 0, reason: 'generation must still be running');
       await inferno.dispose();
       await closed.future;
 
-      expect(terminal, hasLength(1), reason: 'exactly one terminal event');
-      // Nothing may arrive after dispose returned: the worker has joined and the
-      // callback port is closed. A late event here is the abort in slow motion.
+      expect(terminated, 1, reason: 'the stream ends exactly once');
+      // Nothing may arrive after dispose returned: the worker has joined and
+      // the callback port is closed. A late event here is the abort in slow
+      // motion.
       await Future<void>.delayed(const Duration(seconds: 2));
-      expect(terminal, hasLength(1));
+      expect(terminated, 1);
     },
     skip: skipReason,
   );

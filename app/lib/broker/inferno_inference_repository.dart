@@ -134,9 +134,19 @@ final class InfernoInferenceRepository implements InferenceRepository {
 
   @override
   Future<void> dispose() async {
-    // The runtime's own dispose already cancels, waits for the generation to
-    // finish, and unloads before it destroys the engine, so this adds only
-    // the app-side residency reset.
+    // Same reason unload() waits: disposing across an in-flight activation
+    // reaches the runtime while it is `loading`, which is a state its own
+    // unload refuses — the ordered cancel-and-join would be skipped and the
+    // engine destroyed from under the load instead (#124).
+    final pending = _activating;
+    if (pending != null) {
+      try {
+        await pending;
+      } catch (_) {}
+    }
+    // The runtime's own dispose cancels, waits for the generation to finish,
+    // and unloads before destroying the engine, so this adds only the
+    // app-side residency reset.
     try {
       await _runtime.dispose();
     } finally {

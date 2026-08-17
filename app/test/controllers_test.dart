@@ -91,11 +91,17 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   int prepares = 0;
   int unloads = 0;
   int disposes = 0;
-  int cancels = 0;
+
+  /// Parks teardown so a second caller can be observed mid-flight.
+  Completer<void>? disposeGate;
   String initialResidentKey = 'test-mlx';
 
   @override
-  Future<void> dispose() async => disposes++;
+  Future<void> dispose() async {
+    disposes++;
+    await disposeGate?.future;
+  }
+
   final ValueNotifier<InferenceResidency> _residency =
       ValueNotifier<InferenceResidency>(const InferenceResidency.unloaded());
 
@@ -123,7 +129,7 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   }
 
   @override
-  Future<void> cancel() async => cancels++;
+  Future<void> cancel() async {}
 
   /// When set, generate parks mid-stream until completed — for tests that
   /// need a deterministically in-flight generation.
@@ -1539,6 +1545,87 @@ void main() {
     // Idle again, so the same command now applies.
     await models.toggleRuntime();
     expect(inference.unloads, 1);
+  });
+
+  test('a second exit press joins the teardown instead of racing it', () async {
+    // The latch used to return an already-completed future, so an impatient
+    // second back press popped the activity while the first dispose was still
+    // winding the engine down — the original abort (#124).
+    final directory = Directory.systemTemp.createTempSync('golem-reentry-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final inference = _RecordingInferenceRepository();
+    final container = ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(modelControllerProvider.future);
+    final models = container.read(modelControllerProvider.notifier);
+
+    inference.disposeGate = Completer<void>();
+    final first = models.shutDownEngine();
+    var secondCompleted = false;
+    final second = models.shutDownEngine()..then((_) => secondCompleted = true);
+    await Future<void>.delayed(Duration.zero);
+    expect(
+      secondCompleted,
+      isFalse,
+      reason: 'the second press must not return while teardown is in flight',
+    );
+
+    inference.disposeGate!.complete();
+    await Future.wait([first, second]);
+    expect(inference.disposes, 1, reason: 'and it must not dispose twice');
+  });
+
+  test('a failed answer does not block unloading or deleting', () async {
+    // GenerationPhase.failed is sticky until the user retries or discards, so
+    // treating "not idle" as "in flight" would leave Settings > Models inert
+    // exactly when the out-of-memory copy sends the user there (#124).
+    final directory = Directory.systemTemp.createTempSync('golem-failed-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final inference = _RecordingInferenceRepository(
+      generationFailure: InferenceFailureKind.outOfMemory,
+    );
+    final container = ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
+      ],
+    );
+    addTearDown(container.dispose);
+    await installActiveModel(container);
+    await container.read(chatControllerProvider.future);
+    final models = container.read(modelControllerProvider.notifier);
+    await models.toggleRuntime();
+
+    await container.read(chatControllerProvider.notifier).send('boom');
+    expect(
+      container.read(chatControllerProvider).requireValue.generation,
+      GenerationPhase.failed,
+      reason: 'the failure must still be on screen',
+    );
+
+    await models.toggleRuntime();
+    expect(
+      inference.unloads,
+      1,
+      reason: 'unload stays available after a failure',
+    );
   });
 
   test('shutdown disposes the engine even mid-generation', () async {
