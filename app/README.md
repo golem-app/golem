@@ -1,8 +1,8 @@
-# Golem Flutter
+# Golem (Flutter app)
 
 High-fidelity Flutter implementation of Golem. The app ships as three
 coexisting build flavors with independent identities, containers, and
-launcher icons:
+launcher icons — and only those three:
 
 | Flavor | Display name | Application ID | Icon | Role |
 | --- | --- | --- | --- | --- |
@@ -17,14 +17,26 @@ Select a flavor with the standard workflow — `flutter run --flavor qa`,
 `dev` (`default-flavor` in `pubspec.yaml`). The same three flavors exist on
 iOS, Android, and macOS. Each flavor stores its own versioned JSON under its
 separate application-support container. Flavors share every in-app asset and
-theme but differ in identity **and default backend wiring**: `qa` (and the
-flavorless test identity) wires all fakes, while `production` and `dev`
-wire the real downloader and default to real inference (see "Deterministic
-where it matters" below and
-`../docs/decisions/0003-flavor-backend-defaults.md`). The flavorless
-legacy identity `app.golem.flutter` (**Golem Flutter**) remains reachable
-only through direct `xcodebuild -scheme Runner` builds and is never used for
-QA or automation.
+theme but differ in identity **and default backend wiring**: `qa` wires all
+fakes, while `production` and `dev` wire the real downloader and default to
+real inference (see "Deterministic where it matters" below and
+`../docs/decisions/0003-flavor-backend-defaults.md`).
+
+The flavorless `Debug`/`Release`/`Profile` configurations — what a direct
+`xcodebuild -scheme Runner` selects — carry qa's bundle id, display name, and
+launcher artwork, so **no build path produces a fourth app** (#116).
+
+Their Dart half is not equally fixed, and this is a trap worth knowing. Those
+configurations inherit `Flutter/Generated.xcconfig`, which the last
+`flutter build` wrote — including its `FLAVOR` and the `FLUTTER_APP_FLAVOR`
+dart-define. So `appFlavor`, and with it the backend wiring, the in-app icon,
+and the internal-tool gates, is whatever that earlier build named;
+`AppIdentity.forFlavor` returns `qa` only when no flavor was baked at all.
+Run `xcodebuild -scheme Runner` after `flutter build ios --flavor dev` and you
+get a bundle labelled **Golem QA** that installs over the QA container and
+runs `dev`'s real inference and real downloader. Prefer `flutter build
+--flavor <name>`; if you must use a bare `xcodebuild`, run the matching
+`flutter build ... --flavor qa` immediately before it.
 
 > **Physical iPhone caution:** never install the `production`
 > (`app.golem`) flavor on the physical iPhone — that identifier belongs
@@ -33,8 +45,8 @@ QA or automation.
 
 ## Deterministic where it matters
 
-The composition rule, stated once: the `qa` flavor and flavorless
-test-harness builds wire **all fakes** (inference, model management,
+The composition rule, stated once: the `qa` flavor — which is also where
+flavorless builds land — wires **all fakes** (inference, model management,
 benchmark), so goldens, journeys, and CI stay deterministic and never
 touch the network. `production` and `dev` wire the real implementations —
 the pinned Hugging Face downloader and, by default, real local inference.
@@ -208,7 +220,7 @@ handoff under `references/ui_redesign/` at the repo root.
   fake simulates the same catalog; `RealModelManagementRepository` downloads
   via `background_downloader` behind the `ArtifactFileDownloader` seam, with
   free-space probing and backup exclusion on the
-  `app.golem.flutter/storage` platform channel. The seam is identity-aware:
+  `app.golem/storage` platform channel. The seam is identity-aware:
   every call names an `ArtifactFileRef`, and `inspect` reports what the OS
   still holds, so a stop issued after a relaunch reaches the transfer the
   previous process started. Which transfer a platform task belongs to travels
@@ -354,8 +366,7 @@ node that names it,
 `open-benchmark`, `benchmark-case-picker`, `benchmark-phase-picker`,
 `benchmark-run-button`, `benchmark-stop-button`, and `benchmark-export-button`.
 The benchmark keys, route, repository, and prompt assets exist only in `qa`
-and `dev`; production and the legacy flavorless identity do not register or
-bundle that internal surface.
+and `dev`; production does not register or bundle that internal surface.
 
 Startup failure modes are injectable at compile time:
 
@@ -374,8 +385,7 @@ the bootstrap failure pane, Try again, and recovery
 always holds for at least 1.4 seconds; the missing-model scenario adds a
 three-second setup hold.
 All four fault injectors are identity-gated: `qa` and `dev` retain them in
-debug and release builds, while production and the legacy flavorless identity
-ignore the defines.
+debug and release builds, while production ignores the defines.
 
 ## Generate and verify
 

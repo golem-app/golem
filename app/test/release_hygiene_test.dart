@@ -25,15 +25,13 @@ Iterable<String> _routePaths(GoRouter router) sync* {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('production and legacy route tables omit benchmark', () {
-    for (final identity in [AppIdentity.production, AppIdentity.flutter]) {
-      final router = createAppRouter(
-        picker: const AttachmentPicker(),
-        identity: identity,
-      );
-      addTearDown(router.dispose);
-      expect(_routePaths(router), isNot(contains('/benchmark')));
-    }
+  test('the production route table omits benchmark', () {
+    final router = createAppRouter(
+      picker: const AttachmentPicker(),
+      identity: AppIdentity.production,
+    );
+    addTearDown(router.dispose);
+    expect(_routePaths(router), isNot(contains('/benchmark')));
   });
 
   test('qa and dev route tables retain benchmark', () {

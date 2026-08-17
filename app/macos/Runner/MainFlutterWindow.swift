@@ -38,7 +38,7 @@ class MainFlutterWindow: NSWindow {
     RegisterGeneratedPlugins(registry: flutterViewController)
 
     let storageChannel = FlutterMethodChannel(
-      name: "app.golem.flutter/storage",
+      name: "app.golem/storage",
       binaryMessenger: flutterViewController.engine.binaryMessenger
     )
     storageChannel.setMethodCallHandler(Self.handleStorageCall)

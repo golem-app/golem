@@ -47,15 +47,13 @@ Future<DeviceCapabilities> _capabilities({
 );
 
 void main() {
-  test('qa and the flavorless identity default to the fake backend', () async {
-    for (final identity in [AppIdentity.qa, AppIdentity.flutter]) {
-      final config = _resolve(identity: identity);
-      expect(config.kind, InferenceBackendKind.fake);
-      expect(config.simulatedInference, isTrue);
-      expect(config.artifactKey, isNull);
-      expect(config.modelPath, isNull);
-      expect(config.profileKey, 'gemma4');
-    }
+  test('qa defaults to the fake backend', () async {
+    final config = _resolve(identity: AppIdentity.qa);
+    expect(config.kind, InferenceBackendKind.fake);
+    expect(config.simulatedInference, isTrue);
+    expect(config.artifactKey, isNull);
+    expect(config.modelPath, isNull);
+    expect(config.profileKey, 'gemma4');
   });
 
   test('production and dev default to automatic platform policy', () async {

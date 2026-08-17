@@ -17,7 +17,7 @@ import UIKit
       return
     }
     let channel = FlutterMethodChannel(
-      name: "app.golem.flutter/storage",
+      name: "app.golem/storage",
       binaryMessenger: registrar.messenger()
     )
     channel.setMethodCallHandler(Self.handleStorageCall)
