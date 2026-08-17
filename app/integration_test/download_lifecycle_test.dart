@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -162,6 +163,94 @@ void main() {
           expect(again.last.statusOf(entry.key).phase, ArtifactPhase.installed);
         },
         timeout: const Timeout(Duration(minutes: 10)),
+      );
+
+      test(
+        'a pause the user asked for is reported as theirs, not the platform is',
+        () async {
+          // #125: intent was recorded under the plugin's task id and read back
+          // under the destination path, so a commanded pause arrived looking
+          // uncommanded — the adapter then sat out its 15s grace before saying
+          // anything, holding the repository's stream open and the controller's
+          // busy guard raised, and a Resume tapped inside that window was
+          // dropped. Only the real plugin can produce the status this turns on.
+          final downloader = buildLifecycleDownloader();
+          await downloader.initialize();
+          final spec = entry.files.reduce((a, b) => a.bytes >= b.bytes ? a : b);
+          final ref = ArtifactFileRef(
+            artifactKey: entry.key,
+            sourceUrl: entry.resolveUrlFor(spec).toString(),
+            directory: entry.installDirectory,
+            filename: spec.path.split('/').last,
+            expectedBytes: spec.bytes,
+          );
+
+          final events = <ArtifactFileEvent>[];
+          final closed = Completer<void>();
+          final sinceCommand = Stopwatch();
+          var commanded = false;
+          final subscription = downloader
+              .download(ref)
+              .listen(
+                (event) async {
+                  events.add(event);
+                  if (commanded ||
+                      event is! ArtifactFileProgress ||
+                      event.bytesReceived <= 0) {
+                    return;
+                  }
+                  commanded = true;
+                  // Started before the command, not after it returns: on the
+                  // fixed path the stream ends on the platform's paused event
+                  // while pause() is still confirming, so onDone would
+                  // otherwise stop a stopwatch that had never been started and
+                  // the interval below would measure nothing.
+                  sinceCommand.start();
+                  await downloader.pause(ref);
+                },
+                onDone: () {
+                  sinceCommand.stop();
+                  if (!closed.isCompleted) closed.complete();
+                },
+              );
+          await closed.future.timeout(const Duration(seconds: 90));
+          await subscription.cancel();
+
+          expect(
+            commanded,
+            isTrue,
+            reason: 'no progress arrived, so no pause was ever issued',
+          );
+          // Checked before the assertion below so a transfer that outran the
+          // pause round trip says so, rather than failing as a wrong event
+          // type: `commanded` is set when the pause is issued, not when it
+          // lands.
+          expect(
+            events.last,
+            isNot(isA<ArtifactFileComplete>()),
+            reason:
+                'the file finished while the pause was in flight; re-run, or '
+                'point GOLEM_LIFECYCLE_ARTIFACT at a slower artifact',
+          );
+          expect(
+            events.last,
+            isA<ArtifactFilePaused>().having(
+              (event) => event.userInitiated,
+              'userInitiated',
+              isTrue,
+            ),
+          );
+          // Secondary to the flag above, and deliberately loose: the point is
+          // that the stream ends on the command rather than outliving it by the
+          // uncommanded-pause grace.
+          expect(sinceCommand.elapsed, lessThan(const Duration(seconds: 10)));
+
+          await downloader.cancel(ref);
+        },
+        // The real bound is the 90s wait above; this only has to cover it plus
+        // plugin start-up and the cancel, and beat the 30s default that would
+        // otherwise kill the run.
+        timeout: const Timeout(Duration(minutes: 3)),
       );
 
       test(

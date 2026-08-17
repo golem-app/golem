@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:background_downloader/background_downloader.dart';
 
 import 'artifact_adoption_policy.dart';
+import 'artifact_stop_policy.dart';
 import 'artifact_task_metadata.dart';
 
 export 'artifact_adoption_policy.dart';
@@ -404,6 +405,7 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
     final subscription = _updates.listen(buffer.add);
     Timer? watchdog;
     Timer? pauseFinalize;
+    TaskId? generation;
     try {
       if (!await _started()) {
         yield const ArtifactFileFailed('The downloader is unavailable.');
@@ -474,11 +476,21 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
       }
 
       final taskId = task.taskId;
+      // Mirrored to the outer scope so the finally can drop this generation's
+      // recorded intent whichever way the stream ends.
+      final id = generation = TaskId(taskId);
+      _attached.add(id);
+
       // A terminal status recorded before this stream attached — a background
-      // completion, or one replayed by resumeFromBackground at startup.
+      // completion, or one replayed by resumeFromBackground at startup. A
+      // cancel commanded while nothing was listening is still the user's.
       final replayed = _terminal.remove(ref.destination);
       if (replayed != null && replayed.task.taskId == taskId) {
-        final event = _terminalEvent(replayed, userPause: false);
+        final event =
+            _stopEvent(
+              verdictFor(status: replayed.status, commanded: _stops.of(id)),
+            ) ??
+            _terminalEvent(replayed);
         if (event != null) {
           yield event;
           return;
@@ -529,65 +541,71 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
         pauseFinalize = null;
         arm();
 
-        // Read per update, not carried between them: an out-of-band pause or
-        // cancel lands between iterations, and the platform event it causes is
-        // the very next one — a stale flag would report the user's own stop as
-        // uncommanded and strand the card.
-        final userPause = _userPaused.contains(ref.destination);
-        final userCancel = _userCanceled.contains(ref.destination);
-
         switch (update) {
           case TaskProgressUpdate(:final progress) when progress >= 0:
             yield ArtifactFileProgress((progress * ref.expectedBytes).round());
           case TaskProgressUpdate():
             break;
           case TaskStatusUpdate():
-            switch (update.status) {
-              case TaskStatus.paused:
-                if (userPause) {
-                  yield const ArtifactFilePaused();
-                  return;
-                }
-                pauseFinalize = Timer(
-                  uncommandedPauseGrace,
-                  () => buffer.add(_finalizePause),
-                );
-              case TaskStatus.canceled:
-                yield ArtifactFileCanceled(userInitiated: userCancel);
-                return;
-              default:
-                final event = _terminalEvent(update, userPause: userPause);
-                if (event != null) {
-                  yield event;
-                  return;
-                }
+            // Read per update, not carried between them: an out-of-band pause
+            // or cancel lands between iterations, and the platform event it
+            // causes is the very next one — a stale flag would report the
+            // user's own stop as uncommanded and strand the card.
+            final verdict = verdictFor(
+              status: update.status,
+              commanded: _stops.of(id),
+            );
+            if (verdict == StopVerdict.uncommandedPause) {
+              pauseFinalize = Timer(
+                uncommandedPauseGrace,
+                () => buffer.add(_finalizePause),
+              );
+              break;
+            }
+            final event = _stopEvent(verdict) ?? _terminalEvent(update);
+            if (event != null) {
+              yield event;
+              return;
             }
         }
       }
     } finally {
       watchdog?.cancel();
       pauseFinalize?.cancel();
-      _userPaused.remove(ref.destination);
-      _userCanceled.remove(ref.destination);
+      if (generation != null) {
+        _attached.remove(generation);
+        _stops.forget(generation);
+      }
       await subscription.cancel();
       await buffer.close();
     }
   }
 
-  ArtifactFileEvent? _terminalEvent(
-    TaskStatusUpdate update, {
-    required bool userPause,
-  }) => switch (update.status) {
-    TaskStatus.complete => const ArtifactFileComplete(),
-    TaskStatus.canceled => const ArtifactFileCanceled(userInitiated: false),
-    TaskStatus.paused => ArtifactFilePaused(userInitiated: userPause),
-    TaskStatus.failed || TaskStatus.notFound => ArtifactFileFailed(
-      update.exception?.description ?? 'The download failed.',
+  /// The event a stop verdict calls for, or null when the verdict is not one
+  /// the stream ends on.
+  ArtifactFileEvent? _stopEvent(StopVerdict verdict) => switch (verdict) {
+    StopVerdict.userPaused => const ArtifactFilePaused(),
+    StopVerdict.userCanceled => const ArtifactFileCanceled(),
+    StopVerdict.uncommandedCancel => const ArtifactFileCanceled(
+      userInitiated: false,
     ),
-    TaskStatus.enqueued ||
-    TaskStatus.running ||
-    TaskStatus.waitingToRetry => null,
+    StopVerdict.uncommandedPause || StopVerdict.notAStop => null,
   };
+
+  /// Completion and failure only — they carry no intent, so [verdictFor] owns
+  /// every status that does.
+  ArtifactFileEvent? _terminalEvent(TaskStatusUpdate update) =>
+      switch (update.status) {
+        TaskStatus.complete => const ArtifactFileComplete(),
+        TaskStatus.failed || TaskStatus.notFound => ArtifactFileFailed(
+          update.exception?.description ?? 'The download failed.',
+        ),
+        TaskStatus.paused ||
+        TaskStatus.canceled ||
+        TaskStatus.enqueued ||
+        TaskStatus.running ||
+        TaskStatus.waitingToRetry => null,
+      };
 
   /// Cancels whatever the platform holds for this destination, waits for the
   /// cancellation to land, then enqueues fresh. The wait is what keeps a dying
@@ -610,17 +628,25 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
     return await _heldTask(ref) == null;
   }
 
-  /// Task ids whose stop was commanded by the app, so the resulting platform
-  /// event is reported as user-initiated.
+  /// Stops commanded and not yet seen through, and the generations a
+  /// `download()` stream is listening to.
   ///
-  /// Keyed by task id, not destination: a commanded stop belongs to the exact
-  /// generation it was issued for. Keying by destination let an entry survive
-  /// a pause taken while no stream was attached, and the *next* transfer's
-  /// uncommanded pause — Android's ~9-minute transfer-service timeout — was
-  /// then reported as the user's own, so nothing persisted it and the card
-  /// stranded on "downloading".
-  static final Set<String> _userPaused = {};
-  static final Set<String> _userCanceled = {};
+  /// Static, like the plugin handles beside them: two instances in one process
+  /// share the platform, so intent recorded through one has to be visible to a
+  /// stream running on the other. `launch_composition` builds a fresh
+  /// downloader per composition attempt and the integration suite builds
+  /// several, and per-instance state would put the 15s grace straight back
+  /// with nothing to catch it. Testability is not affected — [CommandedStops]
+  /// is exercised on its own instances.
+  static final CommandedStops _stops = CommandedStops();
+  static final Set<TaskId> _attached = {};
+
+  /// A command nobody is listening to has no consumer to read it, so it is
+  /// dropped as soon as it resolves rather than waiting for a `finally` that
+  /// will never run.
+  void _releaseIfUnattached(TaskId id) {
+    if (!_attached.contains(id)) _stops.forget(id);
+  }
 
   // `static final`, never `const`: Dart canonicalizes const objects, so two
   // `const Object()` sentinels are the *same* instance and `identical` cannot
@@ -633,9 +659,13 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
     if (!await _started()) return false;
     final task = await _heldTask(ref);
     if (task is! DownloadTask) return false;
-    _userPaused.add(task.taskId);
+    final id = TaskId(task.taskId);
+    _stops.commandPause(id);
     if (!await _guard(() => _downloader.pause(task), false)) {
-      _userPaused.remove(task.taskId);
+      // Refused outright, so the pause will never happen: the record has to go
+      // even with a stream attached, or the next uncommanded pause on this
+      // generation is reported as the user's.
+      _stops.forgetPause(id);
       return false;
     }
     // Android's native pause returns true even for a task it does not hold, and
@@ -647,10 +677,15 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
         () => _storage.retrieveAllPausedTasks(),
         const <Task>[],
       );
-      if (paused.any((each) => each.taskId == task.taskId)) return true;
+      if (paused.any((each) => each.taskId == task.taskId)) {
+        _releaseIfUnattached(id);
+        return true;
+      }
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }
-    _userPaused.remove(task.taskId);
+    // Unconfirmed is not refused — the request was accepted and may still
+    // land — so an attached stream keeps the intent and labels it correctly.
+    _releaseIfUnattached(id);
     return false;
   }
 
@@ -659,8 +694,14 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
     if (!await _started()) return false;
     final task = await _heldTask(ref);
     if (task == null) return true;
-    _userCanceled.add(task.taskId);
-    return _cancelAndConfirm(ref, task);
+    final id = TaskId(task.taskId);
+    _stops.commandCancel(id);
+    final cleared = await _cancelAndConfirm(ref, task);
+    // Not rolled back on a confirmation timeout: the cancel was issued and may
+    // still land, and an attached stream must report it as the user's when it
+    // does. Only a generation nobody is listening to is dropped here.
+    _releaseIfUnattached(id);
+    return cleared;
   }
 
   /// How long a staging file must have sat untouched before it counts as an

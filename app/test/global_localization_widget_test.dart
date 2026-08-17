@@ -175,11 +175,6 @@ void main() {
             model: progressState,
             child: const ModelsScreen(),
           );
-          expect(
-            find.byKey(const Key('models-download-note')),
-            findsOneWidget,
-            reason: 'the foreground-speed note renders in every catalog',
-          );
           await _scrollToKey(
             tester,
             listKey: const Key('models-list'),
@@ -189,11 +184,29 @@ void main() {
             find.byKey(const Key('model-progress-gemma4-mlx')),
             findsOneWidget,
           );
+          // The note lives inside its own card now, and the list disposes the
+          // children it is not showing — so this only holds once scrolled to.
+          expect(
+            find.byKey(const Key('model-download-note-gemma4-mlx')),
+            findsOneWidget,
+            reason: 'the foreground-speed note renders in every catalog',
+          );
           if (localeCase.locale.languageCode == 'hi' ||
               localeCase.locale.languageCode == 'ko') {
-            final activeBadge = tester.widget<Text>(
-              find.text(l10n.activeBadge).first,
-            );
+            // Which card carries the badge is platform-dependent — the active
+            // model is MLX on iOS and GGUF on Android — so it is scrolled to
+            // only when it is not already built. Scrolling unconditionally
+            // drags to the end of the list looking for something already
+            // behind us, and dies on the helper rather than the assertion.
+            final badge = find.text(l10n.activeBadge);
+            if (badge.evaluate().isEmpty) {
+              await _scrollTo(
+                tester,
+                listKey: const Key('models-list'),
+                target: badge,
+              );
+            }
+            final activeBadge = tester.widget<Text>(badge.first);
             expect(activeBadge.style?.letterSpacing, 0);
           }
           expect(tester.takeException(), isNull);
@@ -254,16 +267,18 @@ Future<void> _scrollToKey(
   WidgetTester tester, {
   required Key listKey,
   required Key targetKey,
+}) => _scrollTo(tester, listKey: listKey, target: find.byKey(targetKey));
+
+Future<void> _scrollTo(
+  WidgetTester tester, {
+  required Key listKey,
+  required Finder target,
 }) async {
   final scrollable = find
       .descendant(of: find.byKey(listKey), matching: find.byType(Scrollable))
       .first;
-  await tester.scrollUntilVisible(
-    find.byKey(targetKey),
-    220,
-    scrollable: scrollable,
-  );
-  await tester.ensureVisible(find.byKey(targetKey));
+  await tester.scrollUntilVisible(target, 220, scrollable: scrollable);
+  await tester.ensureVisible(target);
   await tester.pumpAndSettle();
 }
 

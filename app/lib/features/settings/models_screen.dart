@@ -179,19 +179,6 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
           },
         ),
         const SizedBox(height: 16),
-        if (catalog
-                .where(
-                  (entry) =>
-                      model.statusOf(entry.key).phase ==
-                      ArtifactPhase.downloading,
-                )
-                .firstOrNull
-            case final downloadingEntry?)
-          DownloadNoteBanner(
-            key: const Key('models-download-note'),
-            entry: downloadingEntry,
-            margin: const EdgeInsetsDirectional.only(bottom: 16),
-          ),
         if (visible.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 28),
@@ -894,6 +881,26 @@ class _ModelCard extends ConsumerWidget {
               detail: _progressDetail(context, ref),
             ),
           ],
+          // Inside the card, not hoisted above the list: slotted at the top it
+          // appeared and vanished with the phase — on every pause, and on every
+          // file boundary of a multi-file artifact — and shifted every card
+          // beneath it under a reader who had scrolled (#125). Here nothing
+          // above the card it describes can move.
+          // A mount guard, not a second visibility rule: `downloadNoteVisible`
+          // stays the one statement of when the note renders, and this is
+          // deliberately wider than it, so widening that rule can never be
+          // hidden here. It exists because this is the only surface with a
+          // card per catalog entry — mounting the note on all of them costs a
+          // note provider each, and the churn strands provider-dispose timers
+          // in the widget tests.
+          if (status.phase == ArtifactPhase.downloading ||
+              status.phase == ArtifactPhase.verifying ||
+              status.phase == ArtifactPhase.paused)
+            DownloadNoteBanner(
+              key: Key('model-download-note-${entry.key}'),
+              entry: entry,
+              margin: const EdgeInsetsDirectional.only(top: 14),
+            ),
           if (status.phase == ArtifactPhase.verifying) ...[
             const SizedBox(height: 14),
             Row(

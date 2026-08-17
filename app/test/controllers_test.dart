@@ -297,6 +297,44 @@ final class _TransferRecorder implements ModelManagementRepository {
   Future<ModelState> addModel(ModelCatalogEntry entry) async => _state;
 }
 
+/// A transfer whose stream the test decides when to end, so the busy guard's
+/// release can be observed rather than assumed.
+final class _GatedTransfer implements ModelManagementRepository {
+  _GatedTransfer(this._state);
+
+  final ModelState _state;
+  final List<String> downloads = [];
+  final _gate = StreamController<ModelState>();
+
+  void endTransfer() {
+    if (!_gate.isClosed) _gate.close();
+  }
+
+  @override
+  Stream<ModelState> download(String artifactKey) {
+    downloads.add(artifactKey);
+    // Only the first transfer is held open; the gate is single-subscription,
+    // and what comes after it closes is the point of the exercise.
+    return downloads.length == 1 ? _gate.stream : Stream.value(_state);
+  }
+
+  @override
+  Future<ModelState> load() async => _state;
+  @override
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    String? failure,
+  }) async => _state;
+  @override
+  Future<ModelState> pause(String artifactKey) async => _state;
+  @override
+  Future<ModelState> cancel(String artifactKey) async => _state;
+  @override
+  Future<ModelState> delete(String artifactKey) async => _state;
+  @override
+  Future<ModelState> addModel(ModelCatalogEntry entry) async => _state;
+}
+
 void main() {
   ProviderContainer containerWith({Duration delay = Duration.zero}) {
     final directory = Directory.systemTemp.createTempSync(
@@ -1492,6 +1530,51 @@ void main() {
 
     await models.releaseEngineWhileInactive();
     expect(inference.unloads, 1, reason: 'idle again: the signal applies');
+  });
+
+  test('the busy guard releases when a transfer stream ends', () async {
+    // The last link in #125's chain: the downloader now ends a commanded pause
+    // at once instead of sitting out its 15s grace, but that only reaches the
+    // user because this guard drops when the repository's stream closes. While
+    // it is raised, Resume — which is download() again — is dropped in silence.
+    final models = _GatedTransfer(const ModelState());
+    // Self-cleaning: an assertion that fails before endTransfer() would
+    // otherwise leave the gate open and download() pending under a disposed
+    // container, burying the real failure in teardown noise.
+    addTearDown(models.endTransfer);
+    final container = ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(
+          FakeInferenceRepository(eventDelay: Duration.zero),
+        ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
+        preferencesRepositoryProvider.overrideWithValue(
+          InMemoryPreferencesRepository(),
+        ),
+        modelManagementRepositoryProvider.overrideWithValue(models),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(modelControllerProvider.future);
+    final controller = container.read(modelControllerProvider.notifier);
+
+    unawaited(controller.download('test-mlx'));
+    await Future<void>.delayed(Duration.zero);
+    expect(models.downloads, ['test-mlx']);
+
+    // Still transferring: a second command is dropped, which is the Resume tap
+    // the 15s window used to swallow.
+    await controller.download('test-mlx');
+    expect(models.downloads, ['test-mlx']);
+
+    models.endTransfer();
+    await Future<void>.delayed(Duration.zero);
+
+    await controller.download('test-mlx');
+    expect(models.downloads, ['test-mlx', 'test-mlx']);
   });
 
   test('engine commands refuse while an answer is streaming', () async {
