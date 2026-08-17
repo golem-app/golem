@@ -5,7 +5,7 @@
 ///
 /// The rendering *algorithms* are a closed set — a spec selects a proven
 /// strategy and supplies its markers, and a template it cannot express is
-/// rejected rather than guessed at (handbook v4.2A §5.1).
+/// rejected rather than guessed at (handbook v5.0 §5.1).
 library;
 
 import 'equality.dart';

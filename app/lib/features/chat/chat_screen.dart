@@ -162,8 +162,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         child: Center(child: CupertinoActivityIndicator()),
       ),
       // Fixed copy plus a retry: raw exception text never reaches a surface
-      // (§8.1), and the load failure must not brick the root screen for the
-      // process lifetime — nothing else ever rebuilds this keepAlive provider.
+      // (handbook v5.0 §8.1), and the load failure must not brick the root
+      // screen for the process lifetime — nothing else ever rebuilds this
+      // keepAlive provider.
       error: (error, stack) => CupertinoPageScaffold(
         child: RetryPane(
           key: const Key('chat-load-error'),

@@ -10,8 +10,8 @@ part 'preferences_providers.g.dart';
 /// Persisted app-wide preferences. Every command follows the settings idiom —
 /// drop taps that land in the cold-start load window, publish, then save —
 /// and returns false after rolling back a failed write, never throwing.
-/// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
-/// root on every frame.
+/// KeepAlive: a handbook v5.0 §3.2 client-state owner; theme and text scale
+/// drive the app root on every frame.
 @Riverpod(keepAlive: true, retry: noRetry)
 class PreferencesController extends _$PreferencesController {
   /// The last state known to be on disk — what a failed commit snaps back

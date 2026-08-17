@@ -18,7 +18,7 @@ final class PreparedImage {
 }
 
 /// Why an image was refused. Semantic rather than copy, so presentation owns
-/// the wording (handbook v4.2A §5.2).
+/// the wording (handbook v5.0 §5.2).
 enum ImageRejection {
   unsupportedType,
 

@@ -27,7 +27,9 @@ part 'chat_providers.g.dart';
 /// derivation over an async controller still trips Flutter's element-update
 /// invariant when a provider scope is swapped mid-test — the class of bug
 /// fixed upstream in 3.4.0 ("markNeedsBuild ... inside Widget lifecycle").
-/// Revisit when the pin crosses 3.4.0.
+/// The pin cannot move on this SDK — flutter_test's test_api caps analyzer
+/// below the ^13 the newer generator needs, and the family is exact-pinned
+/// end to end (docs/notes/dependencies.md). Revisit on the SDK bump (#38).
 @Riverpod(keepAlive: true, retry: noRetry)
 (int, int) chatStorageSignature(Ref ref) {
   final conversations =
@@ -663,7 +665,7 @@ class ChatController extends _$ChatController {
 
   /// Typed inference exceptions retain their recovery kind and safe arguments;
   /// presentation owns localized copy. Unknown errors stay generic, and raw
-  /// exception text never reaches the banner (§19.4).
+  /// exception text never reaches the banner (handbook v5.0 §8.1).
   static ChatFailure _classifiedFailure(Object error) => switch (error) {
     InferenceException(:final kind, :final contextTokens) => ChatFailure(
       kind: switch (kind) {

@@ -4,7 +4,8 @@ import '../chrome/golem_button.dart';
 import '../theme/golem_theme.dart';
 
 /// The one read-failure surface: fixed copy (raw exception text never
-/// reaches a screen, §8.1) and a retry that re-runs the failed read.
+/// reaches a screen, handbook v5.0 §8.1) and a retry that re-runs the
+/// failed read.
 class RetryPane extends StatelessWidget {
   const RetryPane({
     required this.message,

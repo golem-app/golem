@@ -7,8 +7,8 @@ import '../../../core/providers/retry.dart';
 part 'settings_providers.g.dart';
 
 /// Only user-set values are stored; profile defaults resolve at the consumer.
-/// KeepAlive: a §3.2 client-state owner — the session's sole in-memory read
-/// owner over write-through persistence.
+/// KeepAlive: a handbook v5.0 §3.2 client-state owner — the session's sole
+/// in-memory read owner over write-through persistence.
 @Riverpod(keepAlive: true, retry: noRetry)
 class SettingsController extends _$SettingsController {
   /// The last state known to be on disk — what a failed commit snaps back

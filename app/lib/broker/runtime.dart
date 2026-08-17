@@ -134,7 +134,8 @@ final class BrokerGenerationCompleted extends BrokerRuntimeEvent {
 
 /// The broker's subtype of the app-level [InferenceException], so controllers
 /// catch one semantic failure type across backends. [message] is diagnostic;
-/// presentation maps [kind] to localized copy and never renders it (§19.2).
+/// presentation maps [kind] to localized copy and never renders it
+/// (handbook v5.0 §5.2).
 final class BrokerRuntimeException extends InferenceException {
   const BrokerRuntimeException(
     String message, {

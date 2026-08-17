@@ -43,7 +43,7 @@ BrokerEngine brokerEngineFor(ModelEngine engine) => switch (engine) {
 /// through a [ProfileRegistry] — never from slicing the key — which lets a
 /// custom repository activate through the same path as a pinned model (#43).
 /// Every refusal is a typed [InferenceException] the chat surface maps to
-/// actionable copy (handbook v4.2A §5.2, §8.1), all before any load.
+/// actionable copy (handbook v5.0 §5.2, §8.1), all before any load.
 ModelRuntimeConfig resolveModelRuntimeConfig(
   String catalogKey, {
   List<ModelCatalogEntry>? catalog,

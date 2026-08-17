@@ -15,7 +15,7 @@ import 'domain/chat_search.dart';
 
 /// Full-screen search across every chat. The raw field text is
 /// widget-local; a 350 ms debounce publishes the normalized query, and
-/// results derive from providers (handbook §23.4).
+/// results derive from providers (handbook v5.0 §7.3).
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
 

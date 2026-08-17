@@ -17,7 +17,9 @@ part of 'chat_providers.dart';
 /// derivation over an async controller still trips Flutter's element-update
 /// invariant when a provider scope is swapped mid-test — the class of bug
 /// fixed upstream in 3.4.0 ("markNeedsBuild ... inside Widget lifecycle").
-/// Revisit when the pin crosses 3.4.0.
+/// The pin cannot move on this SDK — flutter_test's test_api caps analyzer
+/// below the ^13 the newer generator needs, and the family is exact-pinned
+/// end to end (docs/notes/dependencies.md). Revisit on the SDK bump (#38).
 
 @ProviderFor(chatStorageSignature)
 final chatStorageSignatureProvider = ChatStorageSignatureProvider._();
@@ -31,7 +33,9 @@ final chatStorageSignatureProvider = ChatStorageSignatureProvider._();
 /// derivation over an async controller still trips Flutter's element-update
 /// invariant when a provider scope is swapped mid-test — the class of bug
 /// fixed upstream in 3.4.0 ("markNeedsBuild ... inside Widget lifecycle").
-/// Revisit when the pin crosses 3.4.0.
+/// The pin cannot move on this SDK — flutter_test's test_api caps analyzer
+/// below the ^13 the newer generator needs, and the family is exact-pinned
+/// end to end (docs/notes/dependencies.md). Revisit on the SDK bump (#38).
 
 final class ChatStorageSignatureProvider
     extends $FunctionalProvider<(int, int), (int, int), (int, int)>
@@ -45,7 +49,9 @@ final class ChatStorageSignatureProvider
   /// derivation over an async controller still trips Flutter's element-update
   /// invariant when a provider scope is swapped mid-test — the class of bug
   /// fixed upstream in 3.4.0 ("markNeedsBuild ... inside Widget lifecycle").
-  /// Revisit when the pin crosses 3.4.0.
+  /// The pin cannot move on this SDK — flutter_test's test_api caps analyzer
+  /// below the ^13 the newer generator needs, and the family is exact-pinned
+  /// end to end (docs/notes/dependencies.md). Revisit on the SDK bump (#38).
   ChatStorageSignatureProvider._()
     : super(
         from: null,
