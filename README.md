@@ -61,10 +61,12 @@ executes the Inferno build hooks and requires
 The Flutter version is pinned in [`.fvmrc`](.fvmrc), and that file is the only
 place it is written: [fvm](https://fvm.app) reads it locally and
 `subosito/flutter-action` reads the same file in CI, so the two cannot drift.
-`tool/check_toolchain.dart` fails a run that leaves the pin, and
-`app/test/toolchain_pin_test.dart` fails a commit that reintroduces a second
-literal. Goldens are rasterized by the SDK, so an unpinned machine silently
-produces pixel diffs that mean nothing.
+`tool/check_toolchain.dart` is the single implementation of that rule — a
+literal version anywhere in `.github/workflows/`, an unbounded pubspec
+constraint, a tracked `.fvm/`, or an SDK that is not the pinned one all fail
+it. Every CI job runs it, and `app/test/toolchain_pin_test.dart` runs it too so
+`flutter test` catches drift on its own. Goldens are rasterized by the SDK, so
+an unpinned machine silently produces pixel diffs that mean nothing.
 
 ```sh
 brew tap leoafarias/fvm && brew install fvm   # once per machine
@@ -78,9 +80,6 @@ PATH for the session:
 ```sh
 export PATH="$PWD/.fvm/flutter_sdk/bin:$PATH"
 ```
-
-Native assets additionally need `flutter config --enable-native-assets` once
-per machine.
 
 Verify (from the repo root):
 
@@ -96,7 +95,7 @@ built Android artifact against Play's native-library rules — see
 [`app/README.md`](app/README.md#the-play-release-artifact):
 
 ```sh
-dart run tool/check_android_packaging.dart
+fvm dart run tool/check_android_packaging.dart
 ```
 
 See [`app/README.md`](app/README.md) for the app architecture, the asset

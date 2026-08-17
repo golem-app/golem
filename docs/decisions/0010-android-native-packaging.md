@@ -16,7 +16,7 @@ Measured against the production artifacts as they stood at `c57d995`:
 | `PT_LOAD` alignment, 64-bit | `libinferno.so` 2\*\*14, `libdartjni.so` 2\*\*14, `libapp.so` and `libflutter.so` 2\*\*16 | NDK r28 links 16 KB-aligned by default |
 | `.so` stored uncompressed, 16 KB zip offsets | `zipalign -c -P 16` verified | AGP 9 default (`extractNativeLibs="false"`) |
 | `BundleConfig.pb` | `uncompress_native_libraries { enabled: true, alignment: PAGE_ALIGNMENT_16K }` | AGP ≥ 8.5.1 default |
-| `targetSdk` | 36 | Flutter 3.44.9's default |
+| `targetSdk` | 36 | Flutter 3.44.8's default |
 | Page-size assumptions in the engine | none — llama.cpp uses `sysconf(_SC_PAGESIZE)` | upstream |
 
 Not one of those is stated anywhere in this repository. Every one of them is a

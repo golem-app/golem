@@ -27,6 +27,8 @@ jobs:
       - name: Resolve workspace
         run: flutter pub get
         working-directory: app
+      - name: Toolchain pin
+        run: dart run tool/check_toolchain.dart
       - name: Format
         run: dart format --output=none --set-exit-if-changed .
       - name: Import boundary
@@ -52,6 +54,8 @@ jobs:
       - name: Resolve workspace
         run: flutter pub get
         working-directory: app
+      - name: Toolchain pin
+        run: dart run tool/check_toolchain.dart
       - name: Analyze
         run: dart analyze
         working-directory: packages/inferno
@@ -87,6 +91,8 @@ jobs:
       - name: Resolve workspace
         run: flutter pub get
         working-directory: app
+      - name: Toolchain pin
+        run: dart run tool/check_toolchain.dart
       - name: App suite with goldens enforced (macOS renders the goldens)
         run: flutter test
         working-directory: app

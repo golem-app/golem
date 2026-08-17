@@ -1,55 +1,38 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// `.fvmrc` is the only place the SDK version is written. fvm reads it
-/// locally and `subosito/flutter-action` reads it in CI; these assertions
-/// stop a second literal from reappearing and drifting (#128).
-///
-/// The companion `tool/check_toolchain.dart` additionally compares the pin
-/// against the SDK actually running, which only means something outside the
-/// test process.
+/// Runs `tool/check_toolchain.dart` rather than restating its rules, so the
+/// local gate and CI cannot disagree about whether the pin is held. The tool
+/// owns every assertion; this exists because `flutter test` is the gate that
+/// actually gets run while CI is disabled.
 void main() {
-  final pin = _pin();
-
-  test('.fvmrc names a version', () {
-    expect(pin, isNotEmpty);
-  });
-
-  test('the pubspec floor is the pinned version', () {
-    final match = RegExp(
-      r"""^\s+flutter:\s*['"]?>=([\d.]+)""",
-      multiLine: true,
-    ).firstMatch(File('pubspec.yaml').readAsStringSync());
-    expect(match?.group(1), pin);
-  });
-
-  test('CI reads the pin instead of naming a version', () {
-    final source = File('../.github/workflows/ci.yml').readAsStringSync();
+  test('the toolchain pin is held', () {
+    final dart = _dartExecutable();
+    final result = Process.runSync(dart, [
+      'run',
+      'tool/check_toolchain.dart',
+    ], workingDirectory: '..');
     expect(
-      RegExp(r'^\s*flutter-version:', multiLine: true).hasMatch(source),
-      isFalse,
-      reason: 'ci.yml must use flutter-version-file: .fvmrc',
+      result.exitCode,
+      0,
+      reason:
+          'tool/check_toolchain.dart failed:\n${result.stderr}${result.stdout}',
     );
-    expect(
-      RegExp(
-        r'^\s*flutter-version-file:\s*\.fvmrc\s*$',
-        multiLine: true,
-      ).allMatches(source).length,
-      RegExp('subosito/flutter-action').allMatches(source).length,
-      reason: 'every job that sets up Flutter must read .fvmrc',
-    );
-  });
-
-  test('the SDK checkout fvm materialises is not committed', () {
-    final ignored = File('../.gitignore').readAsStringSync();
-    expect(ignored, contains('.fvm/'));
   });
 }
 
-String _pin() {
-  final decoded =
-      jsonDecode(File('../.fvmrc').readAsStringSync()) as Map<String, dynamic>;
-  return decoded['flutter'] as String;
+/// `Platform.resolvedExecutable` under `flutter test` is `flutter_tester`,
+/// buried in the SDK's artifact cache, so the Dart binary is found by walking
+/// up to whichever ancestor holds one.
+String _dartExecutable() {
+  for (
+    var dir = File(Platform.resolvedExecutable).parent;
+    dir.path != dir.parent.path;
+    dir = dir.parent
+  ) {
+    final dart = File('${dir.path}/bin/cache/dart-sdk/bin/dart');
+    if (dart.existsSync()) return dart.path;
+  }
+  fail('No Dart SDK above ${Platform.resolvedExecutable}');
 }
