@@ -22,10 +22,21 @@ fakes, while `production` and `dev` wire the real downloader and default to
 real inference (see "Deterministic where it matters" below and
 `../docs/decisions/0003-flavor-backend-defaults.md`).
 
-A build that names no flavor at all — a direct `xcodebuild -scheme Runner`,
-which selects the flavorless `Debug`/`Release`/`Profile` configurations — is
-a **qa** build: bundle id, display name, launcher artwork, and the all-fakes
-wiring all resolve to `qa` (#116). No build path produces a fourth app.
+The flavorless `Debug`/`Release`/`Profile` configurations — what a direct
+`xcodebuild -scheme Runner` selects — carry qa's bundle id, display name, and
+launcher artwork, so **no build path produces a fourth app** (#116).
+
+Their Dart half is not equally fixed, and this is a trap worth knowing. Those
+configurations inherit `Flutter/Generated.xcconfig`, which the last
+`flutter build` wrote — including its `FLAVOR` and the `FLUTTER_APP_FLAVOR`
+dart-define. So `appFlavor`, and with it the backend wiring, the in-app icon,
+and the internal-tool gates, is whatever that earlier build named;
+`AppIdentity.forFlavor` returns `qa` only when no flavor was baked at all.
+Run `xcodebuild -scheme Runner` after `flutter build ios --flavor dev` and you
+get a bundle labelled **Golem QA** that installs over the QA container and
+runs `dev`'s real inference and real downloader. Prefer `flutter build
+--flavor <name>`; if you must use a bare `xcodebuild`, run the matching
+`flutter build ... --flavor qa` immediately before it.
 
 > **Physical iPhone caution:** never install the `production`
 > (`app.golem`) flavor on the physical iPhone — that identifier belongs

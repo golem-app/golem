@@ -11,9 +11,13 @@ The install-time device floor that complements this composition policy is
 documented in `../device_floor.md` (added with epic #61).
 
 Amended by #116: the flavorless identity this record treats as a fourth
-composition no longer exists. A build that names no flavor resolves to `qa` —
-bundle id, artwork, and wiring alike — so every sentence below that pairs
-"flavorless" with production should be read as `qa`.
+composition no longer exists. A build that names no flavor resolves to `qa`.
+Every sentence below that groups "flavorless" with production is therefore
+obsolete rather than re-readable — the grouping inverted. A flavorless build
+now *gains* what those sentences say it suppresses: the benchmark route and
+assets, the scripted launch and startup failures, and the device-capability
+overrides. Read "production and the flavorless identity" as "production"
+alone.
 
 ## The composition rule, stated once
 

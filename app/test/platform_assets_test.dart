@@ -27,6 +27,18 @@ const _flavors = [
   ),
 ];
 
+/// The Kotlin entry point, whose package moved off the retired identity in
+/// #116. Named once because three assertions and the Android `am start`
+/// runbook all address this exact class.
+const _mainActivity = 'android/app/src/main/kotlin/app/golem/MainActivity.kt';
+
+/// The trailing extension of [path] including its dot, or '' when it has none.
+String _extension(String path) {
+  final dot = path.lastIndexOf('.');
+  final slash = path.lastIndexOf(Platform.pathSeparator);
+  return dot > slash ? path.substring(dot) : '';
+}
+
 num _channel(image.Pixel pixel, String channel) => switch (channel) {
   'r' => pixel.r,
   'g' => pixel.g,
@@ -34,22 +46,32 @@ num _channel(image.Pixel pixel, String channel) => switch (channel) {
   _ => throw ArgumentError.value(channel, 'channel'),
 };
 
-/// The distinct values a pbxproj gives a setting, across every configuration.
-/// A value-set assertion beats `contains`: a stray fourth identity in one
-/// configuration out of twelve still fails it.
-Set<String> _settingValues(String project, String setting) => RegExp(
-  '^\\s*$setting = "?([\\w. -]+)"?;\$',
-  multiLine: true,
-).allMatches(project).map((match) => match[1]!).toSet();
-
-Set<String> _bundleIdentifiers(String project) =>
-    _settingValues(project, 'PRODUCT_BUNDLE_IDENTIFIER');
-
-Set<String> _displayNames(String project) =>
-    _settingValues(project, 'GOLEM_DISPLAY_NAME');
-
-Set<String> _appIconNames(String project) =>
-    _settingValues(project, 'ASSETCATALOG_COMPILER_APPICON_NAME');
+/// How many configurations give a pbxproj setting each value.
+///
+/// The count carries as much as the value: retargeting one configuration at
+/// an identity that some other configuration already uses leaves the set of
+/// distinct values untouched, so a set assertion would pass while a bare
+/// `xcodebuild` installed the wrong app. Deleting the setting from a
+/// configuration is invisible to a set as well, and leaves the flavorless
+/// build with no icon and an empty CFBundleDisplayName.
+Map<String, int> _settingCounts(String project, String setting) {
+  final counts = <String, int>{};
+  for (final match in RegExp(
+    '^\\s*$setting = (.+);\$',
+    multiLine: true,
+  ).allMatches(project)) {
+    final value = match[1]!.replaceAll('"', '');
+    counts[value] = (counts[value] ?? 0) + 1;
+  }
+  // A value the pattern cannot read would be indistinguishable from a clean
+  // project, so every occurrence has to be accounted for.
+  expect(
+    counts.values.fold<int>(0, (sum, count) => sum + count),
+    RegExp('^\\s*$setting = ', multiLine: true).allMatches(project).length,
+    reason: 'unparsed $setting occurrences',
+  );
+  return counts;
+}
 
 void _expectDominantChannel(image.Pixel pixel, String channel) {
   final others = {'r', 'g', 'b'}.difference({channel});
@@ -267,9 +289,7 @@ void main() {
       );
     }
 
-    final activity = await File(
-      'android/app/src/main/kotlin/app/golem/MainActivity.kt',
-    ).readAsString();
+    final activity = await File(_mainActivity).readAsString();
     expect(activity, contains('package app.golem\n'));
     // The retired identity's package directory must not come back: the class
     // name is what `am start` recipes and launcher shortcuts address.
@@ -319,7 +339,7 @@ void main() {
       'lib/core/services/device_storage.dart',
       'ios/Runner/AppDelegate.swift',
       'macos/Runner/MainFlutterWindow.swift',
-      'android/app/src/main/kotlin/app/golem/MainActivity.kt',
+      _mainActivity,
     ];
     final pattern = RegExp('[\'"]([\\w.]+/storage)[\'"]');
     for (final source in sources) {
@@ -332,23 +352,61 @@ void main() {
   });
 
   test('no shipping surface still names the retired identity', () {
-    // #116. The strings live in four places that a rename can miss
-    // independently — Dart, gradle, the two Xcode projects — so the guard
-    // reads all of them rather than trusting one grep at review time.
+    // #116. Enumerating the files a rename touched would pass the moment the
+    // string reappears somewhere nobody listed — a scheme, a second xcconfig,
+    // an Info.plist — so this walks the source trees instead and reads every
+    // text file in them. Generated and vendored trees are excluded: they are
+    // absent on a fresh clone and rebuilt from these sources anyway.
     const retired = 'app.golem.flutter';
+    const roots = [
+      'lib',
+      'tool',
+      'integration_test',
+      'android',
+      'ios',
+      'macos',
+    ];
+    const textExtensions = {
+      '.dart',
+      '.kt',
+      '.kts',
+      '.gradle',
+      '.swift',
+      '.xml',
+      '.plist',
+      '.xcconfig',
+      '.pbxproj',
+      '.xcscheme',
+      '.entitlements',
+      '.storyboard',
+      '.json',
+      '.yaml',
+      '.sh',
+      '.h',
+      '.m',
+    };
+    const generated = {
+      'build',
+      'Pods',
+      'ephemeral',
+      '.dart_tool',
+      '.symlinks',
+      'DerivedData',
+      '.gradle',
+      '.build',
+      '.swiftpm',
+    };
     final sources = <String>[
       'pubspec.yaml',
-      'android/app/build.gradle.kts',
-      'android/app/src/main/AndroidManifest.xml',
-      'android/app/src/main/kotlin/app/golem/MainActivity.kt',
-      'ios/Runner.xcodeproj/project.pbxproj',
-      'ios/Runner/AppDelegate.swift',
-      'macos/Runner.xcodeproj/project.pbxproj',
-      'macos/Runner/Configs/AppInfo.xcconfig',
-      'macos/Runner/MainFlutterWindow.swift',
-      for (final file in Directory('lib').listSync(recursive: true))
-        if (file is File && file.path.endsWith('.dart')) file.path,
+      for (final root in roots)
+        for (final entity in Directory(root).listSync(recursive: true))
+          if (entity is File &&
+              !entity.uri.pathSegments.any(generated.contains) &&
+              textExtensions.contains(_extension(entity.path)))
+            entity.path,
     ];
+    // A walk that silently matched nothing would be a guard in name only.
+    expect(sources.length, greaterThan(50));
     for (final source in sources) {
       expect(
         File(source).readAsStringSync(),
@@ -404,15 +462,22 @@ void main() {
     // `xcodebuild -scheme Runner` selects resolve to qa, artwork included, so
     // no build path can install a fourth app. The shared Info.plist resolves
     // the display name through the per-configuration variable.
-    expect(_bundleIdentifiers(project), {
-      for (final flavor in _flavors) flavor.identity.applicationId,
-      '${AppIdentity.qa.applicationId}.RunnerTests',
+    expect(_settingCounts(project, 'PRODUCT_BUNDLE_IDENTIFIER'), {
+      AppIdentity.production.applicationId: 3,
+      // Three flavor configurations plus the three flavorless ones.
+      AppIdentity.qa.applicationId: 6,
+      AppIdentity.dev.applicationId: 3,
+      '${AppIdentity.qa.applicationId}.RunnerTests': 12,
     });
-    expect(_displayNames(project), {
-      for (final flavor in _flavors) flavor.identity.displayName,
+    expect(_settingCounts(project, 'GOLEM_DISPLAY_NAME'), {
+      AppIdentity.production.displayName: 3,
+      AppIdentity.qa.displayName: 6,
+      AppIdentity.dev.displayName: 3,
     });
-    expect(_appIconNames(project), {
-      for (final flavor in _flavors) 'AppIcon-${flavor.identity.name}',
+    expect(_settingCounts(project, 'ASSETCATALOG_COMPILER_APPICON_NAME'), {
+      'AppIcon-${AppIdentity.production.name}': 3,
+      'AppIcon-${AppIdentity.qa.name}': 6,
+      'AppIcon-${AppIdentity.dev.name}': 3,
     });
     final plist = await File('ios/Runner/Info.plist').readAsString();
     expect(plist, contains(r'<string>$(GOLEM_DISPLAY_NAME)</string>'));
@@ -490,15 +555,23 @@ void main() {
       await File('macos/Runner/Configs/AppInfo.xcconfig').readAsString(),
       contains('PRODUCT_BUNDLE_IDENTIFIER = ${AppIdentity.qa.applicationId}\n'),
     );
-    expect(_bundleIdentifiers(project), {
-      for (final flavor in _flavors) flavor.identity.applicationId,
-      '${AppIdentity.qa.applicationId}.RunnerTests',
+    // The flavorless Runner configurations take their bundle id from
+    // AppInfo.xcconfig, so unlike iOS the pbxproj names qa only three times.
+    expect(_settingCounts(project, 'PRODUCT_BUNDLE_IDENTIFIER'), {
+      AppIdentity.production.applicationId: 3,
+      AppIdentity.qa.applicationId: 3,
+      AppIdentity.dev.applicationId: 3,
+      '${AppIdentity.qa.applicationId}.RunnerTests': 12,
     });
-    expect(_displayNames(project), {
-      for (final flavor in _flavors) flavor.identity.displayName,
+    expect(_settingCounts(project, 'GOLEM_DISPLAY_NAME'), {
+      AppIdentity.production.displayName: 3,
+      AppIdentity.qa.displayName: 6,
+      AppIdentity.dev.displayName: 3,
     });
-    expect(_appIconNames(project), {
-      for (final flavor in _flavors) 'AppIcon-${flavor.identity.name}',
+    expect(_settingCounts(project, 'ASSETCATALOG_COMPILER_APPICON_NAME'), {
+      'AppIcon-${AppIdentity.production.name}': 3,
+      'AppIcon-${AppIdentity.qa.name}': 6,
+      'AppIcon-${AppIdentity.dev.name}': 3,
     });
     final plist = await File('macos/Runner/Info.plist').readAsString();
     expect(
