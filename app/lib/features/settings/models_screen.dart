@@ -179,19 +179,6 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
           },
         ),
         const SizedBox(height: 16),
-        if (catalog
-                .where(
-                  (entry) =>
-                      model.statusOf(entry.key).phase ==
-                      ArtifactPhase.downloading,
-                )
-                .firstOrNull
-            case final downloadingEntry?)
-          DownloadNoteBanner(
-            key: const Key('models-download-note'),
-            entry: downloadingEntry,
-            margin: const EdgeInsetsDirectional.only(bottom: 16),
-          ),
         if (visible.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 28),
@@ -894,6 +881,22 @@ class _ModelCard extends ConsumerWidget {
               detail: _progressDetail(context, ref),
             ),
           ],
+          // Inside the card, not hoisted above the list: slotted at the top it
+          // appeared and vanished with the phase — on every pause, and on every
+          // file boundary of a multi-file artifact — and shifted every card
+          // beneath it under a reader who had scrolled (#125). Here nothing
+          // above the card it describes can move.
+          //
+          // Mounted only for the card that is transferring, unlike the two
+          // single-entry surfaces that embed it unconditionally: one note
+          // provider per catalog entry is churn for no layout gain, since the
+          // note renders nothing outside `downloading` either way.
+          if (status.phase == ArtifactPhase.downloading)
+            DownloadNoteBanner(
+              key: Key('model-download-note-${entry.key}'),
+              entry: entry,
+              margin: const EdgeInsetsDirectional.only(top: 14),
+            ),
           if (status.phase == ArtifactPhase.verifying) ...[
             const SizedBox(height: 14),
             Row(

@@ -13,11 +13,13 @@ import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/domain/resolved_repository.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
+import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/services/custom_repository_resolver.dart';
 import 'package:golem_flutter/core/services/repository_resolver.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
 import 'package:golem_flutter/features/settings/appearance_screen.dart';
+import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/settings/models_screen.dart';
 import 'package:golem_flutter/features/settings/privacy_screen.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';
@@ -197,7 +199,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1600));
   }, variant: iosChrome);
 
-  testWidgets('a running download shows the dismissible note above the cards', (
+  testWidgets('a running download shows the dismissible note in its card', (
     tester,
   ) async {
     await pumpWithRepositories(
@@ -213,7 +215,10 @@ void main() {
       ),
       child: const ModelsScreen(),
     );
-    expect(find.byKey(const Key('models-download-note')), findsOneWidget);
+    expect(
+      find.byKey(const Key('model-download-note-gemma4-mlx')),
+      findsOneWidget,
+    );
     expect(find.text('Keep Golem open for full speed.'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('download-note-dismiss')));
@@ -237,8 +242,55 @@ void main() {
       ),
       child: const ModelsScreen(),
     );
-    expect(find.byKey(const Key('models-download-note')), findsNothing);
+    expect(
+      find.byKey(const Key('model-download-note-gemma4-mlx')),
+      findsNothing,
+    );
     expect(find.textContaining(' left'), findsOneWidget);
+  });
+
+  testWidgets('pausing a card leaves the card itself where it was', (
+    tester,
+  ) async {
+    // Found on device: the foreground-speed note used to sit above every card,
+    // so the moment a transfer stopped being `downloading` — a pause, or any
+    // file boundary of a multi-file artifact — its height left the list and
+    // yanked every card up under a reader watching one (#125). In its card the
+    // note can only move that card's own contents.
+    await pumpWithRepositories(
+      tester,
+      models: _PausableModels(
+        const ModelState(
+          simulated: true,
+          artifacts: {
+            'gemma4-mlx': ArtifactStatus(
+              phase: ArtifactPhase.downloading,
+              downloadedBytes: 900000000,
+            ),
+          },
+        ),
+      ),
+      child: const ModelsScreen(),
+    );
+    expect(find.text('Keep Golem open for full speed.'), findsOneWidget);
+    final before = tester.getTopLeft(
+      find.byKey(const Key('model-card-gemma4-mlx')),
+    );
+
+    // Through the controller rather than the card's Pause button: at this
+    // viewport the button sits below the fold, and scrolling to it puts the
+    // card's top — the thing that must not move — off screen.
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ModelsScreen)),
+    );
+    await container.read(modelControllerProvider.notifier).pause('gemma4-mlx');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Keep Golem open for full speed.'), findsNothing);
+    expect(
+      tester.getTopLeft(find.byKey(const Key('model-card-gemma4-mlx'))),
+      before,
+    );
   });
 
   testWidgets('a custom repository adds through the Advanced card', (
@@ -847,4 +899,40 @@ final class _HangingResolver implements CustomRepositoryResolver {
     String? weightsFile,
     Set<String> existingKeys = const {},
   }) => outcome;
+}
+
+/// The one thing `StaticModels` cannot do: change phase. Only `pause` moves,
+/// because that is the transition this file's scroll regression turns on.
+final class _PausableModels implements ModelManagementRepository {
+  _PausableModels(this._state);
+
+  ModelState _state;
+
+  @override
+  Future<ModelState> load() async => _state;
+
+  @override
+  Future<ModelState> pause(String artifactKey) async =>
+      _state = _state.withArtifact(
+        artifactKey,
+        _state.statusOf(artifactKey).copyWith(phase: ArtifactPhase.paused),
+      );
+
+  @override
+  Stream<ModelState> download(String artifactKey) => Stream.value(_state);
+
+  @override
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    String? failure,
+  }) async => _state;
+
+  @override
+  Future<ModelState> cancel(String artifactKey) async => _state;
+
+  @override
+  Future<ModelState> delete(String artifactKey) async => _state;
+
+  @override
+  Future<ModelState> addModel(ModelCatalogEntry entry) async => _state;
 }
