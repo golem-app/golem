@@ -113,6 +113,17 @@ void main() {
 
     expect(events, isEmpty, reason: 'this back stays inside the app');
     expect(inference.disposes, 0, reason: 'the engine must survive');
+    expect(router.state.uri.toString(), '/');
+
+    // The route's own pop — what an iOS back-swipe completes into. The shell
+    // guard must not gate it either.
+    router.push('/settings');
+    await tester.pumpAndSettle();
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(router.state.uri.toString(), '/');
+    expect(events, isEmpty);
+    expect(inference.disposes, 0);
     // And the app is still usable afterwards: back again now exits.
     await systemBack(tester, events);
     expect(events, ['exit:disposes=1']);
