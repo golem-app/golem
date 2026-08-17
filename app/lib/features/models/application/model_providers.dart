@@ -166,9 +166,11 @@ class ModelController extends _$ModelController {
       if (!ref.mounted) return;
       state = AsyncData(value);
       await _reattach(value);
-    } on Exception {
-      // Reconciliation is a repair pass; a failed one must not blank the
-      // screen or replace a usable snapshot with an error.
+    } catch (_) {
+      // Deliberately broad: app.dart calls this fire-and-forget from a
+      // post-frame callback and a resume timer, so anything escaping here
+      // reaches the zone as an unhandled error. Reconciliation is a repair
+      // pass; a failed one must not blank the screen, and must not crash.
     }
   }
 
@@ -289,9 +291,12 @@ class ModelController extends _$ModelController {
         current.statusOf(target).phase != ArtifactPhase.installed) {
       return;
     }
+    // Ahead of the guard flags: a throwing read between them and the finally
+    // below would latch _busy for the notifier's lifetime, silently disabling
+    // every model command for the rest of the process.
+    final models = ref.read(modelManagementRepositoryProvider);
     _busy = true;
     _engineBusy = true;
-    final models = ref.read(modelManagementRepositoryProvider);
     try {
       final value = await models.recordRuntime(RuntimePhase.loaded);
       if (!ref.mounted) return;
@@ -438,9 +443,11 @@ class ModelController extends _$ModelController {
     // Its own guard: backgrounding and memory pressure can both fire, and this
     // still must not unload twice.
     if (_releasing) return;
-    _releasing = true;
+    // Ahead of the flag, as in reflectEngineLoaded: latching _releasing would
+    // disable the one defence against holding weights in the background.
     final models = ref.read(modelManagementRepositoryProvider);
     final inference = ref.read(inferenceRepositoryProvider);
+    _releasing = true;
     try {
       // Residency decides, not the catalog phase: a GOLEM_MODEL_PATH load is
       // outside phase tracking, yet just as resident and just as jetsammable.
@@ -451,8 +458,9 @@ class ModelController extends _$ModelController {
       final value = await models.recordRuntime(RuntimePhase.unloaded);
       if (!ref.mounted) return;
       state = AsyncData(value);
-    } on Exception {
-      // Advisory signal: no user-visible failure state.
+    } catch (_) {
+      // Broad for the same reason as reconcileDownloads: the lifecycle
+      // observer discards this future. Advisory signal, no failure state.
     } finally {
       _releasing = false;
     }
@@ -466,13 +474,15 @@ class ModelController extends _$ModelController {
   /// is precisely the case that aborts. Reversible, because Flutter permits
   /// `detached -> resumed` and the callback listener stays open.
   void releaseEngineForTeardown() {
-    final inference = ref.read(inferenceRepositoryProvider);
     try {
-      inference.releaseEngine();
+      ref.read(inferenceRepositoryProvider).releaseEngine();
     } catch (_) {
-      // Deliberately broad, and deliberately not around the read (#127): this
-      // is the last thing the process does, and an FFI Error on the way out
-      // must not abort teardown. An unwired seam is a wiring mistake instead.
+      // The one deliberate exemption from #127's no-catch-around-a-read rule,
+      // and it covers the read on purpose. `detached` is the only teardown
+      // signal Android delivers, the framework does not await this handler,
+      // and it can arrive while the container is already disposing — so a
+      // throwing read here would abort the release instead of degrading, on
+      // the one path with no surface left to report a failure to.
     }
   }
 

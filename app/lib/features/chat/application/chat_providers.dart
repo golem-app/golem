@@ -83,7 +83,7 @@ class ChatController extends _$ChatController {
     bridge.bindPersistCurrent(persistCurrent);
     bridge.bindSessionState(() => state.value);
     final persistence = _persistence();
-    final snapshot = await persistence.history.load();
+    final snapshot = await persistence.load();
     await persistence.retainReferenced(snapshot.conversations);
     return ChatState(
       conversations: snapshot.conversations,
@@ -554,8 +554,12 @@ class ChatController extends _$ChatController {
 
   /// Null when model state is unavailable — generation then proceeds and
   /// prepare() stays the loud failure path, rather than inventing a verdict.
-  /// The read itself is outside the guard: a container without the seam is a
-  /// wiring mistake, not a degraded read (#127).
+  ///
+  /// The read sits outside the guard so the guard covers only the awaited work.
+  /// That is a smaller claim than it looks: riverpod delivers an unwired seam
+  /// as a ProviderException on the future, which is an Exception and is still
+  /// caught here. What the narrowing buys is that an Error — a cast, a failed
+  /// assertion — is no longer swallowed as "model state unavailable".
   Future<bool?> _modelInstalled(String artifactKey) async {
     final models = ref.read(modelControllerProvider.future);
     try {
@@ -568,8 +572,9 @@ class ChatController extends _$ChatController {
 
   /// The response style's values with the user's hand-set Advanced overrides
   /// layered on top, knob by knob. Settings that fail to surface must never
-  /// block chat, so each layer degrades independently to nothing — but only the
-  /// awaited load degrades; an unwired seam still throws.
+  /// block chat, so each layer degrades independently to nothing. Only the
+  /// awaited load is guarded, and only against Exception — see _modelInstalled
+  /// for what that does and does not buy.
   Future<SamplingOverrides?> _samplingOverrides(String? modelKey) async {
     final profileKey = _profileKeyFor(modelKey);
     final settings = ref.read(settingsControllerProvider.future);
@@ -602,7 +607,7 @@ class ChatController extends _$ChatController {
   }
 
   /// Null for the model's default; an unreadable preferences store degrades to
-  /// null rather than blocking the turn.
+  /// null rather than blocking the turn. Guarded like _samplingOverrides.
   Future<String?> _systemPrompt() async {
     final preferences = ref.read(preferencesControllerProvider.future);
     try {
@@ -700,6 +705,9 @@ class ChatController extends _$ChatController {
   /// conversation back into the window, so the banner offers a fresh chat.
   Future<void> startFreshChatFromFailure() async {
     await discardFailure();
+    // The sixth post-await site, and the only one not reached through
+    // _startGeneration: newChat opens with stop(), whose first act reads state.
+    if (!ref.mounted) return;
     await newChat();
   }
 }

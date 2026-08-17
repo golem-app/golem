@@ -2584,6 +2584,14 @@ void main() {
       await settle();
     });
 
+    test('starting a fresh chat across a teardown throws nothing', () async {
+      // The sixth site, found in review: startFreshChatFromFailure awaits
+      // discardFailure and then calls newChat, whose stop() reads state.
+      await disposeInsideThePersist(
+        (controller) => controller.startFreshChatFromFailure(),
+      );
+    });
+
     test('invalidation alone does not unmount the controller', () async {
       // Pins the riverpod behaviour the guards above are calibrated against.
       // If a version bump makes invalidation unmount, this goes red and the

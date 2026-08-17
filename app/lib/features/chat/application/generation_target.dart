@@ -59,12 +59,7 @@ GenerationTarget resolveGenerationTarget({
     loadableKeys: loadableKeys,
   );
   if (target == null && !backend.simulatedInference && !backend.sideloaded) {
-    return GenerationRefused(
-      ChatFailure(
-        kind: ChatFailureKind.missingModel,
-        artifactKey: backend.artifactKey,
-      ),
-    );
+    return GenerationRefused(notInstalledFailure(backend.artifactKey));
   }
   return GenerationReady(
     key: target,
@@ -74,8 +69,8 @@ GenerationTarget resolveGenerationTarget({
   );
 }
 
-/// The refusal raised when [key]'s weights turn out not to be installed. Split
-/// from [resolveGenerationTarget] because the installed check is asynchronous
-/// repository I/O, while everything above is a decision over values.
-ChatFailure notInstalledFailure(String key) =>
+/// The one statement of "this turn has no weights to run". Reachable on its own
+/// because the installed check is asynchronous repository I/O the caller runs
+/// after [resolveGenerationTarget] has already decided everything else.
+ChatFailure notInstalledFailure(String? key) =>
     ChatFailure(kind: ChatFailureKind.missingModel, artifactKey: key);

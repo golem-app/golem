@@ -15,10 +15,17 @@ enum ChatSaveOutcome { saved, writeFailed }
 /// ownership, not persistence: only the controller knows whether a newer
 /// attempt has superseded this one.
 final class ChatPersistence {
-  const ChatPersistence({required this.history, required this.attachments});
+  // Private fields behind public names, as ChatConversation does with its
+  // messages: callers still pass `history:` and `attachments:`, but nothing
+  // outside can reach past this unit to one of its collaborators.
+  const ChatPersistence({required this._history, required this._attachments});
 
-  final ChatHistoryRepository history;
-  final AttachmentRepository attachments;
+  final ChatHistoryRepository _history;
+  final AttachmentRepository _attachments;
+
+  /// Hydration, so every history operation goes through this unit rather than
+  /// the controller reaching past it for one of them.
+  Future<ChatHistorySnapshot> load() => _history.load();
 
   /// The newest complete, persistence-eligible view of the live session. A
   /// streaming or failed assistant draft is intentionally absent until Stop or
@@ -52,7 +59,7 @@ final class ChatPersistence {
   /// keeps propagating.
   Future<ChatSaveOutcome> save(ChatHistorySnapshot snapshot) async {
     try {
-      await history.save(snapshot);
+      await _history.save(snapshot);
     } on PersistenceException catch (error) {
       if (error.kind != PersistenceFailureKind.write) rethrow;
       return ChatSaveOutcome.writeFailed;
@@ -64,18 +71,21 @@ final class ChatPersistence {
   /// an orphan costs disk, an aborted send would cost the user their message.
   Future<void> retainReferenced(List<ChatConversation> conversations) async {
     try {
-      await attachments.retainOnly({
+      await _attachments.retainOnly({
         for (final conversation in conversations) ...conversation.attachmentIds,
       });
-    } on Exception {
-      // Deliberately silent — see above.
+    } catch (_) {
+      // Deliberately broad, not just Exception: this runs from build() and
+      // from inside a send, so an Error escaping would error the whole chat
+      // state or abort a turn already committed — the exact costs the rule
+      // above exists to avoid.
     }
   }
 
   /// Copies an already-validated image into the store, so the message that
   /// results references ids only and never bytes.
   Future<ImagePart> store(PreparedImage image) async {
-    final stored = await attachments.store(
+    final stored = await _attachments.store(
       image.bytes,
       mimeType: image.mimeType,
     );
@@ -92,7 +102,7 @@ final class ChatPersistence {
   /// must reach disk even when the save-history gate is closed.
   Future<bool> wipe() async {
     try {
-      await history.save(const ChatHistorySnapshot(conversations: []));
+      await _history.save(const ChatHistorySnapshot(conversations: []));
     } on Exception {
       return false;
     }
