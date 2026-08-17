@@ -28,6 +28,46 @@ enum ChatFailureKind {
   unsupportedDevice,
 }
 
+/// The one way out a failed turn offers. Declared beside the kinds rather than
+/// derived at the banner, so the promise [ChatFailureKind]'s own doc makes is a
+/// value a test can read instead of a widget shape it has to infer.
+enum ChatRecovery {
+  /// Nothing done here changes what this hardware can run.
+  none,
+
+  /// The conversation can never fit the window again; a fresh one can.
+  newChat,
+
+  /// The model is what failed, so the way out is naming another.
+  chooseModel,
+
+  /// The turn cannot be replayed — its attachment is gone or unsupported.
+  removeTurn,
+
+  /// An identical retry can succeed.
+  retry,
+}
+
+extension ChatFailureRecovery on ChatFailureKind {
+  /// Exhaustive on purpose: a new kind must state its recovery here rather
+  /// than inherit Retry from a default arm the way the banner used to give it.
+  ChatRecovery get recovery => switch (this) {
+    ChatFailureKind.unsupportedDevice => ChatRecovery.none,
+    ChatFailureKind.contextExhausted => ChatRecovery.newChat,
+    ChatFailureKind.modelUnavailable ||
+    ChatFailureKind.unsupportedModel ||
+    ChatFailureKind.invalidModelArtifact => ChatRecovery.chooseModel,
+    ChatFailureKind.attachmentUnavailable ||
+    ChatFailureKind.unsupportedImages => ChatRecovery.removeTurn,
+    ChatFailureKind.generic ||
+    ChatFailureKind.attachmentSave ||
+    ChatFailureKind.budgetExhaustedBeforeAnswer ||
+    ChatFailureKind.missingModel ||
+    ChatFailureKind.outOfMemory ||
+    ChatFailureKind.insufficientMemory => ChatRecovery.retry,
+  };
+}
+
 /// A typed chat failure: the classification that picks banner actions and —
 /// for [ChatFailureKind.missingModel] — the catalog key whose download the
 /// banner can offer. Presentation maps this semantic value to localized copy.

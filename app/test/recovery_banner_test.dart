@@ -237,4 +237,25 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('model-picker-sheet')), findsOneWidget);
   });
+
+  testWidgets('a model failure with no chat to switch falls back to Retry', (
+    tester,
+  ) async {
+    // Choosing another model needs a conversation to set it on. Before #127
+    // this arm was an unwritten fallthrough to the switch's default; now the
+    // kind says chooseModel and the widget makes the substitution explicitly,
+    // so the fallback is a behaviour rather than an accident.
+    await pumpWithRepositories(
+      tester,
+      history: const ChatHistorySnapshot(conversations: []),
+      child: const CupertinoPageScaffold(
+        child: RecoveryBanner(
+          failure: ChatFailure(kind: ChatFailureKind.modelUnavailable),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('choose-recovery-model')), findsNothing);
+    expect(find.byKey(const Key('retry-generation')), findsOneWidget);
+  });
 }

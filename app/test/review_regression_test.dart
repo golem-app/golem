@@ -19,6 +19,7 @@ import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/splash/application/startup_providers.dart';
 
+import 'support/in_memory_attachment_repository.dart';
 import 'support/in_memory_chat_history_repository.dart';
 
 Future<String> _fixtureAsset(String key) async =>
@@ -155,6 +156,14 @@ void main() {
   test('select, rename, toggle reasoning, and delete round-trip', () async {
     final container = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
+        // Explicitly empty (#127): this suite never stocked a catalog, and the
+        // read that used to tolerate its absence no longer does.
+        modelCatalogEntriesProvider.overrideWithValue(
+          const <ModelCatalogEntry>[],
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(
           InMemoryChatHistoryRepository(),
         ),
@@ -255,6 +264,9 @@ void main() {
         inferenceRepositoryProvider.overrideWithValue(
           FakeInferenceRepository(eventDelay: Duration.zero),
         ),
+        // The same catalog the fake repository stocks: resolving the engine
+        // target reads it directly now (#127), so the two cannot disagree.
+        modelCatalogEntriesProvider.overrideWithValue(_catalog),
       ],
     );
     addTearDown(container.dispose);

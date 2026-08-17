@@ -149,6 +149,7 @@ class ModelController extends _$ModelController {
   /// Deliberately outside the busy guard: a download stuck waiting on a
   /// platform that stopped answering is precisely when this has to run.
   Future<void> reconcileDownloads() async {
+    final models = ref.read(modelManagementRepositoryProvider);
     try {
       // Never before build has installed its own value: Riverpod assigns that
       // result after the fact, and would overwrite the fresher snapshot below
@@ -161,13 +162,15 @@ class ModelController extends _$ModelController {
       // verified result. Real transfers remain eligible here because their
       // platform worker can advance while Dart is inactive.
       if (_busy && state.value?.simulated == true) return;
-      final value = await ref.read(modelManagementRepositoryProvider).load();
+      final value = await models.load();
       if (!ref.mounted) return;
       state = AsyncData(value);
       await _reattach(value);
     } catch (_) {
-      // Reconciliation is a repair pass; a failed one must not blank the
-      // screen or replace a usable snapshot with an error.
+      // Deliberately broad: app.dart calls this fire-and-forget from a
+      // post-frame callback and a resume timer, so anything escaping here
+      // reaches the zone as an unhandled error. Reconciliation is a repair
+      // pass; a failed one must not blank the screen, and must not crash.
     }
   }
 
@@ -288,15 +291,17 @@ class ModelController extends _$ModelController {
         current.statusOf(target).phase != ArtifactPhase.installed) {
       return;
     }
+    // Ahead of the guard flags: a throwing read between them and the finally
+    // below would latch _busy for the notifier's lifetime, silently disabling
+    // every model command for the rest of the process.
+    final models = ref.read(modelManagementRepositoryProvider);
     _busy = true;
     _engineBusy = true;
     try {
-      final value = await ref
-          .read(modelManagementRepositoryProvider)
-          .recordRuntime(RuntimePhase.loaded);
+      final value = await models.recordRuntime(RuntimePhase.loaded);
       if (!ref.mounted) return;
       state = AsyncData(value);
-    } catch (_) {
+    } on Exception {
       // Phase bookkeeping must never disturb an in-flight generation.
     } finally {
       _busy = false;
@@ -438,22 +443,24 @@ class ModelController extends _$ModelController {
     // Its own guard: backgrounding and memory pressure can both fire, and this
     // still must not unload twice.
     if (_releasing) return;
+    // Ahead of the flag, as in reflectEngineLoaded: latching _releasing would
+    // disable the one defence against holding weights in the background.
+    final models = ref.read(modelManagementRepositoryProvider);
+    final inference = ref.read(inferenceRepositoryProvider);
     _releasing = true;
     try {
-      final inference = ref.read(inferenceRepositoryProvider);
       // Residency decides, not the catalog phase: a GOLEM_MODEL_PATH load is
       // outside phase tracking, yet just as resident and just as jetsammable.
       final loaded = current.runtime == RuntimePhase.loaded;
       if (!loaded && !inference.residency.value.loaded) return;
       await inference.unload();
       if (!ref.mounted || !loaded) return;
-      final value = await ref
-          .read(modelManagementRepositoryProvider)
-          .recordRuntime(RuntimePhase.unloaded);
+      final value = await models.recordRuntime(RuntimePhase.unloaded);
       if (!ref.mounted) return;
       state = AsyncData(value);
     } catch (_) {
-      // Advisory signal: no user-visible failure state.
+      // Broad for the same reason as reconcileDownloads: the lifecycle
+      // observer discards this future. Advisory signal, no failure state.
     } finally {
       _releasing = false;
     }
@@ -470,7 +477,12 @@ class ModelController extends _$ModelController {
     try {
       ref.read(inferenceRepositoryProvider).releaseEngine();
     } catch (_) {
-      // Advisory: no surface is left to report a teardown failure to.
+      // The one deliberate exemption from #127's no-catch-around-a-read rule,
+      // and it covers the read on purpose. `detached` is the only teardown
+      // signal Android delivers, the framework does not await this handler,
+      // and it can arrive while the container is already disposing — so a
+      // throwing read here would abort the release instead of degrading, on
+      // the one path with no surface left to report a failure to.
     }
   }
 
@@ -481,12 +493,7 @@ class ModelController extends _$ModelController {
     final backend = ref.read(inferenceBackendProvider);
     if (backend.sideloaded) return null;
     final chatModelKey = ref.read(chatSessionBridgeProvider).activeModelKey();
-    final List<ModelCatalogEntry> catalog;
-    try {
-      catalog = ref.read(effectiveModelCatalogProvider);
-    } catch (_) {
-      return chatModelKey ?? state.value?.activeArtifactKey;
-    }
+    final catalog = ref.read(effectiveModelCatalogProvider);
     final loadable = domain.loadableModelKeys(
       backend: backend,
       catalog: catalog,
