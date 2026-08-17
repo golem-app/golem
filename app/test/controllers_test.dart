@@ -90,17 +90,12 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   String? lastSystemPrompt;
   int prepares = 0;
   int unloads = 0;
-  int disposes = 0;
-
-  /// Parks teardown so a second caller can be observed mid-flight.
-  Completer<void>? disposeGate;
-  String initialResidentKey = 'test-mlx';
+  int releases = 0;
 
   @override
-  Future<void> dispose() async {
-    disposes++;
-    await disposeGate?.future;
-  }
+  void releaseEngine() => releases++;
+
+  String initialResidentKey = 'test-mlx';
 
   final ValueNotifier<InferenceResidency> _residency =
       ValueNotifier<InferenceResidency>(const InferenceResidency.unloaded());
@@ -1547,11 +1542,11 @@ void main() {
     expect(inference.unloads, 1);
   });
 
-  test('a second exit press joins the teardown instead of racing it', () async {
-    // The latch used to return an already-completed future, so an impatient
-    // second back press popped the activity while the first dispose was still
-    // winding the engine down — the original abort (#124).
-    final directory = Directory.systemTemp.createTempSync('golem-reentry-');
+  test('teardown releases the engine synchronously, mid-answer', () async {
+    // The framework does not await lifecycle handlers, so this must complete
+    // without the event loop turning: an asynchronous release races the
+    // isolate's destruction and the worker aborts the process (#124).
+    final directory = Directory.systemTemp.createTempSync('golem-teardown-');
     addTearDown(() => directory.deleteSync(recursive: true));
     final inference = _RecordingInferenceRepository();
     final container = ProviderContainer(
@@ -1567,23 +1562,28 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
-    await container.read(modelControllerProvider.future);
+    await installActiveModel(container);
+    await container.read(chatControllerProvider.future);
     final models = container.read(modelControllerProvider.notifier);
+    await models.toggleRuntime();
 
-    inference.disposeGate = Completer<void>();
-    final first = models.shutDownEngine();
-    var secondCompleted = false;
-    final second = models.shutDownEngine()..then((_) => secondCompleted = true);
-    await Future<void>.delayed(Duration.zero);
+    inference.generateGate = Completer<void>();
+    final chat = container.read(chatControllerProvider.notifier);
+    final send = chat.send('slow question');
+    while (container.read(chatControllerProvider).requireValue.generation ==
+        GenerationPhase.idle) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+
+    models.releaseEngineForTeardown();
     expect(
-      secondCompleted,
-      isFalse,
-      reason: 'the second press must not return while teardown is in flight',
+      inference.releases,
+      1,
+      reason: 'released before this statement returns, and not gated on idle',
     );
 
-    inference.disposeGate!.complete();
-    await Future.wait([first, second]);
-    expect(inference.disposes, 1, reason: 'and it must not dispose twice');
+    inference.generateGate!.complete();
+    await send;
   });
 
   test('a failed answer does not block unloading or deleting', () async {
@@ -1626,49 +1626,6 @@ void main() {
       1,
       reason: 'unload stays available after a failure',
     );
-  });
-
-  test('shutdown disposes the engine even mid-generation', () async {
-    // The mirror image: teardown must NOT wait for idle. A live generation is
-    // exactly the case that aborts the process from the token trampoline.
-    final directory = Directory.systemTemp.createTempSync('golem-shutdown-');
-    addTearDown(() => directory.deleteSync(recursive: true));
-    final inference = _RecordingInferenceRepository();
-    final container = ProviderContainer(
-      overrides: [
-        chatHistoryRepositoryProvider.overrideWithValue(
-          InMemoryChatHistoryRepository(),
-        ),
-        inferenceRepositoryProvider.overrideWithValue(inference),
-        modelManagementRepositoryProvider.overrideWithValue(
-          fakeModels(directory),
-        ),
-        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
-      ],
-    );
-    addTearDown(container.dispose);
-    await installActiveModel(container);
-    await container.read(chatControllerProvider.future);
-    final models = container.read(modelControllerProvider.notifier);
-    await models.toggleRuntime();
-
-    inference.generateGate = Completer<void>();
-    final chat = container.read(chatControllerProvider.notifier);
-    final send = chat.send('slow question');
-    while (container.read(chatControllerProvider).requireValue.generation ==
-        GenerationPhase.idle) {
-      await Future<void>.delayed(const Duration(milliseconds: 1));
-    }
-
-    await models.shutDownEngine();
-    expect(inference.disposes, 1, reason: 'teardown does not wait for idle');
-
-    // Idempotent: detached and the root back guard can both fire.
-    await models.shutDownEngine();
-    expect(inference.disposes, 1);
-
-    inference.generateGate!.complete();
-    await send;
   });
 
   test('toggling without an installed model refuses per backend', () async {

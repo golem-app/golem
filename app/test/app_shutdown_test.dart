@@ -1,143 +1,76 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
 import 'package:golem_flutter/app/app.dart';
 import 'package:golem_flutter/core/app_identity.dart';
-import 'package:golem_flutter/core/domain/models.dart';
-import 'package:golem_flutter/features/chat/widgets/attach_sheet.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
-import 'package:golem_flutter/features/models/application/model_providers.dart';
-import 'package:golem_flutter/l10n/generated/app_localizations.dart';
-
-import 'package:golem_flutter/features/chat/chat_screen.dart';
+import 'package:golem_flutter/features/chat/widgets/attach_sheet.dart';
 
 import 'support/harness.dart';
 
-/// #124: backing out of the app mid-answer tore the isolate down while
-/// llama.cpp's worker was still calling the token trampoline, aborting the
-/// process ~5 s later.
+/// #124: the process aborted with "Callback invoked after it has been
+/// deleted" when the isolate died while llama.cpp's worker was still calling
+/// the token trampoline.
 ///
-/// Driven through the real router, because the guard's placement is half the
-/// fix: it must cover the shell (the first-run gate loads the engine while
-/// withholding its child) without swallowing ordinary back navigation.
+/// `detached` is the only teardown signal Dart receives — predictive back,
+/// default-on at targetSdk 36, finishes the activity without running Dart at
+/// all — and the framework does not await lifecycle handlers. So the
+/// release has to be *synchronous*; anything else races the isolate's own
+/// destruction. These tests pin that, and that it stays reversible.
 void main() {
-  Future<(GoRouter, FakeInferenceRepository, List<String>)> pumpApp(
-    WidgetTester tester, {
-    bool modelInstalled = true,
-  }) async {
-    // An installed model plus history, so the first-run gate admits the shell
-    // and the router has a route to pop.
-    final container = buildContainer(
-      history: modelInstalled ? seedHistory() : null,
-      model: modelInstalled
-          ? const ModelState(
-              simulated: true,
-              artifacts: {
-                'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
-              },
-            )
-          : const ModelState(simulated: true),
-    );
+  Future<(FakeInferenceRepository, ProviderContainer)> pumpApp(
+    WidgetTester tester,
+  ) async {
+    final container = buildContainer();
     addTearDown(container.dispose);
     final inference =
         container.read(inferenceRepositoryProvider) as FakeInferenceRepository;
-    await container.read(modelControllerProvider.future);
-
-    final events = <String>[];
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      SystemChannels.platform,
-      (call) async {
-        if (call.method == 'SystemNavigator.pop') {
-          events.add('exit:disposes=${inference.disposes}');
-        }
-        return null;
-      },
-    );
-    addTearDown(
-      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        SystemChannels.platform,
-        null,
-      ),
-    );
-
-    final router = createAppRouter(
-      identity: AppIdentity.qa,
-      picker: const AttachmentPicker(),
-    );
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: CupertinoApp.router(
-          routerConfig: router,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
+        child: const GolemApp(
+          identity: AppIdentity.qa,
+          picker: AttachmentPicker(),
         ),
       ),
     );
-    await tester.pumpAndSettle();
-    return (router, inference, events);
+    // Enough for the splash hold and the startup controller's timer; not
+    // pumpAndSettle, which never returns while the gate animates.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    return (inference, container);
   }
 
-  Future<void> systemBack(WidgetTester tester, List<String> events) async {
-    await tester.binding.handlePopRoute();
-    // The teardown is asynchronous; give it bounded time rather than
-    // assuming one settle covers it.
-    for (var i = 0; i < 20 && events.isEmpty; i++) {
-      await tester.pump(const Duration(milliseconds: 10));
-    }
-    await tester.pumpAndSettle();
-  }
-
-  testWidgets('backing out of the app releases the engine first', (
+  testWidgets('detached releases the engine without awaiting anything', (
     tester,
   ) async {
-    final (_, _, events) = await pumpApp(tester);
-    await systemBack(tester, events);
+    final (inference, _) = await pumpApp(tester);
+    expect(inference.releases, 0);
 
-    // The count is captured at the moment the exit is requested, so this
-    // fails both when teardown is missing and when it merely runs afterwards.
-    expect(events, ['exit:disposes=1']);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.detached);
+
+    // Asserted before any pump: a release that needed the event loop to turn
+    // would be exactly the race this exists to close.
+    expect(inference.releases, 1);
+    await tester.pump(const Duration(seconds: 2));
   });
 
-  testWidgets('backing out of a pushed route pops without tearing down', (
+  testWidgets('the release is reversible, because detached may return', (
     tester,
   ) async {
-    final (router, inference, events) = await pumpApp(tester);
-    router.push('/settings');
-    await tester.pumpAndSettle();
+    final (inference, _) = await pumpApp(tester);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.detached);
+    expect(inference.releases, 1);
 
-    await systemBack(tester, events);
-
-    expect(events, isEmpty, reason: 'this back stays inside the app');
-    expect(inference.disposes, 0, reason: 'the engine must survive');
-    expect(router.state.uri.toString(), '/');
-
-    // The route's own pop — what an iOS back-swipe completes into. The shell
-    // guard must not gate it either.
-    router.push('/settings');
-    await tester.pumpAndSettle();
-    router.pop();
-    await tester.pumpAndSettle();
-    expect(router.state.uri.toString(), '/');
-    expect(events, isEmpty);
-    expect(inference.disposes, 0);
-    // And the app is still usable afterwards: back again now exits.
-    await systemBack(tester, events);
-    expect(events, ['exit:disposes=1']);
-  });
-
-  testWidgets('the guard covers first run, which loads before it admits', (
-    tester,
-  ) async {
-    // The gate withholds its child while it validates a sideload — a window
-    // that loads the engine. A guard mounted on the root route's child would
-    // not exist here at all (#124).
-    await pumpApp(tester, modelInstalled: false);
-
-    expect(find.byType(ChatScreen), findsNothing, reason: 'gate is blocking');
-    expect(find.byType(ExitGuard), findsOneWidget);
+    // Flutter permits detached -> resumed. Closing the native callback
+    // listener here would leave the returning app unable to load at all.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    final prepared = inference.prepare(modelKey: 'gemma4-mlx');
+    await tester.pump(const Duration(milliseconds: 1));
+    await prepared;
+    expect(inference.residency.value.loaded, isTrue);
+    await tester.pump(const Duration(seconds: 2));
   });
 }

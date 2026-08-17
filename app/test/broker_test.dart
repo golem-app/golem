@@ -24,6 +24,10 @@ final class _RecordingRuntime implements BrokerRuntime {
   int loads = 0;
   int cancels = 0;
   int disposes = 0;
+  int releases = 0;
+
+  @override
+  void releaseEngine() => releases++;
 
   @override
   Future<void> dispose() async => disposes++;
@@ -1097,6 +1101,10 @@ final class _ResidencyRuntime implements BrokerRuntime {
   final List<String> loadedPaths = [];
   int unloads = 0;
   int disposes = 0;
+  int releases = 0;
+
+  @override
+  void releaseEngine() => releases++;
 
   @override
   Future<void> dispose() async => disposes++;

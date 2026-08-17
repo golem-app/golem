@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -39,11 +38,7 @@ GoRouter createAppRouter({
       // The model invariant owns every route, while remaining below the root
       // Navigator so setup consent and recovery dialogs have valid route
       // context. A deep link cannot bypass this shell.
-      // ExitGuard sits above the gate, not on the root route's child: the
-      // gate withholds that child while it validates a sideload, which loads
-      // the engine — the exact window a back press must not leave unguarded.
-      builder: (context, state, child) =>
-          ExitGuard(child: FirstRunGate(child: child)),
+      builder: (context, state, child) => FirstRunGate(child: child),
       routes: [
         GoRoute(
           path: '/',
@@ -102,33 +97,6 @@ GoRouter createAppRouter({
     ),
   ],
 );
-
-/// Releases the engine before a back press can leave the app, so the isolate
-/// never dies under llama.cpp's token trampoline — an abort Play counts as a
-/// crash (#124).
-///
-/// [canPop] tracks the router rather than being pinned false: only the exit
-/// itself is intercepted, so backing out of Settings or Search still pops
-/// normally.
-class ExitGuard extends ConsumerWidget {
-  const ExitGuard({required this.child, super.key});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final popsWithinApp = GoRouter.of(context).canPop();
-    return PopScope(
-      canPop: popsWithinApp,
-      onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
-        await ref.read(modelControllerProvider.notifier).shutDownEngine();
-        await SystemNavigator.pop();
-      },
-      child: child,
-    );
-  }
-}
 
 class GolemApp extends ConsumerStatefulWidget {
   const GolemApp({
@@ -192,14 +160,13 @@ class _GolemAppState extends ConsumerState<GolemApp>
     if (state == AppLifecycleState.paused) {
       ref.read(modelControllerProvider.notifier).releaseEngineWhileInactive();
     }
-    // Last call before the engine is torn down under a native worker that is
-    // still calling into Dart (#124). A backstop, not the primary defence:
-    // Android can finish the activity without ever delivering this, which is
-    // why the root route guards its own exit.
+    // The only teardown signal this app actually receives on the way out.
+    // Intercepting the back press is not an option: with predictive back —
+    // default-on at targetSdk 36 — the gesture is handled entirely by the
+    // system, so neither PopScope nor didPopRoute runs (verified on device,
+    // #124). The handler is therefore synchronous, because the framework does
+    // not await this either.
     if (state == AppLifecycleState.detached) {
-      // Reversible on purpose: Flutter permits detached -> resumed, and
-      // closing the native callback listener here would leave a returning app
-      // with a runtime it can never load again.
       ref.read(modelControllerProvider.notifier).releaseEngineForTeardown();
     }
     // Returning to the foreground is the only moment the app can notice that

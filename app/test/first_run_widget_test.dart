@@ -772,7 +772,8 @@ final class _ValidatingSideload implements InferenceRepository {
   int prepareCalls = 0;
 
   @override
-  Future<void> dispose() async {}
+  void releaseEngine() {}
+
   final ValueNotifier<InferenceResidency> _residency =
       ValueNotifier<InferenceResidency>(const InferenceResidency.unloaded());
 

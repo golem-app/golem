@@ -171,6 +171,23 @@ final class Inferno {
     await _backend.cancel();
   }
 
+  /// Stops the engine synchronously and stays usable: a later [load] starts
+  /// a fresh engine on the same listener.
+  ///
+  /// This is the teardown that survives process death. Android delivers
+  /// `detached` without awaiting the handler — and predictive back can finish
+  /// the activity without running Dart at all — so an asynchronous unload
+  /// races the isolate's destruction. A worker thread that outlives the
+  /// isolate aborts the process from the callback trampoline (#124);
+  /// destroying the engine blocks until that thread has joined.
+  void releaseEngine() {
+    unawaited(_nativeSubscription?.cancel() ?? Future<void>.value());
+    _nativeSubscription = null;
+    _generationDone = null;
+    _backend.releaseEngine();
+    _state = _RuntimeState.unloaded;
+  }
+
   /// Unloads any resident model and releases the backend's native listener
   /// so the isolate can exit. The runtime must not be used afterwards.
   Future<void> dispose() async {

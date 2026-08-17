@@ -27,7 +27,7 @@ final class FakeInferenceRepository implements InferenceRepository {
 
   /// Observable so a test can assert teardown actually ran, rather than
   /// inferring it from state the simulation starts in anyway.
-  int disposes = 0;
+  int releases = 0;
   final ValueNotifier<InferenceResidency> _residency =
       ValueNotifier<InferenceResidency>(const InferenceResidency.unloaded());
 
@@ -101,14 +101,12 @@ final class FakeInferenceRepository implements InferenceRepository {
   @override
   Future<void> cancel() async => _generationEpoch++;
 
-  /// The simulation has nothing native to release, so this is [unload] plus a
-  /// record that it happened. It stays reusable afterwards, unlike the real
-  /// backend — tests that need post-dispose behaviour must use a fake that
-  /// models it rather than reading anything into this one.
   @override
-  Future<void> dispose() async {
-    disposes++;
-    await unload();
+  void releaseEngine() {
+    releases++;
+    _generationEpoch++;
+    _prepared = false;
+    _residency.value = const InferenceResidency.unloaded();
   }
 
   @override

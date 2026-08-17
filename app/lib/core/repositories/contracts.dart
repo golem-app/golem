@@ -147,12 +147,10 @@ abstract interface class InferenceRepository {
     String? systemPrompt,
   });
 
-  /// Terminal teardown: cancels any generation, releases the engine, and
-  /// closes the native callback listener. Declared here, not just on the
-  /// backend, because the app only ever holds this interface — and a runtime
-  /// nothing can reach is a runtime nothing shuts down (#124). The repository
-  /// must not be used afterwards.
-  Future<void> dispose();
+  /// Stops the engine synchronously and stays usable — a later [prepare]
+  /// loads again. This is the teardown that runs on the way out of the
+  /// process, where nothing asynchronous is guaranteed to finish (#124).
+  void releaseEngine();
 }
 
 /// Persisted per-model generation settings, versioned atomic JSON.

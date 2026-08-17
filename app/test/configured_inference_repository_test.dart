@@ -13,6 +13,9 @@ final class _StubRuntime implements BrokerRuntime {
   String? loadedProjectorPath;
 
   @override
+  void releaseEngine() {}
+
+  @override
   Future<void> dispose() async {}
 
   @override

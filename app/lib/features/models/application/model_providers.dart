@@ -123,7 +123,6 @@ class ModelController extends _$ModelController {
   // they are the escape hatches that end an in-flight download.
   bool _busy = false;
   bool _releasing = false;
-  Future<void>? _shutdown;
 
   /// The subset of [_busy] operations that command the engine. Freeing the
   /// engine skips these but not a download: unloading beneath `prepare()` or
@@ -460,35 +459,18 @@ class ModelController extends _$ModelController {
     }
   }
 
-  /// Reversible teardown for a lifecycle signal that may still come back:
-  /// Flutter permits `detached -> resumed`, so this must not close anything
-  /// the next `prepare()` would need. Unloading is enough to make the exit
-  /// safe — the native unload destroys the engine, which blocks until the
-  /// worker thread that calls the token trampoline has joined (#124).
+  /// The last thing this app reliably does. Synchronous on purpose: the
+  /// framework does not await lifecycle handlers, so an asynchronous unload
+  /// here races the isolate's own destruction — which is the abort (#124).
   ///
   /// Refuses nothing, unlike [releaseEngineWhileInactive]: a live generation
-  /// is precisely the case that aborts the process.
-  Future<void> releaseEngineForTeardown() async {
+  /// is precisely the case that aborts. Reversible, because Flutter permits
+  /// `detached -> resumed` and the callback listener stays open.
+  void releaseEngineForTeardown() {
     try {
-      await ref.read(inferenceRepositoryProvider).unload();
+      ref.read(inferenceRepositoryProvider).releaseEngine();
     } catch (_) {
       // Advisory: no surface is left to report a teardown failure to.
-    }
-  }
-
-  /// Terminal teardown for a definite exit. Also releases the native callback
-  /// listener, which [releaseEngineForTeardown] deliberately keeps.
-  ///
-  /// Memoized rather than latched: an impatient second back press must *join*
-  /// the teardown in flight, not sail past it and finish the activity while
-  /// the engine is still winding down — that is the original crash (#124).
-  Future<void> shutDownEngine() => _shutdown ??= _shutDownEngine();
-
-  Future<void> _shutDownEngine() async {
-    try {
-      await ref.read(inferenceRepositoryProvider).dispose();
-    } catch (_) {
-      // Best effort: the process is leaving either way.
     }
   }
 
