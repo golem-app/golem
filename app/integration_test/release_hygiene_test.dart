@@ -25,6 +25,9 @@ final class _ModelFreeRuntime implements BrokerRuntime {
   Future<void> unload() async {}
 
   @override
+  Future<void> dispose() async {}
+
+  @override
   Future<void> cancel() async {}
 
   @override

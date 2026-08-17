@@ -24,6 +24,11 @@ final class FakeInferenceRepository implements InferenceRepository {
   static List<ModelCatalogEntry> _noCatalog() => const <ModelCatalogEntry>[];
   bool _prepared = true;
   int _generationEpoch = 0;
+
+  /// Observable so a test can assert teardown actually ran, rather than
+  /// inferring it from state the simulation starts in anyway.
+  int cancels = 0;
+  int disposes = 0;
   final ValueNotifier<InferenceResidency> _residency =
       ValueNotifier<InferenceResidency>(const InferenceResidency.unloaded());
 
@@ -95,7 +100,18 @@ final class FakeInferenceRepository implements InferenceRepository {
   }
 
   @override
-  Future<void> cancel() async => _generationEpoch++;
+  Future<void> cancel() async {
+    _generationEpoch++;
+    cancels++;
+  }
+
+  /// Nothing native to release; the epoch bump ends any simulated stream so
+  /// callers observe the same terminal behaviour as the real backend.
+  @override
+  Future<void> dispose() async {
+    disposes++;
+    await unload();
+  }
 
   @override
   Stream<InferenceEvent> generate({

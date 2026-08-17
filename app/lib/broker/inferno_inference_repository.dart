@@ -132,6 +132,19 @@ final class InfernoInferenceRepository implements InferenceRepository {
   @override
   Future<void> cancel() => _runtime.cancel();
 
+  @override
+  Future<void> dispose() async {
+    // The runtime's own dispose already cancels, waits for the generation to
+    // finish, and unloads before it destroys the engine, so this adds only
+    // the app-side residency reset.
+    try {
+      await _runtime.dispose();
+    } finally {
+      _resident = null;
+      _residency.value = const InferenceResidency.unloaded();
+    }
+  }
+
   _Target _targetFor(String? modelKey) {
     if (modelKey == null || modelKey == _initial.catalogKey) return _initial;
     final config = resolveConfig(modelKey);

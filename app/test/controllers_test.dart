@@ -90,7 +90,12 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   String? lastSystemPrompt;
   int prepares = 0;
   int unloads = 0;
+  int disposes = 0;
+  int cancels = 0;
   String initialResidentKey = 'test-mlx';
+
+  @override
+  Future<void> dispose() async => disposes++;
   final ValueNotifier<InferenceResidency> _residency =
       ValueNotifier<InferenceResidency>(const InferenceResidency.unloaded());
 
@@ -118,7 +123,7 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   }
 
   @override
-  Future<void> cancel() async {}
+  Future<void> cancel() async => cancels++;
 
   /// When set, generate parks mid-stream until completed — for tests that
   /// need a deterministically in-flight generation.
@@ -1486,6 +1491,97 @@ void main() {
 
     await models.releaseEngineWhileInactive();
     expect(inference.unloads, 1, reason: 'idle again: the signal applies');
+  });
+
+  test('engine commands refuse while an answer is streaming', () async {
+    // #124: Settings > Models could unload or delete the resident artifact
+    // mid-stream, truncating the answer. releaseEngineWhileInactive was the
+    // only command that checked; these two were not.
+    final directory = Directory.systemTemp.createTempSync('golem-midstream-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final inference = _RecordingInferenceRepository();
+    final container = ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
+      ],
+    );
+    addTearDown(container.dispose);
+    await installActiveModel(container);
+    await container.read(chatControllerProvider.future);
+    final models = container.read(modelControllerProvider.notifier);
+    await models.toggleRuntime();
+
+    inference.generateGate = Completer<void>();
+    final chat = container.read(chatControllerProvider.notifier);
+    final send = chat.send('slow question');
+    while (container.read(chatControllerProvider).requireValue.generation ==
+        GenerationPhase.idle) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+
+    await models.toggleRuntime();
+    expect(inference.unloads, 0, reason: 'unload must not truncate an answer');
+    await models.delete(
+      container.read(modelControllerProvider).requireValue.activeArtifactKey!,
+    );
+    expect(inference.unloads, 0, reason: 'delete must not truncate an answer');
+
+    inference.generateGate!.complete();
+    await send;
+
+    // Idle again, so the same command now applies.
+    await models.toggleRuntime();
+    expect(inference.unloads, 1);
+  });
+
+  test('shutdown disposes the engine even mid-generation', () async {
+    // The mirror image: teardown must NOT wait for idle. A live generation is
+    // exactly the case that aborts the process from the token trampoline.
+    final directory = Directory.systemTemp.createTempSync('golem-shutdown-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final inference = _RecordingInferenceRepository();
+    final container = ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
+      ],
+    );
+    addTearDown(container.dispose);
+    await installActiveModel(container);
+    await container.read(chatControllerProvider.future);
+    final models = container.read(modelControllerProvider.notifier);
+    await models.toggleRuntime();
+
+    inference.generateGate = Completer<void>();
+    final chat = container.read(chatControllerProvider.notifier);
+    final send = chat.send('slow question');
+    while (container.read(chatControllerProvider).requireValue.generation ==
+        GenerationPhase.idle) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+
+    await models.shutDownEngine();
+    expect(inference.disposes, 1, reason: 'teardown does not wait for idle');
+
+    // Idempotent: detached and the root back guard can both fire.
+    await models.shutDownEngine();
+    expect(inference.disposes, 1);
+
+    inference.generateGate!.complete();
+    await send;
   });
 
   test('toggling without an installed model refuses per backend', () async {

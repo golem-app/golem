@@ -11,6 +11,69 @@ void main() {
       ? 'Set INFERNO_TOY_GGUF using tool/fetch_toy_model.dart.'
       : false;
 
+  test(
+    'disposing mid-generation ends the stream once and stays quiet',
+    () async {
+      // #124: the app tore the isolate down while the engine's worker thread was
+      // still calling the token trampoline, which aborts the process with
+      // "Callback invoked after it has been deleted". dispose() must join that
+      // worker before the callback port closes — mock backends cannot show this,
+      // so this suite is where it belongs.
+      final inferno = Inferno.native();
+      await inferno.load(
+        engine: InfernoEngineKind.llamaCpp,
+        modelPath: modelPath!,
+      );
+
+      final terminal = <String>[];
+      final firstDelta = Completer<void>();
+      final closed = Completer<void>();
+      final subscription = inferno
+          .generate(
+            const InfernoGenerationRequest(
+              // Long enough that dispose lands mid-stream rather than after it.
+              prompt: 'Count slowly',
+              sampling: InfernoSamplingParameters(
+                maxTokens: 512,
+                temperature: 0.2,
+                topP: 0.9,
+                seed: 7,
+              ),
+            ),
+          )
+          .listen(
+            (event) {
+              if (event is InfernoTextDelta && !firstDelta.isCompleted) {
+                firstDelta.complete();
+              }
+            },
+            onError: (Object _) {
+              terminal.add('error');
+              if (!closed.isCompleted) closed.complete();
+            },
+            onDone: () {
+              terminal.add('done');
+              if (!closed.isCompleted) closed.complete();
+            },
+          );
+      addTearDown(subscription.cancel);
+
+      await firstDelta.future;
+      // Without this the test would pass vacuously whenever the toy model
+      // outruns the teardown: the point is to dispose *under* a live worker.
+      expect(terminal, isEmpty, reason: 'generation must still be running');
+      await inferno.dispose();
+      await closed.future;
+
+      expect(terminal, hasLength(1), reason: 'exactly one terminal event');
+      // Nothing may arrive after dispose returned: the worker has joined and the
+      // callback port is closed. A late event here is the abort in slow motion.
+      await Future<void>.delayed(const Duration(seconds: 2));
+      expect(terminal, hasLength(1));
+    },
+    skip: skipReason,
+  );
+
   test('toy GGUF loads, streams, reports metrics, and unloads', () async {
     final inferno = Inferno.native();
     await inferno.load(

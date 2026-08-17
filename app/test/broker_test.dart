@@ -23,6 +23,10 @@ final class _RecordingRuntime implements BrokerRuntime {
   BrokerGenerationRequest? request;
   int loads = 0;
   int cancels = 0;
+  int disposes = 0;
+
+  @override
+  Future<void> dispose() async => disposes++;
 
   BrokerLoadOptions? lastLoadOptions;
 
@@ -1092,6 +1096,10 @@ void main() {
 final class _ResidencyRuntime implements BrokerRuntime {
   final List<String> loadedPaths = [];
   int unloads = 0;
+  int disposes = 0;
+
+  @override
+  Future<void> dispose() async => disposes++;
   bool failNextLoad = false;
   Completer<void>? gate;
   BrokerGenerationRequest? request;

@@ -123,6 +123,7 @@ class ModelController extends _$ModelController {
   // they are the escape hatches that end an in-flight download.
   bool _busy = false;
   bool _releasing = false;
+  bool _shuttingDown = false;
 
   /// The subset of [_busy] operations that command the engine. Freeing the
   /// engine skips these but not a download: unloading beneath `prepare()` or
@@ -257,6 +258,9 @@ class ModelController extends _$ModelController {
           ref.read(inferenceRepositoryProvider).residency.value.catalogKey ??
           state.value?.activeArtifactKey;
       if (artifactKey == resident) {
+        // Unloading under a live generation truncates the answer mid-token;
+        // the same rule releaseEngineWhileInactive already follows (#124).
+        if (ref.read(chatSessionBridgeProvider).generationActive()) return;
         await ref.read(inferenceRepositoryProvider).unload();
         if (!ref.mounted) return;
       }
@@ -346,6 +350,7 @@ class ModelController extends _$ModelController {
       final repository = ref.read(modelManagementRepositoryProvider);
       final current = state.requireValue;
       if (current.runtime == RuntimePhase.loaded) {
+        if (ref.read(chatSessionBridgeProvider).generationActive()) return;
         try {
           await ref.read(inferenceRepositoryProvider).unload();
         } catch (error) {
@@ -452,6 +457,22 @@ class ModelController extends _$ModelController {
       // Advisory signal: no user-visible failure state.
     } finally {
       _releasing = false;
+    }
+  }
+
+  /// Terminal teardown before the isolate goes away (#124). Unlike
+  /// [releaseEngineWhileInactive] this refuses nothing and waits for no guard:
+  /// a live generation is precisely the case that aborts the process, because
+  /// llama.cpp's worker keeps calling the token trampoline after the isolate
+  /// that owns it is gone. Writes no state — nothing survives to read it.
+  Future<void> shutDownEngine() async {
+    if (_shuttingDown) return;
+    _shuttingDown = true;
+    try {
+      await ref.read(inferenceRepositoryProvider).dispose();
+    } catch (_) {
+      // Best effort: the process is leaving either way, and a teardown error
+      // has no surface left to report to.
     }
   }
 

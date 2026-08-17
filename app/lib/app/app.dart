@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -42,7 +43,8 @@ GoRouter createAppRouter({
       routes: [
         GoRoute(
           path: '/',
-          builder: (context, state) => ChatScreen(picker: picker),
+          builder: (context, state) =>
+              ExitGuard(child: ChatScreen(picker: picker)),
         ),
         GoRoute(
           path: '/search',
@@ -97,6 +99,30 @@ GoRouter createAppRouter({
     ),
   ],
 );
+
+/// Wraps the only route a system back can leave the app from, so the engine
+/// is released before the isolate dies. Without it, back-pressing mid-answer
+/// aborts the process from llama.cpp's token trampoline ~5 s later, and Play
+/// counts it as a crash (#124).
+///
+/// Scoped to the root route deliberately: a shell-wide `canPop: false` would
+/// swallow ordinary back navigation out of Settings and Search.
+class ExitGuard extends ConsumerWidget {
+  const ExitGuard({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => PopScope(
+    canPop: false,
+    onPopInvokedWithResult: (didPop, _) async {
+      if (didPop) return;
+      await ref.read(modelControllerProvider.notifier).shutDownEngine();
+      await SystemNavigator.pop();
+    },
+    child: child,
+  );
+}
 
 class GolemApp extends ConsumerStatefulWidget {
   const GolemApp({
@@ -159,6 +185,13 @@ class _GolemAppState extends ConsumerState<GolemApp>
     // background memory ceiling; prepare() reloads lazily on return.
     if (state == AppLifecycleState.paused) {
       ref.read(modelControllerProvider.notifier).releaseEngineWhileInactive();
+    }
+    // Last call before the engine is torn down under a native worker that is
+    // still calling into Dart (#124). A backstop, not the primary defence:
+    // Android can finish the activity without ever delivering this, which is
+    // why the root route guards its own exit.
+    if (state == AppLifecycleState.detached) {
+      ref.read(modelControllerProvider.notifier).shutDownEngine();
     }
     // Returning to the foreground is the only moment the app can notice that
     // the OS finished, paused, or discarded a download while it was away.
