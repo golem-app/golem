@@ -160,6 +160,15 @@ class _GolemAppState extends ConsumerState<GolemApp>
     if (state == AppLifecycleState.paused) {
       ref.read(modelControllerProvider.notifier).releaseEngineWhileInactive();
     }
+    // The only teardown signal this app actually receives on the way out.
+    // Intercepting the back press is not an option: with predictive back —
+    // default-on at targetSdk 36 — the gesture is handled entirely by the
+    // system, so neither PopScope nor didPopRoute runs (verified on device,
+    // #124). The handler is therefore synchronous, because the framework does
+    // not await this either.
+    if (state == AppLifecycleState.detached) {
+      ref.read(modelControllerProvider.notifier).releaseEngineForTeardown();
+    }
     // Returning to the foreground is the only moment the app can notice that
     // the OS finished, paused, or discarded a download while it was away.
     // Debounced because `resumed` also fires for a permission sheet, a share

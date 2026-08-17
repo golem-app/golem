@@ -703,7 +703,7 @@ final class NativeInfernoBackend implements InfernoBackend {
   }
 
   @override
-  void dispose() {
+  void releaseEngine() {
     if (_engine != nullptr) {
       // destroy() blocks until the engine's operation worker has finished,
       // so no native code can call the trampoline after this returns.
@@ -711,12 +711,12 @@ final class NativeInfernoBackend implements InfernoBackend {
       _engine = nullptr;
       _activeApi = null;
     }
-    // Nothing in flight can complete once the listener closes; fail it now.
+    // Nothing in flight can complete once the engine is gone; fail it now.
     final pending = List.of(_operations.values);
     _operations.clear();
     const failure = InfernoException(
       InfernoErrorCode.invalidState,
-      'The native backend was disposed.',
+      'The native engine was released.',
     );
     for (final operation in pending) {
       switch (operation) {
@@ -730,6 +730,11 @@ final class NativeInfernoBackend implements InfernoBackend {
           unawaited(operation.controller.close());
       }
     }
+  }
+
+  @override
+  void dispose() {
+    releaseEngine();
     _callback.close();
   }
 

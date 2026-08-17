@@ -24,6 +24,10 @@ final class FakeInferenceRepository implements InferenceRepository {
   static List<ModelCatalogEntry> _noCatalog() => const <ModelCatalogEntry>[];
   bool _prepared = true;
   int _generationEpoch = 0;
+
+  /// Observable so a test can assert teardown actually ran, rather than
+  /// inferring it from state the simulation starts in anyway.
+  int releases = 0;
   final ValueNotifier<InferenceResidency> _residency =
       ValueNotifier<InferenceResidency>(const InferenceResidency.unloaded());
 
@@ -96,6 +100,14 @@ final class FakeInferenceRepository implements InferenceRepository {
 
   @override
   Future<void> cancel() async => _generationEpoch++;
+
+  @override
+  void releaseEngine() {
+    releases++;
+    _generationEpoch++;
+    _prepared = false;
+    _residency.value = const InferenceResidency.unloaded();
+  }
 
   @override
   Stream<InferenceEvent> generate({

@@ -132,6 +132,14 @@ final class InfernoInferenceRepository implements InferenceRepository {
   @override
   Future<void> cancel() => _runtime.cancel();
 
+  @override
+  void releaseEngine() {
+    // No await anywhere on this path, deliberately: see the contract.
+    _runtime.releaseEngine();
+    _resident = null;
+    _residency.value = const InferenceResidency.unloaded();
+  }
+
   _Target _targetFor(String? modelKey) {
     if (modelKey == null || modelKey == _initial.catalogKey) return _initial;
     final config = resolveConfig(modelKey);

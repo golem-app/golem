@@ -87,6 +87,16 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
   }
 
   Widget _body(BuildContext context, ModelState model) {
+    // Matches the chat screen's own busy predicate: `failed` is sticky until
+    // the user retries or discards, and must not disable these controls —
+    // the failure copy sends them here to free memory (#124).
+    final generating = ref.watch(
+      chatControllerProvider.select((state) {
+        final phase = state.value?.generation;
+        return phase == GenerationPhase.preparing ||
+            phase == GenerationPhase.streaming;
+      }),
+    );
     final catalog = ref.watch(effectiveModelCatalogProvider);
     final downloadableKeys = ref.watch(downloadableModelKeysProvider);
     final advanced =
@@ -197,6 +207,7 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
             entry: entry,
             status: model.statusOf(entry.key),
             simulated: model.simulated,
+            generating: generating,
             active: entry.key == activeKey,
             resident: entry.key == residentKey,
             otherDownloadActive:
@@ -213,6 +224,7 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
         _RuntimeCard(
           model: model,
           simulatedInference: simulatedInference,
+          generating: generating,
           activeKey: activeKey,
           deviceRefusal: refusalMessage,
         ),
@@ -258,6 +270,7 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
 class _RuntimeCard extends ConsumerWidget {
   const _RuntimeCard({
     required this.model,
+    required this.generating,
     required this.simulatedInference,
     required this.activeKey,
     this.deviceRefusal,
@@ -265,6 +278,10 @@ class _RuntimeCard extends ConsumerWidget {
   final ModelState model;
   final bool simulatedInference;
   final String? activeKey;
+
+  /// Unloading mid-answer would truncate it, so the controller refuses;
+  /// disabling says so before the tap (#124).
+  final bool generating;
 
   /// Why this device may not load a model, or null when it may.
   final String? deviceRefusal;
@@ -321,7 +338,9 @@ class _RuntimeCard extends ConsumerWidget {
                       : simulatedInference
                       ? context.l10n.loadSimulatedRuntime
                       : context.l10n.loadRuntime,
-                  onPressed: model.runtime == RuntimePhase.loading
+                  onPressed:
+                      model.runtime == RuntimePhase.loading ||
+                          (model.runtime == RuntimePhase.loaded && generating)
                       ? null
                       : () => ref
                             .read(modelControllerProvider.notifier)
@@ -775,6 +794,7 @@ class _ModelCard extends ConsumerWidget {
     required this.entry,
     required this.status,
     required this.simulated,
+    required this.generating,
     required this.active,
     required this.resident,
     required this.otherDownloadActive,
@@ -784,6 +804,10 @@ class _ModelCard extends ConsumerWidget {
   });
 
   final ModelCatalogEntry entry;
+
+  /// Deleting or unloading the resident weights mid-answer would truncate it,
+  /// so the controller refuses; disabling says so before the tap (#124).
+  final bool generating;
   final ArtifactStatus status;
   final bool simulated;
   final bool active;
@@ -1031,7 +1055,9 @@ class _ModelCard extends ConsumerWidget {
         CupertinoButton(
           key: Key('model-delete-${entry.key}'),
           minimumSize: const Size.fromHeight(48),
-          onPressed: () => _confirmDelete(context, controller),
+          onPressed: generating
+              ? null
+              : () => _confirmDelete(context, controller),
           child: Text(
             context.l10n.deleteDownload,
             style: const TextStyle(color: GolemTheme.destructive),

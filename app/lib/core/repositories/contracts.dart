@@ -146,6 +146,11 @@ abstract interface class InferenceRepository {
     String? modelKey,
     String? systemPrompt,
   });
+
+  /// Stops the engine synchronously and stays usable — a later [prepare]
+  /// loads again. This is the teardown that runs on the way out of the
+  /// process, where nothing asynchronous is guaranteed to finish (#124).
+  void releaseEngine();
 }
 
 /// Persisted per-model generation settings, versioned atomic JSON.

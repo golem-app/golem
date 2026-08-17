@@ -96,5 +96,8 @@ final class MockInfernoBackend implements InfernoBackend {
   Future<void> cancel() async => _generationEpoch++;
 
   @override
+  void releaseEngine() {}
+
+  @override
   void dispose() {}
 }

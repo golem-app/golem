@@ -257,6 +257,9 @@ class ModelController extends _$ModelController {
           ref.read(inferenceRepositoryProvider).residency.value.catalogKey ??
           state.value?.activeArtifactKey;
       if (artifactKey == resident) {
+        // Unloading under a live generation truncates the answer mid-token;
+        // the same rule releaseEngineWhileInactive already follows (#124).
+        if (ref.read(chatSessionBridgeProvider).generationActive()) return;
         await ref.read(inferenceRepositoryProvider).unload();
         if (!ref.mounted) return;
       }
@@ -346,6 +349,7 @@ class ModelController extends _$ModelController {
       final repository = ref.read(modelManagementRepositoryProvider);
       final current = state.requireValue;
       if (current.runtime == RuntimePhase.loaded) {
+        if (ref.read(chatSessionBridgeProvider).generationActive()) return;
         try {
           await ref.read(inferenceRepositoryProvider).unload();
         } catch (error) {
@@ -452,6 +456,21 @@ class ModelController extends _$ModelController {
       // Advisory signal: no user-visible failure state.
     } finally {
       _releasing = false;
+    }
+  }
+
+  /// The last thing this app reliably does. Synchronous on purpose: the
+  /// framework does not await lifecycle handlers, so an asynchronous unload
+  /// here races the isolate's own destruction — which is the abort (#124).
+  ///
+  /// Refuses nothing, unlike [releaseEngineWhileInactive]: a live generation
+  /// is precisely the case that aborts. Reversible, because Flutter permits
+  /// `detached -> resumed` and the callback listener stays open.
+  void releaseEngineForTeardown() {
+    try {
+      ref.read(inferenceRepositoryProvider).releaseEngine();
+    } catch (_) {
+      // Advisory: no surface is left to report a teardown failure to.
     }
   }
 

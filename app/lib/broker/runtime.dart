@@ -176,6 +176,19 @@ abstract interface class BrokerRuntime {
   Future<void> unload();
   Stream<BrokerRuntimeEvent> generate(BrokerGenerationRequest request);
   Future<void> cancel();
+
+  /// Stops the engine synchronously, blocking until its worker thread has
+  /// joined, and stays usable afterwards.
+  ///
+  /// Synchronous because it runs on the way out: Android delivers `detached`
+  /// without awaiting the handler, and under predictive back the activity can
+  /// finish without running Dart at all. Anything asynchronous here races the
+  /// isolate's destruction, and a worker that outlives it aborts the process
+  /// from the token trampoline (#124).
+  void releaseEngine();
+
+  /// [releaseEngine] plus the callback listener. Terminal.
+  Future<void> dispose();
 }
 
 /// The only adapter between Flutter application code and package:inferno.
@@ -218,9 +231,10 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
   @override
   Future<void> cancel() => _translating(_inferno.cancel);
 
-  /// The app keeps one adapter for its whole lifetime and never calls this;
-  /// harness code that cycles engines in one process must, or the
-  /// native-callback listener keeps the isolate alive after the run.
+  @override
+  void releaseEngine() => _inferno.releaseEngine();
+
+  @override
   Future<void> dispose() => _translating(_inferno.dispose);
 
   @override

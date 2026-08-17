@@ -40,10 +40,16 @@ final class ChatSessionBridge {
   }
 
   /// Whether a generation is visibly in flight; false while chat has no state.
+  /// In flight, not merely non-idle: [GenerationPhase.failed] is sticky until
+  /// the user retries or discards, and treating it as active would block the
+  /// very commands the failure copy tells them to use (#124). Matches the
+  /// chat screen's own busy predicate.
   bool generationActive() {
     _ensureOwner?.call();
     final state = _sessionState?.call();
-    return state != null && state.generation != GenerationPhase.idle;
+    return state != null &&
+        (state.generation == GenerationPhase.preparing ||
+            state.generation == GenerationPhase.streaming);
   }
 }
 
