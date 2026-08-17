@@ -193,18 +193,20 @@ void main() {
           );
           if (localeCase.locale.languageCode == 'hi' ||
               localeCase.locale.languageCode == 'ko') {
-            // Scrolled to rather than assumed on screen: which card carries
-            // the badge is platform-dependent — the active model is MLX on
-            // iOS and GGUF on Android — and at 1.6x a downloading card is
-            // taller than the viewport, so it is not always the one in view.
-            await _scrollTo(
-              tester,
-              listKey: const Key('models-list'),
-              target: find.text(l10n.activeBadge),
-            );
-            final activeBadge = tester.widget<Text>(
-              find.text(l10n.activeBadge).first,
-            );
+            // Which card carries the badge is platform-dependent — the active
+            // model is MLX on iOS and GGUF on Android — so it is scrolled to
+            // only when it is not already built. Scrolling unconditionally
+            // drags to the end of the list looking for something already
+            // behind us, and dies on the helper rather than the assertion.
+            final badge = find.text(l10n.activeBadge);
+            if (badge.evaluate().isEmpty) {
+              await _scrollTo(
+                tester,
+                listKey: const Key('models-list'),
+                target: badge,
+              );
+            }
+            final activeBadge = tester.widget<Text>(badge.first);
             expect(activeBadge.style?.letterSpacing, 0);
           }
           expect(tester.takeException(), isNull);

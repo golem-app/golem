@@ -242,10 +242,14 @@ void main() {
       ),
       child: const ModelsScreen(),
     );
+    // Mounted but rendering nothing: the mount guard is deliberately wider
+    // than the note's own visibility rule, so what the user sees is decided in
+    // one place (#125).
     expect(
       find.byKey(const Key('model-download-note-gemma4-mlx')),
-      findsNothing,
+      findsOneWidget,
     );
+    expect(find.text('Keep Golem open for full speed.'), findsNothing);
     expect(find.textContaining(' left'), findsOneWidget);
   });
 

@@ -187,7 +187,7 @@ void main() {
 
           final events = <ArtifactFileEvent>[];
           final closed = Completer<void>();
-          final afterPause = Stopwatch();
+          final sinceCommand = Stopwatch();
           var commanded = false;
           final subscription = downloader
               .download(ref)
@@ -200,11 +200,16 @@ void main() {
                     return;
                   }
                   commanded = true;
+                  // Started before the command, not after it returns: on the
+                  // fixed path the stream ends on the platform's paused event
+                  // while pause() is still confirming, so onDone would
+                  // otherwise stop a stopwatch that had never been started and
+                  // the interval below would measure nothing.
+                  sinceCommand.start();
                   await downloader.pause(ref);
-                  afterPause.start();
                 },
                 onDone: () {
-                  afterPause.stop();
+                  sinceCommand.stop();
                   if (!closed.isCompleted) closed.complete();
                 },
               );
@@ -214,7 +219,18 @@ void main() {
           expect(
             commanded,
             isTrue,
-            reason: 'the file finished before a pause could be issued',
+            reason: 'no progress arrived, so no pause was ever issued',
+          );
+          // Checked before the assertion below so a transfer that outran the
+          // pause round trip says so, rather than failing as a wrong event
+          // type: `commanded` is set when the pause is issued, not when it
+          // lands.
+          expect(
+            events.last,
+            isNot(isA<ArtifactFileComplete>()),
+            reason:
+                'the file finished while the pause was in flight; re-run, or '
+                'point GOLEM_LIFECYCLE_ARTIFACT at a slower artifact',
           );
           expect(
             events.last,
@@ -227,7 +243,7 @@ void main() {
           // Secondary to the flag above, and deliberately loose: the point is
           // that the stream ends on the command rather than outliving it by the
           // uncommanded-pause grace.
-          expect(afterPause.elapsed, lessThan(const Duration(seconds: 10)));
+          expect(sinceCommand.elapsed, lessThan(const Duration(seconds: 10)));
 
           await downloader.cancel(ref);
         },

@@ -479,6 +479,7 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
       // Mirrored to the outer scope so the finally can drop this generation's
       // recorded intent whichever way the stream ends.
       final id = generation = TaskId(taskId);
+      _attached.add(id);
 
       // A terminal status recorded before this stream attached — a background
       // completion, or one replayed by resumeFromBackground at startup. A
@@ -540,21 +541,19 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
         pauseFinalize = null;
         arm();
 
-        // Read per update, not carried between them: an out-of-band pause or
-        // cancel lands between iterations, and the platform event it causes is
-        // the very next one — a stale flag would report the user's own stop as
-        // uncommanded and strand the card.
-        final commanded = _stops.of(id);
-
         switch (update) {
           case TaskProgressUpdate(:final progress) when progress >= 0:
             yield ArtifactFileProgress((progress * ref.expectedBytes).round());
           case TaskProgressUpdate():
             break;
           case TaskStatusUpdate():
+            // Read per update, not carried between them: an out-of-band pause
+            // or cancel lands between iterations, and the platform event it
+            // causes is the very next one — a stale flag would report the
+            // user's own stop as uncommanded and strand the card.
             final verdict = verdictFor(
               status: update.status,
-              commanded: commanded,
+              commanded: _stops.of(id),
             );
             if (verdict == StopVerdict.uncommandedPause) {
               pauseFinalize = Timer(
@@ -573,7 +572,10 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
     } finally {
       watchdog?.cancel();
       pauseFinalize?.cancel();
-      if (generation != null) _stops.forget(generation);
+      if (generation != null) {
+        _attached.remove(generation);
+        _stops.forget(generation);
+      }
       await subscription.cancel();
       await buffer.close();
     }
@@ -626,12 +628,25 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
     return await _heldTask(ref) == null;
   }
 
-  /// Stops this downloader commanded, awaiting the platform event they cause.
+  /// Stops commanded and not yet seen through, and the generations a
+  /// `download()` stream is listening to.
   ///
-  /// Per instance rather than process-wide: the app builds exactly one, and
-  /// instance state is what lets a test observe that nothing outlives its
-  /// generation.
-  final CommandedStops _stops = CommandedStops();
+  /// Static, like the plugin handles beside them: two instances in one process
+  /// share the platform, so intent recorded through one has to be visible to a
+  /// stream running on the other. `launch_composition` builds a fresh
+  /// downloader per composition attempt and the integration suite builds
+  /// several, and per-instance state would put the 15s grace straight back
+  /// with nothing to catch it. Testability is not affected — [CommandedStops]
+  /// is exercised on its own instances.
+  static final CommandedStops _stops = CommandedStops();
+  static final Set<TaskId> _attached = {};
+
+  /// A command nobody is listening to has no consumer to read it, so it is
+  /// dropped as soon as it resolves rather than waiting for a `finally` that
+  /// will never run.
+  void _releaseIfUnattached(TaskId id) {
+    if (!_attached.contains(id)) _stops.forget(id);
+  }
 
   // `static final`, never `const`: Dart canonicalizes const objects, so two
   // `const Object()` sentinels are the *same* instance and `identical` cannot
@@ -647,6 +662,9 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
     final id = TaskId(task.taskId);
     _stops.commandPause(id);
     if (!await _guard(() => _downloader.pause(task), false)) {
+      // Refused outright, so the pause will never happen: the record has to go
+      // even with a stream attached, or the next uncommanded pause on this
+      // generation is reported as the user's.
       _stops.forgetPause(id);
       return false;
     }
@@ -659,10 +677,15 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
         () => _storage.retrieveAllPausedTasks(),
         const <Task>[],
       );
-      if (paused.any((each) => each.taskId == task.taskId)) return true;
+      if (paused.any((each) => each.taskId == task.taskId)) {
+        _releaseIfUnattached(id);
+        return true;
+      }
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }
-    _stops.forgetPause(id);
+    // Unconfirmed is not refused — the request was accepted and may still
+    // land — so an attached stream keeps the intent and labels it correctly.
+    _releaseIfUnattached(id);
     return false;
   }
 
@@ -673,12 +696,12 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
     if (task == null) return true;
     final id = TaskId(task.taskId);
     _stops.commandCancel(id);
-    // Rolled back on refusal: download()'s finally drops a generation only
-    // when a stream was attached to it, and a cancel can be issued when none
-    // is — an entry left behind would outlive the process.
-    if (await _cancelAndConfirm(ref, task)) return true;
-    _stops.forgetCancel(id);
-    return false;
+    final cleared = await _cancelAndConfirm(ref, task);
+    // Not rolled back on a confirmation timeout: the cancel was issued and may
+    // still land, and an attached stream must report it as the user's when it
+    // does. Only a generation nobody is listening to is dropped here.
+    _releaseIfUnattached(id);
+    return cleared;
   }
 
   /// How long a staging file must have sat untouched before it counts as an

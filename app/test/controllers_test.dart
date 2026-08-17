@@ -306,7 +306,9 @@ final class _GatedTransfer implements ModelManagementRepository {
   final List<String> downloads = [];
   final _gate = StreamController<ModelState>();
 
-  void endTransfer() => _gate.close();
+  void endTransfer() {
+    if (!_gate.isClosed) _gate.close();
+  }
 
   @override
   Stream<ModelState> download(String artifactKey) {
@@ -1536,6 +1538,10 @@ void main() {
     // user because this guard drops when the repository's stream closes. While
     // it is raised, Resume — which is download() again — is dropped in silence.
     final models = _GatedTransfer(const ModelState());
+    // Self-cleaning: an assertion that fails before endTransfer() would
+    // otherwise leave the gate open and download() pending under a disposed
+    // container, burying the real failure in teardown noise.
+    addTearDown(models.endTransfer);
     final container = ProviderContainer(
       overrides: [
         chatHistoryRepositoryProvider.overrideWithValue(

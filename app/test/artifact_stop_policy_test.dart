@@ -18,16 +18,19 @@ void main() {
     test('a commanded stop is visible to its own generation only', () {
       final stops = CommandedStops()..commandPause(one);
 
-      expect(stops.of(one), CommandedStop.pause);
-      expect(stops.of(two), CommandedStop.none);
+      expect(stops.of(one).pause, isTrue);
+      expect(stops.of(two).pause, isFalse);
     });
 
-    test('cancel outranks a pause on the same generation', () {
+    test('a pause and a cancel on one generation are both remembered', () {
+      // Not a ranking: a cancel issued while the pause is still confirming
+      // must not make the platform's answer to the pause look uncommanded.
       final stops = CommandedStops()
         ..commandPause(one)
         ..commandCancel(one);
 
-      expect(stops.of(one), CommandedStop.cancel);
+      expect(stops.of(one).pause, isTrue);
+      expect(stops.of(one).cancel, isTrue);
     });
 
     test('a rolled-back pause leaves a cancel issued beside it', () {
@@ -36,7 +39,8 @@ void main() {
         ..commandCancel(one)
         ..forgetPause(one);
 
-      expect(stops.of(one), CommandedStop.cancel);
+      expect(stops.of(one).pause, isFalse);
+      expect(stops.of(one).cancel, isTrue);
     });
 
     test('a stop of either kind left behind is still a leak', () {
@@ -62,15 +66,18 @@ void main() {
         ..forget(two);
 
       expect(stops.isEmpty, isTrue);
-      expect(stops.of(one), CommandedStop.none);
-      expect(stops.of(two), CommandedStop.none);
+      expect(stops.of(one).pause, isFalse);
+      expect(stops.of(two).cancel, isFalse);
     });
   });
 
   group('the verdict', () {
     test('a pause the app commanded ends the stream at once', () {
       expect(
-        verdictFor(status: TaskStatus.paused, commanded: CommandedStop.pause),
+        verdictFor(
+          status: TaskStatus.paused,
+          commanded: const CommandedStop(pause: true),
+        ),
         StopVerdict.userPaused,
       );
     });
@@ -86,7 +93,7 @@ void main() {
       expect(
         verdictFor(
           status: TaskStatus.canceled,
-          commanded: CommandedStop.cancel,
+          commanded: const CommandedStop(cancel: true),
         ),
         StopVerdict.userCanceled,
       );
@@ -107,7 +114,10 @@ void main() {
 
     test('a pause command does not claim a cancel the platform made', () {
       expect(
-        verdictFor(status: TaskStatus.canceled, commanded: CommandedStop.pause),
+        verdictFor(
+          status: TaskStatus.canceled,
+          commanded: const CommandedStop(pause: true),
+        ),
         StopVerdict.uncommandedCancel,
       );
     });
@@ -122,7 +132,10 @@ void main() {
         TaskStatus.waitingToRetry,
       ]) {
         expect(
-          verdictFor(status: status, commanded: CommandedStop.cancel),
+          verdictFor(
+            status: status,
+            commanded: const CommandedStop(cancel: true),
+          ),
           StopVerdict.notAStop,
           reason: '$status is not a stop whatever was commanded',
         );

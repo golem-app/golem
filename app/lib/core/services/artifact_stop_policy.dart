@@ -20,7 +20,19 @@ import 'package:background_downloader/background_downloader.dart'
 extension type const TaskId(String value) {}
 
 /// What the app asked the platform to do to a transfer, if anything.
-enum CommandedStop { none, pause, cancel }
+///
+/// Two independent facts rather than a ranking. Ranking them lost one: a
+/// cancel issued while a pause was still being confirmed — reachable, since
+/// `ModelController.cancel` has no busy guard — made the platform's answer to
+/// the pause look uncommanded, and re-armed the grace this exists to avoid.
+final class CommandedStop {
+  const CommandedStop({this.pause = false, this.cancel = false});
+
+  static const none = CommandedStop();
+
+  final bool pause;
+  final bool cancel;
+}
 
 /// The stops the app has commanded and not yet seen through, by generation.
 ///
@@ -34,13 +46,10 @@ final class CommandedStops {
   final Set<TaskId> _paused = {};
   final Set<TaskId> _canceled = {};
 
-  /// Cancel outranks pause: cancelling an already-paused transfer is the
-  /// ordinary way to abandon one, and the platform then reports only a cancel.
-  CommandedStop of(TaskId id) {
-    if (_canceled.contains(id)) return CommandedStop.cancel;
-    if (_paused.contains(id)) return CommandedStop.pause;
-    return CommandedStop.none;
-  }
+  CommandedStop of(TaskId id) => CommandedStop(
+    pause: _paused.contains(id),
+    cancel: _canceled.contains(id),
+  );
 
   void commandPause(TaskId id) => _paused.add(id);
 
@@ -61,7 +70,7 @@ final class CommandedStops {
   }
 
   /// Exists so a test can prove the bookkeeping does not leak between
-  /// transfers — which a private static set never allowed.
+  /// transfers — which a bare pair of sets never allowed.
   bool get isEmpty => _paused.isEmpty && _canceled.isEmpty;
 }
 
@@ -89,13 +98,9 @@ StopVerdict verdictFor({
   required CommandedStop commanded,
 }) => switch (status) {
   TaskStatus.paused =>
-    commanded == CommandedStop.pause
-        ? StopVerdict.userPaused
-        : StopVerdict.uncommandedPause,
+    commanded.pause ? StopVerdict.userPaused : StopVerdict.uncommandedPause,
   TaskStatus.canceled =>
-    commanded == CommandedStop.cancel
-        ? StopVerdict.userCanceled
-        : StopVerdict.uncommandedCancel,
+    commanded.cancel ? StopVerdict.userCanceled : StopVerdict.uncommandedCancel,
   TaskStatus.complete ||
   TaskStatus.failed ||
   TaskStatus.notFound ||

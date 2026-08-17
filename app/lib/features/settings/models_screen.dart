@@ -886,12 +886,16 @@ class _ModelCard extends ConsumerWidget {
           // file boundary of a multi-file artifact — and shifted every card
           // beneath it under a reader who had scrolled (#125). Here nothing
           // above the card it describes can move.
-          //
-          // Mounted only for the card that is transferring, unlike the two
-          // single-entry surfaces that embed it unconditionally: one note
-          // provider per catalog entry is churn for no layout gain, since the
-          // note renders nothing outside `downloading` either way.
-          if (status.phase == ArtifactPhase.downloading)
+          // A mount guard, not a second visibility rule: `downloadNoteVisible`
+          // stays the one statement of when the note renders, and this is
+          // deliberately wider than it, so widening that rule can never be
+          // hidden here. It exists because this is the only surface with a
+          // card per catalog entry — mounting the note on all of them costs a
+          // note provider each, and the churn strands provider-dispose timers
+          // in the widget tests.
+          if (status.phase == ArtifactPhase.downloading ||
+              status.phase == ArtifactPhase.verifying ||
+              status.phase == ArtifactPhase.paused)
             DownloadNoteBanner(
               key: Key('model-download-note-${entry.key}'),
               entry: entry,
