@@ -292,6 +292,28 @@ void main() {
     );
   });
 
+  test('the storage platform channel is named the same on every side', () {
+    // The Dart client and the three native handlers agree by inspection or
+    // not at all: a missed shim is a MissingPluginException that only shows
+    // up on the platform nobody re-ran. The name carries no flavor, because
+    // one channel serves all three application identities.
+    const expected = 'app.golem/storage';
+    const sources = [
+      'lib/core/services/device_storage.dart',
+      'ios/Runner/AppDelegate.swift',
+      'macos/Runner/MainFlutterWindow.swift',
+      'android/app/src/main/kotlin/app/golem/flutter/MainActivity.kt',
+    ];
+    final pattern = RegExp('[\'"]([\\w.]+/storage)[\'"]');
+    for (final source in sources) {
+      final names = pattern
+          .allMatches(File(source).readAsStringSync())
+          .map((match) => match[1])
+          .toSet();
+      expect(names, {expected}, reason: source);
+    }
+  });
+
   test('iOS build configurations map every flavor identity', () async {
     final project = await File(
       'ios/Runner.xcodeproj/project.pbxproj',

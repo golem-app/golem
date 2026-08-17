@@ -208,7 +208,7 @@ handoff under `references/ui_redesign/` at the repo root.
   fake simulates the same catalog; `RealModelManagementRepository` downloads
   via `background_downloader` behind the `ArtifactFileDownloader` seam, with
   free-space probing and backup exclusion on the
-  `app.golem.flutter/storage` platform channel. The seam is identity-aware:
+  `app.golem/storage` platform channel. The seam is identity-aware:
   every call names an `ArtifactFileRef`, and `inspect` reports what the OS
   still holds, so a stop issued after a relaunch reaches the transfer the
   previous process started. Which transfer a platform task belongs to travels

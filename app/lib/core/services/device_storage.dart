@@ -47,7 +47,7 @@ final class DeviceStorageChannel
         DiskCapacityProbe {
   const DeviceStorageChannel();
 
-  static const _channel = MethodChannel('app.golem.flutter/storage');
+  static const _channel = MethodChannel('app.golem/storage');
 
   @override
   Future<int?> freeBytes(String path) =>

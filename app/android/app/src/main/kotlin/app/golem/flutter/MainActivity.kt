@@ -12,7 +12,7 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
-            "app.golem.flutter/storage"
+            "app.golem/storage"
         ).setMethodCallHandler { call, result ->
             if (call.method == "physicalMemoryBytes") {
                 // totalMem reports net of kernel/firmware reservations, so a
