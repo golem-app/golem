@@ -226,7 +226,7 @@ final Map<String, ModelProfileSpec> brokerProfileSpecs = Map.unmodifiable({
 
 /// The built-ins plus any specs a resolved custom model brought with it.
 /// Deliberately a value passed to the resolver, not a mutable global (handbook
-/// v4.2A §2.1 prohibits app-authored mutable statics).
+/// v5.0 §2.1 prohibits app-authored mutable statics).
 final class ProfileRegistry {
   const ProfileRegistry._(this._profiles);
 

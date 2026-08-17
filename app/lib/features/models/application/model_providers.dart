@@ -40,8 +40,8 @@ _CustomModelsSelection _customModelsFrom(AsyncValue<AppPreferences> value) =>
 /// so the pinned manifest stays the single source of model knowledge.
 /// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
 /// (composer, drawer, recovery banner), so disposal would never fire in
-/// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature)
-/// rules autoDispose out. Revisit when the pin crosses 3.4.0.
+/// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature,
+/// which records why the pin cannot move) rules autoDispose out.
 @Riverpod(keepAlive: true, retry: noRetry)
 List<ModelCatalogEntry> effectiveModelCatalog(Ref ref) {
   final pinned = ref.watch(modelCatalogEntriesProvider);
@@ -60,8 +60,7 @@ List<ModelCatalogEntry> effectiveModelCatalog(Ref ref) {
 /// build composed. Derived here so chat, Settings, and Storage cannot disagree
 /// about which model is live (#20).
 /// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
-/// continuously watched, and the 3.3.2 scope-swap hazard. Revisit when the
-/// pin crosses 3.4.0.
+/// continuously watched, and the 3.3.2 scope-swap hazard.
 @Riverpod(keepAlive: true, retry: noRetry)
 Set<String> loadableModelKeys(Ref ref) => domain.loadableModelKeys(
   backend: ref.watch(inferenceBackendProvider),
@@ -115,8 +114,8 @@ Set<String> downloadableModelKeys(Ref ref) {
 }
 
 /// KeepAlive: a command controller whose downloads, busy guard, and epochs
-/// must survive leaving the Models screen (§3.4 — an autoDispose command
-/// provider dies mid-flight).
+/// must survive leaving the Models screen (handbook v5.0 §3.4 — an
+/// autoDispose command provider dies mid-flight).
 @Riverpod(keepAlive: true, retry: noRetry)
 class ModelController extends _$ModelController {
   int _operationEpoch = 0;

@@ -41,8 +41,9 @@ class PersistenceException implements Exception {
 }
 
 /// Semantic classification, stable across fake and real backends so the
-/// recovery banner picks actions without parsing copy (§19.1). Recovery
-/// categories, not engine codes: [contextExhausted] is the one Retry can't fix.
+/// recovery banner picks actions without parsing copy (handbook v5.0
+/// §8.1). Recovery categories, not engine codes: [contextExhausted] is the
+/// one Retry can't fix.
 enum InferenceFailureKind {
   /// Unclassified engine or runtime failure; Retry is a reasonable action.
   engine,

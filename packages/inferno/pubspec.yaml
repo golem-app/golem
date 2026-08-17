@@ -12,7 +12,7 @@ dependencies:
   code_assets: ^1.2.1
   crypto: ^3.0.7
   ffi: ^2.2.0
-  # 2.1.0 requires meta 1.19, while Flutter 3.44.8 pins 1.18 (#38).
+  # 2.1.0 requires meta 1.19, while Flutter 3.44.9 pins 1.18 (#38).
   hooks: 2.0.2
 
 dev_dependencies:

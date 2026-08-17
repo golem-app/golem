@@ -17,8 +17,8 @@ part of 'storage_providers.dart';
 /// continuously anyway, and the 3.3.2 scope-swap hazard (see
 /// chatStorageSignature) rules autoDispose out. Staleness is owned by
 /// invalidation — the storage signature upstream and `ref.invalidate` after
-/// a cache clear — never by a `KeepAliveLink` TTL (§4.4, a silent no-op on
-/// keepAlive providers). Revisit when the pin crosses 3.4.0.
+/// a cache clear — never by a `KeepAliveLink` TTL (handbook v5.0 §4.4, a
+/// silent no-op on keepAlive providers).
 
 @ProviderFor(storageBreakdown)
 final storageBreakdownProvider = StorageBreakdownProvider._();
@@ -32,8 +32,8 @@ final storageBreakdownProvider = StorageBreakdownProvider._();
 /// continuously anyway, and the 3.3.2 scope-swap hazard (see
 /// chatStorageSignature) rules autoDispose out. Staleness is owned by
 /// invalidation — the storage signature upstream and `ref.invalidate` after
-/// a cache clear — never by a `KeepAliveLink` TTL (§4.4, a silent no-op on
-/// keepAlive providers). Revisit when the pin crosses 3.4.0.
+/// a cache clear — never by a `KeepAliveLink` TTL (handbook v5.0 §4.4, a
+/// silent no-op on keepAlive providers).
 
 final class StorageBreakdownProvider
     extends
@@ -52,8 +52,8 @@ final class StorageBreakdownProvider
   /// continuously anyway, and the 3.3.2 scope-swap hazard (see
   /// chatStorageSignature) rules autoDispose out. Staleness is owned by
   /// invalidation — the storage signature upstream and `ref.invalidate` after
-  /// a cache clear — never by a `KeepAliveLink` TTL (§4.4, a silent no-op on
-  /// keepAlive providers). Revisit when the pin crosses 3.4.0.
+  /// a cache clear — never by a `KeepAliveLink` TTL (handbook v5.0 §4.4, a
+  /// silent no-op on keepAlive providers).
   StorageBreakdownProvider._()
     : super(
         from: null,

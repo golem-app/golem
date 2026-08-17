@@ -21,12 +21,14 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          flutter-version: 3.44.8
+          flutter-version-file: .fvmrc
           channel: stable
           cache: true
       - name: Resolve workspace
         run: flutter pub get
         working-directory: app
+      - name: Toolchain pin
+        run: dart run tool/check_toolchain.dart
       - name: Format
         run: dart format --output=none --set-exit-if-changed .
       - name: Import boundary
@@ -46,12 +48,14 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          flutter-version: 3.44.8
+          flutter-version-file: .fvmrc
           channel: stable
           cache: true
       - name: Resolve workspace
         run: flutter pub get
         working-directory: app
+      - name: Toolchain pin
+        run: dart run tool/check_toolchain.dart
       - name: Analyze
         run: dart analyze
         working-directory: packages/inferno
@@ -81,12 +85,14 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          flutter-version: 3.44.8
+          flutter-version-file: .fvmrc
           channel: stable
           cache: true
       - name: Resolve workspace
         run: flutter pub get
         working-directory: app
+      - name: Toolchain pin
+        run: dart run tool/check_toolchain.dart
       - name: App suite with goldens enforced (macOS renders the goldens)
         run: flutter test
         working-directory: app

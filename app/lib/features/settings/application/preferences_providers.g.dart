@@ -11,8 +11,8 @@ part of 'preferences_providers.dart';
 /// Persisted app-wide preferences. Every command follows the settings idiom —
 /// drop taps that land in the cold-start load window, publish, then save —
 /// and returns false after rolling back a failed write, never throwing.
-/// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
-/// root on every frame.
+/// KeepAlive: a handbook v5.0 §3.2 client-state owner; theme and text scale
+/// drive the app root on every frame.
 
 @ProviderFor(PreferencesController)
 final preferencesControllerProvider = PreferencesControllerProvider._();
@@ -20,15 +20,15 @@ final preferencesControllerProvider = PreferencesControllerProvider._();
 /// Persisted app-wide preferences. Every command follows the settings idiom —
 /// drop taps that land in the cold-start load window, publish, then save —
 /// and returns false after rolling back a failed write, never throwing.
-/// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
-/// root on every frame.
+/// KeepAlive: a handbook v5.0 §3.2 client-state owner; theme and text scale
+/// drive the app root on every frame.
 final class PreferencesControllerProvider
     extends $AsyncNotifierProvider<PreferencesController, AppPreferences> {
   /// Persisted app-wide preferences. Every command follows the settings idiom —
   /// drop taps that land in the cold-start load window, publish, then save —
   /// and returns false after rolling back a failed write, never throwing.
-  /// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
-  /// root on every frame.
+  /// KeepAlive: a handbook v5.0 §3.2 client-state owner; theme and text scale
+  /// drive the app root on every frame.
   PreferencesControllerProvider._()
     : super(
         from: null,
@@ -54,8 +54,8 @@ String _$preferencesControllerHash() =>
 /// Persisted app-wide preferences. Every command follows the settings idiom —
 /// drop taps that land in the cold-start load window, publish, then save —
 /// and returns false after rolling back a failed write, never throwing.
-/// KeepAlive: a §3.2 client-state owner; theme and text scale drive the app
-/// root on every frame.
+/// KeepAlive: a handbook v5.0 §3.2 client-state owner; theme and text scale
+/// drive the app root on every frame.
 
 abstract class _$PreferencesController extends $AsyncNotifier<AppPreferences> {
   FutureOr<AppPreferences> build();

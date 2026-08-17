@@ -81,7 +81,7 @@ Future<AttachSource?> showAttachSheet(
 );
 
 /// The platform pickers, behind an injectable seam so widget tests drive the
-/// sheet without a plugin (handbook v4.2A §2.2 platform adapter).
+/// sheet without a plugin (handbook v5.0 §2.2 platform adapter).
 class AttachmentPicker {
   const AttachmentPicker({this.intake = const ImageIntake()});
 

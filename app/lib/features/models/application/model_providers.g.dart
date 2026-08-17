@@ -12,8 +12,8 @@ part of 'model_providers.dart';
 /// so the pinned manifest stays the single source of model knowledge.
 /// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
 /// (composer, drawer, recovery banner), so disposal would never fire in
-/// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature)
-/// rules autoDispose out. Revisit when the pin crosses 3.4.0.
+/// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature,
+/// which records why the pin cannot move) rules autoDispose out.
 
 @ProviderFor(effectiveModelCatalog)
 final effectiveModelCatalogProvider = EffectiveModelCatalogProvider._();
@@ -22,8 +22,8 @@ final effectiveModelCatalogProvider = EffectiveModelCatalogProvider._();
 /// so the pinned manifest stays the single source of model knowledge.
 /// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
 /// (composer, drawer, recovery banner), so disposal would never fire in
-/// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature)
-/// rules autoDispose out. Revisit when the pin crosses 3.4.0.
+/// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature,
+/// which records why the pin cannot move) rules autoDispose out.
 
 final class EffectiveModelCatalogProvider
     extends
@@ -37,8 +37,8 @@ final class EffectiveModelCatalogProvider
   /// so the pinned manifest stays the single source of model knowledge.
   /// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
   /// (composer, drawer, recovery banner), so disposal would never fire in
-  /// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature)
-  /// rules autoDispose out. Revisit when the pin crosses 3.4.0.
+  /// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature,
+  /// which records why the pin cannot move) rules autoDispose out.
   EffectiveModelCatalogProvider._()
     : super(
         from: null,
@@ -80,8 +80,7 @@ String _$effectiveModelCatalogHash() =>
 /// build composed. Derived here so chat, Settings, and Storage cannot disagree
 /// about which model is live (#20).
 /// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
-/// continuously watched, and the 3.3.2 scope-swap hazard. Revisit when the
-/// pin crosses 3.4.0.
+/// continuously watched, and the 3.3.2 scope-swap hazard.
 
 @ProviderFor(loadableModelKeys)
 final loadableModelKeysProvider = LoadableModelKeysProvider._();
@@ -90,8 +89,7 @@ final loadableModelKeysProvider = LoadableModelKeysProvider._();
 /// build composed. Derived here so chat, Settings, and Storage cannot disagree
 /// about which model is live (#20).
 /// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
-/// continuously watched, and the 3.3.2 scope-swap hazard. Revisit when the
-/// pin crosses 3.4.0.
+/// continuously watched, and the 3.3.2 scope-swap hazard.
 
 final class LoadableModelKeysProvider
     extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
@@ -100,8 +98,7 @@ final class LoadableModelKeysProvider
   /// build composed. Derived here so chat, Settings, and Storage cannot disagree
   /// about which model is live (#20).
   /// KeepAlive, deliberately (#69): same grounds as effectiveModelCatalog —
-  /// continuously watched, and the 3.3.2 scope-swap hazard. Revisit when the
-  /// pin crosses 3.4.0.
+  /// continuously watched, and the 3.3.2 scope-swap hazard.
   LoadableModelKeysProvider._()
     : super(
         from: null,
@@ -255,20 +252,20 @@ String _$downloadableModelKeysHash() =>
     r'f9cd2176ddd9c2ba36232444c34b2f369499f5d2';
 
 /// KeepAlive: a command controller whose downloads, busy guard, and epochs
-/// must survive leaving the Models screen (§3.4 — an autoDispose command
-/// provider dies mid-flight).
+/// must survive leaving the Models screen (handbook v5.0 §3.4 — an
+/// autoDispose command provider dies mid-flight).
 
 @ProviderFor(ModelController)
 final modelControllerProvider = ModelControllerProvider._();
 
 /// KeepAlive: a command controller whose downloads, busy guard, and epochs
-/// must survive leaving the Models screen (§3.4 — an autoDispose command
-/// provider dies mid-flight).
+/// must survive leaving the Models screen (handbook v5.0 §3.4 — an
+/// autoDispose command provider dies mid-flight).
 final class ModelControllerProvider
     extends $AsyncNotifierProvider<ModelController, ModelState> {
   /// KeepAlive: a command controller whose downloads, busy guard, and epochs
-  /// must survive leaving the Models screen (§3.4 — an autoDispose command
-  /// provider dies mid-flight).
+  /// must survive leaving the Models screen (handbook v5.0 §3.4 — an
+  /// autoDispose command provider dies mid-flight).
   ModelControllerProvider._()
     : super(
         from: null,
@@ -291,8 +288,8 @@ final class ModelControllerProvider
 String _$modelControllerHash() => r'068e53c413eee519f3989905c99cf7db35177f59';
 
 /// KeepAlive: a command controller whose downloads, busy guard, and epochs
-/// must survive leaving the Models screen (§3.4 — an autoDispose command
-/// provider dies mid-flight).
+/// must survive leaving the Models screen (handbook v5.0 §3.4 — an
+/// autoDispose command provider dies mid-flight).
 
 abstract class _$ModelController extends $AsyncNotifier<ModelState> {
   FutureOr<ModelState> build();
