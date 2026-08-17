@@ -149,6 +149,7 @@ class ModelController extends _$ModelController {
   /// Deliberately outside the busy guard: a download stuck waiting on a
   /// platform that stopped answering is precisely when this has to run.
   Future<void> reconcileDownloads() async {
+    final models = ref.read(modelManagementRepositoryProvider);
     try {
       // Never before build has installed its own value: Riverpod assigns that
       // result after the fact, and would overwrite the fresher snapshot below
@@ -161,11 +162,11 @@ class ModelController extends _$ModelController {
       // verified result. Real transfers remain eligible here because their
       // platform worker can advance while Dart is inactive.
       if (_busy && state.value?.simulated == true) return;
-      final value = await ref.read(modelManagementRepositoryProvider).load();
+      final value = await models.load();
       if (!ref.mounted) return;
       state = AsyncData(value);
       await _reattach(value);
-    } catch (_) {
+    } on Exception {
       // Reconciliation is a repair pass; a failed one must not blank the
       // screen or replace a usable snapshot with an error.
     }
@@ -290,13 +291,12 @@ class ModelController extends _$ModelController {
     }
     _busy = true;
     _engineBusy = true;
+    final models = ref.read(modelManagementRepositoryProvider);
     try {
-      final value = await ref
-          .read(modelManagementRepositoryProvider)
-          .recordRuntime(RuntimePhase.loaded);
+      final value = await models.recordRuntime(RuntimePhase.loaded);
       if (!ref.mounted) return;
       state = AsyncData(value);
-    } catch (_) {
+    } on Exception {
       // Phase bookkeeping must never disturb an in-flight generation.
     } finally {
       _busy = false;
@@ -439,20 +439,19 @@ class ModelController extends _$ModelController {
     // still must not unload twice.
     if (_releasing) return;
     _releasing = true;
+    final models = ref.read(modelManagementRepositoryProvider);
+    final inference = ref.read(inferenceRepositoryProvider);
     try {
-      final inference = ref.read(inferenceRepositoryProvider);
       // Residency decides, not the catalog phase: a GOLEM_MODEL_PATH load is
       // outside phase tracking, yet just as resident and just as jetsammable.
       final loaded = current.runtime == RuntimePhase.loaded;
       if (!loaded && !inference.residency.value.loaded) return;
       await inference.unload();
       if (!ref.mounted || !loaded) return;
-      final value = await ref
-          .read(modelManagementRepositoryProvider)
-          .recordRuntime(RuntimePhase.unloaded);
+      final value = await models.recordRuntime(RuntimePhase.unloaded);
       if (!ref.mounted) return;
       state = AsyncData(value);
-    } catch (_) {
+    } on Exception {
       // Advisory signal: no user-visible failure state.
     } finally {
       _releasing = false;
@@ -467,10 +466,13 @@ class ModelController extends _$ModelController {
   /// is precisely the case that aborts. Reversible, because Flutter permits
   /// `detached -> resumed` and the callback listener stays open.
   void releaseEngineForTeardown() {
+    final inference = ref.read(inferenceRepositoryProvider);
     try {
-      ref.read(inferenceRepositoryProvider).releaseEngine();
+      inference.releaseEngine();
     } catch (_) {
-      // Advisory: no surface is left to report a teardown failure to.
+      // Deliberately broad, and deliberately not around the read (#127): this
+      // is the last thing the process does, and an FFI Error on the way out
+      // must not abort teardown. An unwired seam is a wiring mistake instead.
     }
   }
 
@@ -481,12 +483,7 @@ class ModelController extends _$ModelController {
     final backend = ref.read(inferenceBackendProvider);
     if (backend.sideloaded) return null;
     final chatModelKey = ref.read(chatSessionBridgeProvider).activeModelKey();
-    final List<ModelCatalogEntry> catalog;
-    try {
-      catalog = ref.read(effectiveModelCatalogProvider);
-    } catch (_) {
-      return chatModelKey ?? state.value?.activeArtifactKey;
-    }
+    final catalog = ref.read(effectiveModelCatalogProvider);
     final loadable = domain.loadableModelKeys(
       backend: backend,
       catalog: catalog,

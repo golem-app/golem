@@ -28,6 +28,11 @@ final class FakeInferenceRepository implements InferenceRepository {
   /// Observable so a test can assert teardown actually ran, rather than
   /// inferring it from state the simulation starts in anyway.
   int releases = 0;
+
+  /// Same reason as [releases]: bumping an epoch leaves no trace a test can
+  /// read, and cancellation on the way out of the provider (#127) has to be
+  /// provable rather than inferred from a stream that would have ended anyway.
+  int cancels = 0;
   final ValueNotifier<InferenceResidency> _residency =
       ValueNotifier<InferenceResidency>(const InferenceResidency.unloaded());
 
@@ -99,7 +104,10 @@ final class FakeInferenceRepository implements InferenceRepository {
   }
 
   @override
-  Future<void> cancel() async => _generationEpoch++;
+  Future<void> cancel() async {
+    cancels++;
+    _generationEpoch++;
+  }
 
   @override
   void releaseEngine() {

@@ -19,6 +19,7 @@ import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_model_management_repository.dart';
 import 'package:golem_flutter/core/services/cache_probe.dart';
+import 'package:golem_flutter/core/services/device_storage.dart';
 import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
@@ -26,10 +27,29 @@ import 'package:golem_flutter/features/settings/application/preferences_provider
 import 'package:golem_flutter/features/settings/application/settings_providers.dart';
 import 'package:golem_flutter/features/settings/application/storage_providers.dart';
 
+import 'support/in_memory_attachment_repository.dart';
 import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
 import 'support/in_memory_settings_repository.dart';
 import 'support/scripted_chat_history_repository.dart';
+
+/// Probes that report "unknown". These two containers never wired a disk probe,
+/// and the storage provider's read no longer tolerates an absent seam (#127) —
+/// "unknown" is what they effectively had, and what the meter must keep hiding
+/// on rather than inventing a denominator for.
+final class _UnknownDiskSpace implements DiskSpaceProbe {
+  const _UnknownDiskSpace();
+
+  @override
+  Future<int?> freeBytes(String path) async => null;
+}
+
+final class _UnknownDiskCapacity implements DiskCapacityProbe {
+  const _UnknownDiskCapacity();
+
+  @override
+  Future<int?> totalBytes(String path) async => null;
+}
 
 Future<String> _fixtureAsset(String key) async =>
     '[{"role": "user", "content": "${'x' * 400}"}]';
@@ -91,6 +111,7 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   int prepares = 0;
   int unloads = 0;
   int releases = 0;
+  int cancels = 0;
 
   @override
   void releaseEngine() => releases++;
@@ -124,7 +145,7 @@ final class _RecordingInferenceRepository implements InferenceRepository {
   }
 
   @override
-  Future<void> cancel() async {}
+  Future<void> cancel() async => cancels++;
 
   /// When set, generate parks mid-stream until completed — for tests that
   /// need a deterministically in-flight generation.
@@ -343,6 +364,9 @@ void main() {
     addTearDown(() => directory.deleteSync(recursive: true));
     return ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(
           InMemoryChatHistoryRepository(),
         ),
@@ -435,6 +459,14 @@ void main() {
     }) {
       final container = ProviderContainer(
         overrides: [
+          // Explicitly empty (#127): this container never stocked a catalog, and
+          // the read that used to tolerate its absence no longer does.
+          modelCatalogEntriesProvider.overrideWithValue(
+            const <ModelCatalogEntry>[],
+          ),
+          attachmentRepositoryProvider.overrideWithValue(
+            InMemoryAttachmentRepository(),
+          ),
           chatHistoryRepositoryProvider.overrideWithValue(history),
           preferencesRepositoryProvider.overrideWithValue(
             preferences ?? InMemoryPreferencesRepository(),
@@ -686,6 +718,14 @@ void main() {
     ProviderContainer withModels(ModelManagementRepository models) {
       final container = ProviderContainer(
         overrides: [
+          // Explicitly empty (#127): this container never stocked a catalog, and
+          // the read that used to tolerate its absence no longer does.
+          modelCatalogEntriesProvider.overrideWithValue(
+            const <ModelCatalogEntry>[],
+          ),
+          attachmentRepositoryProvider.overrideWithValue(
+            InMemoryAttachmentRepository(),
+          ),
           chatHistoryRepositoryProvider.overrideWithValue(
             InMemoryChatHistoryRepository(),
           ),
@@ -754,6 +794,14 @@ void main() {
     final inference = _RecordingInferenceRepository();
     final container = ProviderContainer(
       overrides: [
+        // Explicitly empty (#127): this container never stocked a catalog, and
+        // the read that used to tolerate its absence no longer does.
+        modelCatalogEntriesProvider.overrideWithValue(
+          const <ModelCatalogEntry>[],
+        ),
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(
           InMemoryChatHistoryRepository(),
         ),
@@ -795,6 +843,9 @@ void main() {
       final inference = _RecordingInferenceRepository();
       final container = ProviderContainer(
         overrides: [
+          attachmentRepositoryProvider.overrideWithValue(
+            InMemoryAttachmentRepository(),
+          ),
           chatHistoryRepositoryProvider.overrideWithValue(
             InMemoryChatHistoryRepository(),
           ),
@@ -835,6 +886,9 @@ void main() {
     addTearDown(() => directory.deleteSync(recursive: true));
     final container = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(
           InMemoryChatHistoryRepository(),
         ),
@@ -886,50 +940,55 @@ void main() {
     expect(state.generation, GenerationPhase.idle);
   });
 
-  test(
-    'the response style layers under manual overrides at generate',
-    () async {
-      final inference = _RecordingInferenceRepository();
-      final container = ProviderContainer(
-        overrides: [
-          chatHistoryRepositoryProvider.overrideWithValue(
-            InMemoryChatHistoryRepository(),
+  test('the response style layers under manual overrides at generate', () async {
+    final inference = _RecordingInferenceRepository();
+    final container = ProviderContainer(
+      overrides: [
+        // Explicitly empty (#127): this container never stocked a catalog, and
+        // the read that used to tolerate its absence no longer does.
+        modelCatalogEntriesProvider.overrideWithValue(
+          const <ModelCatalogEntry>[],
+        ),
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        inferenceBackendProvider.overrideWithValue(
+          const InferenceBackendConfig(
+            kind: InferenceBackendKind.fake,
+            profileKey: 'gemma4',
           ),
-          inferenceRepositoryProvider.overrideWithValue(inference),
-          inferenceBackendProvider.overrideWithValue(
-            const InferenceBackendConfig(
-              kind: InferenceBackendKind.fake,
-              profileKey: 'gemma4',
+        ),
+        // Precise style (temp 0.3, topP 0.9) with a hand-set temperature:
+        // the manual knob must win, the untouched one must follow the
+        // style, and the system prompt must ride along.
+        preferencesRepositoryProvider.overrideWithValue(
+          InMemoryPreferencesRepository(
+            const AppPreferences(
+              systemPrompt: 'Answer briefly.',
+            ).withStyle('gemma4', ResponseStyle.precise),
+          ),
+        ),
+        settingsRepositoryProvider.overrideWithValue(
+          InMemorySettingsRepository(
+            const GenerationSettings().withModel(
+              'gemma4',
+              const SamplingOverrides(temperature: 0.55),
             ),
           ),
-          // Precise style (temp 0.3, topP 0.9) with a hand-set temperature:
-          // the manual knob must win, the untouched one must follow the
-          // style, and the system prompt must ride along.
-          preferencesRepositoryProvider.overrideWithValue(
-            InMemoryPreferencesRepository(
-              const AppPreferences(
-                systemPrompt: 'Answer briefly.',
-              ).withStyle('gemma4', ResponseStyle.precise),
-            ),
-          ),
-          settingsRepositoryProvider.overrideWithValue(
-            InMemorySettingsRepository(
-              const GenerationSettings().withModel(
-                'gemma4',
-                const SamplingOverrides(temperature: 0.55),
-              ),
-            ),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-      await container.read(chatControllerProvider.future);
-      await container.read(chatControllerProvider.notifier).send('Hello');
-      expect(inference.lastOverrides?.temperature, 0.55);
-      expect(inference.lastOverrides?.topP, 0.9);
-      expect(inference.lastSystemPrompt, 'Answer briefly.');
-    },
-  );
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(chatControllerProvider.future);
+    await container.read(chatControllerProvider.notifier).send('Hello');
+    expect(inference.lastOverrides?.temperature, 0.55);
+    expect(inference.lastOverrides?.topP, 0.9);
+    expect(inference.lastSystemPrompt, 'Answer briefly.');
+  });
 
   test(
     'fallback generation uses the fallback model sampling profile',
@@ -951,6 +1010,9 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          attachmentRepositoryProvider.overrideWithValue(
+            InMemoryAttachmentRepository(),
+          ),
           chatHistoryRepositoryProvider.overrideWithValue(history),
           inferenceRepositoryProvider.overrideWithValue(inference),
           inferenceBackendProvider.overrideWithValue(
@@ -1021,6 +1083,14 @@ void main() {
       final history = InMemoryChatHistoryRepository();
       final container = ProviderContainer(
         overrides: [
+          // Explicitly empty (#127): this container never stocked a catalog, and
+          // the read that used to tolerate its absence no longer does.
+          modelCatalogEntriesProvider.overrideWithValue(
+            const <ModelCatalogEntry>[],
+          ),
+          attachmentRepositoryProvider.overrideWithValue(
+            InMemoryAttachmentRepository(),
+          ),
           chatHistoryRepositoryProvider.overrideWithValue(history),
           inferenceRepositoryProvider.overrideWithValue(
             FakeInferenceRepository(eventDelay: Duration.zero),
@@ -1064,6 +1134,14 @@ void main() {
     final history = InMemoryChatHistoryRepository();
     final container = ProviderContainer(
       overrides: [
+        // Explicitly empty (#127): this container never stocked a catalog, and
+        // the read that used to tolerate its absence no longer does.
+        modelCatalogEntriesProvider.overrideWithValue(
+          const <ModelCatalogEntry>[],
+        ),
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(history),
         inferenceRepositoryProvider.overrideWithValue(
           FakeInferenceRepository(eventDelay: Duration.zero),
@@ -1103,6 +1181,9 @@ void main() {
       ProviderContainer build(List<ModelCatalogEntry> catalog) =>
           ProviderContainer(
             overrides: [
+              attachmentRepositoryProvider.overrideWithValue(
+                InMemoryAttachmentRepository(),
+              ),
               preferencesRepositoryProvider.overrideWithValue(
                 preferencesRepository,
               ),
@@ -1153,6 +1234,19 @@ void main() {
     final cache = _CountingCacheProbe();
     final container = ProviderContainer(
       overrides: [
+        diskFreeSpaceProbeProvider.overrideWithValue(const _UnknownDiskSpace()),
+        deviceCapacityProbeProvider.overrideWithValue(
+          const _UnknownDiskCapacity(),
+        ),
+        documentsPathProvider.overrideWithValue(Directory.systemTemp.path),
+        // Explicitly empty (#127): this container never stocked a catalog, and
+        // the read that used to tolerate its absence no longer does.
+        modelCatalogEntriesProvider.overrideWithValue(
+          const <ModelCatalogEntry>[],
+        ),
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(
           InMemoryChatHistoryRepository(),
         ),
@@ -1209,6 +1303,19 @@ void main() {
   test('storage breakdown sums buckets and tracks chat size', () async {
     final container = ProviderContainer(
       overrides: [
+        diskFreeSpaceProbeProvider.overrideWithValue(const _UnknownDiskSpace()),
+        deviceCapacityProbeProvider.overrideWithValue(
+          const _UnknownDiskCapacity(),
+        ),
+        documentsPathProvider.overrideWithValue(Directory.systemTemp.path),
+        // Explicitly empty (#127): this container never stocked a catalog, and
+        // the read that used to tolerate its absence no longer does.
+        modelCatalogEntriesProvider.overrideWithValue(
+          const <ModelCatalogEntry>[],
+        ),
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(
           InMemoryChatHistoryRepository(),
         ),
@@ -1295,6 +1402,14 @@ void main() {
     final inference = _RecordingInferenceRepository();
     final container = ProviderContainer(
       overrides: [
+        // Explicitly empty (#127): this container never stocked a catalog, and
+        // the read that used to tolerate its absence no longer does.
+        modelCatalogEntriesProvider.overrideWithValue(
+          const <ModelCatalogEntry>[],
+        ),
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(
           InMemoryChatHistoryRepository(),
         ),
@@ -1337,43 +1452,46 @@ void main() {
     expect(state.failure?.kind, ChatFailureKind.outOfMemory);
   });
 
-  test(
-    'deterministic engine refusals retain semantic recovery kinds',
-    () async {
-      const expected = {
-        InferenceFailureKind.modelUnavailable: ChatFailureKind.modelUnavailable,
-        InferenceFailureKind.unsupportedModel: ChatFailureKind.unsupportedModel,
-        InferenceFailureKind.attachmentUnavailable:
-            ChatFailureKind.attachmentUnavailable,
-        InferenceFailureKind.unsupportedImages:
-            ChatFailureKind.unsupportedImages,
-        InferenceFailureKind.invalidModelArtifact:
-            ChatFailureKind.invalidModelArtifact,
-        InferenceFailureKind.unsupportedDevice:
-            ChatFailureKind.unsupportedDevice,
-      };
-      for (final MapEntry(:key, :value) in expected.entries) {
-        final container = ProviderContainer(
-          overrides: [
-            chatHistoryRepositoryProvider.overrideWithValue(
-              InMemoryChatHistoryRepository(),
-            ),
-            inferenceRepositoryProvider.overrideWithValue(
-              _RecordingInferenceRepository(generationFailure: key),
-            ),
-          ],
-        );
-        await container.read(chatControllerProvider.future);
-        await container.read(chatControllerProvider.notifier).send('Hello');
-        expect(
-          container.read(chatControllerProvider).requireValue.failure?.kind,
-          value,
-          reason: key.name,
-        );
-        container.dispose();
-      }
-    },
-  );
+  test('deterministic engine refusals retain semantic recovery kinds', () async {
+    const expected = {
+      InferenceFailureKind.modelUnavailable: ChatFailureKind.modelUnavailable,
+      InferenceFailureKind.unsupportedModel: ChatFailureKind.unsupportedModel,
+      InferenceFailureKind.attachmentUnavailable:
+          ChatFailureKind.attachmentUnavailable,
+      InferenceFailureKind.unsupportedImages: ChatFailureKind.unsupportedImages,
+      InferenceFailureKind.invalidModelArtifact:
+          ChatFailureKind.invalidModelArtifact,
+      InferenceFailureKind.unsupportedDevice: ChatFailureKind.unsupportedDevice,
+    };
+    for (final MapEntry(:key, :value) in expected.entries) {
+      final container = ProviderContainer(
+        overrides: [
+          // Explicitly empty (#127): this container never stocked a catalog, and
+          // the read that used to tolerate its absence no longer does.
+          modelCatalogEntriesProvider.overrideWithValue(
+            const <ModelCatalogEntry>[],
+          ),
+          attachmentRepositoryProvider.overrideWithValue(
+            InMemoryAttachmentRepository(),
+          ),
+          chatHistoryRepositoryProvider.overrideWithValue(
+            InMemoryChatHistoryRepository(),
+          ),
+          inferenceRepositoryProvider.overrideWithValue(
+            _RecordingInferenceRepository(generationFailure: key),
+          ),
+        ],
+      );
+      await container.read(chatControllerProvider.future);
+      await container.read(chatControllerProvider.notifier).send('Hello');
+      expect(
+        container.read(chatControllerProvider).requireValue.failure?.kind,
+        value,
+        reason: key.name,
+      );
+      container.dispose();
+    }
+  });
 
   test('a real backend without its model fails fast into the CTA', () async {
     final directory = Directory.systemTemp.createTempSync('golem-cta-test-');
@@ -1381,6 +1499,9 @@ void main() {
     final inference = _RecordingInferenceRepository();
     final container = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(
           InMemoryChatHistoryRepository(),
         ),
@@ -1420,6 +1541,9 @@ void main() {
     final inference = _RecordingInferenceRepository();
     final container = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         inferenceRepositoryProvider.overrideWithValue(inference),
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
@@ -1454,6 +1578,9 @@ void main() {
       final inference = _RecordingInferenceRepository();
       final container = ProviderContainer(
         overrides: [
+          attachmentRepositoryProvider.overrideWithValue(
+            InMemoryAttachmentRepository(),
+          ),
           chatHistoryRepositoryProvider.overrideWithValue(
             InMemoryChatHistoryRepository(),
           ),
@@ -1498,6 +1625,9 @@ void main() {
     final inference = _RecordingInferenceRepository();
     final container = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(
           InMemoryChatHistoryRepository(),
         ),
@@ -1544,6 +1674,9 @@ void main() {
     addTearDown(models.endTransfer);
     final container = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(
           InMemoryChatHistoryRepository(),
         ),
@@ -1586,6 +1719,9 @@ void main() {
     final inference = _RecordingInferenceRepository();
     final container = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(
           InMemoryChatHistoryRepository(),
         ),
@@ -1634,6 +1770,9 @@ void main() {
     final inference = _RecordingInferenceRepository();
     final container = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(
           InMemoryChatHistoryRepository(),
         ),
@@ -1680,6 +1819,9 @@ void main() {
     );
     final container = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(
           InMemoryChatHistoryRepository(),
         ),
@@ -1719,6 +1861,9 @@ void main() {
     // Fake backend copy: nothing installed yet, fake wording.
     final fakeContainer = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         inferenceRepositoryProvider.overrideWithValue(inference),
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
@@ -1737,6 +1882,9 @@ void main() {
     // Real backend copy: the same refusal names the download instead.
     final realContainer = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         inferenceRepositoryProvider.overrideWithValue(inference),
         inferenceBackendProvider.overrideWithValue(
           const InferenceBackendConfig(
@@ -1769,6 +1917,9 @@ void main() {
     addTearDown(() => directory.deleteSync(recursive: true));
     final container = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         inferenceRepositoryProvider.overrideWithValue(
           _RecordingInferenceRepository(failPrepare: true),
         ),
@@ -1797,6 +1948,9 @@ void main() {
     final inference = _RecordingInferenceRepository();
     final container = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         inferenceRepositoryProvider.overrideWithValue(inference),
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
@@ -1825,6 +1979,9 @@ void main() {
     final inference = _RecordingInferenceRepository();
     final container = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(
           InMemoryChatHistoryRepository(),
         ),
@@ -1862,6 +2019,9 @@ void main() {
     final inference = _RecordingInferenceRepository();
     final container = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(
           InMemoryChatHistoryRepository(),
         ),
@@ -1907,6 +2067,9 @@ void main() {
     final inference = _RecordingInferenceRepository();
     final container = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(
           InMemoryChatHistoryRepository(),
         ),
@@ -1945,6 +2108,9 @@ void main() {
     final inference = _RecordingInferenceRepository();
     final container = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         inferenceRepositoryProvider.overrideWithValue(inference),
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
@@ -1968,6 +2134,9 @@ void main() {
     final inference = _RecordingInferenceRepository(failUnload: true);
     final container = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         inferenceRepositoryProvider.overrideWithValue(inference),
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
@@ -2002,6 +2171,9 @@ void main() {
     final inference = _RecordingInferenceRepository(failUnload: true);
     final container = ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         inferenceRepositoryProvider.overrideWithValue(inference),
         modelManagementRepositoryProvider.overrideWithValue(
           fakeModels(directory),
@@ -2026,7 +2198,17 @@ void main() {
     () async {
       final repository = InMemorySettingsRepository();
       final container = ProviderContainer(
-        overrides: [settingsRepositoryProvider.overrideWithValue(repository)],
+        overrides: [
+          // Explicitly empty (#127): this container never stocked a catalog, and
+          // the read that used to tolerate its absence no longer does.
+          modelCatalogEntriesProvider.overrideWithValue(
+            const <ModelCatalogEntry>[],
+          ),
+          attachmentRepositoryProvider.overrideWithValue(
+            InMemoryAttachmentRepository(),
+          ),
+          settingsRepositoryProvider.overrideWithValue(repository),
+        ],
       );
       addTearDown(container.dispose);
       await container.read(settingsControllerProvider.future);
@@ -2085,6 +2267,9 @@ void main() {
       ModelManagementRepository? models,
     }) => ProviderContainer(
       overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
         chatHistoryRepositoryProvider.overrideWithValue(
           history ?? InMemoryChatHistoryRepository(),
         ),
@@ -2267,6 +2452,153 @@ void main() {
             .phase,
         ArtifactPhase.installed,
       );
+    });
+  });
+
+  group('teardown mid-flight', () {
+    // Verified against riverpod 3.3.2 rather than assumed: `container.dispose`
+    // unmounts the ref and every later `state` read throws
+    // UnmountedRefException, while `invalidate` on a keepAlive provider reuses
+    // the same notifier and hands it a live ref. The issue named invalidation
+    // as the trigger; disposal is the one that actually bites, and it is what
+    // a ProviderScope leaving the tree does.
+    ProviderContainer gated(
+      _RecordingInferenceRepository inference, {
+      ChatHistoryRepository? history,
+    }) => ProviderContainer(
+      overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
+        modelCatalogEntriesProvider.overrideWithValue(
+          const <ModelCatalogEntry>[],
+        ),
+        chatHistoryRepositoryProvider.overrideWithValue(
+          history ?? InMemoryChatHistoryRepository(),
+        ),
+        preferencesRepositoryProvider.overrideWithValue(
+          InMemoryPreferencesRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(inference),
+      ],
+    );
+
+    Future<void> settle() =>
+        Future<void>.delayed(const Duration(milliseconds: 20));
+
+    test('a parked generation is cancelled when the provider goes', () async {
+      final inference = _RecordingInferenceRepository()
+        ..generateGate = Completer<void>();
+      final container = gated(inference);
+      await container.read(chatControllerProvider.future);
+      unawaited(container.read(chatControllerProvider.notifier).send('Hello'));
+      await settle();
+      expect(
+        container.read(chatControllerProvider).requireValue.generation,
+        GenerationPhase.streaming,
+        reason: 'the gate must have parked a real in-flight generation',
+      );
+
+      container.dispose();
+      await settle();
+
+      expect(
+        inference.cancels,
+        1,
+        reason: 'native decode outlives the provider unless onDispose stops it',
+      );
+      inference.generateGate!.complete();
+      await settle();
+    });
+
+    // No expect() after the teardown in the cases below, and none is wanted:
+    // the continuation runs in the test's own zone, so a throw fails the test
+    // outright. flutter_test_config.dart installs no error-zone guard that
+    // could swallow it. The dispose is made to land *inside* the gap rather
+    // than merely near it — a scripted save parks the persist, the container is
+    // disposed while it is parked, and only then is the write released, so the
+    // continuation is guaranteed to resume on a ref that is already gone.
+    // Timing it with delays alone let all of these pass unchanged against the
+    // pre-fix controller, which is no test at all.
+    Future<void> disposeInsideThePersist(
+      Future<void> Function(ChatController controller) command,
+    ) async {
+      final history = ScriptedChatHistoryRepository();
+      final container = gated(
+        _RecordingInferenceRepository(),
+        history: history,
+      );
+      await container.read(chatControllerProvider.future);
+      final controller = container.read(chatControllerProvider.notifier);
+
+      unawaited(controller.send('Hello'));
+      await settle();
+      for (final save in history.saves) {
+        if (!save.isComplete) save.succeed();
+      }
+      await settle();
+
+      unawaited(command(controller));
+      await settle();
+      container.dispose();
+      await settle();
+      for (final save in history.saves) {
+        if (!save.isComplete) save.succeed();
+      }
+      await settle();
+    }
+
+    test('regenerating across a teardown throws nothing', () async {
+      // regenerate persists and then starts a generation with no mounted check
+      // between the two before #127 — the narrowest gap in the file.
+      await disposeInsideThePersist((controller) => controller.regenerate());
+    });
+
+    test('editing a turn across a teardown throws nothing', () async {
+      await disposeInsideThePersist(
+        (controller) => controller.editAndTruncate(
+          controller.state.requireValue.active!.messages.first.id,
+          'Rewritten',
+        ),
+      );
+    });
+
+    test('the very first send across a teardown throws nothing', () async {
+      // Deliberately with no chat yet: that is the only path where send awaits
+      // newChat() and then dereferences the active conversation, which is a
+      // separate gap from the one regenerate and editAndTruncate share.
+      final history = ScriptedChatHistoryRepository();
+      final container = gated(
+        _RecordingInferenceRepository(),
+        history: history,
+      );
+      await container.read(chatControllerProvider.future);
+
+      unawaited(container.read(chatControllerProvider.notifier).send('Hello'));
+      await settle();
+      container.dispose();
+      await settle();
+      for (final save in history.saves) {
+        if (!save.isComplete) save.succeed();
+      }
+      await settle();
+    });
+
+    test('invalidation alone does not unmount the controller', () async {
+      // Pins the riverpod behaviour the guards above are calibrated against.
+      // If a version bump makes invalidation unmount, this goes red and the
+      // first-run gate's retry (first_run_gate.dart:76) becomes a real hazard.
+      final container = gated(_RecordingInferenceRepository());
+      addTearDown(container.dispose);
+      await container.read(chatControllerProvider.future);
+      final before = container.read(chatControllerProvider.notifier);
+
+      container.invalidate(chatControllerProvider);
+      await container.read(chatControllerProvider.future);
+
+      // The same object, so its Ref was never discarded — which is exactly why
+      // the guards above are calibrated against disposal instead.
+      expect(container.read(chatControllerProvider.notifier), same(before));
     });
   });
 }

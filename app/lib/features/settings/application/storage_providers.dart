@@ -3,9 +3,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/application/storage_breakdown_service.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/retry.dart';
-import '../../../core/repositories/contracts.dart';
-import '../../../core/services/cache_probe.dart';
-import '../../../core/services/device_storage.dart';
 import '../../chat/application/chat_providers.dart';
 import '../../models/application/model_providers.dart';
 
@@ -32,26 +29,15 @@ Future<StorageBreakdown> storageBreakdown(Ref ref) async {
   // mid-computation would race its own invalidation.
   ref.watch(chatStorageSignatureProvider);
   final history = ref.watch(chatHistoryRepositoryProvider);
-  AttachmentRepository? attachments;
-  try {
-    attachments = ref.watch(attachmentRepositoryProvider);
-  } catch (_) {}
-  CacheProbe? cache;
-  try {
-    cache = ref.watch(cacheProbeProvider);
-  } catch (_) {}
-  DiskSpaceProbe? free;
-  try {
-    free = ref.watch(diskFreeSpaceProbeProvider);
-  } catch (_) {}
-  DiskCapacityProbe? capacity;
-  try {
-    capacity = ref.watch(deviceCapacityProbeProvider);
-  } catch (_) {}
-  String? path;
-  try {
-    path = ref.watch(documentsPathProvider);
-  } catch (_) {}
+  // Read straight, no tolerance for an absent seam (#127): launchOverrides
+  // wires all five, so a missing one is a wiring mistake that should say so
+  // rather than render as a plausible partial breakdown. The service's fields
+  // stay nullable — a probe that *fails* still degrades to null.
+  final attachments = ref.watch(attachmentRepositoryProvider);
+  final cache = ref.watch(cacheProbeProvider);
+  final free = ref.watch(diskFreeSpaceProbeProvider);
+  final capacity = ref.watch(deviceCapacityProbeProvider);
+  final path = ref.watch(documentsPathProvider);
   final models = await ref.watch(modelControllerProvider.future);
   return StorageBreakdownService(
     history: history,

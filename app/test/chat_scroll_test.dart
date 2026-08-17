@@ -8,6 +8,7 @@ import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 
 import 'support/harness.dart';
+import 'support/in_memory_attachment_repository.dart';
 import 'support/in_memory_chat_history_repository.dart';
 
 const _delay = Duration(milliseconds: 40);
@@ -47,6 +48,9 @@ Future<ScrollPosition> _pumpChat(WidgetTester tester) async {
   setViewport(tester);
   final container = ProviderContainer(
     overrides: [
+      attachmentRepositoryProvider.overrideWithValue(
+        InMemoryAttachmentRepository(),
+      ),
       chatHistoryRepositoryProvider.overrideWithValue(
         InMemoryChatHistoryRepository(_longHistory()),
       ),

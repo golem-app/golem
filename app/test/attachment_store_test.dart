@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
+import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
@@ -111,6 +112,11 @@ void main() {
           ),
         ),
         attachmentRepositoryProvider.overrideWithValue(attachments),
+        // Explicitly empty (#127): the catalog read behind a send no longer
+        // tolerates an absent seam, and this suite is about bytes, not models.
+        modelCatalogEntriesProvider.overrideWithValue(
+          const <ModelCatalogEntry>[],
+        ),
         preferencesRepositoryProvider.overrideWithValue(
           preferences ?? InMemoryPreferencesRepository(),
         ),
@@ -321,27 +327,6 @@ void main() {
         await attachments.read(stored.id),
         isNotNull,
         reason: 'in-memory conversations still reference it',
-      );
-    });
-
-    test('an unwired attachment seam never breaks a chat mutation', () async {
-      // Label-only containers omit the seam; persistence must still work.
-      final container = ProviderContainer(
-        overrides: [
-          chatHistoryRepositoryProvider.overrideWithValue(
-            InMemoryChatHistoryRepository(),
-          ),
-          inferenceRepositoryProvider.overrideWithValue(
-            FakeInferenceRepository(eventDelay: Duration.zero),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-      await container.read(chatControllerProvider.future);
-      await container.read(chatControllerProvider.notifier).newChat();
-      expect(
-        container.read(chatControllerProvider).requireValue.conversations,
-        hasLength(1),
       );
     });
   });

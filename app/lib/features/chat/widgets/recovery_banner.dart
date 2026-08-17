@@ -23,14 +23,14 @@ class RecoveryBanner extends ConsumerWidget {
     final activeId = ref.watch(
       chatControllerProvider.select((value) => value.value?.activeId),
     );
-    // Retry re-runs the identical request, so it is only offered where
-    // that can succeed. A conversation that no longer fits the context
-    // window gets a new chat instead — the one recovery that works — and a
-    // device outside every supported tier gets neither: no action taken here
-    // changes what this hardware can run, so offering one would be a lie.
-    final recovery = switch (failure.kind) {
-      ChatFailureKind.unsupportedDevice => null,
-      ChatFailureKind.contextExhausted => CupertinoButton(
+    // Which way out this failure has is the kind's own property (#127); this
+    // switch only builds the button for it. Choosing a different model needs a
+    // conversation to set it on, so without one that arm falls back to Retry —
+    // written out rather than left to a default arm, because it is a real case
+    // and not a leftover.
+    final recovery = switch (failure.kind.recovery) {
+      ChatRecovery.none => null,
+      ChatRecovery.newChat => CupertinoButton(
         key: const Key('start-new-chat'),
         padding: const EdgeInsets.symmetric(horizontal: 8),
         minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
@@ -39,19 +39,15 @@ class RecoveryBanner extends ConsumerWidget {
             .startFreshChatFromFailure(),
         child: Text(context.l10n.newChat),
       ),
-      ChatFailureKind.modelUnavailable ||
-      ChatFailureKind.unsupportedModel ||
-      ChatFailureKind.invalidModelArtifact when activeId != null =>
-        CupertinoButton(
-          key: const Key('choose-recovery-model'),
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
-          onPressed: () =>
-              showModelPickerSheet(context, conversationId: activeId),
-          child: Text(context.l10n.chooseDifferentModel),
-        ),
-      ChatFailureKind.attachmentUnavailable ||
-      ChatFailureKind.unsupportedImages => CupertinoButton(
+      ChatRecovery.chooseModel when activeId != null => CupertinoButton(
+        key: const Key('choose-recovery-model'),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
+        onPressed: () =>
+            showModelPickerSheet(context, conversationId: activeId),
+        child: Text(context.l10n.chooseDifferentModel),
+      ),
+      ChatRecovery.removeTurn => CupertinoButton(
         key: const Key('remove-failed-turn'),
         padding: const EdgeInsets.symmetric(horizontal: 8),
         minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
@@ -59,7 +55,7 @@ class RecoveryBanner extends ConsumerWidget {
             ref.read(chatControllerProvider.notifier).removeFailedTurn(),
         child: Text(context.l10n.deleteMessage),
       ),
-      _ => CupertinoButton(
+      ChatRecovery.chooseModel || ChatRecovery.retry => CupertinoButton(
         key: const Key('retry-generation'),
         padding: const EdgeInsets.symmetric(horizontal: 8),
         minimumSize: Size.square(GolemChrome.current.minimumTapTarget),

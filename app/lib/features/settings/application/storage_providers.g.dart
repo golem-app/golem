@@ -80,4 +80,4 @@ final class StorageBreakdownProvider
   }
 }
 
-String _$storageBreakdownHash() => r'4ba7c85265ff7001eabf61e7b6339e0080f2a0ba';
+String _$storageBreakdownHash() => r'7161d3d53b1b89aceb56c14321b469d5713a64e0';

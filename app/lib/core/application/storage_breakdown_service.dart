@@ -34,9 +34,11 @@ final class StorageBreakdownService {
 
   final ChatHistoryRepository history;
 
-  /// The optional platform probes: null when unwired, and a probe that fails
-  /// degrades to null/zero — "unknown is not zero capacity" is their
-  /// documented contract, not swallowed failure.
+  /// The optional platform probes. A probe that fails degrades to null/zero —
+  /// "unknown is not zero capacity" is their documented contract, not swallowed
+  /// failure. They stay nullable for direct construction in tests; the provider
+  /// that builds this in the app supplies all of them (#127), so an absent seam
+  /// there is a wiring mistake rather than a supported partial breakdown.
   final AttachmentRepository? attachments;
   final CacheProbe? cache;
   final DiskSpaceProbe? free;

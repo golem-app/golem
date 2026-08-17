@@ -9,6 +9,10 @@ final class ScriptedChatSave {
   final ChatHistorySnapshot snapshot;
   final Completer<void> _completion = Completer<void>();
 
+  /// Whether this write has already been released, so a test that drains
+  /// every outstanding save can be called more than once.
+  bool get isComplete => _completion.isCompleted;
+
   void succeed() => _completion.complete();
 
   void fail() => _completion.completeError(
