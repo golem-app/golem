@@ -1,8 +1,8 @@
-# Golem Flutter
+# Golem (Flutter app)
 
 High-fidelity Flutter implementation of Golem. The app ships as three
 coexisting build flavors with independent identities, containers, and
-launcher icons:
+launcher icons — and only those three:
 
 | Flavor | Display name | Application ID | Icon | Role |
 | --- | --- | --- | --- | --- |
@@ -17,14 +17,15 @@ Select a flavor with the standard workflow — `flutter run --flavor qa`,
 `dev` (`default-flavor` in `pubspec.yaml`). The same three flavors exist on
 iOS, Android, and macOS. Each flavor stores its own versioned JSON under its
 separate application-support container. Flavors share every in-app asset and
-theme but differ in identity **and default backend wiring**: `qa` (and the
-flavorless test identity) wires all fakes, while `production` and `dev`
-wire the real downloader and default to real inference (see "Deterministic
-where it matters" below and
-`../docs/decisions/0003-flavor-backend-defaults.md`). The flavorless
-legacy identity `app.golem.flutter` (**Golem Flutter**) remains reachable
-only through direct `xcodebuild -scheme Runner` builds and is never used for
-QA or automation.
+theme but differ in identity **and default backend wiring**: `qa` wires all
+fakes, while `production` and `dev` wire the real downloader and default to
+real inference (see "Deterministic where it matters" below and
+`../docs/decisions/0003-flavor-backend-defaults.md`).
+
+A build that names no flavor at all — a direct `xcodebuild -scheme Runner`,
+which selects the flavorless `Debug`/`Release`/`Profile` configurations — is
+a **qa** build: bundle id, display name, launcher artwork, and the all-fakes
+wiring all resolve to `qa` (#116). No build path produces a fourth app.
 
 > **Physical iPhone caution:** never install the `production`
 > (`app.golem`) flavor on the physical iPhone — that identifier belongs
@@ -33,8 +34,8 @@ QA or automation.
 
 ## Deterministic where it matters
 
-The composition rule, stated once: the `qa` flavor and flavorless
-test-harness builds wire **all fakes** (inference, model management,
+The composition rule, stated once: the `qa` flavor — which is also where
+flavorless builds land — wires **all fakes** (inference, model management,
 benchmark), so goldens, journeys, and CI stay deterministic and never
 touch the network. `production` and `dev` wire the real implementations —
 the pinned Hugging Face downloader and, by default, real local inference.
@@ -354,8 +355,7 @@ node that names it,
 `open-benchmark`, `benchmark-case-picker`, `benchmark-phase-picker`,
 `benchmark-run-button`, `benchmark-stop-button`, and `benchmark-export-button`.
 The benchmark keys, route, repository, and prompt assets exist only in `qa`
-and `dev`; production and the legacy flavorless identity do not register or
-bundle that internal surface.
+and `dev`; production does not register or bundle that internal surface.
 
 Startup failure modes are injectable at compile time:
 
@@ -374,8 +374,7 @@ the bootstrap failure pane, Try again, and recovery
 always holds for at least 1.4 seconds; the missing-model scenario adds a
 three-second setup hold.
 All four fault injectors are identity-gated: `qa` and `dev` retain them in
-debug and release builds, while production and the legacy flavorless identity
-ignore the defines.
+debug and release builds, while production ignores the defines.
 
 ## Generate and verify
 

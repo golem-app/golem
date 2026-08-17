@@ -10,6 +10,11 @@ any app route content is exposed.
 The install-time device floor that complements this composition policy is
 documented in `../device_floor.md` (added with epic #61).
 
+Amended by #116: the flavorless identity this record treats as a fourth
+composition no longer exists. A build that names no flavor resolves to `qa` —
+bundle id, artwork, and wiring alike — so every sentence below that pairs
+"flavorless" with production should be read as `qa`.
+
 ## The composition rule, stated once
 
 - The `qa` flavor and the flavorless test identity wire fake inference and
