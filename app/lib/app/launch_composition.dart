@@ -171,12 +171,12 @@ _composeRequired({
     defaultValue: 34,
   );
   // One resolution feeds the inference repository, the active artifact, and
-  // the backend signal provider, so they can never disagree. qa and the
-  // flavorless test identity wire all fakes so goldens, journeys, and CI stay
-  // deterministic and offline; production and dev wire the real ones. Explicit
-  // dart-defines override the flavor default, and an override to real
-  // inference drags model management along with it: a real engine fed by a
-  // download simulation would "install" files that do not exist.
+  // the backend signal provider, so they can never disagree. qa — which is
+  // also where flavorless builds land — wires all fakes so goldens, journeys,
+  // and CI stay deterministic and offline; production and dev wire the real
+  // ones. Explicit dart-defines override the flavor default, and an override
+  // to real inference drags model management along with it: a real engine fed
+  // by a download simulation would "install" files that do not exist.
   final (config: backendConfig, :eligibility) = await resolveConfiguredBackend(
     identity: identity,
   );
@@ -185,8 +185,7 @@ _composeRequired({
   final temporary = await getTemporaryDirectory();
   final stateFile = File('${support.path}/flutter-model-v2.json');
   final useFakeModels =
-      (identity == AppIdentity.qa || identity == AppIdentity.flutter) &&
-      backendConfig.simulatedInference;
+      identity == AppIdentity.qa && backendConfig.simulatedInference;
   // Preferences load before the repositories so persisted custom repositories
   // (Advanced mode) are in the fake downloader's catalog from the first frame.
   // The provider catalog stays the pinned list; the UI derives pinned + custom.

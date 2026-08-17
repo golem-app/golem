@@ -32,7 +32,7 @@ String resolveBackendName({
     ? backendDefine
     : switch (identity) {
         AppIdentity.production || AppIdentity.dev => 'auto',
-        AppIdentity.qa || AppIdentity.flutter => 'fake',
+        AppIdentity.qa => 'fake',
       };
 
 /// Pure. `auto` is the platform engine's artifact of the device-policy model

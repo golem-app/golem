@@ -29,11 +29,6 @@ void main() {
     _writeAdaptiveBackground(flavor, icon);
     _writeAppIconTile(flavor, icon);
     _writeMacIconset('AppIcon-$flavor', icon);
-    if (flavor == 'production') {
-      // The flavorless legacy identity (xcodebuild -scheme Runner) keeps a
-      // real Golem icon in the template's default catalog slot.
-      _writeMacIconset('AppIcon', icon);
-    }
     _writeMattedLauncher(flavor, icon);
   }
 

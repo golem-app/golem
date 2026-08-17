@@ -35,7 +35,6 @@ void main() {
     expect(shouldInjectLaunchFailure(AppIdentity.dev, 1), isTrue);
     expect(shouldInjectLaunchFailure(AppIdentity.qa, 1), isTrue);
     expect(shouldInjectLaunchFailure(AppIdentity.production, 1), isFalse);
-    expect(shouldInjectLaunchFailure(AppIdentity.flutter, 1), isFalse);
     expect(shouldInjectLaunchFailure(AppIdentity.dev, 0), isFalse);
   });
 

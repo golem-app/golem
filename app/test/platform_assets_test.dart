@@ -34,6 +34,23 @@ num _channel(image.Pixel pixel, String channel) => switch (channel) {
   _ => throw ArgumentError.value(channel, 'channel'),
 };
 
+/// The distinct values a pbxproj gives a setting, across every configuration.
+/// A value-set assertion beats `contains`: a stray fourth identity in one
+/// configuration out of twelve still fails it.
+Set<String> _settingValues(String project, String setting) => RegExp(
+  '^\\s*$setting = "?([\\w. -]+)"?;\$',
+  multiLine: true,
+).allMatches(project).map((match) => match[1]!).toSet();
+
+Set<String> _bundleIdentifiers(String project) =>
+    _settingValues(project, 'PRODUCT_BUNDLE_IDENTIFIER');
+
+Set<String> _displayNames(String project) =>
+    _settingValues(project, 'GOLEM_DISPLAY_NAME');
+
+Set<String> _appIconNames(String project) =>
+    _settingValues(project, 'ASSETCATALOG_COMPILER_APPICON_NAME');
+
 void _expectDominantChannel(image.Pixel pixel, String channel) {
   final others = {'r', 'g', 'b'}.difference({channel});
   for (final other in others) {
@@ -81,12 +98,11 @@ void main() {
   });
 
   test('every shipped flavor identity is covered by these assertions', () {
-    // AppIdentity also carries the flavorless legacy identity, which owns no
-    // flavor resources — hence its exclusion. A new enum member must either
-    // join _flavors or be exempted here deliberately.
+    // Every identity the app can run under owns flavor resources, and a new
+    // enum member has to join _flavors to acquire them.
     expect(
       _flavors.map((flavor) => flavor.identity).toSet(),
-      AppIdentity.values.toSet().difference({AppIdentity.flutter}),
+      AppIdentity.values.toSet(),
     );
   });
 
@@ -315,6 +331,33 @@ void main() {
     }
   });
 
+  test('no shipping surface still names the retired identity', () {
+    // #116. The strings live in four places that a rename can miss
+    // independently — Dart, gradle, the two Xcode projects — so the guard
+    // reads all of them rather than trusting one grep at review time.
+    const retired = 'app.golem.flutter';
+    final sources = <String>[
+      'pubspec.yaml',
+      'android/app/build.gradle.kts',
+      'android/app/src/main/AndroidManifest.xml',
+      'android/app/src/main/kotlin/app/golem/MainActivity.kt',
+      'ios/Runner.xcodeproj/project.pbxproj',
+      'ios/Runner/AppDelegate.swift',
+      'macos/Runner.xcodeproj/project.pbxproj',
+      'macos/Runner/Configs/AppInfo.xcconfig',
+      'macos/Runner/MainFlutterWindow.swift',
+      for (final file in Directory('lib').listSync(recursive: true))
+        if (file is File && file.path.endsWith('.dart')) file.path,
+    ];
+    for (final source in sources) {
+      expect(
+        File(source).readAsStringSync(),
+        isNot(contains(retired)),
+        reason: source,
+      );
+    }
+  });
+
   test('iOS build configurations map every flavor identity', () async {
     final project = await File(
       'ios/Runner.xcodeproj/project.pbxproj',
@@ -356,19 +399,21 @@ void main() {
       expect(scheme, contains('xcode_backend.sh&quot; prepare'));
     }
 
-    // The flavorless legacy identity remains for RunnerTests and direct
-    // xcodebuild use, and the shared Info.plist resolves its display name
-    // through the per-configuration variable.
-    expect(
-      project,
-      contains(
-        'PRODUCT_BUNDLE_IDENTIFIER = ${AppIdentity.flutter.applicationId};',
-      ),
-    );
-    expect(
-      project,
-      contains('GOLEM_DISPLAY_NAME = "${AppIdentity.flutter.displayName}";'),
-    );
+    // Nothing this project can build carries an identity outside the shipped
+    // set: the flavorless Debug/Release/Profile configurations a bare
+    // `xcodebuild -scheme Runner` selects resolve to qa, artwork included, so
+    // no build path can install a fourth app. The shared Info.plist resolves
+    // the display name through the per-configuration variable.
+    expect(_bundleIdentifiers(project), {
+      for (final flavor in _flavors) flavor.identity.applicationId,
+      '${AppIdentity.qa.applicationId}.RunnerTests',
+    });
+    expect(_displayNames(project), {
+      for (final flavor in _flavors) flavor.identity.displayName,
+    });
+    expect(_appIconNames(project), {
+      for (final flavor in _flavors) 'AppIcon-${flavor.identity.name}',
+    });
     final plist = await File('ios/Runner/Info.plist').readAsString();
     expect(plist, contains(r'<string>$(GOLEM_DISPLAY_NAME)</string>'));
   });
@@ -436,19 +481,25 @@ void main() {
       isTrue,
     );
 
-    // The flavorless legacy identity lives in AppInfo.xcconfig and stays for
-    // RunnerTests and direct xcodebuild use; the shared Info.plist resolves
-    // both name keys through the per-configuration variable.
+    // As on iOS, no configuration may name an identity outside the shipped
+    // set. The macOS Runner target takes its fallback bundle id from
+    // AppInfo.xcconfig rather than the pbxproj, so that file is the one the
+    // flavorless build reads. The shared Info.plist resolves both name keys
+    // through the per-configuration variable.
     expect(
       await File('macos/Runner/Configs/AppInfo.xcconfig').readAsString(),
-      contains(
-        'PRODUCT_BUNDLE_IDENTIFIER = ${AppIdentity.flutter.applicationId}',
-      ),
+      contains('PRODUCT_BUNDLE_IDENTIFIER = ${AppIdentity.qa.applicationId}\n'),
     );
-    expect(
-      project,
-      contains('GOLEM_DISPLAY_NAME = "${AppIdentity.flutter.displayName}";'),
-    );
+    expect(_bundleIdentifiers(project), {
+      for (final flavor in _flavors) flavor.identity.applicationId,
+      '${AppIdentity.qa.applicationId}.RunnerTests',
+    });
+    expect(_displayNames(project), {
+      for (final flavor in _flavors) flavor.identity.displayName,
+    });
+    expect(_appIconNames(project), {
+      for (final flavor in _flavors) 'AppIcon-${flavor.identity.name}',
+    });
     final plist = await File('macos/Runner/Info.plist').readAsString();
     expect(
       RegExp(
@@ -490,8 +541,6 @@ void main() {
     final catalogs = [
       for (final flavor in _flavors)
         (flavor: flavor, name: 'AppIcon-${flavor.identity.name}'),
-      // The flavorless catalog keeps real Golem artwork (production hue).
-      (flavor: _flavors.first, name: 'AppIcon'),
     ];
     for (final entry in catalogs) {
       final path = 'macos/Runner/Assets.xcassets/${entry.name}.appiconset';
@@ -577,8 +626,6 @@ void main() {
       // artwork sample point, scaled from 1024 to 168.
       _expectDominantChannel(tile.getPixel(84, 148), flavor.dominant);
     }
-    // The flavorless identity's fallback to the production tile is an enum
-    // mapping, asserted in app_identity_test.dart.
   });
 
   test('platform launchers use their configured native artwork', () async {

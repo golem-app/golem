@@ -7,9 +7,10 @@
 // The application's name. By default this is also the title of the Flutter window.
 PRODUCT_NAME = golem_flutter
 
-// The flavorless legacy bundle identifier, mirroring iOS: the production, qa,
-// and dev flavors override this per build configuration in the pbxproj.
-PRODUCT_BUNDLE_IDENTIFIER = app.golem.flutter
+// The fallback for a flavorless build, mirroring iOS: the production, qa, and
+// dev flavors override this per build configuration in the pbxproj, and a
+// build that selects no flavor is a qa build.
+PRODUCT_BUNDLE_IDENTIFIER = app.golem.qa
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 app.golem. All rights reserved.

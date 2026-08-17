@@ -22,19 +22,13 @@ void main() {
     );
     expect(AppIdentity.qa.iconAsset, 'assets/images/golem_app_icon_qa.png');
     expect(AppIdentity.dev.iconAsset, 'assets/images/golem_app_icon_dev.png');
-    // No tile is generated for the flavorless identity; it shows the
-    // production artwork, as its macOS catalog does.
-    expect(
-      AppIdentity.flutter.iconAsset,
-      'assets/images/golem_app_icon_production.png',
-    );
   });
 
-  test('flavorless and unknown builds resolve to the legacy identity', () {
-    expect(AppIdentity.forFlavor(null), AppIdentity.flutter);
-    expect(AppIdentity.forFlavor('unknown'), AppIdentity.flutter);
-    expect(AppIdentity.flutter.displayName, 'Golem Flutter');
-    expect(AppIdentity.flutter.applicationId, 'app.golem.flutter');
+  test('flavorless and unknown builds resolve to qa', () {
+    // The bundle ids and artwork a flavorless build carries are qa's, so the
+    // wiring has to be qa's too, or the app would contradict its own label.
+    expect(AppIdentity.forFlavor(null), AppIdentity.qa);
+    expect(AppIdentity.forFlavor('unknown'), AppIdentity.qa);
     // Host-side flutter test runs inherit the pubspec default flavor.
     expect(AppIdentity.current, AppIdentity.dev);
   });
@@ -43,6 +37,5 @@ void main() {
     expect(AppIdentity.dev.internalToolsEnabled, isTrue);
     expect(AppIdentity.qa.internalToolsEnabled, isTrue);
     expect(AppIdentity.production.internalToolsEnabled, isFalse);
-    expect(AppIdentity.flutter.internalToolsEnabled, isFalse);
   });
 }
