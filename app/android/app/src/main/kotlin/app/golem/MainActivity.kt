@@ -1,4 +1,4 @@
-package app.golem.flutter
+package app.golem
 
 import android.app.ActivityManager
 import android.content.Context

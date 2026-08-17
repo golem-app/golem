@@ -203,9 +203,10 @@ void main() {
   test('Android flavors own the application identities and labels', () async {
     final gradle = await File('android/app/build.gradle.kts').readAsString();
     // The namespace (Kotlin package / resource namespace) is deliberately
-    // flavor-independent; only the applicationId varies per flavor.
-    expect(gradle, contains('namespace = "app.golem.flutter"'));
-    expect(gradle, isNot(contains('applicationId = "app.golem.flutter"')));
+    // flavor-independent; only the applicationId varies per flavor. That it
+    // equals the production applicationId is a coincidence of naming, not a
+    // shared setting.
+    expect(gradle, contains('namespace = "app.golem"'));
     expect(gradle, contains('flavorDimensions += "environment"'));
     for (final flavor in _flavors) {
       expect(gradle, contains('create("${flavor.identity.name}")'));
@@ -251,13 +252,13 @@ void main() {
     }
 
     final activity = await File(
-      'android/app/src/main/kotlin/app/golem/flutter/MainActivity.kt',
+      'android/app/src/main/kotlin/app/golem/MainActivity.kt',
     ).readAsString();
-    expect(activity, contains('package app.golem.flutter'));
+    expect(activity, contains('package app.golem\n'));
+    // The retired identity's package directory must not come back: the class
+    // name is what `am start` recipes and launcher shortcuts address.
     expect(
-      File(
-        'android/app/src/main/kotlin/app/golem/golem_flutter/MainActivity.kt',
-      ).existsSync(),
+      Directory('android/app/src/main/kotlin/app/golem/flutter').existsSync(),
       isFalse,
     );
   });
@@ -302,7 +303,7 @@ void main() {
       'lib/core/services/device_storage.dart',
       'ios/Runner/AppDelegate.swift',
       'macos/Runner/MainFlutterWindow.swift',
-      'android/app/src/main/kotlin/app/golem/flutter/MainActivity.kt',
+      'android/app/src/main/kotlin/app/golem/MainActivity.kt',
     ];
     final pattern = RegExp('[\'"]([\\w.]+/storage)[\'"]');
     for (final source in sources) {

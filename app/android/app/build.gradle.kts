@@ -5,7 +5,10 @@ plugins {
 }
 
 android {
-    namespace = "app.golem.flutter"
+    // The Kotlin package and resource namespace, deliberately shared by every
+    // flavor; only the applicationId below varies. It is not an identity: the
+    // production flavor happens to ship under the same string.
+    namespace = "app.golem"
     compileSdk = flutter.compileSdkVersion
     // Pinned rather than inherited from flutter.ndkVersion. The Inferno build
     // hook compiles libinferno.so with whichever NDK it is handed, and Flutter

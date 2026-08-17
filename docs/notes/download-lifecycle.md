@@ -58,7 +58,7 @@ uninstalls first.
 ```sh
 flutter build apk --release --flavor qa
 adb -s SERIAL install -r build/app/outputs/flutter-apk/app-qa-release.apk
-adb -s SERIAL shell am start -n app.golem.qa/app.golem.flutter.MainActivity
+adb -s SERIAL shell am start -n app.golem.qa/app.golem.MainActivity
 ```
 
 Start a download from Settings ▸ Models, then:
