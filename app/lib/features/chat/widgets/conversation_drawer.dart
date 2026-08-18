@@ -1,7 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
+
 import '../../../core/app_identity.dart';
 import '../../../core/chrome/golem_alert.dart';
 import '../../../core/chrome/golem_button.dart';
@@ -23,7 +26,6 @@ import '../../models/model_label.dart';
 import '../application/active_model_providers.dart';
 import '../application/chat_providers.dart';
 import '../domain/chat_sections.dart';
-import 'dart:math' as math;
 
 class ConversationDrawer extends ConsumerStatefulWidget {
   const ConversationDrawer({

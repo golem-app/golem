@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/app_identity.dart';
 import '../../core/chrome/golem_badge.dart';
 import '../../core/chrome/golem_button.dart';
@@ -21,7 +24,6 @@ import '../models/widgets/download_note_banner.dart';
 import '../models/widgets/transfer_card.dart';
 import '../preferences/application/preferences_providers.dart';
 import 'application/onboarding_controller.dart';
-import 'dart:async';
 
 class FirstRunScreen extends ConsumerWidget {
   const FirstRunScreen({this.initialStep, super.key});

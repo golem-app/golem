@@ -14,8 +14,6 @@ class GolemIconButton extends StatelessWidget {
     this.semanticLabel,
     this.size = 22,
     this.color,
-    this.background,
-    this.borderRadius,
     this.padding = EdgeInsets.zero,
     super.key,
   });
@@ -30,17 +28,11 @@ class GolemIconButton extends StatelessWidget {
 
   final double size;
   final Color? color;
-
-  /// A filled chip behind the glyph, where the design calls for one.
-  final Color? background;
-  final BorderRadius? borderRadius;
   final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) => GolemTappable(
     padding: padding,
-    color: background,
-    borderRadius: borderRadius,
     onPressed: onPressed,
     child: Icon(icon, size: size, color: color, semanticLabel: semanticLabel),
   );

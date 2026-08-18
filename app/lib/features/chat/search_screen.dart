@@ -1,14 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+
 import '../../core/chrome/golem_tappable.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../l10n/bidi.dart';
 import '../../l10n/l10n.dart';
 import 'application/chat_providers.dart';
 import 'application/search_providers.dart';
-import 'dart:async';
 import 'domain/chat_search.dart';
 
 /// Full-screen search across every chat. The raw field text is

@@ -1,7 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
+
 import '../../../core/chrome/golem_alert.dart';
 import '../../../core/chrome/golem_icon_button.dart';
 import '../../../core/chrome/golem_menu.dart';
@@ -14,7 +17,6 @@ import '../../../l10n/bidi.dart';
 import '../../../l10n/l10n.dart';
 import '../../preferences/application/preferences_providers.dart';
 import '../application/chat_providers.dart';
-import 'dart:math' as math;
 import 'markdown/golem_markdown.dart';
 
 class MessageBubble extends ConsumerWidget {

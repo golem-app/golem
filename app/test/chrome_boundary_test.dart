@@ -17,13 +17,19 @@ void main() {
       .whereType<File>()
       .where((file) => file.path.endsWith('.dart'));
 
+  /// Prose may name a widget it is explaining; only code counts. Line
+  /// comments are the whole of it — nothing here is written in a block one.
+  String withoutComments(String line) {
+    final start = line.indexOf('//');
+    return start == -1 ? line : line.substring(0, start);
+  }
+
   test('no feature reaches past the chrome layer for a button', () {
     final offenders = <String>[];
     for (final file in dartFiles(features)) {
       final source = file.readAsStringSync();
       for (final (index, line) in source.split('\n').indexed) {
-        // The word may still appear in prose; only a constructor call counts.
-        if (RegExp(r'\bCupertinoButton[.(]').hasMatch(line)) {
+        if (RegExp(r'\bCupertinoButton[.(]').hasMatch(withoutComments(line))) {
           offenders.add('${file.path}:${index + 1}');
         }
       }
@@ -47,7 +53,9 @@ void main() {
     for (final file in dartFiles(features)) {
       final source = file.readAsStringSync();
       for (final (index, line) in source.split('\n').indexed) {
-        if (literal.hasMatch(line)) offenders.add('${file.path}:${index + 1}');
+        if (literal.hasMatch(withoutComments(line))) {
+          offenders.add('${file.path}:${index + 1}');
+        }
       }
     }
     expect(

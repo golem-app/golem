@@ -58,7 +58,10 @@ class GolemButton extends StatelessWidget {
         when variant == _GolemButtonVariant.plain ||
             variant == _GolemButtonVariant.destructive) {
       return GolemTappable(
-        shape: GolemTapShape.wide,
+        // `wide` sets an infinite minimum width, which the parent clamps to
+        // its own. A button that does not expand takes the square minimum and
+        // sizes to its label.
+        shape: expand ? GolemTapShape.wide : GolemTapShape.square,
         onPressed: onPressed,
         child: Text(
           label,

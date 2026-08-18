@@ -151,8 +151,8 @@ class _StyleCard extends StatelessWidget {
                   children: [
                     Text(
                       _styleTitle(context, style),
-                      // Explicit ink: the tappable would otherwise tint the
-                      // title accent-blue.
+                      // Explicit ink: CupertinoButton, under the tappable,
+                      // would otherwise tint the title accent-blue.
                       style: GolemText.bodyStrong.copyWith(
                         color: CupertinoDynamicColor.resolve(
                           GolemTheme.ink,

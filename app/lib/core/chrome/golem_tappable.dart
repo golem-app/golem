@@ -14,7 +14,6 @@ class GolemTappable extends StatelessWidget {
   const GolemTappable({
     required this.child,
     required this.onPressed,
-    this.onLongPress,
     this.padding,
     this.color,
     this.borderRadius,
@@ -22,11 +21,14 @@ class GolemTappable extends StatelessWidget {
     this.shape = GolemTapShape.square,
     this.minimumHeight,
     super.key,
-  });
+  }) : assert(
+         minimumHeight == null || shape == GolemTapShape.wide,
+         'a row height only means something on a target that owns its width; '
+         'a square one is sized by its content',
+       );
 
   final Widget child;
   final VoidCallback? onPressed;
-  final VoidCallback? onLongPress;
   final EdgeInsetsGeometry? padding;
   final Color? color;
   final BorderRadius? borderRadius;
@@ -52,7 +54,6 @@ class GolemTappable extends StatelessWidget {
         GolemTapShape.wide => Size.fromHeight(minimumHeight ?? minimum),
       },
       onPressed: onPressed,
-      onLongPress: onLongPress,
       child: child,
     );
   }
