@@ -195,7 +195,12 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
           const SizedBox(height: 24),
           SectionHeader(context.l10n.customRepository),
           const SizedBox(height: 8),
-          CustomRepositoryCard(simulatedDownloads: model.simulated),
+          CustomRepositoryCard(
+            // Keyed: adding a repository grows the list above this card, and
+            // an unkeyed child at a shifted index is rebuilt from scratch.
+            key: const Key('custom-repository-card'),
+            simulatedDownloads: model.simulated,
+          ),
         ],
         const SizedBox(height: 18),
         SettingsFootnote(

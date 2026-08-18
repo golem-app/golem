@@ -44,6 +44,22 @@ class _CustomRepositoryCardState extends ConsumerState<CustomRepositoryCard> {
     _revision = TextEditingController(text: draft.revision);
   }
 
+  /// The fields follow the draft whenever the controller changes it out of
+  /// band — the reset after a committed add. Typing is the equal case and is
+  /// left alone, because assigning `.text` would collapse the selection.
+  ///
+  /// Clearing the controllers from the `add()` continuation instead was wrong:
+  /// persisting the spec grows the catalog list, which can rebuild this card
+  /// from scratch mid-await, and the clear then landed on the disposed
+  /// controller while the fresh one had already seeded from the pre-reset
+  /// draft — leaving the added repository still typed in.
+  void _syncFields(CustomRepositoryDraft draft) {
+    if (draft.repository != _repository.text) {
+      _repository.text = draft.repository;
+    }
+    if (draft.revision != _revision.text) _revision.text = draft.revision;
+  }
+
   @override
   void dispose() {
     _repository.dispose();
@@ -58,19 +74,23 @@ class _CustomRepositoryCardState extends ConsumerState<CustomRepositoryCard> {
       _controller.resolve(weightsFile: weightsFile);
 
   Future<void> _add() async {
-    if (await _controller.add()) {
-      _repository.clear();
-      _revision.clear();
-      if (mounted) showGolemToast(context, context.l10n.modelAdded);
-      return;
-    }
+    final added = await _controller.add();
+    if (!mounted) return;
     // The preference write failed and rolled back; the resolution card is
     // still on screen, so Add remains the retry affordance.
-    if (mounted) showGolemToast(context, context.l10n.modelSaveFailed);
+    showGolemToast(
+      context,
+      added ? context.l10n.modelAdded : context.l10n.modelSaveFailed,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(customRepositoryControllerProvider, (_, next) {
+      // Outside build: assigning `.text` notifies, and the resolve button
+      // listens to it.
+      _syncFields(next);
+    });
     final draft = ref.watch(customRepositoryControllerProvider);
     final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
     return SettingsCard(

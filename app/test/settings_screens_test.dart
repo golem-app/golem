@@ -364,6 +364,20 @@ void main() {
     expect(spec.profile, isNull);
     expect(spec.toCatalogEntry().profileKey, unresolvedProfileKey);
     expect(find.byKey(const Key('golem-toast')), findsOneWidget);
+    // The draft is spent: both fields empty and the resolution gone, so the
+    // card reads as ready for the next repository rather than as the last
+    // one still pending. Persisting the spec grows the list this card sits
+    // in, which is what used to leave the added name typed in (#129).
+    expect(
+      tester
+          .widget<CupertinoTextField>(
+            find.byKey(const Key('custom-repo-field')),
+          )
+          .controller!
+          .text,
+      isEmpty,
+    );
+    expect(find.byKey(const Key('custom-repo-detail')), findsNothing);
     await tester.pump(const Duration(milliseconds: 1600));
     // The derived card joins the catalog list.
     await tester.scrollUntilVisible(
