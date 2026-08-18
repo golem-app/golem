@@ -6,7 +6,6 @@ import '../../core/chrome/golem_alert.dart';
 import '../../core/chrome/golem_button.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/domain/byte_format.dart';
-import '../../core/domain/download_pace.dart';
 import '../../core/domain/inference_backend.dart';
 import '../../core/domain/model_activation.dart';
 import '../../core/domain/model_catalog.dart';
@@ -14,7 +13,6 @@ import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
-import '../../core/widgets/labeled_progress.dart';
 import '../../core/widgets/labeled_row.dart';
 import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
@@ -25,9 +23,11 @@ import '../chat/application/active_model_providers.dart';
 import '../chat/application/chat_providers.dart';
 import '../models/application/download_pace_providers.dart';
 import '../models/application/model_providers.dart';
+import '../models/artifact_transfer.dart';
 import '../models/model_download_consent.dart';
 import '../models/widgets/custom_repository_card.dart';
 import '../models/widgets/download_note_banner.dart';
+import '../models/widgets/transfer_card.dart';
 import '../preferences/application/preferences_providers.dart';
 
 enum _CatalogTab { all, installed }
@@ -410,26 +410,21 @@ class _ModelCard extends ConsumerWidget {
           if (status.phase == ArtifactPhase.downloading ||
               status.phase == ArtifactPhase.paused) ...[
             const SizedBox(height: 14),
-            LabeledProgress(
+            TransferCard(
               key: Key('model-progress-${entry.key}'),
+              transfer: artifactTransfer(
+                entry: entry,
+                status: status,
+                localizations: context.l10n,
+                pace: ref.watch(downloadPaceProvider),
+                simulated: simulated,
+              ),
+              density: TransferDensity.dense,
               semanticsLabel: context.l10n.downloadProgressLabel(suffix),
               caption: context.l10n.downloadProgressLabel(suffix),
-              captionStyle: const TextStyle(fontSize: 13),
-              fraction: entry.totalBytes == 0
-                  ? 0
-                  : (status.downloadedBytes / entry.totalBytes)
-                        .clamp(0, 1)
-                        .toDouble(),
-              percent: entry.totalBytes == 0
-                  ? 0
-                  : ((status.downloadedBytes / entry.totalBytes).clamp(0, 1) *
-                            100)
-                        .round(),
-              detail: _progressDetail(context, ref),
-              detailStyle: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
+              // The status row above already reads "Downloading 1.42 GB of
+              // 3.30 GB · simulated"; the card does not say it twice.
+              showBytes: false,
             ),
           ],
           // Inside the card, not hoisted above the list: slotted at the top it
@@ -656,20 +651,6 @@ class _ModelCard extends ConsumerWidget {
       ),
     ],
   );
-
-  /// The right-aligned line under the bar: live time left while downloading
-  /// (absent until the pace sampler is warm), amount left while paused.
-  String? _progressDetail(BuildContext context, WidgetRef ref) {
-    if (status.phase == ArtifactPhase.paused) {
-      return context.l10n.amountLeft(
-        gigabytes(entry.totalBytes - status.downloadedBytes),
-      );
-    }
-    final pace = ref.watch(downloadPaceProvider);
-    final eta = pace?.artifactKey == entry.key ? pace?.eta : null;
-    if (status.phase != ArtifactPhase.downloading || eta == null) return null;
-    return context.l10n.etaAboutMinutesLeft(aboutMinutesLeft(eta));
-  }
 
   String _statusLabel(BuildContext context, String suffix) =>
       switch (status.phase) {

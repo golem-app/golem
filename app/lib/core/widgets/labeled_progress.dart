@@ -27,7 +27,9 @@ class LabeledProgress extends StatelessWidget {
     this.showPercent = true,
     this.detail,
     this.detailStyle,
+    this.detailLeading,
     this.trackHeight = 6,
+    this.spacing = 7,
     super.key,
   });
 
@@ -56,7 +58,15 @@ class LabeledProgress extends StatelessWidget {
   final String? detail;
   final TextStyle? detailStyle;
 
+  /// The left half of the line under the bar — the byte count a prominent card
+  /// quotes beside its time left. Null where that line carries one figure.
+  final String? detailLeading;
+
   final double trackHeight;
+
+  /// The gap above and below the bar. Wider on a card that leads with the
+  /// percentage than on a row inside a list.
+  final double spacing;
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +92,7 @@ class LabeledProgress extends StatelessWidget {
                   if (showPercent) Text('$percent%', style: captionText),
                 ],
               ),
-              const SizedBox(height: 7),
+              SizedBox(height: spacing),
             ],
             ProgressTrack(
               value: fraction,
@@ -90,14 +100,27 @@ class LabeledProgress extends StatelessWidget {
               fillColor: GolemTheme.accent,
               height: trackHeight,
             ),
-            if (detail case final detail?) ...[
-              const SizedBox(height: 7),
-              Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: Text(
-                  detail,
-                  style: detailStyle ?? GolemText.captionStrong,
-                ),
+            if (detail != null || detailLeading != null) ...[
+              SizedBox(height: spacing),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: detailLeading == null
+                        ? const SizedBox.shrink()
+                        : Text(
+                            detailLeading!,
+                            style: GolemText.footnote.copyWith(
+                              color: CupertinoDynamicColor.resolve(
+                                GolemTheme.mutedInk,
+                                context,
+                              ),
+                            ),
+                          ),
+                  ),
+                  if (detail case final detail?)
+                    Text(detail, style: detailStyle ?? GolemText.captionStrong),
+                ],
               ),
             ],
           ],
