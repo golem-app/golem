@@ -491,7 +491,12 @@ final class RecordingModels implements ModelManagementRepository {
     RuntimeFailureKind? failure,
   }) async {
     recordRuntimeCalls++;
-    return state = state.copyWith(runtime: phase, failure: failure);
+    // Both real implementations clear on a null kind rather than letting
+    // copyWith's `failure ?? this.failure` carry the old one forward; a fake
+    // that keeps it reports a stale failure under a loaded runtime.
+    return state = failure == null
+        ? state.copyWith(runtime: phase, clearFailure: true)
+        : state.copyWith(runtime: phase, failure: failure);
   }
 
   @override
