@@ -10,16 +10,17 @@ import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/providers/retry.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
+import 'package:golem_flutter/features/chat/application/active_model_providers.dart';
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/chat/application/search_providers.dart';
 import 'package:golem_flutter/features/models/application/download_note_providers.dart';
 import 'package:golem_flutter/features/models/application/download_pace_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
+import 'package:golem_flutter/features/models/application/storage_providers.dart';
 import 'package:golem_flutter/features/onboarding/application/onboarding_controller.dart';
 import 'package:golem_flutter/features/onboarding/application/startup_gate_controller.dart';
-import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
 import 'package:golem_flutter/features/preferences/application/generation_settings_providers.dart';
-import 'package:golem_flutter/features/models/application/storage_providers.dart';
+import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
 import 'package:golem_flutter/features/splash/application/startup_providers.dart';
 
 /// Every generated provider, so a new annotation missing `retry: noRetry`
@@ -45,6 +46,7 @@ final _allProviders = <String, ProviderOrFamily>{
   'modelSessionBridge': modelSessionBridgeProvider,
   'deviceCapacityProbe': deviceCapacityProbeProvider,
   'documentsPath': documentsPathProvider,
+  'activeModelKey': activeModelKeyProvider,
   'storageBreakdown': storageBreakdownProvider,
   'effectiveModelCatalog': effectiveModelCatalogProvider,
   'loadableModelKeys': loadableModelKeysProvider,

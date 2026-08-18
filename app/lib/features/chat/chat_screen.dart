@@ -12,8 +12,9 @@ import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/retry_pane.dart';
 import '../../l10n/l10n.dart';
 import '../models/application/model_providers.dart';
-import 'application/chat_providers.dart';
 import '../models/model_label.dart';
+import 'application/active_model_providers.dart';
+import 'application/chat_providers.dart';
 import 'widgets/attach_sheet.dart';
 import 'widgets/chat_canvas.dart';
 import 'widgets/conversation_drawer.dart';
@@ -221,12 +222,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         title: chat.active == null || chat.active!.title.isEmpty
                             ? context.l10n.newChat
                             : chat.active!.title,
-                        subtitle: chatModelSubtitle(
+                        subtitle: modelSubtitle(
                           backend: ref.watch(inferenceBackendProvider),
                           catalog: ref.watch(effectiveModelCatalogProvider),
-                          modelKey: chat.active?.modelKey,
-                          residentModelKey: ref.watch(residentModelKeyProvider),
-                          loadableKeys: ref.watch(loadableModelKeysProvider),
+                          activeKey: ref.watch(activeModelKeyProvider),
                           runsModels: ref.watch(
                             deviceEligibilityProvider.select(
                               (value) => value.runsModels,

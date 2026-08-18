@@ -6,7 +6,6 @@ import '../../../core/chrome/golem_badge.dart';
 import '../../../core/chrome/golem_button.dart';
 import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/chrome/golem_sheet.dart';
-import '../../../core/domain/model_activation.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
@@ -15,6 +14,7 @@ import '../../../l10n/l10n.dart';
 import '../../models/application/model_providers.dart';
 import '../../models/model_download_consent.dart';
 import '../../preferences/application/preferences_providers.dart';
+import '../application/active_model_providers.dart';
 import '../application/chat_providers.dart';
 import '../model_choice.dart';
 
@@ -48,10 +48,6 @@ final class _ModelPickerContent extends ConsumerWidget {
     final models = ref.watch(modelControllerProvider).value;
     final loadable = ref.watch(loadableModelKeysProvider);
     final chats = ref.watch(chatControllerProvider).value;
-    final modelKey = chats?.conversations
-        .where((item) => item.id == conversationId)
-        .firstOrNull
-        ?.modelKey;
     final preferences = ref.watch(preferencesControllerProvider).value;
     // One reading, used by the row label, the download guard and the consent
     // dialog alike. Defaulting these separately produced a real transfer
@@ -71,13 +67,7 @@ final class _ModelPickerContent extends ConsumerWidget {
       advanced: preferences?.advancedMode ?? false,
       simulatedTransfers: simulatedTransfers,
       localizations: context.l10n,
-      selectedKey: effectiveModelKey(
-        backend: backend,
-        catalog: catalog,
-        modelKey: modelKey,
-        residentModelKey: ref.watch(residentModelKeyProvider),
-        loadableKeys: loadable,
-      ),
+      selectedKey: ref.watch(activeModelKeyProvider),
     );
 
     final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);

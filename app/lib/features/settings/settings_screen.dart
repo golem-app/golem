@@ -11,14 +11,15 @@ import '../../core/domain/app_preferences.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
+import '../../core/widgets/settings_rows.dart';
 import '../../l10n/l10n.dart';
-import '../models/model_label.dart';
+import '../chat/application/active_model_providers.dart';
 import '../legal/ai_disclaimer.dart';
 import '../models/application/model_providers.dart';
-import '../preferences/application/preferences_providers.dart';
 import '../models/application/storage_providers.dart';
+import '../models/model_label.dart';
+import '../preferences/application/preferences_providers.dart';
 import 'save_feedback.dart';
-import '../../core/widgets/settings_rows.dart';
 
 /// The minimal settings root: model and app rows, the Advanced mode
 /// switch, and About. Everything heavier lives one screen deeper.
@@ -61,10 +62,12 @@ class SettingsScreen extends ConsumerWidget {
                 SettingsNavRow(
                   key: const Key('settings-model-row'),
                   label: l10n.settingsModel,
-                  value: chatModelLabel(
+                  // The row names what the Models screen it opens will mark
+                  // active, which the resident key alone did not (#129).
+                  value: modelDisplayLabel(
                     backend: backend,
                     catalog: catalog,
-                    residentModelKey: ref.watch(residentModelKeyProvider),
+                    activeKey: ref.watch(activeModelKeyProvider),
                   ),
                   onTap: () => context.push('/settings/models'),
                 ),

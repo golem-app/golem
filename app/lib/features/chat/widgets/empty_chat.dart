@@ -7,8 +7,8 @@ import '../../../core/theme/golem_theme.dart';
 import '../../../l10n/l10n.dart';
 import '../../../l10n/presentation_messages.dart';
 import '../../models/application/model_providers.dart';
-import '../application/chat_providers.dart';
 import '../../models/model_label.dart';
+import '../application/active_model_providers.dart';
 
 class EmptyChat extends ConsumerWidget {
   const EmptyChat({required this.onStarter, super.key});
@@ -35,16 +35,10 @@ class EmptyChat extends ConsumerWidget {
     // and only it subscribes this widget to residency and the catalog.
     final label = refusal != null
         ? null
-        : chatModelLabel(
+        : modelDisplayLabel(
             backend: backend,
             catalog: ref.watch(effectiveModelCatalogProvider),
-            modelKey: ref.watch(
-              chatControllerProvider.select(
-                (state) => state.value?.active?.modelKey,
-              ),
-            ),
-            residentModelKey: ref.watch(residentModelKeyProvider),
-            loadableKeys: ref.watch(loadableModelKeysProvider),
+            activeKey: ref.watch(activeModelKeyProvider),
           );
     final residency = ref.watch(inferenceResidencyProvider);
     final l10n = context.l10n;

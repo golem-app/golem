@@ -9,9 +9,9 @@ import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_toast.dart';
 import '../../core/domain/app_preferences.dart';
 import '../../core/domain/byte_format.dart';
+import '../../core/domain/download_pace.dart';
 import '../../core/domain/inference_backend.dart';
 import '../../core/domain/model_activation.dart';
-import '../../core/domain/download_pace.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
@@ -22,16 +22,17 @@ import '../../core/widgets/labeled_row.dart';
 import '../../core/widgets/progress_track.dart';
 import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
+import '../../core/widgets/settings_rows.dart';
 import '../../l10n/l10n.dart';
 import '../../l10n/presentation_messages.dart';
+import '../chat/application/active_model_providers.dart';
 import '../chat/application/chat_providers.dart';
 import '../models/application/download_pace_providers.dart';
 import '../models/application/model_providers.dart';
-import '../models/widgets/download_note_banner.dart';
 import '../models/model_download_consent.dart';
-import 'application/custom_repository_workflow.dart';
+import '../models/widgets/download_note_banner.dart';
 import '../preferences/application/preferences_providers.dart';
-import '../../core/widgets/settings_rows.dart';
+import 'application/custom_repository_workflow.dart';
 
 enum _CatalogTab { all, installed }
 
@@ -131,16 +132,8 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
     // deletable) here and in Storage; the fake keeps the whole catalog.
     final backend = ref.watch(inferenceBackendProvider);
     // Which artifact is live must read the same everywhere: chat, here, and
-    // Storage all resolve it through the one helper (#20).
-    final activeKey = effectiveModelKey(
-      backend: backend,
-      catalog: catalog,
-      modelKey: ref.watch(
-        chatControllerProvider.select((state) => state.value?.active?.modelKey),
-      ),
-      residentModelKey: ref.watch(residentModelKeyProvider),
-      loadableKeys: ref.watch(loadableModelKeysProvider),
-    );
+    // Storage all watch the one derivation (#20, #129).
+    final activeKey = ref.watch(activeModelKeyProvider);
     final residentKey = ref.watch(inferenceResidencyProvider).catalogKey;
     final loadable = catalog
         .where(

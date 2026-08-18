@@ -73,6 +73,19 @@ String? startupModelKey({
       ?.key;
 }
 
+/// The artifact this build boots with, before any conversation has chosen one
+/// and before the engine has loaded anything. Surfaces scoped to the build's
+/// own prompt profile name this rather than the open chat's choice: the
+/// response-style screen edits `backend.profileKey`'s sampling, so a caption
+/// following the conversation would describe a different model from the values
+/// under it (#129).
+String? bootModelKey(
+  InferenceBackendConfig backend,
+  List<ModelCatalogEntry> catalog,
+) => backend.sideloaded
+    ? null
+    : backend.artifactKey ?? simulatedFallbackKey(backend, catalog);
+
 /// The catalog key a conversation effectively runs, or null when a real engine
 /// holds an operator-sideloaded file no catalog entry describes.
 ///

@@ -153,7 +153,6 @@ class ChatCanvas extends ConsumerWidget {
           reasoningEnabled: active?.reasoningEnabled ?? false,
           generation: chat.generation,
           activeId: active?.id,
-          modelKey: active?.modelKey,
         ),
       ],
     );
