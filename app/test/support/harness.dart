@@ -23,6 +23,7 @@ import 'package:golem_flutter/core/services/device_storage.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/search_screen.dart';
+import 'package:golem_flutter/core/domain/download_pace.dart';
 import 'package:golem_flutter/features/models/application/download_pace_providers.dart';
 import 'package:golem_flutter/l10n/l10n.dart';
 

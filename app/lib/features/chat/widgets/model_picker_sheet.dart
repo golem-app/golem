@@ -16,6 +16,7 @@ import '../../models/model_download_consent.dart';
 import '../../preferences/application/preferences_providers.dart';
 import '../application/active_model_providers.dart';
 import '../application/chat_providers.dart';
+import '../../models/artifact_transfer.dart';
 import '../model_choice.dart';
 
 /// How far a row's text sits inside the sheet's gutter: the card's 14pt
@@ -194,13 +195,14 @@ final class _ModelPickerContent extends ConsumerWidget {
       await controller.download(choice.entry.key);
     }
 
-    return switch (choice.transfer) {
+    return switch (choice.transfer?.affordance) {
       null => null,
-      ModelTransferOffer(:final enabled) when !enabled => null,
-      ModelTransferOffer() => start,
-      ModelTransferProgress(:final pausable) when pausable =>
-        () => controller.pause(choice.entry.key),
-      ModelTransferProgress() => null,
+      TransferOffer(:final enabled) when !enabled => null,
+      TransferOffer() => start,
+      TransferInFlight(pausable: true) => () => controller.pause(
+        choice.entry.key,
+      ),
+      TransferInFlight() => null,
     };
   }
 }
@@ -333,28 +335,28 @@ final class _ModelRow extends StatelessWidget {
   }
 
   List<Widget> _transfer(BuildContext context, Color muted, Color accent) =>
-      switch (choice.transfer) {
+      switch (choice.transfer?.affordance) {
         null => const [],
-        final ModelTransferProgress progress => [
+        final TransferInFlight progress => [
           const SizedBox(height: GolemSpace.s3),
           Row(
             children: [
               Expanded(
                 child: Text(
-                  progress.label,
+                  choice.transferLabel!,
                   style: GolemText.caption.copyWith(color: muted),
                 ),
               ),
               if (progress.pausable)
                 Text(
-                  '${(progress.fraction * 100).round()}%',
+                  '${(choice.transfer!.fraction * 100).round()}%',
                   style: GolemText.caption.copyWith(color: muted),
                 ),
             ],
           ),
           const SizedBox(height: 7),
           ProgressTrack(
-            value: progress.fraction,
+            value: choice.transfer!.fraction,
             trackColor: GolemTheme.divider,
             fillColor: GolemTheme.accent,
           ),
@@ -375,7 +377,7 @@ final class _ModelRow extends StatelessWidget {
           ],
           const SizedBox(height: GolemSpace.s3),
         ],
-        final ModelTransferOffer offer => [
+        final TransferOffer offer => [
           if (offer.note != null) ...[
             const SizedBox(height: 3),
             Text(offer.note!, style: GolemText.caption.copyWith(color: muted)),
@@ -388,7 +390,7 @@ final class _ModelRow extends StatelessWidget {
             const SizedBox(height: GolemSpace.s2),
             GolemButton.tinted(
               key: Key('model-picker-download-${choice.entry.key}'),
-              label: offer.label,
+              label: choice.transferLabel!,
               onPressed: onTransfer,
             ),
           ],

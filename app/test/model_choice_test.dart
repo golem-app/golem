@@ -7,6 +7,7 @@ import 'package:golem_flutter/core/domain/model_admission.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/chat/model_choice.dart';
+import 'package:golem_flutter/features/models/artifact_transfer.dart';
 
 void main() {
   InferenceBackendConfig auto(DeviceTier tier) => resolveBackendPolicy(
@@ -340,9 +341,9 @@ void main() {
           ),
         }),
       );
-      final progress =
-          rowFor(built, 'qwen35-2b-gguf').transfer! as ModelTransferProgress;
-      expect(progress.label, 'Downloading · simulated');
+      final row = rowFor(built, 'qwen35-2b-gguf');
+      expect(row.transfer!.affordance, isA<TransferInFlight>());
+      expect(row.transferLabel, 'Downloading · simulated');
     });
 
     test('a simulated download says so, exactly as Settings does', () {
@@ -358,12 +359,14 @@ void main() {
         ),
       );
       final built = view(backend: fake, models: state);
-      final progress =
-          rowFor(built, 'qwen35-2b-gguf').transfer! as ModelTransferProgress;
-      expect(progress.label, 'Downloading · simulated');
-      final offer =
-          rowFor(built, 'qwen35-gguf').transfer! as ModelTransferOffer;
-      expect(offer.label, endsWith('· simulated'));
+      expect(
+        rowFor(built, 'qwen35-2b-gguf').transferLabel,
+        'Downloading · simulated',
+      );
+      expect(
+        rowFor(built, 'qwen35-gguf').transferLabel,
+        endsWith('· simulated'),
+      );
     });
 
     test('a real download carries no qualifier', () {
@@ -375,9 +378,7 @@ void main() {
           ),
         }),
       );
-      final progress =
-          rowFor(built, 'qwen35-2b-gguf').transfer! as ModelTransferProgress;
-      expect(progress.label, 'Downloading');
+      expect(rowFor(built, 'qwen35-2b-gguf').transferLabel, 'Downloading');
     });
   });
 
@@ -450,12 +451,15 @@ void main() {
         }),
       );
       final row = rowFor(built, 'gemma4-gguf');
-      final progress = row.transfer! as ModelTransferProgress;
-      expect(progress.pausable, isTrue, reason: 'and it can be stopped here');
+      expect(
+        row.transfer!.affordance,
+        isA<TransferInFlight>().having((it) => it.pausable, 'pausable', isTrue),
+        reason: 'and it can be stopped here',
+      );
       // qwen35-2b-gguf is the one this tier is admitted to, so it is the one
       // with an offer to disable; the slot gemma4-gguf holds still counts.
       expect(
-        (rowFor(built, 'qwen35-2b-gguf').transfer! as ModelTransferOffer)
+        (rowFor(built, 'qwen35-2b-gguf').transfer!.affordance! as TransferOffer)
             .enabled,
         isFalse,
         reason: 'the slot it holds is still counted',
@@ -487,8 +491,9 @@ void main() {
         expect(row.selectable, isFalse);
         expect(row.block, ModelBlock.notInstalled);
         expect(row.blockReason, 'Download it to use it in this chat.');
-        final offer = row.transfer! as ModelTransferOffer;
-        expect(offer.label, 'Download · 1.58 GB');
+        final offer = row.transfer!.affordance! as TransferOffer;
+        expect(offer.action, TransferAction.start);
+        expect(row.transferLabel, 'Download · 1.58 GB');
         expect(offer.enabled, isTrue);
         expect(offer.note, isNull);
       },
@@ -506,11 +511,13 @@ void main() {
           ),
         }),
       );
-      final progress =
-          rowFor(built, 'qwen35-2b-gguf').transfer! as ModelTransferProgress;
-      expect(progress.fraction, closeTo(0.25, 0.01));
-      expect(progress.label, 'Downloading');
-      expect(progress.pausable, isTrue);
+      final row = rowFor(built, 'qwen35-2b-gguf');
+      expect(row.transfer!.fraction, closeTo(0.25, 0.01));
+      expect(row.transferLabel, 'Downloading');
+      expect(
+        row.transfer!.affordance,
+        isA<TransferInFlight>().having((it) => it.pausable, 'pausable', isTrue),
+      );
     });
 
     test('verification runs to completion and offers no pause', () {
@@ -521,10 +528,16 @@ void main() {
           ),
         }),
       );
-      final progress =
-          rowFor(built, 'qwen35-2b-gguf').transfer! as ModelTransferProgress;
-      expect(progress.pausable, isFalse);
-      expect(progress.label, 'Verifying files');
+      final row = rowFor(built, 'qwen35-2b-gguf');
+      expect(
+        row.transfer!.affordance,
+        isA<TransferInFlight>().having(
+          (it) => it.pausable,
+          'pausable',
+          isFalse,
+        ),
+      );
+      expect(row.transferLabel, 'Verifying files');
     });
 
     test('a paused transfer resumes and says how far it got', () {
@@ -537,8 +550,9 @@ void main() {
         }),
       );
       final row = rowFor(built, 'qwen35-2b-gguf');
-      final offer = row.transfer! as ModelTransferOffer;
-      expect(offer.label, 'Resume');
+      final offer = row.transfer!.affordance! as TransferOffer;
+      expect(offer.action, TransferAction.resume);
+      expect(row.transferLabel, 'Resume');
       expect(offer.note, 'Paused at 0.50 GB of 1.58 GB.');
       expect(
         row.blockReason,
@@ -556,9 +570,10 @@ void main() {
           ),
         }),
       );
-      final offer =
-          rowFor(built, 'qwen35-2b-gguf').transfer! as ModelTransferOffer;
-      expect(offer.label, 'Retry');
+      final row = rowFor(built, 'qwen35-2b-gguf');
+      final offer = row.transfer!.affordance! as TransferOffer;
+      expect(offer.action, TransferAction.retry);
+      expect(row.transferLabel, 'Retry');
       expect(offer.note, 'Needs 2.00 GB free; 0.40 GB available.');
     });
 
@@ -572,12 +587,14 @@ void main() {
         }),
       );
       final blocked =
-          rowFor(built, 'qwen35-2b-gguf').transfer! as ModelTransferOffer;
+          rowFor(built, 'qwen35-2b-gguf').transfer!.affordance!
+              as TransferOffer;
+      expect(blocked.block, TransferBlock.busy);
       expect(blocked.enabled, isFalse);
       expect(blocked.note, 'Another model is downloading.');
       expect(
-        rowFor(built, 'gemma4-gguf').transfer,
-        isA<ModelTransferProgress>(),
+        rowFor(built, 'gemma4-gguf').transfer!.affordance,
+        isA<TransferInFlight>(),
         reason: 'the artifact holding the slot still shows its own progress',
       );
     });
@@ -616,7 +633,7 @@ void main() {
       final row = rowFor(built, 'gemma4-gguf');
       expect(row.selected, isFalse);
       expect(row.recommendation, isNotNull, reason: 'the badge still points');
-      expect(row.transfer, isA<ModelTransferOffer>());
+      expect(row.transfer!.affordance, isA<TransferOffer>());
     });
 
     test('a refused device may not pick even an installed model', () {

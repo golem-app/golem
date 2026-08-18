@@ -31,6 +31,7 @@ import 'package:golem_flutter/features/settings/appearance_screen.dart';
 import 'package:golem_flutter/features/settings/language_screen.dart';
 import 'package:golem_flutter/features/settings/models_screen.dart';
 import 'package:golem_flutter/features/settings/privacy_screen.dart';
+import 'package:golem_flutter/core/domain/download_pace.dart';
 import 'package:golem_flutter/features/models/application/download_pace_providers.dart';
 import 'package:golem_flutter/features/settings/response_style_screen.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';
