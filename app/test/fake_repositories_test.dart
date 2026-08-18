@@ -183,14 +183,14 @@ void main() {
       final initial = await repository.load();
       expect(initial.simulated, isTrue);
       expect(initial.activeArtifactKey, 'test-mlx');
-      // A refused load records a failed phase with its message (the
-      // refusal decision itself lives in ModelController since #42).
+      // A refused load records a failed phase with its kind (the refusal
+      // decision itself lives in ModelController since #42).
       final refused = await repository.recordRuntime(
         RuntimePhase.failed,
-        failure: 'Install the selected simulated model first.',
+        failure: RuntimeFailureKind.notInstalled,
       );
       expect(refused.runtime, RuntimePhase.failed);
-      expect(refused.failure, contains('simulated model'));
+      expect(refused.failure, RuntimeFailureKind.notInstalled);
       final subscription = repository.download('test-mlx').listen((_) {});
       await Future<void>.delayed(const Duration(milliseconds: 5));
       final paused = await repository.pause('test-mlx');

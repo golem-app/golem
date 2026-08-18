@@ -208,10 +208,12 @@ final class FakeModelManagementRepository implements ModelManagementRepository {
   }
 
   @override
-  Future<ModelState> recordRuntime(RuntimePhase phase, {String? failure}) =>
-      _persist(
-        failure == null
-            ? _state.copyWith(runtime: phase, clearFailure: true)
-            : _state.copyWith(runtime: phase, failure: failure),
-      );
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    RuntimeFailureKind? failure,
+  }) => _persist(
+    failure == null
+        ? _state.copyWith(runtime: phase, clearFailure: true)
+        : _state.copyWith(runtime: phase, failure: failure),
+  );
 }

@@ -221,7 +221,10 @@ abstract interface class ModelManagementRepository {
 
   /// Bookkeeping only: loading and unloading weights is the inference
   /// repository's job alone (#42). A null [failure] clears any recorded one.
-  Future<ModelState> recordRuntime(RuntimePhase phase, {String? failure});
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    RuntimeFailureKind? failure,
+  });
 
   /// Registers a hand-added catalog entry (Advanced mode), which then
   /// downloads, verifies, lists and deletes exactly like a pinned one (#52).

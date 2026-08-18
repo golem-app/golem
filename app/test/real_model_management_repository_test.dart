@@ -598,17 +598,17 @@ void main() {
     expect(states.last.statusOf('test-mlx').phase, ArtifactPhase.installed);
   });
 
-  test('a recorded failed phase persists with its message', () async {
+  test('a recorded failed phase persists with its kind', () async {
     // The refusal decision lives in ModelController since #42 (covered in
     // controllers_test); the repository just records what it is told.
     final repo = repository();
     await repo.load();
     final failed = await repo.recordRuntime(
       RuntimePhase.failed,
-      failure: 'Inference is a build-time opt-in; no backend is configured.',
+      failure: RuntimeFailureKind.notInstalled,
     );
     expect(failed.runtime, RuntimePhase.failed);
-    expect(failed.failure, contains('build-time opt-in'));
+    expect(failed.failure, RuntimeFailureKind.notInstalled);
 
     final cleared = await repo.recordRuntime(RuntimePhase.unloaded);
     expect(cleared.runtime, RuntimePhase.unloaded);

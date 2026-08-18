@@ -196,8 +196,10 @@ final class _FlakyModels implements ModelManagementRepository {
   }
 
   @override
-  Future<ModelState> recordRuntime(RuntimePhase phase, {String? failure}) =>
-      Future.value(_state);
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    RuntimeFailureKind? failure,
+  }) => Future.value(_state);
   @override
   Stream<ModelState> download(String artifactKey) => Stream.value(_state);
   @override

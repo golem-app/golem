@@ -122,7 +122,7 @@ void main() {
     await first.load();
     final failed = await first.recordRuntime(
       RuntimePhase.failed,
-      failure: 'Install the selected simulated model first.',
+      failure: RuntimeFailureKind.notInstalled,
     );
     expect(failed.runtime, RuntimePhase.failed);
     expect(failed.failure, isNotNull);

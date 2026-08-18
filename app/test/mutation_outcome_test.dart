@@ -317,7 +317,7 @@ final class _RecordingModels implements ModelManagementRepository {
   @override
   Future<ModelState> recordRuntime(
     RuntimePhase phase, {
-    String? failure,
+    RuntimeFailureKind? failure,
   }) async => _state;
   @override
   Stream<ModelState> download(String artifactKey) => Stream.value(_state);
