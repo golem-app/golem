@@ -200,14 +200,28 @@ Shared immutable models, the Golem Navy design tokens
 (`lib/core/theme/` — colors, type ramp, radii/spacing/sizes, elevation and
 motion, light + dark), the platform-chrome layer (`lib/core/chrome/` —
 `GolemChrome` resolves cupertino or android chrome from the target platform
-and drives the nav bar, menu, alert, sheet, action list, and primary button;
+and drives the nav bar, menu, alert, sheet, action list, badge, and buttons;
 layout, color, and type stay identical across platforms), and repository
-contracts live under `lib/core/`. `lib/core/providers/app_providers.dart`
-holds only what is genuinely shared: the launch seams wired by
-`launchOverrides`, the boot-constant derivations, and the session bridges
-through which one feature's controller offers capabilities to another
-without a feature→feature import (#88). The design source of truth is the
-handoff under `references/ui_redesign/` at the repo root.
+contracts live under `lib/core/`. No feature builds a platform button
+directly: a label is a `GolemButton`, a glyph a `GolemIconButton`, and a
+tappable row or chip a `GolemTappable`, which is the one place the platform tap
+minimum is stated. `test/chrome_boundary_test.dart` enforces that, and the
+sizes it owns are why `features/` holds no hard-coded 44 or 48.
+`lib/core/providers/app_providers.dart` holds only what is genuinely shared:
+the launch seams wired by `launchOverrides`, the boot-constant derivations,
+and the session bridges through which one feature's controller offers
+capabilities to another without a feature→feature import (#88). The design
+source of truth is the handoff under `references/ui_redesign/` at the repo
+root.
+
+One artifact transfer is projected once, by
+`features/models/artifact_transfer.dart`: the percentage, the pace figures,
+the phase's affordance and why it is blocked. First run, Settings ▸ Models,
+the chat setup banner and the model picker all read that one answer, the two
+card surfaces through `TransferCard` at two densities and the rest through
+`LabeledProgress`, which is also the only place a progress bar states its
+accessible reading. What stays per surface is the copy — the same decision is
+"Resume download" under a full-width primary and "Resume" inside a picker row.
 
 - `ChatController`: authoritative chats and active selection for the live
   session, with an orthogonal recovery notice when durability falls behind.

@@ -131,6 +131,14 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
   static final Stream<TaskUpdate> _updates = _downloader.updates
       .asBroadcastStream();
 
+  /// Static, like the plugin handles above them, and deliberately not instance
+  /// fields (#131). `launch_composition` builds a fresh downloader on every
+  /// composition attempt and four integration suites build their own, so per
+  /// instance this readiness would re-run `trackTasks` and
+  /// `resumeFromBackground` against one shared platform queue, and the
+  /// [_terminal] backlog below — which exists precisely because those calls
+  /// fire before any `download()` is listening — would be dropped by whichever
+  /// instance did not record it.
   static Future<void>? _ready;
   static StreamSubscription<TaskUpdate>? _permanent;
 
