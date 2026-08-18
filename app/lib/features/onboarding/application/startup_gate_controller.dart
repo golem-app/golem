@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart'
     show ProviderListenableSelect;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -75,25 +77,32 @@ class StartupGateController extends _$StartupGateController {
       models: models.requireValue,
       backend: backend,
     );
-    // Inspect the same admitted key FirstRunScreen will render. An upgrade can
-    // carry an interrupted artifact for the other platform engine (for
-    // example GGUF from the old iOS auto policy); its bytes must not send the
-    // compatible, untouched MLX recommendation to an unactionable resume UI.
-    final selectedKey = recommendedAdmittedModelKey(
-      catalog: ref.watch(modelCatalogEntriesProvider),
-      backend: backend,
-      eligibility: ref.watch(deviceEligibilityProvider),
-      selectedKey: preferences.requireValue.onboardingModelKey,
-    );
     final decision = resolveStartupGate(
       pristineAtLaunch: _pristineAtLaunch!,
       onboardingComplete:
           preferences.requireValue.onboardingVersion >=
           currentOnboardingVersion,
       hasUsableModel: ref.watch(loadableModelKeysProvider).isNotEmpty,
-      selectedStatus: selectedKey == null
-          ? const ArtifactStatus()
-          : models.requireValue.statusOf(selectedKey),
+      // Only consulted when setup is required, which keeps the catalog scan
+      // and these two dependencies off the admitted path — the one this
+      // provider takes on every rebuild for the life of an installed app.
+      //
+      // Inspect the same admitted key FirstRunScreen will render. An upgrade
+      // can carry an interrupted artifact for the other platform engine (for
+      // example GGUF from the old iOS auto policy); its bytes must not send
+      // the compatible, untouched MLX recommendation to an unactionable
+      // resume UI.
+      selectedStatus: () {
+        final selectedKey = recommendedAdmittedModelKey(
+          catalog: ref.watch(modelCatalogEntriesProvider),
+          backend: backend,
+          eligibility: ref.watch(deviceEligibilityProvider),
+          selectedKey: preferences.requireValue.onboardingModelKey,
+        );
+        return selectedKey == null
+            ? const ArtifactStatus()
+            : models.requireValue.statusOf(selectedKey);
+      },
     );
     if (decision.migrateLegacy && !_migrated) {
       _migrated = true;
@@ -119,12 +128,24 @@ class StartupGateController extends _$StartupGateController {
   /// reach a composer that would report it as a failed turn instead.
   Future<StartupGate> _admitSideload() async {
     await ref.read(inferenceRepositoryProvider).prepare();
-    if (!ref.mounted) return const GateWaiting();
-    // The engine now holds weights, so Settings may not keep claiming
-    // "Unloaded". Awaited for the reason ChatController awaits the same call:
-    // a recorded phase must not race what it describes.
-    await ref.read(modelSessionBridgeProvider).reflectEngineLoaded();
+    if (!ref.mounted) return const GateAdmitted();
+    unawaited(_reflectResident());
     return const GateAdmitted();
+  }
+
+  /// The engine now holds weights, so Settings may not keep claiming
+  /// "Unloaded". Bookkeeping, so it can neither gate nor veto admission: the
+  /// weights loaded either way, and this reaches the model store — a store the
+  /// sideload path otherwise never touches, and one that must not be able to
+  /// tell the operator their own file is invalid, or hold the shell shut while
+  /// it hydrates.
+  Future<void> _reflectResident() async {
+    try {
+      await ref.read(modelSessionBridgeProvider).reflectEngineLoaded();
+    } catch (_) {
+      // Deliberately broad: nothing awaits this, so anything escaping reaches
+      // the zone as an unhandled error, over a phase that is a label.
+    }
   }
 
   /// The failure panes' one way out. Deliberately not a bare invalidation of

@@ -1,12 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
-import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
-import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
@@ -17,6 +14,7 @@ import 'package:golem_flutter/features/onboarding/domain/onboarding_policy.dart'
 import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
+import 'support/validating_sideload.dart';
 
 /// The app's admission boundary, as provider state (#126).
 ///
@@ -37,19 +35,32 @@ void main() {
   Future<StartupGate> settled(ProviderContainer container) =>
       container.read(startupGateControllerProvider.future);
 
-  /// Lets the resolved stores propagate without waiting for the parked one.
-  Future<void> turn() async {
-    for (var i = 0; i < 4; i++) {
+  /// Drains provider rebuilds and the repository work they start, until
+  /// [ready] holds — so an ordering assertion waits on the thing it names
+  /// rather than a fixed number of event-loop turns. The bound only stops a
+  /// wrong expectation from hanging the suite.
+  Future<void> drainUntil(
+    ProviderContainer container,
+    bool Function() ready,
+  ) async {
+    for (var i = 0; i < 50 && !ready(); i++) {
+      await container.pump();
       await Future<void>.delayed(Duration.zero);
     }
   }
+
+  /// Drains without a condition, for asserting that something did *not*
+  /// happen — the one case no condition can be waited on.
+  Future<void> drain(ProviderContainer container) =>
+      drainUntil(container, () => false);
 
   StartupGate? gateOf(ProviderContainer container) =>
       container.read(startupGateControllerProvider).value;
 
   group('the store path', () {
     test('the shell waits while a store has not answered yet', () async {
-      final history = _ParkedHistory();
+      final history = InMemoryChatHistoryRepository()
+        ..parkLoad = Completer<void>();
       final container = buildContainer(
         chatHistory: history,
         preferences: InMemoryPreferencesRepository(completed),
@@ -62,15 +73,15 @@ void main() {
       );
       addTearDown(subscription.close);
 
-      await turn();
+      await drainUntil(container, () => gateOf(container) != null);
       expect(
         gateOf(container),
         isA<GateWaiting>(),
         reason: 'chat history has not resolved, so nothing may render',
       );
 
-      history.release();
-      await turn();
+      history.parkLoad!.complete();
+      await drainUntil(container, () => gateOf(container) is GateAdmitted);
       expect(gateOf(container), isA<GateAdmitted>());
     });
 
@@ -123,7 +134,7 @@ void main() {
         );
         expect(preferences.preferences.onboardingVersion, 0);
 
-        await turn();
+        await drainUntil(container, () => preferences.saves > 0);
         expect(
           preferences.preferences.onboardingVersion,
           currentOnboardingVersion,
@@ -132,7 +143,7 @@ void main() {
         // one-shot guard, the rebuild it causes writes again, forever.
         expect(preferences.saves, 1);
 
-        await turn();
+        await drain(container);
         expect(preferences.saves, 1);
       },
     );
@@ -155,7 +166,7 @@ void main() {
       addTearDown(subscription.close);
 
       expect(await settled(container), isA<GateAdmitted>());
-      await turn();
+      await drain(container);
 
       expect(preferences.saves, 0);
       expect(
@@ -189,7 +200,7 @@ void main() {
         // choice, not back at the welcome step.
         final container = buildContainer(
           preferences: InMemoryPreferencesRepository(completed),
-          models: _RuntimeRecordingModels(installedGemma),
+          models: RecordingModels(installedGemma),
         );
         addTearDown(container.dispose);
         final subscription = container.listen(
@@ -234,7 +245,7 @@ void main() {
       await container
           .read(chatControllerProvider.notifier)
           .send('Stream to me');
-      await turn();
+      await drain(container);
 
       expect(gateOf(container), isA<GateAdmitted>());
       expect(
@@ -255,8 +266,8 @@ void main() {
     test(
       'a sideload that will not load blocks the shell until it does',
       () async {
-        final inference = _ValidatingSideload(failuresRemaining: 1);
-        final models = _RuntimeRecordingModels(const ModelState());
+        final inference = ValidatingSideload(failuresRemaining: 1);
+        final models = RecordingModels(const ModelState());
         final container = buildContainer(
           backend: sideloaded,
           inference: inference,
@@ -287,10 +298,10 @@ void main() {
       // for weights the engine is already holding. toggleRuntime already
       // exempts sideloads from the installed-artifact check for the same
       // reason; reflectEngineLoaded did not.
-      final models = _RuntimeRecordingModels(const ModelState());
+      final models = RecordingModels(const ModelState());
       final container = buildContainer(
         backend: sideloaded,
-        inference: _ValidatingSideload(failuresRemaining: 0),
+        inference: ValidatingSideload(),
         models: models,
       );
       addTearDown(container.dispose);
@@ -301,109 +312,13 @@ void main() {
       addTearDown(subscription.close);
 
       expect(await settled(container), isA<GateAdmitted>());
+      // Dispatched rather than awaited: the phase is bookkeeping and must not
+      // hold the shell shut while the model store hydrates.
+      await drainUntil(container, () => models.recordRuntimeCalls > 0);
       expect(
         container.read(modelControllerProvider).requireValue.runtime,
         RuntimePhase.loaded,
       );
     });
   });
-}
-
-/// A history seam whose first read parks until the test releases it, so the
-/// waiting branch is observable without counting pumped frames.
-final class _ParkedHistory implements ChatHistoryRepository {
-  final Completer<void> _gate = Completer<void>();
-
-  void release() => _gate.complete();
-
-  @override
-  Future<ChatHistorySnapshot> load() async {
-    await _gate.future;
-    return const ChatHistorySnapshot(conversations: []);
-  }
-
-  @override
-  Future<void> save(ChatHistorySnapshot snapshot) async {}
-
-  @override
-  Future<int> storedBytes() async => 0;
-}
-
-/// Applies what it is told to record, unlike [StaticModels], so the runtime
-/// phase a load reflects is readable back.
-final class _RuntimeRecordingModels implements ModelManagementRepository {
-  _RuntimeRecordingModels(this._state);
-
-  ModelState _state;
-
-  @override
-  Future<ModelState> load() async => _state;
-
-  @override
-  Future<ModelState> recordRuntime(
-    RuntimePhase phase, {
-    String? failure,
-  }) async => _state = _state.copyWith(runtime: phase, failure: failure);
-
-  @override
-  Future<ModelState> delete(String artifactKey) async =>
-      _state = _state.withArtifact(artifactKey, const ArtifactStatus());
-
-  @override
-  Stream<ModelState> download(String artifactKey) => Stream.value(_state);
-
-  @override
-  Future<ModelState> pause(String artifactKey) async => _state;
-
-  @override
-  Future<ModelState> cancel(String artifactKey) async => _state;
-
-  @override
-  Future<ModelState> addModel(ModelCatalogEntry entry) async => _state;
-}
-
-/// The operator sideload seam: `prepare()` is both the load and the check.
-final class _ValidatingSideload implements InferenceRepository {
-  _ValidatingSideload({required this.failuresRemaining});
-
-  int failuresRemaining;
-  int prepareCalls = 0;
-
-  final ValueNotifier<InferenceResidency> _residency =
-      ValueNotifier<InferenceResidency>(const InferenceResidency.unloaded());
-
-  @override
-  ValueListenable<InferenceResidency> get residency => _residency;
-
-  @override
-  void releaseEngine() {}
-
-  @override
-  Future<void> prepare({String? modelKey}) async {
-    prepareCalls++;
-    if (failuresRemaining > 0) {
-      failuresRemaining--;
-      throw const InferenceException(
-        InferenceFailureKind.invalidModelArtifact,
-        'injected invalid sideload',
-      );
-    }
-    _residency.value = const InferenceResidency(loaded: true);
-  }
-
-  @override
-  Future<void> unload() async =>
-      _residency.value = const InferenceResidency.unloaded();
-
-  @override
-  Future<void> cancel() async {}
-
-  @override
-  Stream<InferenceEvent> generate({
-    required List<PromptMessage> context,
-    required bool reasoningEnabled,
-    SamplingOverrides? overrides,
-    String? modelKey,
-    String? systemPrompt,
-  }) => const Stream.empty();
 }

@@ -306,7 +306,7 @@ void main() {
       pristineAtLaunch: pristineAtLaunch,
       onboardingComplete: onboardingComplete,
       hasUsableModel: hasUsableModel,
-      selectedStatus: selectedStatus,
+      selectedStatus: () => selectedStatus,
     );
 
     test('a usable model admits the shell, pristine or not', () {

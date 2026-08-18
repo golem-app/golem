@@ -31,6 +31,15 @@ class FirstRunGate extends ConsumerWidget {
     final sideloaded = ref.watch(inferenceBackendProvider).sideloaded;
     final gate = ref.watch(startupGateControllerProvider);
     void retry() => ref.read(startupGateControllerProvider.notifier).retry();
+    final waiting = _BlockingProgress(
+      key: Key(sideloaded ? 'sideload-validating' : 'first-run-loading'),
+    );
+    final unavailable = _BlockingFailure(
+      key: Key(
+        sideloaded ? 'sideload-validation-failure' : 'first-run-read-failure',
+      ),
+      onRetry: retry,
+    );
 
     // The retained value first, not this provider's own loading flag.
     // Riverpod republishes a refreshing provider as loading with its previous
@@ -38,27 +47,15 @@ class FirstRunGate extends ConsumerWidget {
     // whatever it last decided still holds until the rebuild says otherwise.
     final decided = gate.value;
     if (decided == null) {
-      return gate.hasError
-          ? _BlockingFailure(
-              key: Key(
-                sideloaded
-                    ? 'sideload-validation-failure'
-                    : 'first-run-read-failure',
-              ),
-              onRetry: retry,
-            )
-          : _BlockingProgress(
-              key: Key(
-                sideloaded ? 'sideload-validating' : 'first-run-loading',
-              ),
-            );
+      // "Still deciding" beats "the last decision failed": a refresh keeps the
+      // error attached (AsyncError.copyWithPrevious), so reading hasError first
+      // leaves the failure pane and its live retry button up for the whole
+      // reload — tens of seconds on a real sideload.
+      return gate.isLoading ? waiting : unavailable;
     }
     return switch (decided) {
-      GateWaiting() => const _BlockingProgress(key: Key('first-run-loading')),
-      GateUnavailable() => _BlockingFailure(
-        key: const Key('first-run-read-failure'),
-        onRetry: retry,
-      ),
+      GateWaiting() => waiting,
+      GateUnavailable() => unavailable,
       GateUnsupported() => const FirstRunScreen(
         initialStep: FirstRunStep.unsupported,
       ),

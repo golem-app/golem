@@ -101,11 +101,15 @@ final class GateFirstRun extends StartupGate {
 /// [pristineAtLaunch] is latched by the caller at the first successful read of
 /// all three stores. Recomputing it per rebuild would let a model deleted
 /// mid-session read as a fresh install.
+///
+/// [selectedStatus] is a callback rather than a value because resolving which
+/// artifact setup would offer costs a catalog scan, and the admitted path —
+/// which is every rebuild for the life of an installed app — does not need it.
 ({StartupGate gate, bool migrateLegacy}) resolveStartupGate({
   required bool pristineAtLaunch,
   required bool onboardingComplete,
   required bool hasUsableModel,
-  required ArtifactStatus selectedStatus,
+  required ArtifactStatus Function() selectedStatus,
 }) {
   if (hasUsableModel && (onboardingComplete || !pristineAtLaunch)) {
     return (gate: const GateAdmitted(), migrateLegacy: !onboardingComplete);
@@ -118,9 +122,9 @@ final class GateFirstRun extends StartupGate {
   }
   // An upgrade can carry an interrupted artifact; its bytes decide whether
   // setup resumes the transfer or sends the user back to model choice.
+  final status = selectedStatus();
   final interrupted =
-      selectedStatus.phase != ArtifactPhase.notDownloaded ||
-      selectedStatus.downloadedBytes > 0;
+      status.phase != ArtifactPhase.notDownloaded || status.downloadedBytes > 0;
   return (
     gate: GateFirstRun(
       interrupted ? FirstRunEntry.resumeDownload : FirstRunEntry.chooseModel,

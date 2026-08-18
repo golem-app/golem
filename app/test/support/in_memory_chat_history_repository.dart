@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 
@@ -25,8 +27,14 @@ final class InMemoryChatHistoryRepository implements ChatHistoryRepository {
   /// While > 0, each load throws a typed read failure and decrements.
   int failingLoads = 0;
 
+  /// While set, each load blocks on it. The store that has not answered yet is
+  /// a real gate state, and counting pumped frames cannot observe it.
+  Completer<void>? parkLoad;
+
   @override
   Future<ChatHistorySnapshot> load() async {
+    final parked = parkLoad;
+    if (parked != null) await parked.future;
     if (failingLoads > 0) {
       failingLoads--;
       throw const PersistenceException(
