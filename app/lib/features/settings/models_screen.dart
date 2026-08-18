@@ -16,7 +16,7 @@ import '../../core/domain/model_catalog.dart';
 import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
-import '../../core/services/repository_resolver.dart';
+import '../../core/domain/repository_resolution.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/labeled_row.dart';
 import '../../core/widgets/progress_track.dart';

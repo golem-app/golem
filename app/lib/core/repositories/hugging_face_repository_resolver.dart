@@ -4,85 +4,20 @@
 /// This decides *what* may be fetched and pins it to one commit;
 /// `RealModelManagementRepository` decides whether the bytes that arrive are
 /// good. Fails closed, and never infers from a name, a file name or an engine.
+/// The whole trust policy is recorded in
+/// `docs/decisions/0014-hub-read-client.md`.
 library;
 
 import 'dart:typed_data';
 
 import '../domain/model_catalog.dart';
 import '../domain/model_profile_spec.dart';
+import '../domain/repository_resolution.dart';
 import '../domain/resolved_repository.dart';
-import 'custom_repository_resolver.dart';
-import 'chat_template_fingerprint.dart';
-import 'gguf_header.dart';
-import 'hugging_face_api.dart';
-
-/// Why a repository cannot become a model. Presentation maps each stable
-/// reason to localized copy; no catch-all "invalid repository" is allowed,
-/// because that would tell the user nothing to change.
-enum RepositoryRejection {
-  malformedIdentifier,
-  notFoundOrPrivate,
-  gated,
-  disabled,
-  rateLimited,
-  network,
-  malformedMetadata,
-  unsafePath,
-  noWeights,
-  shardedWeights,
-  unsafeWeightFormat,
-  missingRequiredFile,
-  inconsistentMetadata,
-  unsupportedArchitecture,
-  headerTooLarge,
-  duplicateEntry,
-}
-
-sealed class RepositoryResolution {
-  const RepositoryResolution();
-}
-
-/// [profile] is null when nothing about the chat template proved a broker
-/// profile — normal; the entry still lists and downloads, but cannot activate.
-final class RepositoryResolved extends RepositoryResolution {
-  const RepositoryResolved({
-    required this.resolved,
-    required this.profile,
-    required this.templateFingerprint,
-  });
-
-  final ResolvedRepository resolved;
-  final ModelProfileSpec? profile;
-
-  /// The fingerprint that was looked up, present even when it matched nothing —
-  /// it is what a future accepted-set addition would have to name.
-  final String? templateFingerprint;
-
-  bool get profileResolved => profile != null;
-}
-
-/// Several loadable weight files exist; the user picks, this never guesses.
-final class RepositoryNeedsWeightChoice extends RepositoryResolution {
-  const RepositoryNeedsWeightChoice(this.candidates);
-
-  final List<ResolvedWeightCandidate> candidates;
-}
-
-final class ResolvedWeightCandidate {
-  const ResolvedWeightCandidate(this.path, this.bytes);
-
-  final String path;
-  final int bytes;
-}
-
-final class RepositoryRejected extends RepositoryResolution {
-  const RepositoryRejected(this.reason, {this.cause});
-
-  final RepositoryRejection reason;
-
-  /// Internal detail for logs — never shown.
-  final Object? cause;
-}
+import '../services/chat_template_fingerprint.dart';
+import '../services/gguf_header.dart';
+import '../services/hugging_face_api.dart';
+import 'contracts.dart';
 
 /// The architectures each engine has been *proven* to load here, from the
 /// artifacts this app ships. Widening either set needs evidence, not a guess

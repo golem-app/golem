@@ -26,10 +26,10 @@ import '../core/repositories/file_settings_repository.dart';
 import '../core/repositories/real_model_management_repository.dart';
 import '../core/services/artifact_downloader.dart';
 import '../core/services/cache_probe.dart';
-import '../core/services/custom_repository_resolver.dart';
+import '../core/repositories/fake_repository_resolver.dart';
 import '../core/services/device_storage.dart';
 import '../core/services/hugging_face_api.dart';
-import '../core/services/repository_resolver.dart';
+import '../core/repositories/hugging_face_repository_resolver.dart';
 import '../features/chat/application/chat_providers.dart';
 import '../features/models/application/model_providers.dart';
 

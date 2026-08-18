@@ -5,13 +5,12 @@ import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/application/storage_breakdown_service.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
+import 'package:golem_flutter/core/domain/repository_resolution.dart';
 import 'package:golem_flutter/core/domain/model_profile_spec.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/services/cache_probe.dart';
-import 'package:golem_flutter/core/services/custom_repository_resolver.dart';
 import 'package:golem_flutter/core/services/device_storage.dart';
-import 'package:golem_flutter/core/services/repository_resolver.dart';
 import 'package:golem_flutter/features/settings/application/custom_repository_workflow.dart';
 
 import 'support/harness.dart';

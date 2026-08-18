@@ -92,11 +92,25 @@ final class HttpClientHuggingFaceApi implements HuggingFaceApi {
   HttpClientHuggingFaceApi({
     HttpClient? client,
     this.timeout = const Duration(seconds: 20),
-  }) : _client = client ?? (HttpClient()..userAgent = 'golem-app');
+  }) : _client =
+           client ??
+           (HttpClient()
+             ..userAgent = 'golem-app'
+             // Bounds what a process-lifetime client retains. Nothing closes
+             // this one: `detached` is the only teardown signal the app gets
+             // and Flutter permits `detached -> resumed`, so a forced close
+             // there would fail the next resolution as a network error
+             // (ADR 0014).
+             ..idleTimeout = const Duration(seconds: 15));
 
   final HttpClient _client;
+
+  /// Applies to connecting, to reading the response head, and — as an
+  /// inactivity deadline — between body chunks.
   final Duration timeout;
 
+  /// For tests, which build and tear down a client per case. Production keeps
+  /// one for the life of the process; see the constructor.
   void close() => _client.close(force: true);
 
   @override
@@ -162,7 +176,11 @@ final class HttpClientHuggingFaceApi implements HuggingFaceApi {
     }
     final builder = BytesBuilder(copy: false);
     try {
-      await for (final chunk in response) {
+      // Deadlined per chunk, not for the whole body: a slow but live
+      // connection on a bad network is not a failure, while a server that
+      // answers 200 and then stalls used to hang resolve() for as long as the
+      // socket stayed open — behind a spinner, with no way back (ADR 0014).
+      await for (final chunk in response.timeout(timeout)) {
         builder.add(chunk);
         if (builder.length > maxBytes) {
           throw const HubException(HubErrorKind.tooLarge);

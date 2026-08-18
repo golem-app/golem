@@ -4,6 +4,7 @@ import '../domain/app_preferences.dart';
 import '../domain/generation_settings.dart';
 import '../domain/model_catalog.dart';
 import '../domain/models.dart';
+import '../domain/repository_resolution.dart';
 
 abstract interface class ChatHistoryRepository {
   Future<ChatHistorySnapshot> load();
@@ -228,4 +229,21 @@ abstract interface class ModelManagementRepository {
 abstract interface class BenchmarkRepository {
   Future<BenchmarkRecord> run(String caseId, BenchmarkPhase phase);
   Future<String> export(BenchmarkRecord result);
+}
+
+/// The seam the custom-repository Add flow resolves through (#52).
+///
+/// An interface so the fake backend runs the same business flow as the real
+/// one: resolve, inspect what came back, then download. A one-tap add on the
+/// fake and a three-step add on a real engine would leave the interesting path
+/// untested by every golden and journey. What either implementation is allowed
+/// to trust is recorded in `docs/decisions/0014-hub-read-client.md`.
+abstract interface class CustomRepositoryResolver {
+  Future<RepositoryResolution> resolve({
+    required String repository,
+    required ModelEngine engine,
+    String ref,
+    String? weightsFile,
+    Set<String> existingKeys,
+  });
 }

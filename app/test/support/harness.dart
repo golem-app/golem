@@ -20,7 +20,7 @@ import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 import 'package:golem_flutter/core/services/cache_probe.dart';
 import 'package:golem_flutter/core/services/device_storage.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
-import 'package:golem_flutter/core/services/custom_repository_resolver.dart';
+import 'package:golem_flutter/core/repositories/fake_repository_resolver.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/search_screen.dart';
 import 'package:golem_flutter/features/models/application/download_pace_providers.dart';

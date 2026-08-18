@@ -5,7 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/models.dart';
-import 'package:golem_flutter/core/services/repository_resolver.dart';
+import 'package:golem_flutter/core/domain/repository_resolution.dart';
 import 'package:golem_flutter/core/theme/golem_typography.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';

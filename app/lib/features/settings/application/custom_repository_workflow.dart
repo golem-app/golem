@@ -1,7 +1,7 @@
 import '../../../core/domain/app_preferences.dart';
 import '../../../core/domain/model_catalog.dart';
-import '../../../core/services/custom_repository_resolver.dart';
-import '../../../core/services/repository_resolver.dart';
+import '../../../core/domain/repository_resolution.dart';
+import '../../../core/repositories/contracts.dart';
 
 /// The resolve half of the add-custom-repository flow, extracted from the
 /// Add card so the collision derivation and the resolver's failure contract

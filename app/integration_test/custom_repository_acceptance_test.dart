@@ -5,12 +5,13 @@ import 'package:golem_flutter/broker/model_profile.dart';
 import 'package:golem_flutter/broker/model_runtime_config.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
+import 'package:golem_flutter/core/domain/repository_resolution.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/real_model_management_repository.dart';
 import 'package:golem_flutter/core/services/artifact_downloader.dart';
 import 'package:golem_flutter/core/services/device_storage.dart';
 import 'package:golem_flutter/core/services/hugging_face_api.dart';
-import 'package:golem_flutter/core/services/repository_resolver.dart';
+import 'package:golem_flutter/core/repositories/hugging_face_repository_resolver.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:path_provider/path_provider.dart';
 
