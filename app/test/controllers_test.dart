@@ -2042,20 +2042,20 @@ void main() {
     );
     addTearDown(container.dispose);
     await container.read(chatControllerProvider.future);
-    // A sideload is outside the catalog, so the lazy load leaves the
-    // persisted phase at unloaded — while the engine holds the weights.
     await container.read(chatControllerProvider.notifier).send('Hello');
     await container.read(modelControllerProvider.future);
     final models = container.read(modelControllerProvider.notifier);
+    // A sideload has no catalog phase to gate on, but it is exactly as
+    // resident — and since #126 the lazy load says so, rather than leaving
+    // Settings offering "Load" for weights the engine already holds.
     expect(
       container.read(modelControllerProvider).requireValue.runtime,
-      RuntimePhase.unloaded,
+      RuntimePhase.loaded,
     );
 
     await models.releaseEngineWhileInactive();
     expect(inference.unloads, 1, reason: 'resident weights must be released');
 
-    // And the phase it never claimed is not rewritten on the way out.
     expect((await fakeModels(directory).load()).runtime, RuntimePhase.unloaded);
     await models.releaseEngineWhileInactive();
     expect(inference.unloads, 1, reason: 'nothing resident: a no-op');

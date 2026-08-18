@@ -279,17 +279,34 @@ class ModelController extends _$ModelController {
     }
   }
 
-  /// Records that the engine holds weights after ChatController's lazy
-  /// prepare(). Skips sideloaded paths — outside the catalog's phase tracking.
+  /// Records that the engine holds weights after a lazy prepare() — the
+  /// startup gate's for a sideload, ChatController's otherwise.
   Future<void> reflectEngineLoaded() async {
     if (_busy) return;
-    final current = state.value;
-    final target = _engineTargetKey();
-    if (current == null ||
-        current.runtime == RuntimePhase.loaded ||
-        target == null ||
-        current.statusOf(target).phase != ArtifactPhase.installed) {
+    // Never before this controller has hydrated: the startup gate's sideload
+    // load is what forces it to build, so the dispatch arriving through the
+    // bridge is what would otherwise read a null state and give up (#126).
+    try {
+      await future;
+    } on Exception {
       return;
+    }
+    // Re-checked after the await, which the pre-#126 shape had no need of: a
+    // delete or a toggle that took the guard while this was hydrating owns
+    // the flags, and clearing them under it would unlock its own engine work.
+    if (!ref.mounted || _busy) return;
+    final current = state.value;
+    if (current == null || current.runtime == RuntimePhase.loaded) return;
+    // A sideload's path is the operator's own and has no catalog phase to gate
+    // on — the exemption toggleRuntime already makes when it loads one. Before
+    // #126 the null target refused instead, so Settings offered "Load" for
+    // weights the engine was already holding.
+    if (!ref.read(inferenceBackendProvider).sideloaded) {
+      final target = _engineTargetKey();
+      if (target == null ||
+          current.statusOf(target).phase != ArtifactPhase.installed) {
+        return;
+      }
     }
     // Ahead of the guard flags: a throwing read between them and the finally
     // below would latch _busy for the notifier's lifetime, silently disabling

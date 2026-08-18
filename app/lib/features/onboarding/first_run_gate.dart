@@ -1,19 +1,12 @@
-import 'dart:async';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/chrome/golem_button.dart';
-import '../../core/domain/app_preferences.dart';
-import '../../core/domain/model_admission.dart';
-import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../l10n/l10n.dart';
-import '../chat/application/chat_providers.dart';
-import '../models/application/model_providers.dart';
-import '../settings/application/preferences_providers.dart';
 import 'application/onboarding_controller.dart';
+import 'application/startup_gate_controller.dart';
 import 'domain/onboarding_policy.dart';
 import 'first_run_screen.dart';
 
@@ -21,136 +14,63 @@ import 'first_run_screen.dart';
 /// recovery and dialogs, while its all-routes shell keeps route content,
 /// semantics, and keyboard actions unavailable until this policy admits the
 /// process.
-class FirstRunGate extends ConsumerStatefulWidget {
+///
+/// Rendering only (#126): the decision, the sideload load it waits on and the
+/// legacy onboarding stamp all belong to [StartupGateController].
+class FirstRunGate extends ConsumerWidget {
   const FirstRunGate({required this.child, super.key});
 
   final Widget child;
 
   @override
-  ConsumerState<FirstRunGate> createState() => _FirstRunGateState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Which validation is holding the shell decides which copy the blocking
+    // panes carry. It is a boot constant, so it reads even while the gate
+    // itself is still loading or has failed — which is the only moment the
+    // gate cannot say so itself.
+    final sideloaded = ref.watch(inferenceBackendProvider).sideloaded;
+    final gate = ref.watch(startupGateControllerProvider);
+    void retry() => ref.read(startupGateControllerProvider.notifier).retry();
 
-class _FirstRunGateState extends ConsumerState<FirstRunGate> {
-  bool? _pristineAtLaunch;
-  Future<void>? _sideloadValidation;
-  Object? _sideloadFailure;
-  bool _sideloadValidated = false;
-  bool _migrationScheduled = false;
-
-  void _validateSideload() {
-    if (_sideloadValidated || _sideloadValidation != null) return;
-    setState(() {
-      _sideloadFailure = null;
-      _sideloadValidation = ref
-          .read(inferenceRepositoryProvider)
-          .prepare()
-          .then((_) {
-            if (!mounted) return;
-            setState(() => _sideloadValidated = true);
-          })
-          .catchError((Object error) {
-            if (!mounted) return;
-            setState(() => _sideloadFailure = error);
-          })
-          .whenComplete(() {
-            if (!mounted) return;
-            setState(() => _sideloadValidation = null);
-          });
-    });
-  }
-
-  void _completeLegacyMigration() {
-    if (_migrationScheduled) return;
-    _migrationScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      await ref
-          .read(preferencesControllerProvider.notifier)
-          .completeOnboarding();
-    });
-  }
-
-  void _retryStores() {
-    _pristineAtLaunch = null;
-    ref.invalidate(preferencesControllerProvider);
-    ref.invalidate(chatControllerProvider);
-    ref.invalidate(modelControllerProvider);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final backend = ref.watch(inferenceBackendProvider);
-    final refusal = ref.watch(deviceRefusalProvider);
-    if (refusal != null) {
-      return const FirstRunScreen(initialStep: FirstRunStep.unsupported);
+    // The retained value first, not this provider's own loading flag.
+    // Riverpod republishes a refreshing provider as loading with its previous
+    // value attached, and the gate has no "briefly undecided" state to render:
+    // whatever it last decided still holds until the rebuild says otherwise.
+    final decided = gate.value;
+    if (decided == null) {
+      return gate.hasError
+          ? _BlockingFailure(
+              key: Key(
+                sideloaded
+                    ? 'sideload-validation-failure'
+                    : 'first-run-read-failure',
+              ),
+              onRetry: retry,
+            )
+          : _BlockingProgress(
+              key: Key(
+                sideloaded ? 'sideload-validating' : 'first-run-loading',
+              ),
+            );
     }
-
-    if (backend.sideloaded) {
-      if (_sideloadValidated) return widget.child;
-      if (_sideloadValidation == null && _sideloadFailure == null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _validateSideload();
-        });
-      }
-      if (_sideloadFailure != null) {
-        return _BlockingFailure(
-          key: const Key('sideload-validation-failure'),
-          onRetry: _validateSideload,
-        );
-      }
-      return const _BlockingProgress(key: Key('sideload-validating'));
-    }
-
-    final preferences = ref.watch(preferencesControllerProvider);
-    final chats = ref.watch(chatControllerProvider);
-    final models = ref.watch(modelControllerProvider);
-    if (preferences.isLoading || chats.isLoading || models.isLoading) {
-      return const _BlockingProgress(key: Key('first-run-loading'));
-    }
-    if (!preferences.hasValue || !chats.hasValue || !models.hasValue) {
-      return _BlockingFailure(
+    return switch (decided) {
+      GateWaiting() => const _BlockingProgress(key: Key('first-run-loading')),
+      GateUnavailable() => _BlockingFailure(
         key: const Key('first-run-read-failure'),
-        onRetry: _retryStores,
-      );
-    }
-
-    _pristineAtLaunch ??= shouldShowFirstRun(
-      preferences: preferences.requireValue,
-      chats: chats.requireValue,
-      models: models.requireValue,
-      backend: backend,
-    );
-    final onboardingComplete =
-        preferences.requireValue.onboardingVersion >= currentOnboardingVersion;
-    final hasUsableModel = ref.watch(loadableModelKeysProvider).isNotEmpty;
-    if (hasUsableModel && (onboardingComplete || !_pristineAtLaunch!)) {
-      if (!onboardingComplete) _completeLegacyMigration();
-      return widget.child;
-    }
-
-    // Inspect the same admitted key FirstRunScreen will render. An upgrade can
-    // carry an interrupted artifact for the other platform engine (for
-    // example GGUF from the old iOS auto policy); its bytes must not send the
-    // compatible, untouched MLX recommendation to an unactionable resume UI.
-    final selectedKey = recommendedAdmittedModelKey(
-      catalog: ref.watch(modelCatalogEntriesProvider),
-      backend: backend,
-      eligibility: ref.watch(deviceEligibilityProvider),
-      selectedKey: preferences.requireValue.onboardingModelKey,
-    );
-    final selectedStatus = selectedKey == null
-        ? const ArtifactStatus()
-        : models.requireValue.statusOf(selectedKey);
-    final interrupted =
-        selectedStatus.phase != ArtifactPhase.notDownloaded ||
-        selectedStatus.downloadedBytes > 0;
-    return FirstRunScreen(
-      initialStep: _pristineAtLaunch!
-          ? null
-          : interrupted
-          ? FirstRunStep.download
-          : FirstRunStep.model,
-    );
+        onRetry: retry,
+      ),
+      GateUnsupported() => const FirstRunScreen(
+        initialStep: FirstRunStep.unsupported,
+      ),
+      GateAdmitted() => child,
+      GateFirstRun(:final entry) => FirstRunScreen(
+        initialStep: switch (entry) {
+          FirstRunEntry.fresh => null,
+          FirstRunEntry.resumeDownload => FirstRunStep.download,
+          FirstRunEntry.chooseModel => FirstRunStep.model,
+        },
+      ),
+    };
   }
 }
 

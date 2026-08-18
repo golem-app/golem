@@ -16,6 +16,7 @@ import 'package:golem_flutter/features/onboarding/first_run_gate.dart';
 import 'package:golem_flutter/features/onboarding/first_run_screen.dart';
 
 import 'support/harness.dart';
+import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
 
 void main() {
@@ -117,6 +118,45 @@ void main() {
     expect(inference.prepareCalls, 2);
     expect(inference.residency.value.loaded, isTrue);
     expect(inference.residency.value.catalogKey, isNull);
+  });
+
+  testWidgets('a store that will not read blocks the shell behind a retry', (
+    tester,
+  ) async {
+    // The launch-failure path, untested until #126 moved it into a provider:
+    // the gate owned both the failure pane and what its retry re-read, so
+    // neither was reachable without a widget tree and the right pump count.
+    final history = InMemoryChatHistoryRepository()..failingLoads = 1;
+    await pumpWithRepositories(
+      tester,
+      chatHistory: history,
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(
+          onboardingVersion: currentOnboardingVersion,
+          onboardingModelKey: 'gemma4-mlx',
+        ),
+      ),
+      model: const ModelState(
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+        },
+      ),
+      child: const FirstRunGate(
+        child: SizedBox(key: Key('chat-after-first-run')),
+      ),
+    );
+
+    expect(find.byKey(const Key('first-run-read-failure')), findsOneWidget);
+    expect(find.byKey(const Key('chat-after-first-run')), findsNothing);
+    expect(find.byKey(const Key('sideload-validation-failure')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('startup-gate-retry')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('chat-after-first-run')),
+      findsOneWidget,
+      reason: 'retry must re-read the store, not only this gate',
+    );
   });
 
   testWidgets('download state cannot complete first run implicitly', (
