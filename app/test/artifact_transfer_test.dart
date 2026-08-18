@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/download_pace.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
@@ -25,7 +26,7 @@ void main() {
     ArtifactStatus status, {
     DownloadPaceSnapshot? pace,
     bool simulated = false,
-    String? deviceRefusal,
+    DeviceIneligibilityReason? deviceRefusal,
     bool sideloaded = false,
     bool admitted = true,
     bool downloadable = true,
@@ -329,7 +330,7 @@ void main() {
       final offer =
           project(
                 const ArtifactStatus(),
-                deviceRefusal: 'no',
+                deviceRefusal: DeviceIneligibilityReason.belowMemoryFloor,
                 sideloaded: true,
                 downloadable: false,
                 transferringKey: 'someone-else',
@@ -368,7 +369,10 @@ void main() {
       // blockReason, Settings in its own order under its own button — so a
       // second copy here would be copy nobody reads.
       for (final blocked in [
-        () => project(const ArtifactStatus(), deviceRefusal: 'no'),
+        () => project(
+          const ArtifactStatus(),
+          deviceRefusal: DeviceIneligibilityReason.belowMemoryFloor,
+        ),
         () => project(const ArtifactStatus(), sideloaded: true),
         () => project(const ArtifactStatus(), admitted: false),
         () => project(const ArtifactStatus(), downloadable: false),
@@ -408,7 +412,7 @@ void main() {
       final transfer = project(
         const ArtifactStatus(phase: ArtifactPhase.downloading),
         admitted: false,
-        deviceRefusal: 'no',
+        deviceRefusal: DeviceIneligibilityReason.belowMemoryFloor,
       );
       expect(transfer.affordance, isA<TransferInFlight>());
     });

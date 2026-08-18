@@ -59,21 +59,18 @@ final class DeviceCapabilities {
   int get hashCode => Object.hash(physicalMemoryBytes, engineSupported);
 }
 
-/// A classified device: the tier, why it was refused when it was, and the copy
-/// that refusal presents. Value-equal so widgets can select on it.
+/// A classified device: the tier, and why it was refused when it was. Carries
+/// no copy — the sentence for a refusal is one of thirteen catalogs and belongs
+/// to `l10n/presentation_messages.dart` (#130). Value-equal so widgets can
+/// select on it.
 final class DeviceEligibility {
   const DeviceEligibility({
     required this.tier,
     this.reason,
-    this.message,
     this.memoryKnown = true,
   }) : assert(
          (tier == DeviceTier.unsupported) == (reason != null),
          'an unsupported device carries its reason, a supported one has none',
-       ),
-       assert(
-         (tier == DeviceTier.unsupported) == (message != null),
-         'an unsupported device carries its copy, a supported one has none',
        );
 
   /// What an unclassified process assumes: supported, nothing refused. The
@@ -85,9 +82,6 @@ final class DeviceEligibility {
   final DeviceTier tier;
   final DeviceIneligibilityReason? reason;
 
-  /// User-presentable copy for the refusal; null while the device is supported.
-  final String? message;
-
   /// Whether the memory reading behind [tier] actually happened. The light tier
   /// is reached two ways — a small phone, and a probe that answered nothing —
   /// and copy that explains the tier must not describe the second as if it were
@@ -96,23 +90,22 @@ final class DeviceEligibility {
 
   bool get runsModels => tier != DeviceTier.unsupported;
 
-  /// The copy a refused device must present — non-null exactly when the device
-  /// is refused. Every gate keys on this rather than on [message] directly: a
-  /// verdict built without copy would otherwise open all three of them, and
-  /// the constructor's assert is compiled out of the builds that matter.
-  String? get refusal =>
-      runsModels ? null : message ?? 'Golem cannot run models on this device.';
+  /// Why a refused device is refused — non-null exactly when it is, which is
+  /// what every gate keys on. `classifyDevice` is the only producer and sets
+  /// both halves on both refusal branches, so the tier and the reason cannot
+  /// disagree in a build where the assert above is compiled out; presentation
+  /// words a null reason generically all the same.
+  DeviceIneligibilityReason? get refusal => runsModels ? null : reason;
 
   @override
   bool operator ==(Object other) =>
       other is DeviceEligibility &&
       other.tier == tier &&
       other.reason == reason &&
-      other.message == message &&
       other.memoryKnown == memoryKnown;
 
   @override
-  int get hashCode => Object.hash(tier, reason, message, memoryKnown);
+  int get hashCode => Object.hash(tier, reason, memoryKnown);
 }
 
 /// The whole admission policy, pure. Instruction set decides first: a CPU that
@@ -129,11 +122,6 @@ DeviceEligibility classifyDevice({
     return const DeviceEligibility(
       tier: DeviceTier.unsupported,
       reason: DeviceIneligibilityReason.missingInstructionSet,
-      // The same sentence the native load guard uses, so a device that somehow
-      // reaches the engine anyway is told the same thing twice, not two things.
-      message:
-          'This device’s processor is missing an instruction set the local '
-          'engine needs, so it cannot run models here.',
     );
   }
   final memory = capabilities.physicalMemoryBytes;
@@ -144,10 +132,6 @@ DeviceEligibility classifyDevice({
     return const DeviceEligibility(
       tier: DeviceTier.unsupported,
       reason: DeviceIneligibilityReason.belowMemoryFloor,
-      message:
-          'This device has less memory than the smallest model Golem ships '
-          'needs to run, so downloads are turned off here. Your chats and '
-          'settings are unaffected.',
     );
   }
   return DeviceEligibility(

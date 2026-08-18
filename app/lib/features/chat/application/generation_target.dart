@@ -1,4 +1,5 @@
 import '../../../core/domain/app_state.dart';
+import '../../../core/domain/device_eligibility.dart';
 import '../../../core/domain/inference_backend.dart';
 import '../../../core/domain/model_activation.dart';
 import '../../../core/domain/model_catalog.dart';
@@ -40,7 +41,7 @@ final class GenerationRefused extends GenerationTarget {
 /// artifact that is (#20).
 GenerationTarget resolveGenerationTarget({
   required InferenceBackendConfig backend,
-  required String? deviceRefusal,
+  required DeviceIneligibilityReason? deviceRefusal,
   required List<ModelCatalogEntry> catalog,
   required String? conversationModelKey,
   required String? residentModelKey,

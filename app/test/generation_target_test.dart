@@ -1,3 +1,4 @@
+import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
@@ -42,7 +43,7 @@ const _sideloaded = InferenceBackendConfig(
 
 GenerationTarget _resolve({
   InferenceBackendConfig backend = _fake,
-  String? deviceRefusal,
+  DeviceIneligibilityReason? deviceRefusal,
   String? conversationModelKey,
   String? residentModelKey,
   Set<String> loadableKeys = const {},
@@ -63,7 +64,7 @@ void main() {
       // load. Everything here would otherwise have resolved happily.
       final target = _resolve(
         backend: _mlx,
-        deviceRefusal: 'Needs more memory than this device has.',
+        deviceRefusal: DeviceIneligibilityReason.belowMemoryFloor,
         conversationModelKey: 'gemma4-mlx',
         loadableKeys: const {'gemma4-mlx'},
       );
@@ -81,7 +82,10 @@ void main() {
     test('the sideload exemption does not extend to the device floor', () {
       // An operator's own file needs the same memory and instruction set.
       expect(
-        _resolve(backend: _sideloaded, deviceRefusal: 'Unsupported.'),
+        _resolve(
+          backend: _sideloaded,
+          deviceRefusal: DeviceIneligibilityReason.missingInstructionSet,
+        ),
         isA<GenerationRefused>(),
       );
     });

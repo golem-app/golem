@@ -71,7 +71,6 @@ void main() {
           eligibility: const DeviceEligibility(
             tier: DeviceTier.unsupported,
             reason: DeviceIneligibilityReason.belowMemoryFloor,
-            message: 'Unsupported for this test.',
           ),
           preferences: preferences,
         ),

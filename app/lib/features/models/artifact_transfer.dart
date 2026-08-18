@@ -19,6 +19,7 @@
 library;
 
 import '../../core/domain/byte_format.dart';
+import '../../core/domain/device_eligibility.dart';
 import '../../core/domain/download_pace.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/models.dart';
@@ -148,7 +149,7 @@ ArtifactTransferPresentation artifactTransfer({
   required AppLocalizations localizations,
   DownloadPaceSnapshot? pace,
   bool simulated = false,
-  String? deviceRefusal,
+  DeviceIneligibilityReason? deviceRefusal,
   bool sideloaded = false,
   bool admitted = true,
   bool downloadable = true,
@@ -239,7 +240,7 @@ TransferAffordance? _affordance({
   required ModelCatalogEntry entry,
   required ArtifactStatus status,
   required String suffix,
-  required String? deviceRefusal,
+  required DeviceIneligibilityReason? deviceRefusal,
   required bool sideloaded,
   required bool admitted,
   required bool downloadable,
@@ -310,7 +311,7 @@ TransferAffordance? _affordance({
 /// A second copy here would be copy nobody reads, drifting quietly.
 (TransferBlock?, String?) _block({
   required ModelCatalogEntry entry,
-  required String? deviceRefusal,
+  required DeviceIneligibilityReason? deviceRefusal,
   required bool sideloaded,
   required bool admitted,
   required bool downloadable,

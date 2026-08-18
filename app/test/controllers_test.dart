@@ -2328,7 +2328,6 @@ void main() {
     const refusal = DeviceEligibility(
       tier: DeviceTier.unsupported,
       reason: DeviceIneligibilityReason.belowMemoryFloor,
-      message: 'This device cannot run models.',
     );
     const realBackend = InferenceBackendConfig(
       kind: InferenceBackendKind.mlx,

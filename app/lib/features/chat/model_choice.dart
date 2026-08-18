@@ -149,7 +149,8 @@ final class ModelPickerView {
 /// [deviceRefusal] is `deviceRefusalProvider`'s answer, passed in rather than
 /// re-derived from [eligibility]: the refusal rule — including that a simulated
 /// backend is never gated — has one owner, and this is not it. [eligibility] is
-/// read only for the tier that explains the recommendation.
+/// read for the tier that explains the recommendation, and for the reason the
+/// footnote words.
 ModelPickerView buildModelPickerView({
   required List<ModelCatalogEntry> catalog,
 
@@ -164,7 +165,7 @@ ModelPickerView buildModelPickerView({
   required Set<String> loadableKeys,
   required List<ChatConversation> conversations,
   required DeviceEligibility eligibility,
-  required String? deviceRefusal,
+  required DeviceIneligibilityReason? deviceRefusal,
   required bool advanced,
   required bool simulatedTransfers,
   required AppLocalizations localizations,
@@ -301,7 +302,7 @@ ModelChoice _choiceFor({
   required InferenceBackendConfig backend,
   required ModelState? models,
   required Set<String> loadableKeys,
-  required String? deviceRefusal,
+  required DeviceIneligibilityReason? deviceRefusal,
   required bool advanced,
   required String? selectedKey,
   required bool ambiguousName,
@@ -552,7 +553,7 @@ String _recommendationReason({
 /// (`sideloadedModelLabel`).
 String? _footnote({
   required InferenceBackendConfig backend,
-  required String? deviceRefusal,
+  required DeviceIneligibilityReason? deviceRefusal,
   required AppLocalizations localizations,
   required DeviceEligibility eligibility,
 }) {

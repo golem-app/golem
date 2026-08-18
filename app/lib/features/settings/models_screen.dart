@@ -91,13 +91,10 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
         .simulatedInference;
     // A device outside every supported tier may not start a transfer or a load
     // (#27); the cards say why instead of offering buttons that would refuse.
-    final deviceRefusal = ref.watch(deviceRefusalProvider);
-    final refusalMessage = deviceRefusal == null
+    final refusal = ref.watch(deviceRefusalProvider);
+    final refusalMessage = refusal == null
         ? null
-        : deviceRefusalMessage(
-            context.l10n,
-            ref.watch(deviceEligibilityProvider).reason,
-          );
+        : deviceRefusalMessage(context.l10n, refusal);
     // Verification holds the slot as surely as the transfer does — it runs
     // inside the same download() stream, behind the same busy guard — so a
     // button offered during it would do nothing when tapped. The chat picker
@@ -177,7 +174,7 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
             otherDownloadActive:
                 downloadingKey != null && downloadingKey != entry.key,
             downloadable: downloadableKeys.contains(entry.key),
-            deviceRefusal: refusalMessage,
+            refusalMessage: refusalMessage,
             defaultMeasuredKey: defaultMeasuredModelKey(backend, model),
           ),
           const SizedBox(height: 12),
@@ -190,7 +187,7 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
           simulatedInference: simulatedInference,
           generating: generating,
           activeKey: activeKey,
-          deviceRefusal: refusalMessage,
+          refusalMessage: refusalMessage,
         ),
         if (advanced) ...[
           const SizedBox(height: 24),
@@ -220,7 +217,7 @@ class _RuntimeCard extends ConsumerWidget {
     required this.generating,
     required this.simulatedInference,
     required this.activeKey,
-    this.deviceRefusal,
+    this.refusalMessage,
   });
   final ModelState model;
   final bool simulatedInference;
@@ -231,7 +228,7 @@ class _RuntimeCard extends ConsumerWidget {
   final bool generating;
 
   /// Why this device may not load a model, or null when it may.
-  final String? deviceRefusal;
+  final String? refusalMessage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -275,7 +272,8 @@ class _RuntimeCard extends ConsumerWidget {
               // Withheld for loading only: a runtime phase persisted as loaded
               // by an earlier build must stay correctable, and toggleRuntime
               // permits that direction for the same reason.
-              if (deviceRefusal == null || model.runtime == RuntimePhase.loaded)
+              if (refusalMessage == null ||
+                  model.runtime == RuntimePhase.loaded)
                 GolemButton.tinted(
                   key: const Key('runtime-toggle-button'),
                   label: model.runtime == RuntimePhase.loaded
@@ -293,11 +291,11 @@ class _RuntimeCard extends ConsumerWidget {
                             .read(modelControllerProvider.notifier)
                             .toggleRuntime(),
                 ),
-              if (deviceRefusal != null)
+              if (refusalMessage != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 10),
                   child: Text(
-                    deviceRefusal!,
+                    refusalMessage!,
                     key: const Key('runtime-device-refusal'),
                     style: GolemText.footnote.copyWith(
                       color: CupertinoDynamicColor.resolve(
@@ -326,7 +324,7 @@ class _ModelCard extends ConsumerWidget {
     required this.otherDownloadActive,
     required this.downloadable,
     required this.defaultMeasuredKey,
-    this.deviceRefusal,
+    this.refusalMessage,
   });
 
   final ModelCatalogEntry entry;
@@ -345,7 +343,7 @@ class _ModelCard extends ConsumerWidget {
   final bool downloadable;
 
   /// Why this device may not fetch any weights at all, or null when it may.
-  final String? deviceRefusal;
+  final String? refusalMessage;
 
   /// What an unattributed metric belongs to, resolved once by the list rather
   /// than re-derived — and re-subscribed — per card.
@@ -536,7 +534,7 @@ class _ModelCard extends ConsumerWidget {
         // A refused device gets the explanation in place of the button rather
         // than beneath it: a full-width accent CTA that does nothing when
         // tapped would undo the honesty the copy is there to provide.
-        if (deviceRefusal == null)
+        if (refusalMessage == null)
           GolemButton.filled(
             key: Key('model-download-${entry.key}'),
             label: switch (status.phase) {
@@ -558,7 +556,7 @@ class _ModelCard extends ConsumerWidget {
                     controller.download(entry.key);
                   },
           ),
-        if (!downloadable || deviceRefusal != null)
+        if (!downloadable || refusalMessage != null)
           Padding(
             padding: const EdgeInsets.only(top: 10),
             child: Text(
@@ -570,7 +568,7 @@ class _ModelCard extends ConsumerWidget {
                   ? Key('model-device-refusal-${entry.key}')
                   : null,
               downloadable
-                  ? deviceRefusal!
+                  ? refusalMessage!
                   : context.l10n.unresolvedRepositoryReason,
               style: GolemText.footnote.copyWith(
                 color: CupertinoDynamicColor.resolve(
