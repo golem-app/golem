@@ -1,6 +1,9 @@
 import 'dart:io';
 
 import 'package:inferno/inferno.dart';
+// Not exported: the ABI number is a contract between this package and the
+// two native halves, not something a consumer configures.
+import 'package:inferno/src/native_backend.dart' show infernoAbiVersion;
 import 'package:test/test.dart';
 
 /// The native pins exist in more than one place by necessity (Dart manifest,
@@ -36,6 +39,26 @@ void main() {
     final resolved = read('native/apple/Package.resolved');
     expect(resolved, contains(mlxSwiftLmRevision));
     expect(resolved, contains(mlxSwiftRevision));
+  });
+
+  // The ABI number exists three times by necessity: Dart checks it, the C
+  // header defines it, and the Swift carrier answers it over a separate
+  // entry point. A shim that reports a number it does not implement fails at
+  // load with a version mismatch instead of at the feature that is missing —
+  // the presence penalty ABI 4 added is silently dropped rather than refused
+  // (#130).
+  test('the C header defines the ABI this package speaks', () {
+    expect(
+      read('native/include/inferno.h'),
+      contains('#define INFERNO_ABI_VERSION $infernoAbiVersion'),
+    );
+  });
+
+  test('the MLX carrier reports the ABI this package speaks', () {
+    expect(
+      read('native/apple/Sources/InfernoMLXCarrier/InfernoMLXShim.swift'),
+      contains('let infernoMlxABI: UInt32 = $infernoAbiVersion'),
+    );
   });
 
   test('the SwiftPM manifest requests the manifest MLX revisions', () {
