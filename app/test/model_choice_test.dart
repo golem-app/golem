@@ -8,8 +8,14 @@ import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/chat/model_choice.dart';
 import 'package:golem_flutter/features/models/artifact_transfer.dart';
+import 'package:golem_flutter/l10n/bidi.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_en.dart';
 
 void main() {
+  // The picker's copy is the ARB's, and the pure tests read it from the same
+  // place the app does rather than restating it (#130).
+  final en = AppLocalizationsEn();
+
   InferenceBackendConfig auto(DeviceTier tier) => resolveBackendPolicy(
     backendName: 'auto',
     profileDefine: '',
@@ -78,6 +84,7 @@ void main() {
     return buildModelPickerView(
       catalog: catalog ?? modelCatalog,
       pinnedCatalog: modelCatalog,
+      localizations: en,
       simulatedTransfers: simulatedTransfers ?? backend.simulatedInference,
       downloadableKeys:
           downloadableKeys ?? {for (final e in catalog ?? modelCatalog) e.key},
@@ -273,8 +280,10 @@ void main() {
       );
       expect(
         built.footnote,
-        'no memory here',
-        reason: 'the verdict is spelled out once, not once per row',
+        en.deviceBelowMemoryFloor,
+        reason:
+            'the verdict is spelled out once, not once per row, and in '
+            'the locale rather than in whatever the gate happened to carry',
       );
     });
   });
@@ -566,7 +575,14 @@ void main() {
         models: stateWith({
           'qwen35-2b-gguf': const ArtifactStatus(
             phase: ArtifactPhase.failed,
-            failure: 'Needs 2.00 GB free; 0.40 GB available.',
+            // The diagnostic beside the kind can name a path on the device, so
+            // the row words the kind and its redacted figures (#130).
+            failure: '/Users/someone/Library/models/x.gguf',
+            failureReason: ArtifactFailure(
+              ArtifactFailureKind.insufficientStorage,
+              requiredBytes: 2000000000,
+              availableBytes: 400000000,
+            ),
           ),
         }),
       );
@@ -574,7 +590,13 @@ void main() {
       final offer = row.transfer!.affordance! as TransferOffer;
       expect(offer.action, TransferAction.retry);
       expect(row.transferLabel, 'Retry');
-      expect(offer.note, 'Needs 2.00 GB free; 0.40 GB available.');
+      expect(
+        offer.note,
+        en.downloadInsufficientStorage(
+          ltrIsolate('2.00 GB'),
+          ltrIsolate('0.40 GB'),
+        ),
+      );
     });
 
     test('one transfer at a time, and the others say so', () {
@@ -656,7 +678,7 @@ void main() {
         expect(choice.block, ModelBlock.deviceRefused);
         expect(choice.transfer, isNull);
       }
-      expect(built.footnote, 'This device cannot run models.');
+      expect(built.footnote, en.deviceBelowMemoryFloor);
     });
 
     test('the fake honours any row, installed or not', () {
@@ -750,6 +772,7 @@ void main() {
           final built = buildModelPickerView(
             catalog: modelCatalog,
             pinnedCatalog: modelCatalog,
+            localizations: en,
             simulatedTransfers: backend.simulatedInference,
             downloadableKeys: {for (final e in modelCatalog) e.key},
             backend: backend,
