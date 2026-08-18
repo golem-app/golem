@@ -1,6 +1,6 @@
-import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
+import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/features/chat/application/generation_target.dart';

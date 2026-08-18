@@ -47,17 +47,34 @@ void main() {
   // load with a version mismatch instead of at the feature that is missing —
   // the presence penalty ABI 4 added is silently dropped rather than refused
   // (#130).
+  // Anchored, not `contains`: a bare number matches any longer one starting
+  // with the same digits, so ABI 4 would pass against a header that says 40,
+  // and an unanchored match also accepts a commented-out copy of the define.
   test('the C header defines the ABI this package speaks', () {
     expect(
       read('native/include/inferno.h'),
-      contains('#define INFERNO_ABI_VERSION $infernoAbiVersion'),
+      matches(
+        RegExp(
+          r'^#define INFERNO_ABI_VERSION '
+          '$infernoAbiVersion'
+          r'\s*$',
+          multiLine: true,
+        ),
+      ),
     );
   });
 
   test('the MLX carrier reports the ABI this package speaks', () {
     expect(
       read('native/apple/Sources/InfernoMLXCarrier/InfernoMLXShim.swift'),
-      contains('let infernoMlxABI: UInt32 = $infernoAbiVersion'),
+      matches(
+        RegExp(
+          r'^\s*(private\s+)?let infernoMlxABI: UInt32 = '
+          '$infernoAbiVersion'
+          r'\s*$',
+          multiLine: true,
+        ),
+      ),
     );
   });
 

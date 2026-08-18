@@ -1,17 +1,17 @@
-import 'package:golem_flutter/l10n/bidi.dart';
-import 'package:golem_flutter/l10n/generated/app_localizations_en.dart';
-import 'package:golem_flutter/l10n/presentation_messages.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/backend_policy.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
+import 'package:golem_flutter/core/domain/model_activation.dart';
+import 'package:golem_flutter/core/domain/model_admission.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/onboarding/domain/onboarding_policy.dart';
-import 'package:golem_flutter/core/domain/model_activation.dart';
-import 'package:golem_flutter/core/domain/model_admission.dart';
+import 'package:golem_flutter/l10n/bidi.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_en.dart';
+import 'package:golem_flutter/l10n/presentation_messages.dart';
 
 void main() {
   group('first-run decision', () {
