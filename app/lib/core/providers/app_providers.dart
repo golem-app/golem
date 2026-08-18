@@ -6,7 +6,6 @@ import '../domain/inference_backend.dart';
 import '../domain/model_catalog.dart';
 import '../repositories/contracts.dart';
 import '../services/cache_probe.dart';
-import '../services/custom_repository_resolver.dart';
 import '../services/device_storage.dart';
 import 'retry.dart';
 

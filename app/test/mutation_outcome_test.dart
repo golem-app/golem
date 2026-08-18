@@ -7,9 +7,9 @@ import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
+import 'package:golem_flutter/features/preferences/application/generation_settings_providers.dart';
+import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
 import 'package:golem_flutter/features/settings/appearance_screen.dart';
-import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
-import 'package:golem_flutter/features/settings/application/settings_providers.dart';
 
 import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';

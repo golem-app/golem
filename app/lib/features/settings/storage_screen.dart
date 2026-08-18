@@ -6,18 +6,17 @@ import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_toast.dart';
 import '../../core/domain/byte_format.dart';
-import '../../core/domain/model_activation.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
+import '../../core/widgets/settings_rows.dart';
 import '../../l10n/l10n.dart';
-import '../chat/application/chat_providers.dart';
+import '../chat/application/active_model_providers.dart';
 import '../models/application/model_providers.dart';
-import 'application/storage_providers.dart';
-import 'widgets/settings_rows.dart';
+import '../models/application/storage_providers.dart';
 
 class StorageScreen extends ConsumerWidget {
   const StorageScreen({super.key});
@@ -250,15 +249,7 @@ class _DownloadedModels extends ConsumerWidget {
     final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
     // The same resolution chat and Settings use, so one model is called active
     // in exactly one place at a time (#20).
-    final activeKey = effectiveModelKey(
-      backend: ref.watch(inferenceBackendProvider),
-      catalog: catalog,
-      modelKey: ref.watch(
-        chatControllerProvider.select((state) => state.value?.active?.modelKey),
-      ),
-      residentModelKey: ref.watch(residentModelKeyProvider),
-      loadableKeys: ref.watch(loadableModelKeysProvider),
-    );
+    final activeKey = ref.watch(activeModelKeyProvider);
     // Anything holding bytes shows up — installed or partial — so what the
     // meter counts and what can be freed always agree.
     final rows = catalog

@@ -4,7 +4,7 @@ import '../../../core/domain/generation_settings.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/retry.dart';
 
-part 'settings_providers.g.dart';
+part 'generation_settings_providers.g.dart';
 
 /// Only user-set values are stored; profile defaults resolve at the consumer.
 /// KeepAlive: a handbook v5.0 §3.2 client-state owner — the session's sole

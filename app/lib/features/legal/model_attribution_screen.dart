@@ -9,7 +9,7 @@ import '../../core/domain/model_catalog.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
-import '../settings/widgets/settings_rows.dart';
+import '../../core/widgets/settings_rows.dart';
 import '../../l10n/l10n.dart';
 
 typedef ExternalUriLauncher = Future<bool> Function(Uri uri);

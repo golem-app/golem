@@ -4,34 +4,31 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/chrome/golem_alert.dart';
 import '../../core/chrome/golem_button.dart';
-import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
-import '../../core/chrome/golem_toast.dart';
-import '../../core/domain/app_preferences.dart';
 import '../../core/domain/byte_format.dart';
+import '../../core/domain/download_pace.dart';
 import '../../core/domain/inference_backend.dart';
 import '../../core/domain/model_activation.dart';
-import '../../core/domain/download_pace.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
-import '../../core/services/repository_resolver.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/labeled_row.dart';
 import '../../core/widgets/progress_track.dart';
 import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
+import '../../core/widgets/settings_rows.dart';
 import '../../l10n/l10n.dart';
 import '../../l10n/presentation_messages.dart';
+import '../chat/application/active_model_providers.dart';
 import '../chat/application/chat_providers.dart';
 import '../models/application/download_pace_providers.dart';
 import '../models/application/model_providers.dart';
+import '../models/model_download_consent.dart';
+import '../models/widgets/custom_repository_card.dart';
 import '../models/widgets/download_note_banner.dart';
-import '../onboarding/model_download_consent.dart';
-import 'application/custom_repository_workflow.dart';
-import 'application/preferences_providers.dart';
-import 'widgets/settings_rows.dart';
+import '../preferences/application/preferences_providers.dart';
 
 enum _CatalogTab { all, installed }
 
@@ -45,22 +42,9 @@ class ModelsScreen extends ConsumerStatefulWidget {
 }
 
 class _ModelsScreenState extends ConsumerState<ModelsScreen> {
-  // Ephemeral screen state stays widget-local: the tab, the custom repository
-  // draft, its engine chip, and what resolving it found. The resolution lives
-  // here rather than in the card because the list disposes off-screen children
-  // — scrolling away and back would otherwise silently discard it.
+  // The tab is the only ephemeral state left here; the custom-repository draft
+  // outlived this screen's own lifetime and moved to a controller (#129).
   _CatalogTab _tab = _CatalogTab.all;
-  final _repositoryController = TextEditingController();
-  final _revisionController = TextEditingController();
-  ModelEngine _customEngine = ModelEngine.mlx;
-  _AddState _addState = const _Unresolved();
-
-  @override
-  void dispose() {
-    _repositoryController.dispose();
-    _revisionController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -131,16 +115,8 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
     // deletable) here and in Storage; the fake keeps the whole catalog.
     final backend = ref.watch(inferenceBackendProvider);
     // Which artifact is live must read the same everywhere: chat, here, and
-    // Storage all resolve it through the one helper (#20).
-    final activeKey = effectiveModelKey(
-      backend: backend,
-      catalog: catalog,
-      modelKey: ref.watch(
-        chatControllerProvider.select((state) => state.value?.active?.modelKey),
-      ),
-      residentModelKey: ref.watch(residentModelKeyProvider),
-      loadableKeys: ref.watch(loadableModelKeysProvider),
-    );
+    // Storage all watch the one derivation (#20, #129).
+    final activeKey = ref.watch(activeModelKeyProvider);
     final residentKey = ref.watch(inferenceResidencyProvider).catalogKey;
     final loadable = catalog
         .where(
@@ -219,27 +195,10 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
           const SizedBox(height: 24),
           SectionHeader(context.l10n.customRepository),
           const SizedBox(height: 8),
-          _CustomRepositoryCard(
-            controller: _repositoryController,
-            revisionController: _revisionController,
-            state: _addState,
-            // Resolving a repository takes seconds of network, and Back is one
-            // tap: both callbacks can land after this screen is gone.
-            onState: (state) {
-              if (mounted) setState(() => _addState = state);
-            },
-            onAdded: () {
-              if (!mounted) return;
-              _repositoryController.clear();
-              _revisionController.clear();
-              setState(() => _addState = const _Unresolved());
-            },
-            engine: _customEngine,
-            onEngine: (engine) => setState(() {
-              _customEngine = engine;
-              // A resolution belongs to one engine's file selection.
-              _addState = const _Unresolved();
-            }),
+          CustomRepositoryCard(
+            // Keyed: adding a repository grows the list above this card, and
+            // an unkeyed child at a shifted index is rebuilt from scratch.
+            key: const Key('custom-repository-card'),
             simulatedDownloads: model.simulated,
           ),
         ],
@@ -351,427 +310,6 @@ class _RuntimeCard extends ConsumerWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// What the Add flow has learned about the repository currently in the field.
-sealed class _AddState {
-  const _AddState();
-}
-
-final class _Unresolved extends _AddState {
-  const _Unresolved();
-}
-
-final class _Resolving extends _AddState {
-  const _Resolving();
-}
-
-final class _Resolved extends _AddState {
-  const _Resolved(this.outcome);
-
-  final RepositoryResolved outcome;
-}
-
-final class _WeightChoice extends _AddState {
-  const _WeightChoice(this.candidates);
-
-  final List<ResolvedWeightCandidate> candidates;
-}
-
-final class _Refused extends _AddState {
-  const _Refused(this.reason);
-
-  final RepositoryRejection reason;
-}
-
-class _CustomRepositoryCard extends ConsumerWidget {
-  const _CustomRepositoryCard({
-    required this.controller,
-    required this.revisionController,
-    required this.state,
-    required this.onState,
-    required this.onAdded,
-    required this.engine,
-    required this.onEngine,
-    required this.simulatedDownloads,
-  });
-
-  final TextEditingController controller;
-  final TextEditingController revisionController;
-
-  /// Owned by the screen, so scrolling this card off-list cannot discard it.
-  final _AddState state;
-  final ValueChanged<_AddState> onState;
-
-  /// Clears the draft once a spec is persisted. Owned by the screen for the
-  /// same reason [state] is, and because it touches the two controllers.
-  final VoidCallback onAdded;
-
-  final ModelEngine engine;
-  final ValueChanged<ModelEngine> onEngine;
-
-  /// Both backends resolve, so only the copy differs — a simulated size is
-  /// never presented as something that was measured.
-  final bool simulatedDownloads;
-
-  String get _ref => revisionController.text.trim().isEmpty
-      ? 'main'
-      : revisionController.text.trim();
-
-  /// Any edit makes an existing resolution stale, and showing a commit and file
-  /// list for a repository the user has since retyped is worse than nothing.
-  void _invalidate() {
-    if (state is! _Unresolved) onState(const _Unresolved());
-  }
-
-  Future<void> _resolve(WidgetRef ref, {String? weightsFile}) async {
-    final repository = controller.text.trim();
-    if (repository.isEmpty) return;
-    // Every seam is read before the first await; the workflow owns the
-    // collision derivation and the resolver's failure contract.
-    final workflow = CustomRepositoryWorkflow(
-      resolver: ref.read(customRepositoryResolverProvider),
-    );
-    final pinned = ref.read(modelCatalogEntriesProvider);
-    final custom =
-        ref.read(preferencesControllerProvider).value?.customModels ??
-        const <CustomModelSpec>[];
-    onState(const _Resolving());
-    final outcome = await workflow.resolve(
-      repository: repository,
-      engine: engine,
-      ref: _ref,
-      weightsFile: weightsFile,
-      pinned: pinned,
-      custom: custom,
-    );
-    onState(switch (outcome) {
-      RepositoryResolved() => _Resolved(outcome),
-      RepositoryNeedsWeightChoice(:final candidates) => _WeightChoice(
-        candidates,
-      ),
-      RepositoryRejected(:final reason) => _Refused(reason),
-    });
-  }
-
-  Future<void> _add(
-    BuildContext context,
-    WidgetRef ref,
-    RepositoryResolved outcome,
-  ) async {
-    final preferences = ref.read(preferencesControllerProvider.notifier);
-    final added = await preferences.addCustomModel(
-      CustomModelSpec(
-        repository: controller.text.trim(),
-        engine: engine,
-        revision: _ref,
-        profile: outcome.profile,
-        resolved: outcome.resolved,
-      ),
-    );
-    if (!added) {
-      // The preference write failed and rolled back; the resolution card is
-      // still on screen, so Add remains the retry affordance.
-      if (context.mounted) {
-        showGolemToast(context, context.l10n.modelSaveFailed);
-      }
-      return;
-    }
-    // The controllers and the draft state belong to the screen, which may be
-    // gone: only it can decide whether resetting them is still meaningful.
-    onAdded();
-    if (context.mounted) showGolemToast(context, context.l10n.modelAdded);
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
-    return SettingsCard(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  _EngineChip(
-                    key: const Key('custom-repo-engine-mlx'),
-                    label: 'MLX',
-                    selected: engine == ModelEngine.mlx,
-                    onTap: () => onEngine(ModelEngine.mlx),
-                  ),
-                  const SizedBox(width: 8),
-                  _EngineChip(
-                    key: const Key('custom-repo-engine-gguf'),
-                    label: 'GGUF',
-                    selected: engine == ModelEngine.gguf,
-                    onTap: () => onEngine(ModelEngine.gguf),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              _field(
-                context,
-                key: const Key('custom-repo-field'),
-                controller: controller,
-                placeholder: engine == ModelEngine.mlx
-                    ? 'mlx-community/model-name'
-                    : 'org/model-name-GGUF',
-                muted: muted,
-              ),
-              const SizedBox(height: 10),
-              _field(
-                context,
-                key: const Key('custom-repo-revision'),
-                controller: revisionController,
-                placeholder: context.l10n.repositoryRevisionPlaceholder,
-                muted: muted,
-              ),
-              const SizedBox(height: 16),
-              ..._outcome(context, ref, muted),
-              const SizedBox(height: 12),
-              Text(switch (state) {
-                _Resolved(:final outcome) when outcome.profile == null =>
-                  context.l10n.unknownTemplateWarning,
-                _ when simulatedDownloads =>
-                  context.l10n.simulatedRepositoryDetail,
-                _ => context.l10n.publicRepositoryDetail,
-              }, style: GolemText.footnote.copyWith(color: muted)),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _field(
-    BuildContext context, {
-    required Key key,
-    required TextEditingController controller,
-    required String placeholder,
-    required Color muted,
-  }) => CupertinoTextField(
-    key: key,
-    controller: controller,
-    textDirection: TextDirection.ltr,
-    placeholder: placeholder,
-    autocorrect: false,
-    enableSuggestions: false,
-    onChanged: (_) => _invalidate(),
-    style: GolemText.code,
-    placeholderStyle: GolemText.code.copyWith(color: muted),
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-    decoration: BoxDecoration(
-      border: Border.all(
-        color: CupertinoDynamicColor.resolve(GolemTheme.borderStrong, context),
-      ),
-      borderRadius: BorderRadius.circular(GolemRadius.field),
-    ),
-  );
-
-  List<Widget> _outcome(
-    BuildContext context,
-    WidgetRef ref,
-    Color muted,
-  ) => switch (state) {
-    _Unresolved() => [_resolveButton(ref)],
-    _Resolving() => [
-      Row(
-        children: [
-          const CupertinoActivityIndicator(radius: 8),
-          const SizedBox(width: 10),
-          Flexible(
-            child: Text(
-              context.l10n.readingRepository,
-              style: GolemText.footnote.copyWith(color: muted),
-            ),
-          ),
-        ],
-      ),
-    ],
-    _Refused(:final reason) => [
-      Text(
-        key: const Key('custom-repo-error'),
-        repositoryRejectionMessage(context.l10n, reason),
-        style: GolemText.footnote.copyWith(
-          color: CupertinoDynamicColor.resolve(GolemTheme.destructive, context),
-        ),
-      ),
-      const SizedBox(height: 14),
-      _resolveButton(ref, label: context.l10n.tryAgain),
-    ],
-    _WeightChoice(:final candidates) => [
-      Text(
-        context.l10n.chooseWeightFile,
-        style: GolemText.footnote.copyWith(color: muted),
-      ),
-      const SizedBox(height: 10),
-      for (final candidate in candidates)
-        CupertinoButton(
-          key: Key('custom-repo-candidate-${candidate.path}'),
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
-          onPressed: () => _resolve(ref, weightsFile: candidate.path),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  candidate.path,
-                  style: GolemText.code,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                gigabytes(candidate.bytes),
-                style: GolemText.footnote.copyWith(color: muted),
-              ),
-            ],
-          ),
-        ),
-    ],
-    _Resolved(:final outcome) => [
-      Column(
-        key: const Key('custom-repo-detail'),
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          LabeledRow(
-            label: context.l10n.revision,
-            // The commit, not the ref that was typed: this is what installs.
-            value: outcome.resolved.commitSha.substring(0, 12),
-          ),
-          const SizedBox(height: 8),
-          LabeledRow(
-            label: context.l10n.quantization,
-            value: outcome.resolved.quantization,
-          ),
-          const SizedBox(height: 8),
-          LabeledRow(
-            label: context.l10n.size,
-            value: gigabytes(outcome.resolved.totalBytes),
-          ),
-          const SizedBox(height: 8),
-          LabeledRow(
-            label: context.l10n.promptProfile,
-            value: outcome.profile?.key ?? context.l10n.notRecognized,
-          ),
-          const SizedBox(height: 12),
-          for (final file in outcome.resolved.files.take(5))
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      file.path,
-                      style: GolemText.code.copyWith(color: muted),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    gigabytes(file.bytes),
-                    style: GolemText.footnote.copyWith(color: muted),
-                  ),
-                ],
-              ),
-            ),
-          if (outcome.resolved.files.length > 5)
-            Text(
-              context.l10n.moreFiles(outcome.resolved.files.length - 5),
-              style: GolemText.footnote.copyWith(color: muted),
-            ),
-        ],
-      ),
-      const SizedBox(height: 16),
-      Builder(
-        builder: (context) => GolemButton.filled(
-          key: const Key('custom-repo-add'),
-          label: context.l10n.addModel,
-          onPressed: () => _add(context, ref, outcome),
-        ),
-      ),
-    ],
-  };
-
-  Widget _resolveButton(WidgetRef ref, {String? label}) =>
-      ValueListenableBuilder<TextEditingValue>(
-        valueListenable: controller,
-        builder: (context, value, _) => GolemButton.filled(
-          key: const Key('custom-repo-resolve'),
-          label: label ?? context.l10n.resolveRepository,
-          onPressed: value.text.trim().isEmpty ? null : () => _resolve(ref),
-        ),
-      );
-}
-
-class _EngineChip extends StatelessWidget {
-  const _EngineChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    super.key,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = CupertinoDynamicColor.resolve(GolemTheme.accent, context);
-    // A 6pt dot and a fill were the only cue that this pair is a choice.
-    return Semantics(
-      selected: selected,
-      child: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
-        onPressed: onTap,
-        child: Container(
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 13),
-          decoration: BoxDecoration(
-            color: CupertinoDynamicColor.resolve(
-              selected ? GolemTheme.accentSoft : GolemTheme.fillQuiet,
-              context,
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (selected) ...[
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: accent,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-                const SizedBox(width: 6),
-              ],
-              Text(
-                label,
-                style: GolemText.captionStrong.copyWith(
-                  color: selected
-                      ? CupertinoDynamicColor.resolve(
-                          GolemTheme.accentIcon,
-                          context,
-                        )
-                      : CupertinoDynamicColor.resolve(
-                          GolemTheme.mutedInk,
-                          context,
-                        ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

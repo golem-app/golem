@@ -10,7 +10,7 @@ import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 import 'package:golem_flutter/core/repositories/file_attachment_repository.dart';
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
-import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
+import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
 
 import 'support/in_memory_attachment_repository.dart';
 import 'support/in_memory_chat_history_repository.dart';

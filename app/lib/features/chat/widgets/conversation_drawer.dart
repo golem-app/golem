@@ -20,10 +20,11 @@ import '../../../core/theme/golem_theme.dart';
 import '../../../l10n/bidi.dart';
 import '../../../l10n/l10n.dart';
 import '../../models/application/model_providers.dart';
-import '../../settings/application/storage_providers.dart';
+import '../../models/application/storage_providers.dart';
+import '../../models/model_label.dart';
+import '../application/active_model_providers.dart';
 import '../application/chat_providers.dart';
 import '../domain/chat_sections.dart';
-import '../model_label.dart';
 
 class ConversationDrawer extends ConsumerStatefulWidget {
   const ConversationDrawer({
@@ -49,12 +50,10 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
     );
     // The same one-line claim the nav bar makes, from the same function: two
     // copies of the honesty rule is one copy too many, and this one drifted.
-    final modelSubtitle = chatModelSubtitle(
+    final subtitle = modelSubtitle(
       backend: ref.watch(inferenceBackendProvider),
       catalog: ref.watch(effectiveModelCatalogProvider),
-      modelKey: widget.chat.active?.modelKey,
-      residentModelKey: ref.watch(residentModelKeyProvider),
-      loadableKeys: ref.watch(loadableModelKeysProvider),
+      activeKey: ref.watch(activeModelKeyProvider),
       runsModels: ref.watch(
         deviceEligibilityProvider.select((value) => value.runsModels),
       ),
@@ -100,7 +99,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        modelSubtitle,
+                        subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GolemText.caption.copyWith(color: faint),

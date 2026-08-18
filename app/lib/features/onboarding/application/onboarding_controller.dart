@@ -3,7 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/domain/model_admission.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/retry.dart';
-import '../../settings/application/preferences_providers.dart';
+import '../../preferences/application/preferences_providers.dart';
 
 part 'onboarding_controller.g.dart';
 

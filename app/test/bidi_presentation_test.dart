@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/chrome/golem_nav_bar.dart';
 import 'package:golem_flutter/features/chat/widgets/markdown/golem_markdown.dart';
-import 'package:golem_flutter/features/onboarding/model_download_consent.dart';
+import 'package:golem_flutter/features/models/model_download_consent.dart';
 
 import 'support/harness.dart';
 

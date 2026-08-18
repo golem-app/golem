@@ -13,12 +13,6 @@ part of 'storage_providers.dart';
 /// are unwired) — surfaces hide those figures instead of inventing them. The
 /// provider owns seam tolerance; the service owns the computation and its
 /// required-vs-optional failure policy.
-/// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it
-/// continuously anyway, and the 3.3.2 scope-swap hazard (see
-/// chatStorageSignature) rules autoDispose out. Staleness is owned by
-/// invalidation — the storage signature upstream and `ref.invalidate` after
-/// a cache clear — never by a `KeepAliveLink` TTL (handbook v5.0 §4.4, a
-/// silent no-op on keepAlive providers).
 
 @ProviderFor(storageBreakdown)
 final storageBreakdownProvider = StorageBreakdownProvider._();
@@ -28,12 +22,6 @@ final storageBreakdownProvider = StorageBreakdownProvider._();
 /// are unwired) — surfaces hide those figures instead of inventing them. The
 /// provider owns seam tolerance; the service owns the computation and its
 /// required-vs-optional failure policy.
-/// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it
-/// continuously anyway, and the 3.3.2 scope-swap hazard (see
-/// chatStorageSignature) rules autoDispose out. Staleness is owned by
-/// invalidation — the storage signature upstream and `ref.invalidate` after
-/// a cache clear — never by a `KeepAliveLink` TTL (handbook v5.0 §4.4, a
-/// silent no-op on keepAlive providers).
 
 final class StorageBreakdownProvider
     extends
@@ -48,12 +36,6 @@ final class StorageBreakdownProvider
   /// are unwired) — surfaces hide those figures instead of inventing them. The
   /// provider owns seam tolerance; the service owns the computation and its
   /// required-vs-optional failure policy.
-  /// KeepAlive, deliberately (#69): the always-mounted drawer meter watches it
-  /// continuously anyway, and the 3.3.2 scope-swap hazard (see
-  /// chatStorageSignature) rules autoDispose out. Staleness is owned by
-  /// invalidation — the storage signature upstream and `ref.invalidate` after
-  /// a cache clear — never by a `KeepAliveLink` TTL (handbook v5.0 §4.4, a
-  /// silent no-op on keepAlive providers).
   StorageBreakdownProvider._()
     : super(
         from: null,
@@ -80,4 +62,4 @@ final class StorageBreakdownProvider
   }
 }
 
-String _$storageBreakdownHash() => r'7161d3d53b1b89aceb56c14321b469d5713a64e0';
+String _$storageBreakdownHash() => r'37052d38d1c2bbc44c1959881ac1756e421aa29d';

@@ -33,6 +33,8 @@ jobs:
         run: dart format --output=none --set-exit-if-changed .
       - name: Import boundary
         run: dart run tool/check_inferno_imports.dart
+      - name: Feature layering
+        run: dart run tool/check_feature_imports.dart
       - name: Analyze
         run: flutter analyze
         working-directory: app

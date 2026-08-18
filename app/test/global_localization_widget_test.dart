@@ -7,7 +7,7 @@ import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/chat/widgets/attach_sheet.dart';
 import 'package:golem_flutter/features/chat/widgets/recovery_banner.dart';
-import 'package:golem_flutter/features/onboarding/model_download_consent.dart';
+import 'package:golem_flutter/features/models/model_download_consent.dart';
 import 'package:golem_flutter/features/settings/language_screen.dart';
 import 'package:golem_flutter/features/settings/models_screen.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';

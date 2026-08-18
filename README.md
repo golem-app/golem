@@ -13,7 +13,9 @@ workspace with two members:
   the decision notes in [`docs/decisions/`](docs/decisions/).
 
 Only [`app/lib/broker/`](app/lib/broker/) may import `package:inferno`;
-`tool/check_inferno_imports.dart` enforces that boundary in CI. The broker
+`tool/check_inferno_imports.dart` enforces that boundary in CI, and
+`tool/check_feature_imports.dart` enforces the app's own feature-import
+direction ([ADR 0015](docs/decisions/0015-feature-layering.md)). The broker
 owns Gemma chat templating, reasoning-tag parsing, and stop-token policy —
 engines receive fully rendered prompts and emit raw text.
 
@@ -86,6 +88,7 @@ Verify (from the repo root):
 ```sh
 cd app && fvm flutter pub get && fvm flutter analyze && fvm flutter test && cd ..
 fvm dart run tool/check_inferno_imports.dart
+fvm dart run tool/check_feature_imports.dart
 fvm dart run tool/check_toolchain.dart
 cd packages/inferno && fvm dart test
 ```

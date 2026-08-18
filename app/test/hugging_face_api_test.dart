@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -247,6 +248,56 @@ void main() {
         (request) async {},
         timeout: const Duration(milliseconds: 200),
       );
+
+      await expectLater(
+        api.json(url()),
+        throwsA(
+          isA<HubException>().having(
+            (error) => error.kind,
+            'kind',
+            HubErrorKind.network,
+          ),
+        ),
+      );
+    });
+
+    test('an error body that stalls is still bounded', () async {
+      // The status is known here and the body is drained only to free the
+      // connection, so a server that answers 403 and then holds the socket
+      // open must not hang the caller either.
+      await serve((request) async {
+        request.response.statusCode = HttpStatus.forbidden;
+        request.response.add(utf8.encode('{"error":'));
+        await request.response.flush();
+        await Completer<void>().future;
+      }, timeout: const Duration(milliseconds: 200));
+
+      await expectLater(
+        api.json(url()),
+        throwsA(
+          isA<HubException>()
+              .having(
+                (error) => error.kind,
+                'kind',
+                HubErrorKind.notFoundOrPrivate,
+              )
+              .having((error) => error.status, 'status', HttpStatus.forbidden),
+        ),
+      );
+    });
+
+    test('a body that stalls mid-stream is a network failure', () async {
+      // The gap #129 closed: connecting and reading the status line were
+      // bounded, draining the body was not. A server that answered 200, sent a
+      // chunk and then went quiet hung resolve() for as long as the socket
+      // stayed open — a spinner with no way back.
+      await serve((request) async {
+        request.response.statusCode = HttpStatus.ok;
+        request.response.add(utf8.encode('{"partial":'));
+        await request.response.flush();
+        // Deliberately never closed.
+        await Completer<void>().future;
+      }, timeout: const Duration(milliseconds: 200));
 
       await expectLater(
         api.json(url()),

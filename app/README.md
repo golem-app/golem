@@ -186,9 +186,17 @@ The Flutter app never migrates, opens, or otherwise reads another app's data.
 
 `CupertinoApp.router` and GoRouter own navigation. Features live under
 `lib/features/`, each owning its controllers and derivations in
-`features/<name>/application/` with committed `.g.dart` parts (chat, models,
-settings — including preferences and storage accounting — splash, benchmark,
-onboarding, eval). Shared immutable models, the Golem Navy design tokens
+`features/<name>/application/` with committed `.g.dart` parts (legal,
+preferences, models — including storage accounting — chat, settings,
+onboarding, benchmark, eval, splash). Those are also the layers of a recorded
+import direction, in that order: a feature imports strictly downward and never
+sideways, `core/` imports no feature at all, and only `lib/app/` and `main.dart`
+may name every feature. `../tool/check_feature_imports.dart` and
+`test/feature_import_boundary_test.dart` enforce it; the reasoning, including
+why the Models screen is a Settings screen, is in
+[ADR 0015](../docs/decisions/0015-feature-layering.md).
+
+Shared immutable models, the Golem Navy design tokens
 (`lib/core/theme/` — colors, type ramp, radii/spacing/sizes, elevation and
 motion, light + dark), the platform-chrome layer (`lib/core/chrome/` —
 `GolemChrome` resolves cupertino or android chrome from the target platform
@@ -266,7 +274,9 @@ reports instead — the trade, and what it costs, is recorded in
 repository
 downloads, verifies, and activates through the same paths as a pinned one; the
 fake simulates the whole flow, and an unresolved entry still refuses to download
-because its file list is synthesized.
+because its file list is synthesized. What a resolution is allowed to trust,
+and the five bounds on reading a stranger's server, are recorded in
+[ADR 0014](../docs/decisions/0014-hub-read-client.md).
 
 Assistant messages render a scoped markdown subset (paragraphs, emphasis,
 inline code, one-level lists, fenced code with a fixed dark card in both
@@ -405,6 +415,7 @@ fvm dart format --output=none --set-exit-if-changed .
 fvm flutter analyze
 fvm flutter test
 (cd .. && fvm dart run tool/check_inferno_imports.dart)
+(cd .. && fvm dart run tool/check_feature_imports.dart)
 (cd .. && fvm dart run tool/check_toolchain.dart)
 (cd ../packages/inferno && fvm dart test)
 ```

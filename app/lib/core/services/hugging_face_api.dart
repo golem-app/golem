@@ -92,11 +92,26 @@ final class HttpClientHuggingFaceApi implements HuggingFaceApi {
   HttpClientHuggingFaceApi({
     HttpClient? client,
     this.timeout = const Duration(seconds: 20),
-  }) : _client = client ?? (HttpClient()..userAgent = 'golem-app');
+  }) : _client =
+           client ??
+           (HttpClient()
+             ..userAgent = 'golem-app'
+             // dart:io's own default, pinned here so the only bound on what a
+             // process-lifetime client retains is stated where that lifetime
+             // is. Nothing closes this one: `detached` is the only teardown
+             // signal the app gets and Flutter permits `detached -> resumed`,
+             // so a forced close there would fail the next resolution as a
+             // network error (ADR 0014).
+             ..idleTimeout = const Duration(seconds: 15));
 
   final HttpClient _client;
+
+  /// Applies to connecting, to reading the response head, and — as an
+  /// inactivity deadline — between body chunks.
   final Duration timeout;
 
+  /// For tests, which build and tear down a client per case. Production keeps
+  /// one for the life of the process; see the constructor.
   void close() => _client.close(force: true);
 
   @override
@@ -157,12 +172,20 @@ final class HttpClientHuggingFaceApi implements HuggingFaceApi {
     }
     final status = response.statusCode;
     if (status != HttpStatus.ok && status != HttpStatus.partialContent) {
-      await response.drain<void>().catchError((_) {});
+      // Deadlined like the success path below, and for the same reason: a
+      // server that answers 4xx/5xx and then holds the socket open would
+      // otherwise hang here, where the status is already known and the body
+      // is being drained only to free the connection.
+      await response.drain<void>().timeout(timeout).catchError((Object _) {});
       throw HubException(_kindFor(status), status: status);
     }
     final builder = BytesBuilder(copy: false);
     try {
-      await for (final chunk in response) {
+      // Deadlined per chunk, not for the whole body: a slow but live
+      // connection on a bad network is not a failure, while a server that
+      // answers 200 and then stalls used to hang resolve() for as long as the
+      // socket stayed open — behind a spinner, with no way back (ADR 0014).
+      await for (final chunk in response.timeout(timeout)) {
         builder.add(chunk);
         if (builder.length > maxBytes) {
           throw const HubException(HubErrorKind.tooLarge);

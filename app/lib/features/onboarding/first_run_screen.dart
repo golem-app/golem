@@ -8,9 +8,9 @@ import '../../core/chrome/golem_badge.dart';
 import '../../core/chrome/golem_button.dart';
 import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
+import '../../core/domain/download_pace.dart';
 import '../../core/domain/model_admission.dart';
 import '../../core/domain/model_catalog.dart';
-import '../../core/domain/download_pace.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
@@ -20,10 +20,10 @@ import '../../l10n/presentation_messages.dart';
 import '../legal/ai_disclaimer.dart';
 import '../models/application/download_pace_providers.dart';
 import '../models/application/model_providers.dart';
+import '../models/model_download_consent.dart';
 import '../models/widgets/download_note_banner.dart';
-import '../settings/application/preferences_providers.dart';
+import '../preferences/application/preferences_providers.dart';
 import 'application/onboarding_controller.dart';
-import 'model_download_consent.dart';
 
 class FirstRunScreen extends ConsumerWidget {
   const FirstRunScreen({this.initialStep, super.key});

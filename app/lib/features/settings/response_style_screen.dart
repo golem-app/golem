@@ -11,18 +11,19 @@ import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/domain/app_preferences.dart';
 import '../../core/domain/generation_settings.dart';
+import '../../core/domain/model_activation.dart';
 import '../../core/domain/response_style_mapping.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
+import '../../core/widgets/settings_rows.dart';
 import '../../l10n/l10n.dart';
-import '../chat/model_label.dart';
 import '../models/application/model_providers.dart';
-import 'application/preferences_providers.dart';
-import 'application/settings_providers.dart';
+import '../models/model_label.dart';
+import '../preferences/application/generation_settings_providers.dart';
+import '../preferences/application/preferences_providers.dart';
 import 'save_feedback.dart';
-import 'widgets/settings_rows.dart';
 
 /// Response style: the three presets, and — in Advanced mode — the raw
 /// sampling controls for the active model profile.
@@ -38,7 +39,13 @@ class ResponseStyleScreen extends ConsumerWidget {
         const AppPreferences();
     final profileKey = backend.profileKey;
     final selected = preferences.styleFor(profileKey);
-    final modelLabel = chatModelLabel(backend: backend, catalog: catalog);
+    // Profile-scoped, not conversation-scoped: this screen edits
+    // `backend.profileKey`'s sampling, so the caption must name that model.
+    final modelLabel = modelDisplayLabel(
+      backend: backend,
+      catalog: catalog,
+      activeKey: bootModelKey(backend, catalog),
+    );
     return CupertinoPageScaffold(
       navigationBar: GolemNavBar(
         title: context.l10n.responseStyle,

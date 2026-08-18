@@ -15,7 +15,7 @@ import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/widgets/attach_sheet.dart';
 import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
-import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
+import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
 
 import 'support/harness.dart';
 import 'support/in_memory_attachment_repository.dart';

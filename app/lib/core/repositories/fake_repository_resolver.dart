@@ -1,24 +1,11 @@
-/// The seam the Add flow resolves through (#52).
-///
-/// An interface so the fake backend runs the same business flow as the real one:
-/// resolve, inspect what came back, then download. A one-tap add on the fake and
-/// a three-step add on a real engine would leave the interesting path untested
-/// by every golden and journey.
+/// The deterministic stand-in for [CustomRepositoryResolver], beside the other
+/// fakes it keeps company with.
 library;
 
 import '../domain/model_catalog.dart';
+import '../domain/repository_resolution.dart';
 import '../domain/resolved_repository.dart';
-import 'repository_resolver.dart';
-
-abstract interface class CustomRepositoryResolver {
-  Future<RepositoryResolution> resolve({
-    required String repository,
-    required ModelEngine engine,
-    String ref,
-    String? weightsFile,
-    Set<String> existingKeys,
-  });
-}
+import 'contracts.dart';
 
 /// Resolves without a network, deterministically from the repository name.
 ///

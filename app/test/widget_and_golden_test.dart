@@ -1518,7 +1518,6 @@ void main() {
               reasoningEnabled: false,
               generation: phase,
               activeId: null,
-              modelKey: null,
             ),
           ),
         ),

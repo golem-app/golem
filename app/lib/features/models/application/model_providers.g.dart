@@ -12,8 +12,8 @@ part of 'model_providers.dart';
 /// so the pinned manifest stays the single source of model knowledge.
 /// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
 /// (composer, drawer, recovery banner), so disposal would never fire in
-/// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature,
-/// which records why the pin cannot move) rules autoDispose out.
+/// practice — and the 3.3.2 scope-swap hazard (see storageBreakdown, which
+/// records why the pin cannot move) rules autoDispose out.
 
 @ProviderFor(effectiveModelCatalog)
 final effectiveModelCatalogProvider = EffectiveModelCatalogProvider._();
@@ -22,8 +22,8 @@ final effectiveModelCatalogProvider = EffectiveModelCatalogProvider._();
 /// so the pinned manifest stays the single source of model knowledge.
 /// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
 /// (composer, drawer, recovery banner), so disposal would never fire in
-/// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature,
-/// which records why the pin cannot move) rules autoDispose out.
+/// practice — and the 3.3.2 scope-swap hazard (see storageBreakdown, which
+/// records why the pin cannot move) rules autoDispose out.
 
 final class EffectiveModelCatalogProvider
     extends
@@ -37,8 +37,8 @@ final class EffectiveModelCatalogProvider
   /// so the pinned manifest stays the single source of model knowledge.
   /// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
   /// (composer, drawer, recovery banner), so disposal would never fire in
-  /// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature,
-  /// which records why the pin cannot move) rules autoDispose out.
+  /// practice — and the 3.3.2 scope-swap hazard (see storageBreakdown, which
+  /// records why the pin cannot move) rules autoDispose out.
   EffectiveModelCatalogProvider._()
     : super(
         from: null,
@@ -285,7 +285,7 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'92ce7a24956eeb4d7e4af5c68e24a46ddd6920f7';
+String _$modelControllerHash() => r'494ae5bae02b12c5fd1b52e3b9bc12df005530ab';
 
 /// KeepAlive: a command controller whose downloads, busy guard, and epochs
 /// must survive leaving the Models screen (handbook v5.0 §3.4 — an

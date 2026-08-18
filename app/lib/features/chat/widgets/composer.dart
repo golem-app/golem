@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/chrome/golem_toast.dart';
-import '../../../core/domain/model_activation.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/services/image_intake.dart';
@@ -12,9 +11,10 @@ import '../../../core/theme/golem_theme.dart';
 import '../../../l10n/bidi.dart';
 import '../../../l10n/l10n.dart';
 import '../../models/application/model_providers.dart';
-import '../../settings/application/preferences_providers.dart';
+import '../../models/model_label.dart';
+import '../../preferences/application/preferences_providers.dart';
+import '../application/active_model_providers.dart';
 import '../application/chat_providers.dart';
-import '../model_label.dart';
 import 'attach_sheet.dart';
 import 'model_picker_sheet.dart';
 
@@ -25,7 +25,6 @@ class Composer extends ConsumerStatefulWidget {
     required this.reasoningEnabled,
     required this.generation,
     required this.activeId,
-    required this.modelKey,
     this.picker = const AttachmentPicker(),
     super.key,
   });
@@ -36,7 +35,6 @@ class Composer extends ConsumerStatefulWidget {
 
   /// The active conversation, if one exists yet.
   final String? activeId;
-  final String? modelKey;
 
   final AttachmentPicker picker;
 
@@ -193,41 +191,28 @@ class _ComposerState extends ConsumerState<Composer> {
   bool get reasoningEnabled => widget.reasoningEnabled;
   GenerationPhase get generation => widget.generation;
   String? get activeId => widget.activeId;
-  String? get modelKey => widget.modelKey;
 
   @override
   Widget build(BuildContext context) {
     final generating = generation != GenerationPhase.idle;
     final backend = ref.watch(inferenceBackendProvider);
     final catalog = ref.watch(effectiveModelCatalogProvider);
-    final resident = ref.watch(residentModelKeyProvider);
     final loadable = ref.watch(loadableModelKeysProvider);
-    final modelLabel = chatModelLabel(
-      backend: backend,
-      catalog: catalog,
-      modelKey: modelKey,
-      residentModelKey: resident,
-      loadableKeys: loadable,
-    );
-    final supportsImages = chatModelSupportsImages(
-      backend: backend,
-      catalog: catalog,
-      modelKey: modelKey,
-      residentModelKey: resident,
-      loadableKeys: loadable,
-    );
     // On a real engine, the exact resolution `ChatController.send` performs,
-    // so the button and the turn cannot disagree. Gating on the raw
+    // so the button, the label and the turn cannot disagree. Gating on the raw
     // `modelKey ?? artifactKey` left Send dark while the header honestly read
     // "on device" off the fallback the send path would have taken, and lit it
     // for an artifact of the other engine that `statusOf` called installed
-    // (#118). The loadable set already means installed and compatible.
-    final target = effectiveModelKey(
+    // (#118).
+    final target = ref.watch(activeModelKeyProvider);
+    final modelLabel = modelDisplayLabel(
       backend: backend,
       catalog: catalog,
-      modelKey: modelKey,
-      residentModelKey: resident,
-      loadableKeys: loadable,
+      activeKey: target,
+    );
+    final supportsImages = modelSupportsImages(
+      catalog: catalog,
+      activeKey: target,
     );
     // The simulation runs the whole catalog without weights, so its send path
     // never refuses — the only reason to hold Send is first run's deferred

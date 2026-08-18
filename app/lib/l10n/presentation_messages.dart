@@ -1,9 +1,9 @@
-import '../core/domain/device_eligibility.dart';
 import '../core/domain/byte_format.dart';
+import '../core/domain/device_eligibility.dart';
 import '../core/domain/model_admission.dart';
 import '../core/domain/model_catalog.dart';
 import '../core/domain/models.dart';
-import '../core/services/repository_resolver.dart';
+import '../core/domain/repository_resolution.dart';
 import 'bidi.dart';
 import 'generated/app_localizations.dart';
 

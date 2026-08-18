@@ -3,18 +3,18 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/chrome/golem_button.dart';
-import '../../core/domain/app_preferences.dart';
-import '../../core/domain/models.dart';
-import '../../core/providers/app_providers.dart';
-import '../../core/theme/golem_theme.dart';
-import '../../core/widgets/progress_track.dart';
-import '../../l10n/l10n.dart';
-import '../../l10n/presentation_messages.dart';
-import '../models/application/model_providers.dart';
-import '../models/widgets/download_note_banner.dart';
-import '../settings/application/preferences_providers.dart';
-import 'model_download_consent.dart';
+import '../../../core/chrome/golem_button.dart';
+import '../../../core/domain/app_preferences.dart';
+import '../../../core/domain/models.dart';
+import '../../../core/providers/app_providers.dart';
+import '../../../core/theme/golem_theme.dart';
+import '../../../core/widgets/progress_track.dart';
+import '../../../l10n/l10n.dart';
+import '../../../l10n/presentation_messages.dart';
+import '../../preferences/application/preferences_providers.dart';
+import '../application/model_providers.dart';
+import '../model_download_consent.dart';
+import 'download_note_banner.dart';
 
 /// The recoverable path promised when first-run consent is declined. It reads
 /// the same model controller as Settings, so pause, verification, failure, and

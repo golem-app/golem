@@ -4,7 +4,7 @@ import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_activation.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
-import 'package:golem_flutter/features/chat/model_label.dart';
+import 'package:golem_flutter/features/models/model_label.dart';
 
 void main() {
   const real = InferenceBackendConfig(
@@ -41,12 +41,10 @@ void main() {
           'the moment a model is picked',
     );
     expect(
-      chatModelSubtitle(
+      modelSubtitle(
         backend: real,
         catalog: modelCatalog,
-        modelKey: 'qwen35-mlx',
-        residentModelKey: 'gemma4-mlx',
-        loadableKeys: {'gemma4-mlx', 'qwen35-mlx'},
+        activeKey: 'qwen35-mlx',
       ),
       'Qwen 3.5 4B · on device',
     );
@@ -249,12 +247,12 @@ void main() {
     );
     expect(effectiveModelKey(backend: sideload, catalog: modelCatalog), isNull);
     expect(
-      chatModelSubtitle(backend: sideload, catalog: modelCatalog),
+      modelSubtitle(backend: sideload, catalog: modelCatalog, activeKey: null),
       'my-own-build.gguf · on device',
     );
     // gemma4-gguf is image-capable; the sideload must not borrow that proof.
     expect(
-      chatModelSupportsImages(backend: sideload, catalog: modelCatalog),
+      modelSupportsImages(catalog: modelCatalog, activeKey: null),
       isFalse,
     );
   });
@@ -289,15 +287,21 @@ void main() {
       'qwen35-gguf',
     );
     expect(
-      chatModelSubtitle(
+      modelSubtitle(
         backend: fake,
         catalog: modelCatalog,
-        modelKey: 'qwen35-gguf',
+        activeKey: 'qwen35-gguf',
       ),
       'Qwen 3.5 4B · simulated',
     );
     expect(
-      chatModelSubtitle(backend: fake, catalog: modelCatalog, modelKey: null),
+      // What the build boots with, which is what a surface scoped to the
+      // profile rather than the conversation names (#129).
+      modelSubtitle(
+        backend: fake,
+        catalog: modelCatalog,
+        activeKey: bootModelKey(fake, modelCatalog),
+      ),
       'Gemma 4 E2B · simulated',
     );
   });
@@ -306,7 +310,7 @@ void main() {
     // "on device" is a claim about residency, and nothing will ever be
     // resident here; the subtitle drops the model rather than imply one.
     expect(
-      chatModelSubtitle(
+      modelSubtitle(
         backend: const InferenceBackendConfig(
           kind: InferenceBackendKind.llama,
           profileKey: 'qwen35',
@@ -315,15 +319,20 @@ void main() {
           modelPathFromCatalog: true,
         ),
         catalog: modelCatalog,
+        activeKey: 'qwen35-2b-gguf',
         runsModels: false,
       ),
       'Unsupported device',
     );
     // The fake is never refused, so it keeps saying what it is.
     expect(
-      chatModelSubtitle(
+      modelSubtitle(
         backend: const InferenceBackendConfig.fake(),
         catalog: modelCatalog,
+        activeKey: bootModelKey(
+          const InferenceBackendConfig.fake(),
+          modelCatalog,
+        ),
         runsModels: false,
       ),
       contains('simulated'),

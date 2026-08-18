@@ -11,15 +11,15 @@ import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
+import 'package:golem_flutter/core/domain/repository_resolution.dart';
 import 'package:golem_flutter/core/domain/resolved_repository.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
-import 'package:golem_flutter/core/services/custom_repository_resolver.dart';
-import 'package:golem_flutter/core/services/repository_resolver.dart';
+import 'package:golem_flutter/core/repositories/fake_repository_resolver.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
-import 'package:golem_flutter/features/settings/appearance_screen.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
+import 'package:golem_flutter/features/settings/appearance_screen.dart';
 import 'package:golem_flutter/features/settings/models_screen.dart';
 import 'package:golem_flutter/features/settings/privacy_screen.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';
@@ -364,6 +364,20 @@ void main() {
     expect(spec.profile, isNull);
     expect(spec.toCatalogEntry().profileKey, unresolvedProfileKey);
     expect(find.byKey(const Key('golem-toast')), findsOneWidget);
+    // The draft is spent: both fields empty and the resolution gone, so the
+    // card reads as ready for the next repository rather than as the last
+    // one still pending. Persisting the spec grows the list this card sits
+    // in, which is what used to leave the added name typed in (#129).
+    expect(
+      tester
+          .widget<CupertinoTextField>(
+            find.byKey(const Key('custom-repo-field')),
+          )
+          .controller!
+          .text,
+      isEmpty,
+    );
+    expect(find.byKey(const Key('custom-repo-detail')), findsNothing);
     await tester.pump(const Duration(milliseconds: 1600));
     // The derived card joins the catalog list.
     await tester.scrollUntilVisible(
@@ -589,6 +603,48 @@ void main() {
     await tester.pumpAndSettle();
     expect(reasoning, findsOneWidget);
   }, variant: iosChrome);
+
+  testWidgets(
+    'the root model row names the chat\'s model, not the boot one',
+    (tester) async {
+      // The visible half of the one-derivation rule (#129). The row used to
+      // resolve from residency alone, so with nothing loaded yet it named the
+      // build's boot artifact while chat, the picker and the Models screen all
+      // named the conversation's choice.
+      await pumpWithRepositories(
+        tester,
+        backend: const InferenceBackendConfig(
+          kind: InferenceBackendKind.mlx,
+          profileKey: 'gemma4',
+          artifactKey: 'gemma4-mlx',
+          modelPath: '/models/gemma',
+          modelPathFromCatalog: true,
+        ),
+        model: const ModelState(
+          artifacts: {
+            'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+            'qwen35-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+          },
+        ),
+        history: ChatHistorySnapshot(
+          activeId: 'chat',
+          conversations: [
+            ChatConversation(
+              id: 'chat',
+              title: 'Switched',
+              updatedAt: DateTime.utc(2026, 8, 18),
+              messages: const [],
+              modelKey: 'qwen35-mlx',
+            ),
+          ],
+        ),
+        child: const SettingsScreen(identity: AppIdentity.dev),
+      );
+      expect(find.text('Qwen 3.5 4B'), findsOneWidget);
+      expect(find.text('Gemma 4 E2B'), findsNothing);
+    },
+    variant: iosChrome,
+  );
 
   testWidgets('the root reflects the active style and advanced rows', (
     tester,
