@@ -72,6 +72,20 @@ void main() {
       },
     );
 
+    test('a verification is complete, not partway', () {
+      // `real_model_management_repository` publishes `verifying` with the
+      // bytes verified *so far*, one file at a time. Reading a fraction off
+      // that would walk a finished download's bar backwards.
+      final transfer = project(
+        const ArtifactStatus(
+          phase: ArtifactPhase.verifying,
+          downloadedBytes: 400000000,
+        ),
+      );
+      expect(transfer.fraction, 1.0);
+      expect(transfer.percent, 100);
+    });
+
     test('a sizeless entry reads zero instead of dividing by it', () {
       final transfer = artifactTransfer(
         entry: const ModelCatalogEntry(
@@ -275,7 +289,7 @@ void main() {
               ).affordance!
               as TransferOffer;
       expect(offer.block, TransferBlock.deviceRefused);
-      expect(offer.note, 'Not available on this device.');
+      expect(offer.note, isNull, reason: 'the surface words this one');
     });
 
     test('a sideload has nothing to fetch', () {
@@ -283,7 +297,7 @@ void main() {
           project(const ArtifactStatus(), sideloaded: true).affordance!
               as TransferOffer;
       expect(offer.block, TransferBlock.sideload);
-      expect(offer.note, 'Pinned by this build.');
+      expect(offer.note, isNull, reason: 'the surface words this one');
     });
 
     test('an unadmitted artifact leaves its sentence to the caller', () {
@@ -294,36 +308,52 @@ void main() {
       expect(offer.note, isNull);
     });
 
-    test('an unresolved repository cannot be fetched, and says so', () {
+    test('an unresolved repository cannot be fetched', () {
       final offer =
           project(const ArtifactStatus(), downloadable: false).affordance!
               as TransferOffer;
       expect(offer.block, TransferBlock.unresolvedRepository);
-      expect(offer.note, contains('has not been resolved'));
+      expect(offer.note, isNull, reason: 'the surface words this one');
     });
 
-    test(
-      'an artifact this engine cannot load is blocked, unless simulated',
-      () {
-        expect(
-          (project(const ArtifactStatus(), loadsHere: false).affordance!
-                  as TransferOffer)
-              .block,
-          TransferBlock.otherEngine,
-        );
-        expect(
-          (project(
-                    const ArtifactStatus(),
-                    loadsHere: false,
-                    simulated: true,
-                  ).affordance!
-                  as TransferOffer)
-              .block,
-          isNull,
-          reason: 'the fake loads every format',
-        );
-      },
-    );
+    test('only a busy slot carries its own sentence', () {
+      // Every other block is worded by the surface — the picker as the row's
+      // blockReason, Settings in its own order under its own button — so a
+      // second copy here would be copy nobody reads.
+      for (final blocked in [
+        () => project(const ArtifactStatus(), deviceRefusal: 'no'),
+        () => project(const ArtifactStatus(), sideloaded: true),
+        () => project(const ArtifactStatus(), admitted: false),
+        () => project(const ArtifactStatus(), downloadable: false),
+        () => project(const ArtifactStatus(), loadsHere: false),
+      ]) {
+        final offer = blocked().affordance! as TransferOffer;
+        expect(offer.block, isNotNull);
+        expect(offer.note, isNull);
+      }
+    });
+
+    test('an artifact this engine cannot load is blocked', () {
+      expect(
+        (project(const ArtifactStatus(), loadsHere: false).affordance!
+                as TransferOffer)
+            .block,
+        TransferBlock.otherEngine,
+      );
+      // A fake *backend* loads every format, but that is the caller's fact
+      // to state through `loadsHere`; a simulated *download* says nothing
+      // about which weights an engine can map.
+      expect(
+        (project(
+                  const ArtifactStatus(),
+                  loadsHere: false,
+                  simulated: true,
+                ).affordance!
+                as TransferOffer)
+            .block,
+        TransferBlock.otherEngine,
+      );
+    });
 
     test('a running transfer is described whatever the verdict', () {
       // Settings has no tier gate, so it can start a download this device is

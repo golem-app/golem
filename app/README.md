@@ -217,11 +217,17 @@ root.
 One artifact transfer is projected once, by
 `features/models/artifact_transfer.dart`: the percentage, the pace figures,
 the phase's affordance and why it is blocked. First run, Settings ▸ Models,
-the chat setup banner and the model picker all read that one answer, the two
-card surfaces through `TransferCard` at two densities and the rest through
+the chat setup banner and the model picker all read that one answer — the two
+card surfaces through `TransferCard` at two densities, the rest through
 `LabeledProgress`, which is also the only place a progress bar states its
-accessible reading. What stays per surface is the copy — the same decision is
-"Resume download" under a full-width primary and "Resume" inside a picker row.
+accessible reading. Two things stay per surface, on purpose: the copy (the
+same decision is "Resume download" under a full-width primary and "Resume"
+inside a picker row, so the projection carries the action and not the
+sentence), and whether a blocked offer is dimmed or withheld — the picker
+withholds it per [ADR 0007](../docs/decisions/0007-supported-device-policy.md),
+Settings dims it and prints the reason in its own order, because an unresolved
+repository is the more specific problem there. Only the busy slot's sentence
+is shared; a second copy of the rest would be copy nobody reads.
 
 - `ChatController`: authoritative chats and active selection for the live
   session, with an orthogonal recovery notice when durability falls behind.

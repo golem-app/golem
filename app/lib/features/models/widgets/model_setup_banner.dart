@@ -13,6 +13,7 @@ import '../../../l10n/l10n.dart';
 import '../../../l10n/presentation_messages.dart';
 import '../../preferences/application/preferences_providers.dart';
 import '../application/model_providers.dart';
+import '../artifact_transfer.dart';
 import '../model_download_consent.dart';
 import 'download_note_banner.dart';
 
@@ -42,9 +43,12 @@ class ModelSetupBanner extends ConsumerWidget {
     if (status.phase == ArtifactPhase.installed) {
       return const SizedBox.shrink();
     }
-    final progress = entry.totalBytes == 0
-        ? 0.0
-        : (status.downloadedBytes / entry.totalBytes).clamp(0.0, 1.0);
+    final transfer = artifactTransfer(
+      entry: entry,
+      status: status,
+      localizations: context.l10n,
+      simulated: model.simulated,
+    );
     return Container(
       key: const Key('model-setup-banner'),
       margin: const EdgeInsetsDirectional.fromSTEB(12, 4, 12, 6),
@@ -81,8 +85,8 @@ class ModelSetupBanner extends ConsumerWidget {
             // caption of its own.
             LabeledProgress(
               semanticsLabel: context.l10n.download,
-              fraction: progress,
-              percent: (progress * 100).round(),
+              fraction: transfer.fraction,
+              percent: transfer.percent,
               showPercent: false,
             ),
           ],

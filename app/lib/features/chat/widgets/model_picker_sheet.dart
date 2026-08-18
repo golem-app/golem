@@ -341,8 +341,10 @@ final class _ModelRow extends StatelessWidget {
             captionStyle: GolemText.caption.copyWith(color: muted),
             fraction: choice.transfer!.fraction,
             percent: choice.transfer!.percent,
-            // A verification is not 40% verified; the caption carries it.
+            // A verification is not 40% verified — neither painted nor read
+            // out; the caption carries the phase.
             showPercent: progress.pausable,
+            announcePercent: progress.pausable,
           ),
           if (progress.pausable) ...[
             const SizedBox(height: GolemSpace.s2),

@@ -70,6 +70,9 @@ class TransferCard extends StatelessWidget {
       // At hero size the caption *is* the percentage; printing it twice on one
       // line would be a typo, not a design.
       showPercent: !prominent,
+      // The size, the rate and the time left are the only place a user on the
+      // first-run screen can learn them, and they read out there.
+      announceDetail: prominent,
       detailLeading: showBytes
           ? context.l10n.downloadAmount(transfer.transferred, transfer.total)
           : null,

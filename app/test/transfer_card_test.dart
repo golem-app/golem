@@ -165,15 +165,21 @@ void main() {
     expect(find.text('3.00 GB left'), findsOneWidget);
   });
 
-  testWidgets('the simulation qualifier reaches the byte figures', (
+  testWidgets('a verification fills the bar rather than emptying it', (
     tester,
   ) async {
+    // The repository counts verified bytes per file, so a fraction derived
+    // from them would collapse a finished download's bar to one file's worth.
     await pump(
       tester,
       density: TransferDensity.dense,
-      phase: ArtifactPhase.paused,
-      simulated: true,
+      phase: ArtifactPhase.verifying,
     );
-    expect(find.text('1.00 GB of 4.00 GB'), findsOneWidget);
+    expect(
+      tester
+          .widget<FractionallySizedBox>(find.byType(FractionallySizedBox))
+          .widthFactor,
+      1.0,
+    );
   });
 }

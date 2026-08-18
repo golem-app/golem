@@ -413,7 +413,12 @@ class _ModelCard extends ConsumerWidget {
                 entry: entry,
                 status: status,
                 localizations: context.l10n,
-                pace: ref.watch(downloadPaceProvider),
+                // Only a running transfer has a pace; watching it while
+                // paused would rebuild this card on every tick of a download
+                // belonging to another one.
+                pace: status.phase == ArtifactPhase.downloading
+                    ? ref.watch(downloadPaceProvider)
+                    : null,
                 simulated: simulated,
               ),
               density: TransferDensity.dense,

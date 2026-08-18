@@ -25,6 +25,8 @@ class LabeledProgress extends StatelessWidget {
     this.captionStyle,
     this.trailing,
     this.showPercent = true,
+    this.announcePercent = true,
+    this.announceDetail = false,
     this.detail,
     this.detailStyle,
     this.detailLeading,
@@ -49,9 +51,24 @@ class LabeledProgress extends StatelessWidget {
   /// the percentage.
   final Widget? trailing;
 
-  /// Whether the percentage is painted. Off where the phase makes it
-  /// meaningless — a verification is not 40% verified.
+  /// Whether the percentage is painted. Off where the caption already carries
+  /// it, or where the surface has no room for it.
   final bool showPercent;
+
+  /// Whether the percentage is *announced*. Off where the phase makes it
+  /// meaningless — a verification is not 40% verified — and deliberately
+  /// separate from [showPercent], because the chat setup banner paints no
+  /// number and is the only thing carrying how far along the transfer is.
+  final bool announcePercent;
+
+  /// Whether the figures under the bar read as their own nodes.
+  ///
+  /// A row inside a list keeps them silent: split across three nodes, the
+  /// caption and the number announce as unrelated fragments. A card that is
+  /// the whole screen does the opposite — the size, the rate and the time left
+  /// are the only place a user can learn them, and first run has always read
+  /// them out.
+  final bool announceDetail;
 
   /// The time or amount left, under the bar and right-aligned. Inside the same
   /// excluded subtree: the reading stays caption plus percentage.
@@ -72,59 +89,84 @@ class LabeledProgress extends StatelessWidget {
   Widget build(BuildContext context) {
     final captionText = captionStyle ?? GolemText.caption;
     final hasHeader = caption != null || trailing != null || showPercent;
+    final bar = ExcludeSemantics(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (hasHeader) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: caption == null
+                      ? const SizedBox.shrink()
+                      : Text(caption!, style: captionText),
+                ),
+                ?trailing,
+                if (showPercent) Text('$percent%', style: captionText),
+              ],
+            ),
+            SizedBox(height: spacing),
+          ],
+          ProgressTrack(
+            value: fraction,
+            trackColor: GolemTheme.divider,
+            fillColor: GolemTheme.accent,
+            height: trackHeight,
+          ),
+        ],
+      ),
+    );
+
+    Widget? figures;
+    if (detail != null || detailLeading != null) {
+      figures = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: detailLeading == null
+                ? const SizedBox.shrink()
+                : Text(
+                    detailLeading!,
+                    style: GolemText.footnote.copyWith(
+                      color: CupertinoDynamicColor.resolve(
+                        GolemTheme.mutedInk,
+                        context,
+                      ),
+                    ),
+                  ),
+          ),
+          // Flexible, not bare: in a Row a non-flexible child is measured
+          // against infinity, so a long "About 14 minutes left" would size
+          // past the card and paint an overflow stripe instead of wrapping.
+          if (detail case final detail?)
+            Flexible(
+              child: Text(
+                detail,
+                style: detailStyle ?? GolemText.captionStrong,
+              ),
+            ),
+        ],
+      );
+      if (!announceDetail) figures = ExcludeSemantics(child: figures);
+    }
+
+    // explicitChildNodes: the figures under the bar keep their own readings
+    // where a surface wants them; without it this container would swallow
+    // their labels into its own and announce one run-on string.
     return Semantics(
       container: true,
+      explicitChildNodes: true,
       label: semanticsLabel,
-      value: context.l10n.percentValue(percent),
-      child: ExcludeSemantics(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (hasHeader) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: caption == null
-                        ? const SizedBox.shrink()
-                        : Text(caption!, style: captionText),
-                  ),
-                  ?trailing,
-                  if (showPercent) Text('$percent%', style: captionText),
-                ],
-              ),
-              SizedBox(height: spacing),
-            ],
-            ProgressTrack(
-              value: fraction,
-              trackColor: GolemTheme.divider,
-              fillColor: GolemTheme.accent,
-              height: trackHeight,
-            ),
-            if (detail != null || detailLeading != null) ...[
-              SizedBox(height: spacing),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: detailLeading == null
-                        ? const SizedBox.shrink()
-                        : Text(
-                            detailLeading!,
-                            style: GolemText.footnote.copyWith(
-                              color: CupertinoDynamicColor.resolve(
-                                GolemTheme.mutedInk,
-                                context,
-                              ),
-                            ),
-                          ),
-                  ),
-                  if (detail case final detail?)
-                    Text(detail, style: detailStyle ?? GolemText.captionStrong),
-                ],
-              ),
-            ],
+      value: announcePercent ? context.l10n.percentValue(percent) : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          bar,
+          if (figures case final figures?) ...[
+            SizedBox(height: spacing),
+            figures,
           ],
-        ),
+        ],
       ),
     );
   }

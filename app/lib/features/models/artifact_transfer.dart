@@ -20,7 +20,6 @@ library;
 
 import '../../core/domain/byte_format.dart';
 import '../../core/domain/download_pace.dart';
-import '../../core/domain/model_admission.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/models.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -79,8 +78,8 @@ final class TransferOffer extends TransferAffordance {
   final TransferBlock? block;
 
   /// Why it is blocked, or what went wrong on the attempt before it. Null for
-  /// an unblocked first download, which owes no explanation, and for the two
-  /// blocks whose sentence belongs to the caller.
+  /// an unblocked first download, which owes no explanation, and for every
+  /// block but [TransferBlock.busy], whose sentence each surface words itself.
   final String? note;
 
   bool get enabled => block == null;
@@ -139,8 +138,10 @@ final class ArtifactTransferPresentation {
 ///
 /// The gating flags are *asked*, never re-derived here: [deviceRefusal] is
 /// `deviceRefusalProvider`'s answer, [admitted] the shared admission policy's,
-/// [downloadable] the repository's. A surface that has already filtered its
-/// list by engine passes `loadsHere: true` rather than being second-guessed.
+/// [downloadable] the repository's, and [loadsHere] the backend's — a fake
+/// backend loads every format, so its caller passes true rather than having
+/// [simulated] stand in for it. [simulated] means only that the *download* is
+/// simulated, which is a different flag on a different seam.
 ///
 /// [localizations] is nullable to match `model_choice.dart`, whose pure tests
 /// run without a widget tree. The English fallbacks are the ones that already
@@ -159,7 +160,12 @@ ArtifactTransferPresentation artifactTransfer({
   bool loadsHere = true,
   String? transferringKey,
 }) {
-  final fraction = entry.totalBytes <= 0
+  // Verification runs on a complete download, and the repository reports its
+  // byte count per verified file — so deriving a fraction there would collapse
+  // a full bar to one file's worth and step it back up (#131 review).
+  final fraction = status.phase == ArtifactPhase.verifying
+      ? 1.0
+      : entry.totalBytes <= 0
       ? 0.0
       : (status.downloadedBytes / entry.totalBytes).clamp(0.0, 1.0).toDouble();
   final percent = (fraction * 100).round();
@@ -197,7 +203,6 @@ ArtifactTransferPresentation artifactTransfer({
       admitted: admitted,
       downloadable: downloadable,
       loadsHere: loadsHere,
-      simulated: simulated,
       transferringKey: transferringKey,
       localizations: localizations,
     ),
@@ -250,7 +255,6 @@ TransferAffordance? _affordance({
   required bool admitted,
   required bool downloadable,
   required bool loadsHere,
-  required bool simulated,
   required String? transferringKey,
   required AppLocalizations? localizations,
 }) {
@@ -274,7 +278,6 @@ TransferAffordance? _affordance({
     admitted: admitted,
     downloadable: downloadable,
     loadsHere: loadsHere,
-    simulated: simulated,
     transferringKey: transferringKey,
     localizations: localizations,
   );
@@ -286,8 +289,8 @@ TransferAffordance? _affordance({
       _ => TransferAction.start,
     },
     block: blocked.$1,
-    // A block explains itself; an unblocked resume or retry explains where it
-    // stopped instead.
+    // A busy slot explains itself; an unblocked resume or retry explains where
+    // it stopped instead.
     note: blocked.$1 != null
         ? blocked.$2
         : switch (status.phase) {
@@ -311,10 +314,14 @@ TransferAffordance? _affordance({
 /// Ordered by what a user can do least about.
 ///
 /// The device verdict outranks the sideload: under both, nothing will load for
-/// either reason, and "this device cannot run models" is the one nothing on
-/// any of these screens can fix. Two blocks carry no sentence — the admission
-/// policy words its own (`ModelAdmissionOption.disabledReason`) and the engine
-/// mismatch has to name the build's engine, which is the caller's to know.
+/// either reason, and "this device cannot run models" is the one that nothing
+/// on any of these screens can fix.
+///
+/// Only [TransferBlock.busy] carries a sentence. The others are worded by the
+/// surface — the picker prints them as `ModelChoice.blockReason` and Settings
+/// prints its own, in its own order, because an unresolved repository is the
+/// more specific problem there and the device verdict is the one it cannot fix.
+/// A second copy here would be copy nobody reads, drifting quietly.
 (TransferBlock?, String?) _block({
   required ModelCatalogEntry entry,
   required String? deviceRefusal,
@@ -322,34 +329,18 @@ TransferAffordance? _affordance({
   required bool admitted,
   required bool downloadable,
   required bool loadsHere,
-  required bool simulated,
   required String? transferringKey,
   required AppLocalizations? localizations,
 }) {
-  if (deviceRefusal != null) {
-    return (
-      TransferBlock.deviceRefused,
-      localizations?.notAvailableOnDevice ?? 'Not available on this device.',
-    );
-  }
-  if (sideloaded) {
-    return (
-      TransferBlock.sideload,
-      localizations?.pinnedByBuild ?? 'Pinned by this build.',
-    );
-  }
+  if (deviceRefusal != null) return (TransferBlock.deviceRefused, null);
+  if (sideloaded) return (TransferBlock.sideload, null);
   if (!admitted) return (TransferBlock.needsMoreMemory, null);
   // Nothing can be fetched for a repository that never resolved, so no surface
   // may tell the user to download it.
-  if (!downloadable) {
-    return (
-      TransferBlock.unresolvedRepository,
-      localizations?.unresolvedRepositoryReason ?? unresolvedRepositoryReason,
-    );
-  }
-  // Nor for an artifact this build could never run, even when a previous build
-  // installed it.
-  if (!loadsHere && !simulated) return (TransferBlock.otherEngine, null);
+  if (!downloadable) return (TransferBlock.unresolvedRepository, null);
+  // Nor for an artifact this build's engine could never run, even when a
+  // previous build installed it.
+  if (!loadsHere) return (TransferBlock.otherEngine, null);
   if (transferringKey != null && transferringKey != entry.key) {
     return (
       TransferBlock.busy,

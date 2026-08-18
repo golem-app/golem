@@ -40,6 +40,7 @@ void main() {
     await pump(
       tester,
       const LabeledProgress(
+        key: Key('bar'),
         semanticsLabel: 'Download',
         caption: 'Download · simulated',
         fraction: 0.4,
@@ -51,12 +52,11 @@ void main() {
     expect(find.text('Download · simulated'), findsOneWidget);
     expect(find.text('40%'), findsOneWidget);
     expect(find.text('About 2 minutes left'), findsOneWidget);
-    // …and none of them reaches the reading. Without the excluded subtree the
-    // caption, the number and the time left are absorbed into the node's own
-    // label, which then announces "Download / Download · simulated / 40% /
-    // About 2 minutes left" as one run-on string.
+    // …and neither the caption nor the number reaches the reading. Without
+    // the excluded subtree they are absorbed into the node's own label, which
+    // announces "Download / Download · simulated / 40%" as one run-on string.
     expect(
-      tester.getSemantics(find.byType(LabeledProgress)),
+      tester.getSemantics(find.byKey(const Key('bar'))),
       isSemantics(label: 'Download', value: '40 percent'),
     );
     handle.dispose();
@@ -82,6 +82,58 @@ void main() {
     expect(
       tester.getSemantics(find.byKey(const Key('bar'))),
       isSemantics(label: 'Download', value: '60 percent'),
+    );
+    handle.dispose();
+  });
+
+  testWidgets('a card that is the whole screen reads its figures out', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await pump(
+      tester,
+      const LabeledProgress(
+        semanticsLabel: 'Download progress',
+        fraction: 0.25,
+        percent: 25,
+        caption: '25%',
+        showPercent: false,
+        detailLeading: '1.00 GB of 4.00 GB',
+        detail: 'About 2 minutes left',
+        announceDetail: true,
+      ),
+    );
+    // First run has always announced these: the size and the time left are the
+    // only place a user there can learn them, and a bar that swallowed them
+    // would leave "25 percent" as the entire reading of the screen.
+    for (final figure in const ['1.00 GB of 4.00 GB', 'About 2 minutes left']) {
+      expect(
+        tester.getSemantics(find.text(figure)).label,
+        figure,
+        reason: figure,
+      );
+    }
+    handle.dispose();
+  });
+
+  testWidgets('a phase with no percentage announces none', (tester) async {
+    final handle = tester.ensureSemantics();
+    await pump(
+      tester,
+      const LabeledProgress(
+        key: Key('bar'),
+        semanticsLabel: 'Verifying files',
+        fraction: 1,
+        percent: 100,
+        caption: 'Verifying files',
+        showPercent: false,
+        announcePercent: false,
+      ),
+    );
+    // A verification is not 40% verified, painted or read out.
+    expect(
+      tester.getSemantics(find.byKey(const Key('bar'))),
+      isSemantics(label: 'Verifying files', value: ''),
     );
     handle.dispose();
   });

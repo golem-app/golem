@@ -411,21 +411,27 @@ ModelChoice _choiceFor({
   final suffix = simulatedTransfers
       ? ' · ${localizations?.simulated ?? 'simulated'}'
       : '';
-  final transfer = _pickerTransfer(
-    artifactTransfer(
-      entry: entry,
-      status: status,
-      localizations: localizations,
-      simulated: simulatedTransfers,
-      deviceRefusal: deviceRefusal,
-      sideloaded: backend.sideloaded,
-      admitted: admission?.enabled ?? true,
-      downloadable: downloadable,
-      loadsHere: loadsHere,
-      transferringKey: transferringKey,
-    ),
-    withheld: deviceRefusal != null || backend.sideloaded,
-  );
+  // Nothing is offered under either of these, so nothing is projected: the
+  // sheet rebuilds on every download-progress snapshot, and a refused device
+  // would otherwise pay for a full projection per row on every tick.
+  final withheld = deviceRefusal != null || backend.sideloaded;
+  final transfer = withheld
+      ? null
+      : _pickerTransfer(
+          artifactTransfer(
+            entry: entry,
+            status: status,
+            localizations: localizations,
+            simulated: simulatedTransfers,
+            admitted: admission?.enabled ?? true,
+            downloadable: downloadable,
+            // The fake backend loads every format, so nothing is blocked on
+            // the engine under it — a fact about the backend, not about
+            // whether the *download* is simulated.
+            loadsHere: loadsHere || simulated,
+            transferringKey: transferringKey,
+          ),
+        );
 
   return ModelChoice(
     entry: entry,
@@ -469,16 +475,15 @@ ModelChoice _choiceFor({
 
 /// This sheet's reading of the shared projection.
 ///
-/// Withheld outright — not disabled — on a refused device, under a sideload,
-/// and for anything this build could never fetch or run, because a full-width
-/// button that does nothing when tapped undoes the honesty the copy beside it
-/// provides (ADR 0007). A busy slot is the one block that keeps its offer: the
-/// note explains the wait and the sheet hides only the button.
+/// Withheld outright — not disabled — for anything this build could never
+/// fetch or run, because a full-width button that does nothing when tapped
+/// undoes the honesty the copy beside it provides (ADR 0007). A busy slot is
+/// the one block that keeps its offer: the note explains the wait and the
+/// sheet hides only the button. The refused device and the sideload never get
+/// here at all; the caller withholds them before projecting.
 ArtifactTransferPresentation? _pickerTransfer(
-  ArtifactTransferPresentation transfer, {
-  required bool withheld,
-}) {
-  if (withheld) return null;
+  ArtifactTransferPresentation transfer,
+) {
   return switch (transfer.affordance) {
     null => null,
     TransferOffer(:final block?) when block != TransferBlock.busy => null,
