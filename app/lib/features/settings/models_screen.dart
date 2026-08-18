@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/chrome/golem_alert.dart';
+import '../../core/chrome/golem_badge.dart';
 import '../../core/chrome/golem_button.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/domain/byte_format.dart';
@@ -388,12 +389,8 @@ class _ModelCard extends ConsumerWidget {
               spacing: 8,
               runSpacing: 6,
               children: [
-                if (active)
-                  _ModelStateBadge(
-                    label: context.l10n.activeBadge,
-                    emphasized: true,
-                  ),
-                if (resident) _ModelStateBadge(label: context.l10n.loadedBadge),
+                if (active) GolemBadge(label: context.l10n.activeBadge),
+                if (resident) GolemBadge.quiet(label: context.l10n.loadedBadge),
               ],
             ),
           ],
@@ -580,14 +577,10 @@ class _ModelCard extends ConsumerWidget {
           ),
       ],
     );
-    final cancel = CupertinoButton(
+    final cancel = GolemButton.destructive(
       key: Key('model-cancel-${entry.key}'),
-      minimumSize: const Size.fromHeight(48),
+      label: context.l10n.cancelAndDiscard,
       onPressed: () => controller.cancel(entry.key),
-      child: Text(
-        context.l10n.cancelAndDiscard,
-        style: const TextStyle(color: GolemTheme.destructive),
-      ),
     );
     return switch (status.phase) {
       ArtifactPhase.notDownloaded => [const SizedBox(height: 14), download],
@@ -605,16 +598,12 @@ class _ModelCard extends ConsumerWidget {
       ArtifactPhase.verifying => const [],
       ArtifactPhase.installed => [
         const SizedBox(height: 14),
-        CupertinoButton(
+        GolemButton.destructive(
           key: Key('model-delete-${entry.key}'),
-          minimumSize: const Size.fromHeight(48),
+          label: context.l10n.deleteDownload,
           onPressed: generating
               ? null
               : () => _confirmDelete(context, controller),
-          child: Text(
-            context.l10n.deleteDownload,
-            style: const TextStyle(color: GolemTheme.destructive),
-          ),
         ),
       ],
     };
@@ -677,37 +666,6 @@ class _ModelCard extends ConsumerWidget {
     ArtifactPhase.installed => CupertinoIcons.check_mark_circled_solid,
     ArtifactPhase.failed => CupertinoIcons.exclamationmark_triangle_fill,
   };
-}
-
-class _ModelStateBadge extends StatelessWidget {
-  const _ModelStateBadge({required this.label, this.emphasized = false});
-
-  final String label;
-  final bool emphasized;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    decoration: BoxDecoration(
-      color: CupertinoDynamicColor.resolve(
-        emphasized ? GolemTheme.accentSoft : GolemTheme.fillQuiet,
-        context,
-      ),
-      borderRadius: BorderRadius.circular(GolemRadius.badge),
-    ),
-    child: Text(
-      label,
-      style:
-          localizedLabelStyle(
-            GolemText.badge,
-            Localizations.localeOf(context),
-          ).copyWith(
-            color: emphasized
-                ? CupertinoDynamicColor.resolve(GolemTheme.accent, context)
-                : null,
-          ),
-    ),
-  );
 }
 
 class _Status extends StatelessWidget {

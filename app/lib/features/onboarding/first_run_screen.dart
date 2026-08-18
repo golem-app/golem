@@ -236,12 +236,11 @@ class _ModelScreen extends ConsumerWidget {
                 ? null
                 : () => _requestDownload(context, ref, selected),
           ),
-          CupertinoButton(
+          GolemButton.plain(
             key: const Key('first-run-choose-model'),
-            minimumSize: Size.fromHeight(GolemChrome.current.minimumTapTarget),
+            label: context.l10n.chooseDifferentModel,
             onPressed: () =>
                 ref.read(firstRunControllerProvider.notifier).showCatalog(),
-            child: Text(context.l10n.chooseDifferentModel),
           ),
           const _PageDots(index: 1),
         ],
@@ -635,15 +634,12 @@ class _DownloadScreen extends ConsumerWidget {
               ArtifactPhase.downloading => Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  CupertinoButton(
+                  GolemButton.plain(
                     key: const Key('first-run-pause-download'),
-                    minimumSize: Size.fromHeight(
-                      GolemChrome.current.minimumTapTarget,
-                    ),
+                    label: context.l10n.pauseDownload,
                     onPressed: () => ref
                         .read(modelControllerProvider.notifier)
                         .pause(selected.key),
-                    child: Text(context.l10n.pauseDownload),
                   ),
                   _CancelDownloadButton(entry: selected),
                 ],
@@ -651,17 +647,14 @@ class _DownloadScreen extends ConsumerWidget {
               ArtifactPhase.paused => Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  CupertinoButton(
+                  GolemButton.plain(
                     key: const Key('first-run-resume-download'),
-                    minimumSize: Size.fromHeight(
-                      GolemChrome.current.minimumTapTarget,
-                    ),
+                    label: context.l10n.resumeDownload,
                     onPressed: () => unawaited(
                       ref
                           .read(modelControllerProvider.notifier)
                           .download(selected.key),
                     ),
-                    child: Text(context.l10n.resumeDownload),
                   ),
                   _CancelDownloadButton(entry: selected),
                 ],
@@ -901,22 +894,13 @@ class _CancelDownloadButton extends ConsumerWidget {
   final ModelCatalogEntry entry;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => CupertinoButton(
+  Widget build(BuildContext context, WidgetRef ref) => GolemButton.destructive(
     key: const Key('first-run-cancel-download'),
-    minimumSize: Size.fromHeight(GolemChrome.current.minimumTapTarget),
+    // The same label Settings uses for this operation: it deletes the
+    // partial download, so a bare "Cancel" undersells it.
+    label: context.l10n.cancelAndDiscard,
     onPressed: () =>
         unawaited(ref.read(modelControllerProvider.notifier).cancel(entry.key)),
-    child: Text(
-      // The same label Settings uses for this operation: it deletes the
-      // partial download, so a bare "Cancel" undersells it.
-      context.l10n.cancelAndDiscard,
-      style: TextStyle(
-        color: CupertinoDynamicColor.resolve(
-          GolemTheme.destructiveText,
-          context,
-        ),
-      ),
-    ),
   );
 }
 
