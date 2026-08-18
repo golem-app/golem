@@ -8,7 +8,7 @@ import '../../../core/domain/app_preferences.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
-import '../../../core/widgets/progress_track.dart';
+import '../../../core/widgets/labeled_progress.dart';
 import '../../../l10n/l10n.dart';
 import '../../../l10n/presentation_messages.dart';
 import '../../preferences/application/preferences_providers.dart';
@@ -77,16 +77,13 @@ class ModelSetupBanner extends ConsumerWidget {
               status.phase == ArtifactPhase.paused) ...[
             const SizedBox(height: 10),
             // The headline and detail above say what is happening; the bar is
-            // the only thing carrying how far along it is.
-            Semantics(
-              container: true,
-              label: context.l10n.download,
-              value: context.l10n.percentValue((progress * 100).round()),
-              child: ProgressTrack(
-                value: progress,
-                trackColor: GolemTheme.divider,
-                fillColor: GolemTheme.accent,
-              ),
+            // the only thing carrying how far along it is, so it paints no
+            // caption of its own.
+            LabeledProgress(
+              semanticsLabel: context.l10n.download,
+              fraction: progress,
+              percent: (progress * 100).round(),
+              showPercent: false,
             ),
           ],
           DownloadNoteBanner(

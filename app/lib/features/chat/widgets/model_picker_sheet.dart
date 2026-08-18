@@ -9,7 +9,7 @@ import '../../../core/chrome/golem_sheet.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
-import '../../../core/widgets/progress_track.dart';
+import '../../../core/widgets/labeled_progress.dart';
 import '../../../l10n/l10n.dart';
 import '../../models/application/model_providers.dart';
 import '../../models/model_download_consent.dart';
@@ -339,26 +339,14 @@ final class _ModelRow extends StatelessWidget {
         null => const [],
         final TransferInFlight progress => [
           const SizedBox(height: GolemSpace.s3),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  choice.transferLabel!,
-                  style: GolemText.caption.copyWith(color: muted),
-                ),
-              ),
-              if (progress.pausable)
-                Text(
-                  '${(choice.transfer!.fraction * 100).round()}%',
-                  style: GolemText.caption.copyWith(color: muted),
-                ),
-            ],
-          ),
-          const SizedBox(height: 7),
-          ProgressTrack(
-            value: choice.transfer!.fraction,
-            trackColor: GolemTheme.divider,
-            fillColor: GolemTheme.accent,
+          LabeledProgress(
+            semanticsLabel: choice.transferLabel!,
+            caption: choice.transferLabel!,
+            captionStyle: GolemText.caption.copyWith(color: muted),
+            fraction: choice.transfer!.fraction,
+            percent: choice.transfer!.percent,
+            // A verification is not 40% verified; the caption carries it.
+            showPercent: progress.pausable,
           ),
           if (progress.pausable) ...[
             const SizedBox(height: GolemSpace.s2),

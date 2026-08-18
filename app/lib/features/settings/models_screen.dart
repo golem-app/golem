@@ -14,8 +14,8 @@ import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
+import '../../core/widgets/labeled_progress.dart';
 import '../../core/widgets/labeled_row.dart';
-import '../../core/widgets/progress_track.dart';
 import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/settings_rows.dart';
@@ -410,13 +410,26 @@ class _ModelCard extends ConsumerWidget {
           if (status.phase == ArtifactPhase.downloading ||
               status.phase == ArtifactPhase.paused) ...[
             const SizedBox(height: 14),
-            _Progress(
-              progressKey: Key('model-progress-${entry.key}'),
-              value: entry.totalBytes == 0
+            LabeledProgress(
+              key: Key('model-progress-${entry.key}'),
+              semanticsLabel: context.l10n.downloadProgressLabel(suffix),
+              caption: context.l10n.downloadProgressLabel(suffix),
+              captionStyle: const TextStyle(fontSize: 13),
+              fraction: entry.totalBytes == 0
                   ? 0
-                  : (status.downloadedBytes / entry.totalBytes).clamp(0, 1),
-              label: context.l10n.downloadProgressLabel(suffix),
+                  : (status.downloadedBytes / entry.totalBytes)
+                        .clamp(0, 1)
+                        .toDouble(),
+              percent: entry.totalBytes == 0
+                  ? 0
+                  : ((status.downloadedBytes / entry.totalBytes).clamp(0, 1) *
+                            100)
+                        .round(),
               detail: _progressDetail(context, ref),
+              detailStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
           // Inside the card, not hoisted above the list: slotted at the top it
@@ -734,71 +747,6 @@ class _Status extends StatelessWidget {
         child: Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
       ),
     ],
-  );
-}
-
-class _Progress extends StatelessWidget {
-  const _Progress({
-    required this.value,
-    required this.label,
-    this.detail,
-    this.progressKey,
-  });
-  final double value;
-  final String label;
-
-  /// The time or amount left, shown under the bar. Inside the same excluded
-  /// subtree: the accessible reading stays label plus percent, unchanged.
-  final String? detail;
-  final Key? progressKey;
-
-  @override
-  // The bar carries no semantics of its own, and split across three nodes the
-  // caption and the number read as unrelated fragments. Deliberately not a
-  // live region: re-announcing every tick of a multi-gigabyte download would
-  // talk over everything else on the screen.
-  Widget build(BuildContext context) => Semantics(
-    key: progressKey,
-    container: true,
-    label: label,
-    value: context.l10n.percentValue((value * 100).round()),
-    child: ExcludeSemantics(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(label, style: const TextStyle(fontSize: 13)),
-              ),
-              Text(
-                '${(value * 100).round()}%',
-                style: const TextStyle(fontSize: 13),
-              ),
-            ],
-          ),
-          const SizedBox(height: 7),
-          ProgressTrack(
-            value: value,
-            trackColor: GolemTheme.divider,
-            fillColor: GolemTheme.accent,
-          ),
-          if (detail case final detail?) ...[
-            const SizedBox(height: 7),
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: Text(
-                detail,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    ),
   );
 }
 
