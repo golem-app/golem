@@ -63,7 +63,7 @@ final class ModelChoice {
     required this.selected,
     required this.selectable,
     this.needsConsent = false,
-    this.summary,
+    required this.summary,
     this.artifactLine,
     this.recommendation,
     this.block,
@@ -88,9 +88,10 @@ final class ModelChoice {
   /// Size, proven capability, and measured speed — `1.58 GB · reads pictures`.
   final String detail;
 
-  /// What the model is *for*, in a user's words; null for a hand-added
-  /// repository, which nobody has characterized.
-  final String? summary;
+  /// What the model is *for*, in a user's words. Always present: a hand-added
+  /// repository gets the sentence that says nobody characterized it, which is
+  /// still copy the picker owes the row.
+  final String summary;
 
   /// `GGUF · Q4_0 · unsloth/…`. Non-null only under Advanced mode: the exact
   /// artifact stays discoverable for operators without leading with it
@@ -149,8 +150,8 @@ final class ModelPickerView {
 /// [deviceRefusal] is `deviceRefusalProvider`'s answer, passed in rather than
 /// re-derived from [eligibility]: the refusal rule — including that a simulated
 /// backend is never gated — has one owner, and this is not it. [eligibility] is
-/// read for the tier that explains the recommendation, and for the reason the
-/// footnote words.
+/// read only for the tier that explains the recommendation; the footnote words
+/// [deviceRefusal] itself, so the two cannot disagree.
 ModelPickerView buildModelPickerView({
   required List<ModelCatalogEntry> catalog,
 
@@ -292,7 +293,6 @@ ModelPickerView buildModelPickerView({
       backend: backend,
       deviceRefusal: deviceRefusal,
       localizations: localizations,
-      eligibility: eligibility,
     ),
   );
 }
@@ -432,9 +432,6 @@ ModelChoice _choiceFor({
       simulated: simulated,
       localizations: localizations,
     ),
-    // Every pinned entry carries copy by construction, so a missing summary
-    // means a hand-added repository — which nobody has characterized and this
-    // project will not characterize on its behalf.
     summary: _localizedSummary(entry, localizations),
     artifactLine: advanced
         ? '${engineFormat(entry.engine)} · ${entry.quantization} · '
@@ -555,11 +552,10 @@ String? _footnote({
   required InferenceBackendConfig backend,
   required DeviceIneligibilityReason? deviceRefusal,
   required AppLocalizations localizations,
-  required DeviceEligibility eligibility,
 }) {
   if (backend.simulatedInference) return null;
   if (deviceRefusal != null) {
-    return deviceRefusalMessage(localizations, eligibility.reason);
+    return deviceRefusalMessage(localizations, deviceRefusal);
   }
   if (backend.sideloaded) {
     return localizations.sideloadPreventsSwitch(
@@ -569,24 +565,26 @@ String? _footnote({
   return localizations.modelLoadsNextMessage;
 }
 
-/// Pinned entries are described by key prefix rather than by a field on the
+/// Pinned entries are described from the ARB rather than by a field on the
 /// entry: the copy is one of thirteen catalogs, and a `summary` string on the
-/// manifest would be the English one nobody translates (#130). A key that
-/// matches no prefix is a hand-added repository, which nobody has
-/// characterized and this project will not characterize on its behalf.
+/// manifest would be the English one nobody translates (#130).
+///
+/// Exact keys, not prefixes. A `qwen35-7b-` added later matches `qwen35-` and
+/// would present the 4B copy — leans towards code, thinks a problem through —
+/// for a model nobody characterized, with nothing failing. Falling through
+/// instead makes it read as hand-added, which `model_choice_test` catches for
+/// every key in `modelCatalog`.
 String _localizedSummary(
   ModelCatalogEntry entry,
   AppLocalizations localizations,
-) {
-  if (entry.key.startsWith('gemma4-')) return localizations.gemmaModelSummary;
-  if (entry.key.startsWith('qwen35-2b-')) {
-    return localizations.qwenTwoBModelSummary;
-  }
-  if (entry.key.startsWith('qwen35-')) {
-    return localizations.qwenFourBModelSummary;
-  }
-  return localizations.customModelSummary;
-}
+) => switch (entry.key) {
+  'gemma4-mlx' || 'gemma4-gguf' => localizations.gemmaModelSummary,
+  'qwen35-2b-mlx' || 'qwen35-2b-gguf' => localizations.qwenTwoBModelSummary,
+  'qwen35-mlx' || 'qwen35-gguf' => localizations.qwenFourBModelSummary,
+  // A hand-added repository, which nobody has characterized and this project
+  // will not characterize on its behalf.
+  _ => localizations.customModelSummary,
+};
 
 /// Which artifact holds the single transfer slot, mirroring the Settings rule
 /// that one download runs at a time (`models_screen.dart`).
