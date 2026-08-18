@@ -286,16 +286,19 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
             });
         }
       }
-    } on InfernoException catch (error) {
-      throw _translated(error);
+    } on InfernoException catch (error, stackTrace) {
+      Error.throwWithStackTrace(_translated(error), stackTrace);
     }
   }
 
+  /// The origin trace travels with the translation. A `throw` here would start
+  /// the stack at this frame, which is the one frame that explains nothing —
+  /// the engine call underneath it is the whole diagnostic (#130).
   static Future<T> _translating<T>(Future<T> Function() operation) async {
     try {
       return await operation();
-    } on InfernoException catch (error) {
-      throw _translated(error);
+    } on InfernoException catch (error, stackTrace) {
+      Error.throwWithStackTrace(_translated(error), stackTrace);
     }
   }
 

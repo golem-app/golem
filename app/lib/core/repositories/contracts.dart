@@ -28,8 +28,8 @@ enum PersistenceFailureKind { read, write }
 /// An unexpected I/O failure at a persistence boundary — permissions, a full
 /// disk, a vanished directory. Deliberately distinct from corrupt-data
 /// recovery, which quarantines the file and falls back to defaults without
-/// throwing. [message] is user-presentable copy, like [InferenceException];
-/// [cause] keeps the `dart:io` error for logs only.
+/// throwing. [message] is a diagnostic, like [InferenceException]'s, and
+/// [cause] keeps the `dart:io` error — both for logs, neither for a screen.
 class PersistenceException implements Exception {
   const PersistenceException(this.kind, this.message, {this.cause});
 
@@ -113,6 +113,10 @@ class InferenceException implements Exception {
   });
 
   final InferenceFailureKind kind;
+
+  /// English, and a diagnostic — never presented. Presentation switches on
+  /// [kind] (`chat_failure_classifier.dart`, handbook v5.0 §8.1), so this may
+  /// name a file, a code, or an engine internal without reaching a user (#130).
   final String message;
   final int? contextTokens;
 

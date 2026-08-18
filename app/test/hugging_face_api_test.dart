@@ -103,6 +103,26 @@ void main() {
       );
     });
 
+    // The kind is a label the caller reads; the trace is what a maintainer
+    // reads. A plain `throw` would replace the decoder's frames with this
+    // file's own, which explain nothing (#130).
+    test('a malformed body keeps the decoder in its stack', () async {
+      await serve((request) => respond(request, body: '<html>nope</html>'));
+
+      try {
+        await api.json(url());
+        fail('expected a HubException');
+      } on HubException catch (_, stackTrace) {
+        expect(
+          stackTrace.toString().split('\n').first,
+          isNot(contains('HttpClientHuggingFaceApi')),
+          reason:
+              'the trace begins where the failure did, not where it '
+              'was labelled',
+        );
+      }
+    });
+
     test('text comes back as sent', () async {
       await serve((request) => respond(request, body: 'chat template body'));
 
@@ -259,6 +279,26 @@ void main() {
           ),
         ),
       );
+    });
+
+    test('a transport failure keeps its origin in the stack', () async {
+      await serve(
+        (request) async {},
+        timeout: const Duration(milliseconds: 200),
+      );
+
+      try {
+        await api.json(url());
+        fail('expected a HubException');
+      } on HubException catch (_, stackTrace) {
+        expect(
+          stackTrace.toString().split('\n').first,
+          isNot(contains('HttpClientHuggingFaceApi')),
+          reason:
+              'the trace begins where the failure did, not where it '
+              'was labelled',
+        );
+      }
     });
 
     test('an error body that stalls is still bounded', () async {
