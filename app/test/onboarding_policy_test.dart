@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/backend_policy.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
-import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
@@ -17,12 +16,12 @@ void main() {
 
     bool decide({
       AppPreferences preferences = const AppPreferences(),
-      ChatState chats = const ChatState(),
+      bool hasConversations = false,
       ModelState models = const ModelState(),
       InferenceBackendConfig configuredBackend = backend,
     }) => shouldShowFirstRun(
       preferences: preferences,
-      chats: chats,
+      hasConversations: hasConversations,
       models: models,
       backend: configuredBackend,
     );
@@ -48,17 +47,13 @@ void main() {
         ),
         isTrue,
       );
+      expect(decide(hasConversations: true), isFalse);
+      // A downgrade carries a version this build has never heard of. It is
+      // still a completed install, so the comparison is `>=` and not `==`.
       expect(
         decide(
-          chats: ChatState(
-            conversations: [
-              ChatConversation(
-                id: 'existing',
-                title: 'Existing chat',
-                messages: const [],
-                updatedAt: DateTime.utc(2026, 8, 11),
-              ),
-            ],
+          preferences: const AppPreferences(
+            onboardingVersion: currentOnboardingVersion + 1,
           ),
         ),
         isFalse,
@@ -71,6 +66,19 @@ void main() {
                 phase: ArtifactPhase.paused,
                 downloadedBytes: 42,
               ),
+            },
+          ),
+        ),
+        isFalse,
+      );
+      // Every clause has to hold, not any of them: an artifact installed by a
+      // build that predates onboarding carries no bytes and no failure, and is
+      // exactly the legacy install that must not be sent through setup.
+      expect(
+        decide(
+          models: const ModelState(
+            artifacts: {
+              'gemma4-gguf': ArtifactStatus(phase: ArtifactPhase.installed),
             },
           ),
         ),
@@ -286,5 +294,85 @@ void main() {
         );
       },
     );
+  });
+
+  group('startup gate decision', () {
+    ({StartupGate gate, bool migrateLegacy}) resolve({
+      bool pristineAtLaunch = false,
+      bool onboardingComplete = true,
+      bool hasUsableModel = true,
+      ArtifactStatus selectedStatus = const ArtifactStatus(),
+    }) => resolveStartupGate(
+      pristineAtLaunch: pristineAtLaunch,
+      onboardingComplete: onboardingComplete,
+      hasUsableModel: hasUsableModel,
+      selectedStatus: () => selectedStatus,
+    );
+
+    test('a usable model admits the shell, pristine or not', () {
+      expect(resolve().gate, const GateAdmitted());
+      // The install that was pristine at launch and has since acquired a model
+      // still owes its onboarding: it is admitted only once setup completed it.
+      expect(
+        resolve(pristineAtLaunch: true, onboardingComplete: true).gate,
+        const GateAdmitted(),
+      );
+    });
+
+    test('the legacy stamp is owed exactly once, and only when admitted', () {
+      // The install this exists for: chats or model work on disk from before
+      // onboarding existed, so it must not be sent through setup, but its
+      // version has to be recorded or the next launch asks again.
+      expect(
+        resolve(onboardingComplete: false).migrateLegacy,
+        isTrue,
+        reason: 'a usable legacy install is admitted and stamped',
+      );
+      expect(resolve().migrateLegacy, isFalse);
+      expect(
+        resolve(onboardingComplete: false, hasUsableModel: false).migrateLegacy,
+        isFalse,
+        reason: 'nothing is stamped while setup is still required',
+      );
+    });
+
+    test('a pristine install opens setup at its own welcome', () {
+      // Not the download step, whatever bytes a *different* artifact carries:
+      // a fresh install has made no choice for a resume to belong to.
+      expect(
+        resolve(
+          pristineAtLaunch: true,
+          hasUsableModel: false,
+          selectedStatus: const ArtifactStatus(
+            phase: ArtifactPhase.paused,
+            downloadedBytes: 400,
+          ),
+        ).gate,
+        const GateFirstRun(FirstRunEntry.fresh),
+      );
+    });
+
+    test('an interrupted upgrade resumes rather than re-choosing', () {
+      expect(
+        resolve(hasUsableModel: false).gate,
+        const GateFirstRun(FirstRunEntry.chooseModel),
+      );
+      // Either signal is enough: a cancelled transfer keeps its bytes while
+      // reverting to notDownloaded, and a failed one keeps its phase.
+      expect(
+        resolve(
+          hasUsableModel: false,
+          selectedStatus: const ArtifactStatus(downloadedBytes: 400),
+        ).gate,
+        const GateFirstRun(FirstRunEntry.resumeDownload),
+      );
+      expect(
+        resolve(
+          hasUsableModel: false,
+          selectedStatus: const ArtifactStatus(phase: ArtifactPhase.failed),
+        ).gate,
+        const GateFirstRun(FirstRunEntry.resumeDownload),
+      );
+    });
   });
 }

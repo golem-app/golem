@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
-import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
@@ -16,6 +15,8 @@ import 'package:golem_flutter/features/onboarding/first_run_gate.dart';
 import 'package:golem_flutter/features/onboarding/first_run_screen.dart';
 
 import 'support/harness.dart';
+import 'support/in_memory_chat_history_repository.dart';
+import 'support/validating_sideload.dart';
 import 'support/in_memory_preferences_repository.dart';
 
 void main() {
@@ -90,7 +91,7 @@ void main() {
   testWidgets('an operator sideload must load before the shell is exposed', (
     tester,
   ) async {
-    final inference = _ValidatingSideload(failuresRemaining: 1);
+    final inference = ValidatingSideload(failuresRemaining: 1);
     await pumpWithRepositories(
       tester,
       inference: inference,
@@ -117,6 +118,89 @@ void main() {
     expect(inference.prepareCalls, 2);
     expect(inference.residency.value.loaded, isTrue);
     expect(inference.residency.value.catalogKey, isNull);
+  });
+
+  testWidgets('a store that will not read blocks the shell behind a retry', (
+    tester,
+  ) async {
+    // The launch-failure path, untested until #126 moved it into a provider:
+    // the gate owned both the failure pane and what its retry re-read, so
+    // neither was reachable without a widget tree and the right pump count.
+    final history = InMemoryChatHistoryRepository()..failingLoads = 1;
+    await pumpWithRepositories(
+      tester,
+      chatHistory: history,
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(
+          onboardingVersion: currentOnboardingVersion,
+          onboardingModelKey: 'gemma4-mlx',
+        ),
+      ),
+      model: const ModelState(
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+        },
+      ),
+      child: const FirstRunGate(
+        child: SizedBox(key: Key('chat-after-first-run')),
+      ),
+    );
+
+    expect(find.byKey(const Key('first-run-read-failure')), findsOneWidget);
+    expect(find.byKey(const Key('chat-after-first-run')), findsNothing);
+    expect(find.byKey(const Key('sideload-validation-failure')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('startup-gate-retry')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('chat-after-first-run')),
+      findsOneWidget,
+      reason: 'retry must re-read the store, not only this gate',
+    );
+  });
+
+  testWidgets('retrying a sideload shows the load, not the failure it retries', (
+    tester,
+  ) async {
+    // Riverpod carries the error through a refresh — AsyncError.copyWithPrevious
+    // keeps it — so reading this gate's error flag literally leaves the failure
+    // pane and its live "Try again" button up for the whole reload, which on a
+    // real sideload is tens of seconds of multi-gigabyte load. The widget it
+    // replaced cleared the failure before starting. Settling hides this, so the
+    // frames are pumped one at a time.
+    final inference = ValidatingSideload(failuresRemaining: 1);
+    await pumpWithRepositories(
+      tester,
+      inference: inference,
+      backend: const InferenceBackendConfig(
+        kind: InferenceBackendKind.mlx,
+        profileKey: 'gemma4',
+        modelPath: 'documents:operator/model',
+      ),
+      child: const FirstRunGate(
+        child: SizedBox(key: Key('chat-after-first-run')),
+      ),
+    );
+    expect(
+      find.byKey(const Key('sideload-validation-failure')),
+      findsOneWidget,
+    );
+
+    inference.park = true;
+    await tester.tap(find.byKey(const Key('startup-gate-retry')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('sideload-validating')), findsOneWidget);
+    expect(
+      find.byKey(const Key('sideload-validation-failure')),
+      findsNothing,
+      reason: 'the load it is retrying is what the shell is waiting on',
+    );
+
+    inference.release();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-after-first-run')), findsOneWidget);
+    expect(inference.prepareCalls, 2);
   });
 
   testWidgets('download state cannot complete first run implicitly', (
@@ -763,50 +847,4 @@ final class _DeletableModels implements ModelManagementRepository {
     RuntimePhase phase, {
     String? failure,
   }) async => _state;
-}
-
-final class _ValidatingSideload implements InferenceRepository {
-  _ValidatingSideload({required this.failuresRemaining});
-
-  int failuresRemaining;
-  int prepareCalls = 0;
-
-  @override
-  void releaseEngine() {}
-
-  final ValueNotifier<InferenceResidency> _residency =
-      ValueNotifier<InferenceResidency>(const InferenceResidency.unloaded());
-
-  @override
-  ValueListenable<InferenceResidency> get residency => _residency;
-
-  @override
-  Future<void> prepare({String? modelKey}) async {
-    prepareCalls++;
-    if (failuresRemaining > 0) {
-      failuresRemaining--;
-      throw const InferenceException(
-        InferenceFailureKind.invalidModelArtifact,
-        'injected invalid sideload',
-      );
-    }
-    _residency.value = const InferenceResidency(loaded: true);
-  }
-
-  @override
-  Future<void> unload() async {
-    _residency.value = const InferenceResidency.unloaded();
-  }
-
-  @override
-  Future<void> cancel() async {}
-
-  @override
-  Stream<InferenceEvent> generate({
-    required List<PromptMessage> context,
-    required bool reasoningEnabled,
-    SamplingOverrides? overrides,
-    String? modelKey,
-    String? systemPrompt,
-  }) => const Stream.empty();
 }

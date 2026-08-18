@@ -16,6 +16,7 @@ import 'package:golem_flutter/features/models/application/download_note_provider
 import 'package:golem_flutter/features/models/application/download_pace_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/onboarding/application/onboarding_controller.dart';
+import 'package:golem_flutter/features/onboarding/application/startup_gate_controller.dart';
 import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
 import 'package:golem_flutter/features/settings/application/settings_providers.dart';
 import 'package:golem_flutter/features/settings/application/storage_providers.dart';
@@ -64,6 +65,7 @@ final _allProviders = <String, ProviderOrFamily>{
   'startupController': startupControllerProvider,
   'benchmarkController': benchmarkControllerProvider,
   'firstRunController': firstRunControllerProvider,
+  'startupGateController': startupGateControllerProvider,
 };
 
 final class _FailingSettingsRepository implements SettingsRepository {

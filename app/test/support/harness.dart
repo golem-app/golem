@@ -455,6 +455,43 @@ ChatHistorySnapshot seedHistory() {
 }
 
 /// A frozen model repository: every operation reports the same state.
+/// [StaticModels] that keeps what it is told, so a test can read back the phase
+/// a load reflected or the artifact a delete cleared.
+final class RecordingModels implements ModelManagementRepository {
+  RecordingModels([this.state = const ModelState()]);
+
+  ModelState state;
+  int recordRuntimeCalls = 0;
+
+  @override
+  Future<ModelState> load() async => state;
+
+  @override
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    String? failure,
+  }) async {
+    recordRuntimeCalls++;
+    return state = state.copyWith(runtime: phase, failure: failure);
+  }
+
+  @override
+  Future<ModelState> delete(String artifactKey) async =>
+      state = state.withArtifact(artifactKey, const ArtifactStatus());
+
+  @override
+  Stream<ModelState> download(String artifactKey) => Stream.value(state);
+
+  @override
+  Future<ModelState> pause(String artifactKey) async => state;
+
+  @override
+  Future<ModelState> cancel(String artifactKey) async => state;
+
+  @override
+  Future<ModelState> addModel(ModelCatalogEntry entry) async => state;
+}
+
 final class StaticModels implements ModelManagementRepository {
   const StaticModels(this.state);
   final ModelState state;

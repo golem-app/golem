@@ -279,18 +279,30 @@ class ModelController extends _$ModelController {
     }
   }
 
-  /// Records that the engine holds weights after ChatController's lazy
-  /// prepare(). Skips sideloaded paths — outside the catalog's phase tracking.
+  /// Records that the engine holds weights after a lazy prepare() — the
+  /// startup gate's for a sideload, ChatController's otherwise.
   Future<void> reflectEngineLoaded() async {
     if (_busy) return;
-    final current = state.value;
-    final target = _engineTargetKey();
-    if (current == null ||
-        current.runtime == RuntimePhase.loaded ||
-        target == null ||
-        current.statusOf(target).phase != ArtifactPhase.installed) {
+    // Never before this controller has hydrated: the startup gate's sideload
+    // load is what forces it to build, so the dispatch arriving through the
+    // bridge is what would otherwise read a null state and give up (#126).
+    try {
+      await future;
+    } catch (_) {
+      // Deliberately broad, as in reconcileDownloads: every caller of this
+      // treats the phase as bookkeeping beside work that already succeeded, so
+      // a model store that cannot be read must not fail a prepared generation
+      // or a validated sideload. A malformed persisted map surfaces here as an
+      // Error, which `on Exception` would let through.
       return;
     }
+    // Re-checked after the await, which the pre-#126 shape had no need of: a
+    // delete or a toggle that took the guard while this was hydrating owns
+    // the flags, and clearing them under it would unlock its own engine work.
+    if (!ref.mounted || _busy) return;
+    final current = state.value;
+    if (current == null || current.runtime == RuntimePhase.loaded) return;
+    if (!_engineMayHoldWeights(current)) return;
     // Ahead of the guard flags: a throwing read between them and the finally
     // below would latch _busy for the notifier's lifetime, silently disabling
     // every model command for the rest of the process.
@@ -387,14 +399,8 @@ class ModelController extends _$ModelController {
           state = AsyncData(value);
           return;
         }
-        // A sideload's path is the operator's own and has no catalog phase to
-        // gate on; everything else must be installed before the engine is
-        // touched, and which artifact that is follows the active chat (#20).
-        final backend = ref.read(inferenceBackendProvider);
         final target = _engineTargetKey();
-        if (!backend.sideloaded &&
-            (target == null ||
-                current.statusOf(target).phase != ArtifactPhase.installed)) {
+        if (!_engineMayHoldWeights(current)) {
           // Refuse with a persisted failed phase; the engine is never touched.
           final value = await repository.recordRuntime(
             RuntimePhase.failed,
@@ -484,6 +490,21 @@ class ModelController extends _$ModelController {
       // throwing read here would abort the release instead of degrading, on
       // the one path with no surface left to report a failure to.
     }
+  }
+
+  /// Whether the engine may be commanded to hold weights for [current]. A
+  /// sideload's path is the operator's own and has no catalog phase to gate on;
+  /// everything else must be installed first, and which artifact that is
+  /// follows the active chat (#20).
+  ///
+  /// Stated once because its two callers drifted: reflectEngineLoaded refused
+  /// the sideload that toggleRuntime allowed, which is what left Settings
+  /// offering "Load" for weights the engine was already holding (#126).
+  bool _engineMayHoldWeights(ModelState current) {
+    if (ref.read(inferenceBackendProvider).sideloaded) return true;
+    final target = _engineTargetKey();
+    return target != null &&
+        current.statusOf(target).phase == ArtifactPhase.installed;
   }
 
   /// The model the engine would load now: the active chat's choice when it has
