@@ -13,6 +13,7 @@ import 'package:golem_flutter/features/benchmark/application/benchmark_providers
 import 'package:golem_flutter/features/chat/application/active_model_providers.dart';
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/chat/application/search_providers.dart';
+import 'package:golem_flutter/features/models/application/custom_repository_controller.dart';
 import 'package:golem_flutter/features/models/application/download_note_providers.dart';
 import 'package:golem_flutter/features/models/application/download_pace_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
@@ -54,6 +55,7 @@ final _allProviders = <String, ProviderOrFamily>{
   'downloadableModelKeys': downloadableModelKeysProvider,
   'paceClock': paceClockProvider,
   'downloadPace': downloadPaceProvider,
+  'customRepositoryController': customRepositoryControllerProvider,
   'downloadNoteDismissal': downloadNoteDismissalProvider,
   'downloadNoteFigures': downloadNoteFiguresProvider,
   'downloadNoteVisible': downloadNoteVisibleProvider,

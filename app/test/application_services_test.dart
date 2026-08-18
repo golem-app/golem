@@ -1,17 +1,23 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/application/storage_breakdown_service.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/repository_resolution.dart';
+import 'package:golem_flutter/core/domain/resolved_repository.dart';
 import 'package:golem_flutter/core/domain/model_profile_spec.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
+import 'package:golem_flutter/core/repositories/fake_repository_resolver.dart';
 import 'package:golem_flutter/core/services/cache_probe.dart';
 import 'package:golem_flutter/core/services/device_storage.dart';
-import 'package:golem_flutter/features/settings/application/custom_repository_workflow.dart';
+import 'package:golem_flutter/features/models/application/custom_repository_controller.dart';
+import 'package:golem_flutter/features/models/application/custom_repository_workflow.dart';
+import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
 
 import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
@@ -185,6 +191,200 @@ void main() {
       },
     );
   });
+
+  group('CustomRepositoryController', () {
+    ProviderContainer containerWith(CustomRepositoryResolver resolver) {
+      final container = buildContainer(
+        model: const ModelState(simulated: true),
+        resolver: resolver,
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    test('a resolution survives the card being rebuilt from scratch', () async {
+      // The reason this is a controller and not screen state: the Models list
+      // disposes off-screen children, so a resolution used to depend on the
+      // card staying on screen (#129).
+      final container = containerWith(
+        _ScriptedResolver([
+          RepositoryResolved(
+            resolved: _resolved,
+            profile: null,
+            templateFingerprint: null,
+          ),
+        ]),
+      );
+      final controller = container.read(
+        customRepositoryControllerProvider.notifier,
+      );
+      controller.edit(repository: 'org/tiny-GGUF');
+      await controller.resolve();
+      expect(
+        container.read(customRepositoryControllerProvider).outcome,
+        isA<AddResolved>(),
+      );
+      expect(
+        container.read(customRepositoryControllerProvider).repository,
+        'org/tiny-GGUF',
+        reason: 'the typed text travels with the resolution',
+      );
+    });
+
+    test('editing or switching engine drops a stale resolution', () async {
+      final container = containerWith(
+        _ScriptedResolver([
+          RepositoryResolved(
+            resolved: _resolved,
+            profile: null,
+            templateFingerprint: null,
+          ),
+        ]),
+      );
+      final controller = container.read(
+        customRepositoryControllerProvider.notifier,
+      );
+      controller.edit(repository: 'org/tiny-GGUF');
+      await controller.resolve();
+      controller.edit(repository: 'org/tiny-GGU');
+      expect(
+        container.read(customRepositoryControllerProvider).outcome,
+        isA<AddIdle>(),
+      );
+      await controller.resolve();
+      controller.selectEngine(ModelEngine.gguf);
+      expect(
+        container.read(customRepositoryControllerProvider).outcome,
+        isA<AddIdle>(),
+      );
+    });
+
+    test('an answer for a repository the user retyped is dropped', () async {
+      // Resolving takes seconds of network. The edit already published
+      // AddIdle, and this answer describes something no longer on screen.
+      final resolver = _GatedResolver();
+      final container = containerWith(resolver);
+      final controller = container.read(
+        customRepositoryControllerProvider.notifier,
+      );
+      controller.edit(repository: 'org/slow');
+      final pending = controller.resolve();
+      controller.edit(repository: 'org/other');
+      resolver.complete(
+        RepositoryResolved(
+          resolved: _resolved,
+          profile: null,
+          templateFingerprint: null,
+        ),
+      );
+      await pending;
+      expect(
+        container.read(customRepositoryControllerProvider).outcome,
+        isA<AddIdle>(),
+      );
+    });
+
+    test(
+      'a weight choice resolves again with the file the user picked',
+      () async {
+        final resolver = _RecordingResolver();
+        final container = containerWith(resolver);
+        final controller = container.read(
+          customRepositoryControllerProvider.notifier,
+        );
+        controller.edit(repository: 'org/tiny-GGUF');
+        await controller.resolve(weightsFile: 'tiny-Q4_0.gguf');
+        expect(resolver.weightsFiles, ['tiny-Q4_0.gguf']);
+      },
+    );
+
+    test('a committed add persists the spec and clears the draft', () async {
+      final container = containerWith(
+        _ScriptedResolver([
+          RepositoryResolved(
+            resolved: _resolved,
+            profile: null,
+            templateFingerprint: null,
+          ),
+        ]),
+      );
+      final controller = container.read(
+        customRepositoryControllerProvider.notifier,
+      );
+      controller.edit(repository: 'org/tiny-GGUF', revision: 'abc123');
+      await controller.resolve();
+      expect(await controller.add(), isTrue);
+      final draft = container.read(customRepositoryControllerProvider);
+      expect(draft.repository, isEmpty);
+      expect(draft.outcome, isA<AddIdle>());
+      final stored = (await container.read(
+        preferencesControllerProvider.future,
+      )).customModels;
+      expect(stored.single.repository, 'org/tiny-GGUF');
+      expect(stored.single.revision, 'abc123');
+    });
+
+    test('add refuses without a resolution on screen', () async {
+      final container = containerWith(const DeterministicRepositoryResolver());
+      final controller = container.read(
+        customRepositoryControllerProvider.notifier,
+      );
+      controller.edit(repository: 'org/tiny-GGUF');
+      expect(await controller.add(), isFalse);
+    });
+  });
+}
+
+final _resolved = ResolvedRepository(
+  commitSha: 'a' * 40,
+  quantization: 'Q4_0',
+  displayName: 'Tiny',
+  files: const [
+    ModelArtifactFile(
+      path: 'tiny.gguf',
+      bytes: 1000,
+      role: ModelFileRole.weights,
+    ),
+  ],
+);
+
+/// Replays scripted resolutions, and records the weights file each pass asked
+/// for so the two-step choice can be asserted.
+final class _ScriptedResolver implements CustomRepositoryResolver {
+  _ScriptedResolver(this.outcomes);
+
+  final List<RepositoryResolution> outcomes;
+  int _calls = 0;
+
+  @override
+  Future<RepositoryResolution> resolve({
+    required String repository,
+    required ModelEngine engine,
+    String ref = 'main',
+    String? weightsFile,
+    Set<String> existingKeys = const {},
+  }) async {
+    final index = _calls < outcomes.length ? _calls : outcomes.length - 1;
+    _calls++;
+    return outcomes[index];
+  }
+}
+
+/// Answers only when the test says so, which is how a slow Hub read is staged
+/// against an edit that lands while it is in flight.
+final class _GatedResolver implements CustomRepositoryResolver {
+  final _gate = Completer<RepositoryResolution>();
+
+  void complete(RepositoryResolution outcome) => _gate.complete(outcome);
+
+  @override
+  Future<RepositoryResolution> resolve({
+    required String repository,
+    required ModelEngine engine,
+    String ref = 'main',
+    String? weightsFile,
+    Set<String> existingKeys = const {},
+  }) => _gate.future;
 }
 
 final class _ThrowingCacheProbe implements CacheProbe {
@@ -206,6 +406,7 @@ final class _ThrowingDiskCapacity implements DiskCapacityProbe {
 
 final class _RecordingResolver implements CustomRepositoryResolver {
   Set<String> existingKeys = const {};
+  final List<String?> weightsFiles = [];
 
   @override
   Future<RepositoryResolution> resolve({
@@ -216,6 +417,7 @@ final class _RecordingResolver implements CustomRepositoryResolver {
     Set<String> existingKeys = const {},
   }) async {
     this.existingKeys = existingKeys;
+    weightsFiles.add(weightsFile);
     return const RepositoryRejected(RepositoryRejection.duplicateEntry);
   }
 }

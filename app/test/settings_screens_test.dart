@@ -590,45 +590,47 @@ void main() {
     expect(reasoning, findsOneWidget);
   }, variant: iosChrome);
 
-  testWidgets('the root model row names the chat\'s model, not the boot one', (
-    tester,
-  ) async {
-    // The visible half of the one-derivation rule (#129). The row used to
-    // resolve from residency alone, so with nothing loaded yet it named the
-    // build's boot artifact while chat, the picker and the Models screen all
-    // named the conversation's choice.
-    await pumpWithRepositories(
-      tester,
-      backend: const InferenceBackendConfig(
-        kind: InferenceBackendKind.mlx,
-        profileKey: 'gemma4',
-        artifactKey: 'gemma4-mlx',
-        modelPath: '/models/gemma',
-        modelPathFromCatalog: true,
-      ),
-      model: const ModelState(
-        artifacts: {
-          'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
-          'qwen35-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
-        },
-      ),
-      history: ChatHistorySnapshot(
-        activeId: 'chat',
-        conversations: [
-          ChatConversation(
-            id: 'chat',
-            title: 'Switched',
-            updatedAt: DateTime.utc(2026, 8, 18),
-            messages: const [],
-            modelKey: 'qwen35-mlx',
-          ),
-        ],
-      ),
-      child: const SettingsScreen(identity: AppIdentity.dev),
-    );
-    expect(find.text('Qwen 3.5 4B'), findsOneWidget);
-    expect(find.text('Gemma 4 E2B'), findsNothing);
-  }, variant: iosChrome);
+  testWidgets(
+    'the root model row names the chat\'s model, not the boot one',
+    (tester) async {
+      // The visible half of the one-derivation rule (#129). The row used to
+      // resolve from residency alone, so with nothing loaded yet it named the
+      // build's boot artifact while chat, the picker and the Models screen all
+      // named the conversation's choice.
+      await pumpWithRepositories(
+        tester,
+        backend: const InferenceBackendConfig(
+          kind: InferenceBackendKind.mlx,
+          profileKey: 'gemma4',
+          artifactKey: 'gemma4-mlx',
+          modelPath: '/models/gemma',
+          modelPathFromCatalog: true,
+        ),
+        model: const ModelState(
+          artifacts: {
+            'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+            'qwen35-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+          },
+        ),
+        history: ChatHistorySnapshot(
+          activeId: 'chat',
+          conversations: [
+            ChatConversation(
+              id: 'chat',
+              title: 'Switched',
+              updatedAt: DateTime.utc(2026, 8, 18),
+              messages: const [],
+              modelKey: 'qwen35-mlx',
+            ),
+          ],
+        ),
+        child: const SettingsScreen(identity: AppIdentity.dev),
+      );
+      expect(find.text('Qwen 3.5 4B'), findsOneWidget);
+      expect(find.text('Gemma 4 E2B'), findsNothing);
+    },
+    variant: iosChrome,
+  );
 
   testWidgets('the root reflects the active style and advanced rows', (
     tester,
