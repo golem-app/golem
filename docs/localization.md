@@ -7,6 +7,25 @@ Standard Arabic are maintained in the repository. Flutter's SDK
 `gen-l10n` generator is the only localization framework; there is no runtime
 translation or TMS.
 
+## Where copy lives
+
+Every user-facing sentence is in the catalogs, reached either through
+`context.l10n` or through `app/lib/l10n/presentation_messages.dart`, which
+words a domain classification for a screen. Below that line — `core/domain/`,
+`broker/`, and every persisted store — carries kinds and redacted arguments,
+never sentences: a string on a domain type is the English one nobody
+translates, and a string in a store is a sentence a later release cannot
+retranslate (and, for a failure, one that can quote a path off the device).
+
+A pure function that produces copy takes a non-nullable `AppLocalizations`.
+Tests that run without a widget tree construct `AppLocalizationsEn()`, which is
+what `context.l10n` already falls back to; a nullable parameter with `?? '…'`
+fallbacks is how a second, untranslated copy of the product's voice grows.
+
+Exception `message` fields are the deliberate exception. They are English
+diagnostics for logs and the gated acceptance suites, never rendered —
+presentation switches on the accompanying kind.
+
 ## Product language
 
 Polish copy is neutral, concise, and gender-neutral. Avoid `Pan/Pani` and avoid
