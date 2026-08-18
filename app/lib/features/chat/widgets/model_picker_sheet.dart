@@ -4,19 +4,19 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/chrome/golem_badge.dart';
 import '../../../core/chrome/golem_button.dart';
-import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/chrome/golem_sheet.dart';
+import '../../../core/chrome/golem_tappable.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../../../core/widgets/labeled_progress.dart';
 import '../../../l10n/l10n.dart';
 import '../../models/application/model_providers.dart';
+import '../../models/artifact_transfer.dart';
 import '../../models/model_download_consent.dart';
 import '../../preferences/application/preferences_providers.dart';
 import '../application/active_model_providers.dart';
 import '../application/chat_providers.dart';
-import '../../models/artifact_transfer.dart';
 import '../model_choice.dart';
 
 /// How far a row's text sits inside the sheet's gutter: the card's 14pt
@@ -132,12 +132,10 @@ final class _ModelPickerContent extends ConsumerWidget {
                     style: GolemText.caption.copyWith(color: muted),
                   ),
                 ),
-            CupertinoButton(
+            GolemTappable(
               key: const Key('model-picker-manage'),
+              shape: GolemTapShape.wide,
               padding: const EdgeInsetsDirectional.only(start: _rowTextInset),
-              minimumSize: Size.fromHeight(
-                GolemChrome.current.minimumTapTarget,
-              ),
               alignment: AlignmentDirectional.centerStart,
               onPressed: () {
                 Navigator.pop(context);
@@ -250,12 +248,10 @@ final class _ModelRow extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            CupertinoButton(
+            GolemTappable(
               key: Key('model-picker-${choice.entry.key}'),
+              shape: GolemTapShape.wide,
               padding: const EdgeInsets.symmetric(vertical: GolemSpace.s2),
-              minimumSize: Size.fromHeight(
-                GolemChrome.current.minimumTapTarget,
-              ),
               onPressed: onSelect,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -350,12 +346,10 @@ final class _ModelRow extends StatelessWidget {
           ),
           if (progress.pausable) ...[
             const SizedBox(height: GolemSpace.s2),
-            CupertinoButton(
+            GolemTappable(
               key: Key('model-picker-pause-${choice.entry.key}'),
+              shape: GolemTapShape.wide,
               padding: EdgeInsets.zero,
-              minimumSize: Size.fromHeight(
-                GolemChrome.current.minimumTapTarget,
-              ),
               onPressed: onTransfer,
               child: Text(
                 context.l10n.pause,

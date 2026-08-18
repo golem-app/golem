@@ -1,8 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/chrome/golem_chrome.dart';
+import '../../../core/chrome/golem_icon_button.dart';
 import '../../../core/domain/download_pace.dart';
 import '../../../core/domain/model_catalog.dart';
 import '../../../core/theme/golem_theme.dart';
@@ -137,23 +137,19 @@ class DownloadNoteBanner extends ConsumerWidget {
             child: Semantics(
               button: true,
               label: l10n.dismissNote,
-              child: CupertinoButton(
+              // No semanticLabel on the glyph: the Semantics above already
+              // names the control, and a second label would read twice.
+              child: GolemIconButton(
                 key: const Key('download-note-dismiss'),
-                padding: EdgeInsets.zero,
-                minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
+                icon: CupertinoIcons.xmark,
+                size: 16,
+                color: CupertinoDynamicColor.resolve(
+                  GolemTheme.mutedInk,
+                  context,
+                ),
                 onPressed: () => ref
                     .read(downloadNoteDismissalProvider.notifier)
                     .dismiss(entry.key),
-                child: ExcludeSemantics(
-                  child: Icon(
-                    CupertinoIcons.xmark,
-                    size: 16,
-                    color: CupertinoDynamicColor.resolve(
-                      GolemTheme.mutedInk,
-                      context,
-                    ),
-                  ),
-                ),
               ),
             ),
           ),

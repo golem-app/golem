@@ -1,16 +1,14 @@
-import 'dart:math' as math;
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
-
 import '../../../core/app_identity.dart';
 import '../../../core/chrome/golem_alert.dart';
 import '../../../core/chrome/golem_button.dart';
 import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/chrome/golem_menu.dart';
 import '../../../core/chrome/golem_sheet.dart';
+import '../../../core/chrome/golem_tappable.dart';
 import '../../../core/chrome/golem_toast.dart';
 import '../../../core/domain/app_state.dart';
 import '../../../core/domain/byte_format.dart';
@@ -25,6 +23,7 @@ import '../../models/model_label.dart';
 import '../application/active_model_providers.dart';
 import '../application/chat_providers.dart';
 import '../domain/chat_sections.dart';
+import 'dart:math' as math;
 
 class ConversationDrawer extends ConsumerStatefulWidget {
   const ConversationDrawer({
@@ -112,11 +111,12 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: CupertinoButton(
+            child: GolemTappable(
               key: const Key('new-chat-drawer'),
+              shape: GolemTapShape.wide,
+              minimumHeight: GolemSize.button,
               color: GolemTheme.accent,
               borderRadius: BorderRadius.circular(GolemRadius.pill),
-              minimumSize: const Size.fromHeight(GolemSize.button),
               onPressed: widget.blocked
                   ? null
                   : () {
@@ -141,13 +141,12 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
-            child: CupertinoButton(
+            child: GolemTappable(
               key: const Key('drawer-search-button'),
               padding: EdgeInsets.zero,
+              shape: GolemTapShape.wide,
               // 46 is the drawn height; the platform floor only ever raises it.
-              minimumSize: Size.fromHeight(
-                math.max(46, GolemChrome.current.minimumTapTarget),
-              ),
+              minimumHeight: math.max(46, GolemChrome.current.minimumTapTarget),
               // Gated like the conversation rows: opening a result calls
               // selectConversation, which no-ops mid-generation — search
               // must not offer taps that silently do nothing.
@@ -228,10 +227,13 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
             ),
           ),
           _StorageMeter(),
-          CupertinoButton(
+          GolemTappable(
             key: const Key('open-settings'),
+            shape: GolemTapShape.wide,
+            // The drawn row height from the handoff, above the platform
+            // minimum rather than instead of it.
+            minimumHeight: 56,
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            minimumSize: const Size.fromHeight(56),
             onPressed: () {
               widget.close();
               context.push('/settings');
@@ -312,13 +314,15 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                 // and said nothing.
                 child: Semantics(
                   selected: selected,
-                  child: CupertinoButton(
+                  child: GolemTappable(
                     key: Key('conversation-${item.id}'),
+                    shape: GolemTapShape.wide,
+                    // The drawn row height, as above.
+                    minimumHeight: 52,
                     padding: const EdgeInsetsDirectional.only(
                       start: 20,
                       end: 4,
                     ),
-                    minimumSize: const Size.fromHeight(52),
                     alignment: AlignmentDirectional.centerStart,
                     onPressed: widget.blocked
                         ? null

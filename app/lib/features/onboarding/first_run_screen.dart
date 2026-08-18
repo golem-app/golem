@@ -1,13 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../core/app_identity.dart';
 import '../../core/chrome/golem_badge.dart';
 import '../../core/chrome/golem_button.dart';
-import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
+import '../../core/chrome/golem_tappable.dart';
 import '../../core/domain/model_admission.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/models.dart';
@@ -24,6 +21,7 @@ import '../models/widgets/download_note_banner.dart';
 import '../models/widgets/transfer_card.dart';
 import '../preferences/application/preferences_providers.dart';
 import 'application/onboarding_controller.dart';
+import 'dart:async';
 
 class FirstRunScreen extends ConsumerWidget {
   const FirstRunScreen({this.initialStep, super.key});
@@ -455,10 +453,10 @@ class _CatalogModelRow extends StatelessWidget {
     // circle glyph carrying no label.
     return Semantics(
       selected: selected,
-      child: CupertinoButton(
+      child: GolemTappable(
         key: Key('first-run-model-${option.entry.key}'),
+        shape: GolemTapShape.wide,
         padding: EdgeInsets.zero,
-        minimumSize: Size.fromHeight(GolemChrome.current.minimumTapTarget),
         onPressed: onTap,
         child: Opacity(
           opacity: option.enabled ? 1 : 0.48,
@@ -850,10 +848,9 @@ class _DownloadFailureBanner extends ConsumerWidget {
             alignment: WrapAlignment.end,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              CupertinoButton(
+              GolemTappable(
                 key: const Key('first-run-resume-download'),
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
                 onPressed: () => unawaited(
                   ref
                       .read(modelControllerProvider.notifier)
@@ -861,10 +858,9 @@ class _DownloadFailureBanner extends ConsumerWidget {
                 ),
                 child: Text(context.l10n.retry),
               ),
-              CupertinoButton(
+              GolemTappable(
                 key: const Key('first-run-discard-download'),
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
                 onPressed: () => unawaited(
                   ref.read(modelControllerProvider.notifier).cancel(entry.key),
                 ),

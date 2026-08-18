@@ -1,9 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
-import 'package:highlight/highlight.dart' show highlight;
 import 'package:highlight/highlight.dart' as hl show Node;
+import 'package:highlight/highlight.dart' show highlight;
 
 import '../../../../core/chrome/golem_chrome.dart';
+import '../../../../core/chrome/golem_tappable.dart';
 import '../../../../core/chrome/golem_toast.dart';
 import '../../../../core/theme/golem_theme.dart';
 import '../../../../l10n/l10n.dart';
@@ -176,12 +177,11 @@ final class _CopyChip extends StatelessWidget {
   final _CodePalette palette;
 
   @override
-  Widget build(BuildContext context) => CupertinoButton(
+  Widget build(BuildContext context) => GolemTappable(
     key: const Key('code-copy'),
     // The chip paints at its handoff size; `minimumSize` expands only the
     // tap target around it to the platform minimum.
     padding: const EdgeInsets.symmetric(horizontal: 11),
-    minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
     onPressed: () async {
       await Clipboard.setData(ClipboardData(text: code));
       if (context.mounted) {

@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/chrome/golem_chrome.dart';
+import '../../../core/chrome/golem_tappable.dart';
 import '../../../core/domain/app_state.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../../../l10n/l10n.dart';
@@ -18,7 +18,6 @@ class PersistenceRecoveryBanner extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final retrying = phase == ChatPersistencePhase.retrying;
-    final target = GolemChrome.current.minimumTapTarget;
     List<Widget> messageChildren() => [
       const ExcludeSemantics(
         child: Icon(
@@ -38,9 +37,8 @@ class PersistenceRecoveryBanner extends ConsumerWidget {
       ),
     ];
 
-    Widget retryButton() => CupertinoButton(
+    Widget retryButton() => GolemTappable(
       key: const Key('retry-chat-persistence'),
-      minimumSize: Size(target, target),
       padding: const EdgeInsets.symmetric(horizontal: 8),
       onPressed: retrying
           ? null

@@ -1,7 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../core/chrome/golem_button.dart';
 import '../../core/chrome/golem_nav_bar.dart';
+import '../../core/chrome/golem_tappable.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
 import '../../l10n/l10n.dart';
@@ -138,10 +140,11 @@ class _LicenseFailure extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          CupertinoButton.filled(
+          GolemButton.filled(
             key: const Key('licenses-retry'),
+            label: context.l10n.tryAgain,
             onPressed: onRetry,
-            child: Text(context.l10n.tryAgain),
+            expand: false,
           ),
         ],
       ),
@@ -181,7 +184,7 @@ class _LicenseDisclosureState extends State<_LicenseDisclosure> {
             label: _expanded
                 ? context.l10n.hideLicenseFor(title)
                 : context.l10n.showLicenseFor(title),
-            child: CupertinoButton(
+            child: GolemTappable(
               key: Key('license-${title.toLowerCase()}'),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
               onPressed: () => setState(() => _expanded = !_expanded),

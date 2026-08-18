@@ -7,8 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // knowledge (profiles carry no Inferno import); the Inferno boundary is
 // unchanged — only lib/broker/ touches package:inferno.
 import '../../broker/model_profile.dart';
-import '../../core/chrome/golem_chrome.dart';
+import '../../core/chrome/golem_icon_button.dart';
 import '../../core/chrome/golem_nav_bar.dart';
+import '../../core/chrome/golem_tappable.dart';
 import '../../core/domain/app_preferences.dart';
 import '../../core/domain/generation_settings.dart';
 import '../../core/domain/model_activation.dart';
@@ -123,7 +124,7 @@ class _StyleCard extends StatelessWidget {
       value: selected
           ? context.l10n.selectedOption(_styleTitle(context, style))
           : null,
-      child: CupertinoButton(
+      child: GolemTappable(
         key: Key('style-${style.name}'),
         padding: EdgeInsets.zero,
         onPressed: onTap,
@@ -150,8 +151,8 @@ class _StyleCard extends StatelessWidget {
                   children: [
                     Text(
                       _styleTitle(context, style),
-                      // Explicit ink: CupertinoButton would otherwise tint
-                      // the title accent-blue.
+                      // Explicit ink: the tappable would otherwise tint the
+                      // title accent-blue.
                       style: GolemText.bodyStrong.copyWith(
                         color: CupertinoDynamicColor.resolve(
                           GolemTheme.ink,
@@ -310,13 +311,12 @@ class GenerationCard extends ConsumerWidget {
           if (!overrides.isEmpty)
             Align(
               alignment: AlignmentDirectional.centerEnd,
-              child: CupertinoButton(
+              child: GolemTappable(
                 key: Key('gen-reset-$profileKey'),
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                // Square, not `fromHeight`: that sets an infinite minimum
-                // width, which the parent clamps to its own — and a
+                // The square shape, not the wide one: wide sets an infinite
+                // minimum width, which the parent clamps to its own — and a
                 // full-width Reset would ignore the trailing Align above it.
-                minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
                 onPressed: () => announceFailedSave(
                   context,
                   ref
@@ -549,14 +549,12 @@ class _StepperRow extends StatelessWidget {
           key: stepperKey,
           children: [
             Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
-            CupertinoButton(
+            GolemIconButton(
               key: Key('${stepperKey.value}-minus'),
-              padding: EdgeInsets.zero,
-              minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
+              icon: CupertinoIcons.minus_circle,
               onPressed: value <= min
                   ? null
                   : () => onCommit(lower.clamp(min, max)),
-              child: const Icon(CupertinoIcons.minus_circle, size: 22),
             ),
             SizedBox(
               width: 64,
@@ -571,14 +569,12 @@ class _StepperRow extends StatelessWidget {
                 ],
               ),
             ),
-            CupertinoButton(
+            GolemIconButton(
               key: Key('${stepperKey.value}-plus'),
-              padding: EdgeInsets.zero,
-              minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
+              icon: CupertinoIcons.plus_circle,
               onPressed: value >= max
                   ? null
                   : () => onCommit(higher.clamp(min, max)),
-              child: const Icon(CupertinoIcons.plus_circle, size: 22),
             ),
           ],
         ),
