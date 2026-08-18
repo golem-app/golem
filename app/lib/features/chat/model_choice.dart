@@ -25,49 +25,7 @@ import '../../core/domain/model_catalog.dart';
 import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
 import '../../l10n/generated/app_localizations.dart';
-import '../../l10n/presentation_messages.dart';
-
-/// A download affordance a picker row may offer. Absent (`null` on the choice)
-/// when the artifact is installed, or when the device is refused and the
-/// affordance is *withheld* rather than dimmed (ADR 0007).
-sealed class ModelTransfer {
-  const ModelTransfer();
-}
-
-/// A transfer this row can start: a first download, a resume, or a retry.
-final class ModelTransferOffer extends ModelTransfer {
-  const ModelTransferOffer({
-    required this.label,
-    required this.enabled,
-    this.note,
-  });
-
-  /// `Download · 1.58 GB`, `Resume`, or `Retry`.
-  final String label;
-
-  /// False while another artifact holds the one transfer slot; [note] says so.
-  final bool enabled;
-
-  /// Why the offer is disabled, or what went wrong on the attempt before it.
-  final String? note;
-}
-
-/// A transfer already running, described for a progress bar.
-final class ModelTransferProgress extends ModelTransfer {
-  const ModelTransferProgress({
-    required this.fraction,
-    required this.label,
-    required this.pausable,
-  });
-
-  /// 0–1, derived from the catalog total; the repository never stores a stale
-  /// percentage (`ArtifactStatus.downloadedBytes`).
-  final double fraction;
-  final String label;
-
-  /// Verification cannot be interrupted; a download can.
-  final bool pausable;
-}
+import '../models/artifact_transfer.dart';
 
 /// Why a row cannot be chosen. Carried alongside the copy rather than instead
 /// of it: the enum is for tests and keys, the sentence is for the user.
@@ -110,6 +68,7 @@ final class ModelChoice {
     this.block,
     this.blockReason,
     this.transfer,
+    this.transferLabel,
   }) : assert(
          selectable == (blockReason == null),
          'a row a user cannot choose owes them a reason (#79)',
@@ -150,7 +109,15 @@ final class ModelChoice {
   final bool selectable;
   final ModelBlock? block;
   final String? blockReason;
-  final ModelTransfer? transfer;
+
+  /// The shared projection for this row, or null where this sheet withholds
+  /// the whole affordance rather than dimming it (ADR 0007).
+  final ArtifactTransferPresentation? transfer;
+
+  /// How this sheet words [transfer]: `Download · 1.58 GB`, `Resume`,
+  /// `Downloading`. Settings words the same decision at greater length, which
+  /// is why the projection carries the action and not the sentence.
+  final String? transferLabel;
 }
 
 /// The whole sheet: its rows, and an honest account of what is not among them.
@@ -441,6 +408,31 @@ ModelChoice _choiceFor({
     ),
   };
 
+  final suffix = simulatedTransfers
+      ? ' · ${localizations?.simulated ?? 'simulated'}'
+      : '';
+  // Nothing is offered under either of these, so nothing is projected: the
+  // sheet rebuilds on every download-progress snapshot, and a refused device
+  // would otherwise pay for a full projection per row on every tick.
+  final withheld = deviceRefusal != null || backend.sideloaded;
+  final transfer = withheld
+      ? null
+      : _pickerTransfer(
+          artifactTransfer(
+            entry: entry,
+            status: status,
+            localizations: localizations,
+            simulated: simulatedTransfers,
+            admitted: admission?.enabled ?? true,
+            downloadable: downloadable,
+            // The fake backend loads every format, so nothing is blocked on
+            // the engine under it — a fact about the backend, not about
+            // whether the *download* is simulated.
+            loadsHere: loadsHere || simulated,
+            transferringKey: transferringKey,
+          ),
+        );
+
   return ModelChoice(
     entry: entry,
     title: ambiguousName
@@ -471,119 +463,57 @@ ModelChoice _choiceFor({
     needsConsent: status.phase == ArtifactPhase.notDownloaded,
     block: blocked.$1,
     blockReason: blocked.$2,
-    transfer: _transferFor(
+    transfer: transfer,
+    transferLabel: _transferLabel(
+      transfer,
       entry: entry,
-      status: status,
-      deviceRefusal: deviceRefusal,
-      loadsHere: loadsHere,
-      simulated: simulated,
-      sideloaded: backend.sideloaded,
-      transferringKey: transferringKey,
-      simulatedTransfers: simulatedTransfers,
-      downloadable: downloadable,
-      admitted: admission?.enabled ?? true,
+      suffix: suffix,
       localizations: localizations,
     ),
   );
 }
 
-/// The row's download affordance, or null when there is nothing to offer.
+/// This sheet's reading of the shared projection.
 ///
-/// Withheld outright — not disabled — on a refused device and under a sideload,
-/// because a full-width button that does nothing when tapped undoes the honesty
-/// the copy beside it provides (ADR 0007).
-ModelTransfer? _transferFor({
-  required ModelCatalogEntry entry,
-  required ArtifactStatus status,
-  required String? deviceRefusal,
-  required bool loadsHere,
-  required bool simulated,
-  required bool sideloaded,
-  required String? transferringKey,
-  required bool simulatedTransfers,
-  required bool downloadable,
-  required bool admitted,
-  required AppLocalizations? localizations,
-}) {
-  if (deviceRefusal != null || sideloaded) return null;
-  // A transfer already under way is shown whatever the row's verdict. Settings
-  // has no tier gate, so it can start one this device is not admitted to; a
-  // picker that hid it would disable every other row with "Another model is
-  // downloading" while refusing to show the download it means, and offer no
-  // way to stop it.
-  final running =
-      status.phase == ArtifactPhase.downloading ||
-      status.phase == ArtifactPhase.verifying;
-  if (!running) {
-    // Nothing is *offered* for an artifact this device is not admitted to:
-    // the shared policy refused it on the first-run screen, and the row
-    // carries that sentence.
-    if (!admitted) return null;
-    // Nor for a hand-added repository that never resolved: it has synthesized
-    // files and no real byte count, so the request could not succeed, and
-    // Settings withholds its button for the same reason.
-    if (!downloadable) return null;
-    // Nor for an artifact this build could never run, even when a previous
-    // build installed it. That row explains itself and stops there.
-    if (!loadsHere && !simulated) return null;
-  }
-  final busyElsewhere = transferringKey != null && transferringKey != entry.key;
-  // The same qualifier Settings appends to every transfer phase: a simulated
-  // download must never read like a real one, and the two surfaces describe one
-  // repository.
-  final suffix = simulatedTransfers
-      ? ' · ${localizations?.simulated ?? 'simulated'}'
-      : '';
-  final busyNote = localizations?.anotherModelDownloading ?? _busyNote;
-  return switch (status.phase) {
-    ArtifactPhase.installed => null,
-    ArtifactPhase.downloading => ModelTransferProgress(
-      fraction: _fraction(status.downloadedBytes, entry.totalBytes),
-      label: localizations?.downloadingStatus(suffix) ?? 'Downloading$suffix',
-      pausable: true,
-    ),
-    ArtifactPhase.verifying => ModelTransferProgress(
-      fraction: 1,
-      label:
-          localizations?.verifyingFilesPicker(suffix) ??
-          'Verifying files$suffix',
-      pausable: false,
-    ),
-    ArtifactPhase.paused => ModelTransferOffer(
-      label: localizations?.resume ?? 'Resume',
-      enabled: !busyElsewhere,
-      note: busyElsewhere
-          ? busyNote
-          : localizations?.pausedDownloadAmount(
-                  gigabytes(status.downloadedBytes),
-                  gigabytes(entry.totalBytes),
-                  suffix,
-                ) ??
-                'Paused at ${gigabytes(status.downloadedBytes)} '
-                    'of ${gigabytes(entry.totalBytes)}$suffix.',
-    ),
-    ArtifactPhase.failed => ModelTransferOffer(
-      label: localizations?.retry ?? 'Retry',
-      enabled: !busyElsewhere,
-      note: busyElsewhere
-          ? busyNote
-          : localizations == null
-          ? status.failure ?? 'Download failed.'
-          : artifactFailureMessage(localizations, status),
-    ),
-    ArtifactPhase.notDownloaded => ModelTransferOffer(
-      label:
-          localizations?.downloadSizeAction(
-            '${gigabytes(entry.totalBytes)}$suffix',
-          ) ??
-          'Download · ${gigabytes(entry.totalBytes)}$suffix',
-      enabled: !busyElsewhere,
-      note: busyElsewhere ? busyNote : null,
-    ),
+/// Withheld outright — not disabled — for anything this build could never
+/// fetch or run, because a full-width button that does nothing when tapped
+/// undoes the honesty the copy beside it provides (ADR 0007). A busy slot is
+/// the one block that keeps its offer: the note explains the wait and the
+/// sheet hides only the button. The refused device and the sideload never get
+/// here at all; the caller withholds them before projecting.
+ArtifactTransferPresentation? _pickerTransfer(
+  ArtifactTransferPresentation transfer,
+) {
+  return switch (transfer.affordance) {
+    null => null,
+    TransferOffer(:final block?) when block != TransferBlock.busy => null,
+    _ => transfer,
   };
 }
 
-const _busyNote = 'Another model is downloading.';
+/// How this sheet words a transfer. Short by design: these buttons sit inside
+/// a row, where Settings' "Resume download" would wrap.
+String? _transferLabel(
+  ArtifactTransferPresentation? transfer, {
+  required ModelCatalogEntry entry,
+  required String suffix,
+  required AppLocalizations? localizations,
+}) => switch (transfer?.affordance) {
+  null => null,
+  TransferInFlight(pausable: true) =>
+    localizations?.downloadingStatus(suffix) ?? 'Downloading$suffix',
+  TransferInFlight() =>
+    localizations?.verifyingFilesPicker(suffix) ?? 'Verifying files$suffix',
+  TransferOffer(action: TransferAction.resume) =>
+    localizations?.resume ?? 'Resume',
+  TransferOffer(action: TransferAction.retry) =>
+    localizations?.retry ?? 'Retry',
+  TransferOffer() =>
+    localizations?.downloadSizeAction(
+          '${gigabytes(entry.totalBytes)}$suffix',
+        ) ??
+        'Download · ${gigabytes(entry.totalBytes)}$suffix',
+};
 
 /// Size first, because it is the cost; then capability, which is proven per
 /// artifact (#18); then speed, only where a generation measured it — the fake's
@@ -732,6 +662,3 @@ String? _keyInFlight(ModelState models, List<ModelCatalogEntry> catalog) {
 /// single engine to name — callers only reach this on the real paths.
 ModelEngine _composedEngine(InferenceBackendConfig backend) =>
     backend.kind.loads(ModelEngine.gguf) ? ModelEngine.gguf : ModelEngine.mlx;
-
-double _fraction(int downloaded, int total) =>
-    total <= 0 ? 0 : (downloaded / total).clamp(0, 1).toDouble();

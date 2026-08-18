@@ -88,11 +88,7 @@ void main() {
     expect(find.text('Saving…'), findsOneWidget);
     expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
     expect(
-      tester
-          .widget<CupertinoButton>(
-            find.byKey(const Key('retry-chat-persistence')),
-          )
-          .onPressed,
+      pressedHandler(tester, find.byKey(const Key('retry-chat-persistence'))),
       isNull,
     );
 

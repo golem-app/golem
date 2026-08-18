@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/chrome/golem_button.dart';
-import '../../../core/chrome/golem_chrome.dart';
+import '../../../core/chrome/golem_tappable.dart';
 import '../../../core/chrome/golem_toast.dart';
 import '../../../core/domain/byte_format.dart';
 import '../../../core/domain/model_catalog.dart';
@@ -219,10 +219,9 @@ class _CustomRepositoryCardState extends ConsumerState<CustomRepositoryCard> {
       ),
       const SizedBox(height: 10),
       for (final candidate in candidates)
-        CupertinoButton(
+        GolemTappable(
           key: Key('custom-repo-candidate-${candidate.path}'),
           padding: const EdgeInsets.symmetric(vertical: 6),
-          minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
           onPressed: () => _resolve(weightsFile: candidate.path),
           child: Row(
             children: [
@@ -333,9 +332,8 @@ class _EngineChip extends StatelessWidget {
     // A 6pt dot and a fill were the only cue that this pair is a choice.
     return Semantics(
       selected: selected,
-      child: CupertinoButton(
+      child: GolemTappable(
         padding: EdgeInsets.zero,
-        minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
         onPressed: onTap,
         child: Container(
           height: 32,

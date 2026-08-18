@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/chrome/golem_alert.dart';
-import '../../../core/chrome/golem_chrome.dart';
+import '../../../core/chrome/golem_icon_button.dart';
 import '../../../core/chrome/golem_menu.dart';
 import '../../../core/chrome/golem_sheet.dart';
 import '../../../core/chrome/golem_toast.dart';
@@ -191,12 +191,13 @@ class MessageBubble extends ConsumerWidget {
       required IconData icon,
       required String label,
       required VoidCallback onPressed,
-    }) => CupertinoButton(
+    }) => GolemIconButton(
       key: key,
-      padding: EdgeInsets.zero,
-      minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
+      icon: icon,
+      size: 18,
+      color: tint,
+      semanticLabel: label,
       onPressed: onPressed,
-      child: Icon(icon, size: 18, color: tint, semanticLabel: label),
     );
     return Padding(
       padding: const EdgeInsets.only(top: 2),

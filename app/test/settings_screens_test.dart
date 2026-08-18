@@ -24,6 +24,7 @@ import 'package:golem_flutter/features/settings/models_screen.dart';
 import 'package:golem_flutter/features/settings/privacy_screen.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';
 import 'package:golem_flutter/features/settings/system_prompt_screen.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations.dart';
 
 import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
@@ -251,6 +252,50 @@ void main() {
     );
     expect(find.text('Keep Golem open for full speed.'), findsNothing);
     expect(find.textContaining(' left'), findsOneWidget);
+  });
+
+  testWidgets('the two model badges are told apart by more than their words', (
+    tester,
+  ) async {
+    // One of these was a private copy of GolemBadge that had already drifted a
+    // padding point from the shared one (#131). Both are on screen at once, so
+    // "which fact is this" has to survive not reading the label.
+    await pumpWithRepositories(
+      tester,
+      model: const ModelState(
+        simulated: true,
+        activeArtifactKey: 'gemma4-mlx',
+        runtime: RuntimePhase.loaded,
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+        },
+      ),
+      overrides: [
+        // Residency is the engine's, not the store's, and a simulated backend
+        // never holds weights — so it is stated rather than staged.
+        inferenceResidencyProvider.overrideWithValue(
+          const InferenceResidency(loaded: true, catalogKey: 'gemma4-mlx'),
+        ),
+      ],
+      child: const ModelsScreen(),
+    );
+    final l10n = AppLocalizations.of(tester.element(find.byType(ModelsScreen)));
+    Color badgeColor(String label) {
+      final badge = tester.widget<Container>(
+        find
+            .ancestor(of: find.text(label), matching: find.byType(Container))
+            .first,
+      );
+      return (badge.decoration! as BoxDecoration).color!;
+    }
+
+    expect(find.text(l10n.activeBadge), findsOneWidget);
+    expect(find.text(l10n.loadedBadge), findsOneWidget);
+    expect(
+      badgeColor(l10n.activeBadge),
+      isNot(badgeColor(l10n.loadedBadge)),
+      reason: 'the selected badge leads; the resident one sits quietly beside',
+    );
   });
 
   testWidgets('pausing a card leaves the card itself where it was', (

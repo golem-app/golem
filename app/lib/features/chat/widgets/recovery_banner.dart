@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/chrome/golem_chrome.dart';
+import '../../../core/chrome/golem_tappable.dart';
 import '../../../core/domain/app_state.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/theme/golem_theme.dart';
@@ -30,35 +30,31 @@ class RecoveryBanner extends ConsumerWidget {
     // and not a leftover.
     final recovery = switch (failure.kind.recovery) {
       ChatRecovery.none => null,
-      ChatRecovery.newChat => CupertinoButton(
+      ChatRecovery.newChat => GolemTappable(
         key: const Key('start-new-chat'),
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
         onPressed: () => ref
             .read(chatControllerProvider.notifier)
             .startFreshChatFromFailure(),
         child: Text(context.l10n.newChat),
       ),
-      ChatRecovery.chooseModel when activeId != null => CupertinoButton(
+      ChatRecovery.chooseModel when activeId != null => GolemTappable(
         key: const Key('choose-recovery-model'),
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
         onPressed: () =>
             showModelPickerSheet(context, conversationId: activeId),
         child: Text(context.l10n.chooseDifferentModel),
       ),
-      ChatRecovery.removeTurn => CupertinoButton(
+      ChatRecovery.removeTurn => GolemTappable(
         key: const Key('remove-failed-turn'),
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
         onPressed: () =>
             ref.read(chatControllerProvider.notifier).removeFailedTurn(),
         child: Text(context.l10n.deleteMessage),
       ),
-      ChatRecovery.chooseModel || ChatRecovery.retry => CupertinoButton(
+      ChatRecovery.chooseModel || ChatRecovery.retry => GolemTappable(
         key: const Key('retry-generation'),
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
         onPressed: () =>
             ref.read(chatControllerProvider.notifier).retryFailure(),
         child: Text(context.l10n.retry),
@@ -105,12 +101,9 @@ class RecoveryBanner extends ConsumerWidget {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 ?recovery,
-                CupertinoButton(
+                GolemTappable(
                   key: const Key('discard-generation'),
                   padding: const EdgeInsets.symmetric(horizontal: 8),
-                  minimumSize: Size.square(
-                    GolemChrome.current.minimumTapTarget,
-                  ),
                   onPressed: () => ref
                       .read(chatControllerProvider.notifier)
                       .discardFailure(),
@@ -181,10 +174,10 @@ class _DownloadActiveModelButton extends ConsumerWidget {
     );
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: CupertinoButton(
+      child: GolemTappable(
         key: const Key('download-active-model'),
+        shape: GolemTapShape.wide,
         color: GolemTheme.accent,
-        minimumSize: Size.fromHeight(GolemChrome.current.minimumTapTarget),
         padding: const EdgeInsets.symmetric(horizontal: 12),
         onPressed: () async {
           final status = ref

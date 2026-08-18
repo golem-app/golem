@@ -35,6 +35,7 @@
     <file>lib/core/startup/startup_sequence.dart</file>
     <file>lib/core/services/artifact_task_metadata.dart</file>
     <file>lib/core/services/artifact_stop_policy.dart</file>
+    <file>lib/features/models/artifact_transfer.dart</file>
     <file>lib/features/onboarding/domain/onboarding_policy.dart</file>
     <file>lib/features/chat/application/chat_failure_classifier.dart</file>
     <file>lib/features/chat/application/chat_conversation_edits.dart</file>

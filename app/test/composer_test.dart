@@ -103,9 +103,7 @@ void main() {
     // Installed alternatives are now selectable — the point of #20.
     for (final key in ['gemma4-mlx', 'qwen35-mlx']) {
       expect(
-        tester
-            .widget<CupertinoButton>(find.byKey(Key('model-picker-$key')))
-            .onPressed,
+        pressedHandler(tester, find.byKey(Key('model-picker-$key'))),
         isNotNull,
         reason: key,
       );
@@ -113,11 +111,10 @@ void main() {
     // A model that is not downloaded cannot be chosen: the chip would name
     // weights the next send would fail to load.
     expect(
-      tester
-          .widget<CupertinoButton>(
-            find.byKey(const Key('model-picker-qwen35-2b-mlx')),
-          )
-          .onPressed,
+      pressedHandler(
+        tester,
+        find.byKey(const Key('model-picker-qwen35-2b-mlx')),
+      ),
       isNull,
     );
     // Artifacts this build's engine can never load stay hidden outright
@@ -150,11 +147,7 @@ void main() {
     await tester.tap(find.byKey(const Key('composer-model-chip')));
     await tester.pumpAndSettle();
     expect(
-      tester
-          .widget<CupertinoButton>(
-            find.byKey(const Key('model-picker-gemma4-mlx')),
-          )
-          .onPressed,
+      pressedHandler(tester, find.byKey(const Key('model-picker-gemma4-mlx'))),
       isNull,
       reason:
           'switching away from a sideload is a one-way door: there is no key '
@@ -271,11 +264,10 @@ void main() {
       findsNothing,
     );
     expect(
-      tester
-          .widget<CupertinoButton>(
-            find.byKey(const Key('model-picker-pause-qwen35-2b-gguf')),
-          )
-          .onPressed,
+      pressedHandler(
+        tester,
+        find.byKey(const Key('model-picker-pause-qwen35-2b-gguf')),
+      ),
       isNotNull,
       reason: 'a download started here can be stopped here',
     );
@@ -413,8 +405,7 @@ void main() {
       'attach-take-photo',
       'attach-files',
     ]) {
-      final button = tester.widget<CupertinoButton>(find.byKey(Key(key)));
-      expect(button.onPressed, isNull, reason: key);
+      expect(pressedHandler(tester, find.byKey(Key(key))), isNull, reason: key);
     }
   });
 
@@ -448,10 +439,10 @@ void main() {
     // The picked image shows in the tray, and send is now reachable with no
     // text typed at all.
     expect(find.byKey(const Key('composer-attachments')), findsOneWidget);
-    final send = tester.widget<CupertinoButton>(
-      find.byKey(const Key('send-button')),
+    expect(
+      pressedHandler(tester, find.byKey(const Key('send-button'))),
+      isNotNull,
     );
-    expect(send.onPressed, isNotNull);
 
     await tester.tap(find.byKey(const Key('send-button')));
     await tester.pumpAndSettle();
@@ -649,9 +640,7 @@ void main() {
     await tester.tap(find.byKey(const Key('attach-photo-library')));
     await tester.pumpAndSettle();
     expect(
-      tester
-          .widget<CupertinoButton>(find.byKey(const Key('send-button')))
-          .onPressed,
+      pressedHandler(tester, find.byKey(const Key('send-button'))),
       isNotNull,
     );
 
@@ -667,9 +656,7 @@ void main() {
     // worse — but the turn cannot be fired at a model that cannot read it.
     expect(find.byKey(const Key('composer-attachments')), findsOneWidget);
     expect(
-      tester
-          .widget<CupertinoButton>(find.byKey(const Key('send-button')))
-          .onPressed,
+      pressedHandler(tester, find.byKey(const Key('send-button'))),
       isNull,
     );
   });
@@ -842,9 +829,8 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    VoidCallback? sendAction(WidgetTester tester) => tester
-        .widget<CupertinoButton>(find.byKey(const Key('send-button')))
-        .onPressed;
+    VoidCallback? sendAction(WidgetTester tester) =>
+        pressedHandler(tester, find.byKey(const Key('send-button')));
 
     testWidgets('a de-pinned conversation model falls back, not off', (
       tester,

@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/chrome/golem_chrome.dart';
+import '../../../core/chrome/golem_tappable.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../../../l10n/l10n.dart';
@@ -129,12 +129,9 @@ class EmptyChat extends ConsumerWidget {
                   runSpacing: 10,
                   children: [
                     for (final starter in starters)
-                      CupertinoButton(
+                      GolemTappable(
                         key: starter.key,
                         padding: EdgeInsets.zero,
-                        minimumSize: Size.square(
-                          GolemChrome.current.minimumTapTarget,
-                        ),
                         onPressed: () => onStarter(starter.prompt),
                         child: Container(
                           padding: const EdgeInsets.symmetric(

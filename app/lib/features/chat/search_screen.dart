@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/chrome/golem_chrome.dart';
+import '../../core/chrome/golem_tappable.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../l10n/bidi.dart';
 import '../../l10n/l10n.dart';
@@ -133,13 +133,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       ),
                     ),
                   ),
-                  CupertinoButton(
+                  GolemTappable(
                     key: const Key('search-cancel'),
                     padding: const EdgeInsets.symmetric(
                       horizontal: GolemSpace.s3,
-                    ),
-                    minimumSize: Size.square(
-                      GolemChrome.current.minimumTapTarget,
                     ),
                     onPressed: _cancel,
                     child: Text(
@@ -246,7 +243,7 @@ final class _ResultCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final muted = CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context);
     final highlight = result.matchStart >= 0 && result.matchLength > 0;
-    return CupertinoButton(
+    return GolemTappable(
       key: Key('search-result-${result.conversationId}'),
       padding: EdgeInsets.zero,
       onPressed: () => onTap(result.conversationId),

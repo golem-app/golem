@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/chrome/golem_chrome.dart';
+import '../../../core/chrome/golem_tappable.dart';
 import '../../../core/chrome/golem_toast.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
@@ -141,12 +142,9 @@ class _ComposerState extends ConsumerState<Composer> {
                 PositionedDirectional(
                   top: -6,
                   end: -6,
-                  child: CupertinoButton(
+                  child: GolemTappable(
                     key: Key('composer-attachment-remove-$index'),
                     padding: EdgeInsets.zero,
-                    minimumSize: Size.square(
-                      GolemChrome.current.minimumTapTarget,
-                    ),
                     onPressed: () => setState(() => _pending.removeAt(index)),
                     child: Semantics(
                       button: true,
@@ -460,12 +458,9 @@ class _ComposerState extends ConsumerState<Composer> {
                           (hasText || _pending.isNotEmpty) &&
                           (_pending.isEmpty || supportsImages) &&
                           modelReady;
-                      return CupertinoButton(
+                      return GolemTappable(
                         key: Key(generating ? 'stop-button' : 'send-button'),
                         padding: EdgeInsets.zero,
-                        minimumSize: Size.square(
-                          GolemChrome.current.minimumTapTarget,
-                        ),
                         onPressed: generating
                             ? () => ref
                                   .read(chatControllerProvider.notifier)
@@ -582,10 +577,9 @@ final class _PowerButton extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => CupertinoButton(
+  Widget build(BuildContext context) => GolemTappable(
     key: buttonKey,
     padding: EdgeInsets.zero,
-    minimumSize: Size.square(GolemChrome.current.minimumTapTarget),
     onPressed: onPressed,
     child: Semantics(label: semanticLabel, child: child),
   );

@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/chrome/golem_alert.dart';
+import '../../core/chrome/golem_badge.dart';
 import '../../core/chrome/golem_button.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/domain/byte_format.dart';
-import '../../core/domain/download_pace.dart';
 import '../../core/domain/inference_backend.dart';
 import '../../core/domain/model_activation.dart';
 import '../../core/domain/model_catalog.dart';
@@ -15,7 +15,6 @@ import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/labeled_row.dart';
-import '../../core/widgets/progress_track.dart';
 import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/settings_rows.dart';
@@ -25,9 +24,11 @@ import '../chat/application/active_model_providers.dart';
 import '../chat/application/chat_providers.dart';
 import '../models/application/download_pace_providers.dart';
 import '../models/application/model_providers.dart';
+import '../models/artifact_transfer.dart';
 import '../models/model_download_consent.dart';
 import '../models/widgets/custom_repository_card.dart';
 import '../models/widgets/download_note_banner.dart';
+import '../models/widgets/transfer_card.dart';
 import '../preferences/application/preferences_providers.dart';
 
 enum _CatalogTab { all, installed }
@@ -388,12 +389,8 @@ class _ModelCard extends ConsumerWidget {
               spacing: 8,
               runSpacing: 6,
               children: [
-                if (active)
-                  _ModelStateBadge(
-                    label: context.l10n.activeBadge,
-                    emphasized: true,
-                  ),
-                if (resident) _ModelStateBadge(label: context.l10n.loadedBadge),
+                if (active) GolemBadge(label: context.l10n.activeBadge),
+                if (resident) GolemBadge.quiet(label: context.l10n.loadedBadge),
               ],
             ),
           ],
@@ -410,13 +407,26 @@ class _ModelCard extends ConsumerWidget {
           if (status.phase == ArtifactPhase.downloading ||
               status.phase == ArtifactPhase.paused) ...[
             const SizedBox(height: 14),
-            _Progress(
-              progressKey: Key('model-progress-${entry.key}'),
-              value: entry.totalBytes == 0
-                  ? 0
-                  : (status.downloadedBytes / entry.totalBytes).clamp(0, 1),
-              label: context.l10n.downloadProgressLabel(suffix),
-              detail: _progressDetail(context, ref),
+            TransferCard(
+              key: Key('model-progress-${entry.key}'),
+              transfer: artifactTransfer(
+                entry: entry,
+                status: status,
+                localizations: context.l10n,
+                // Only a running transfer has a pace; watching it while
+                // paused would rebuild this card on every tick of a download
+                // belonging to another one.
+                pace: status.phase == ArtifactPhase.downloading
+                    ? ref.watch(downloadPaceProvider)
+                    : null,
+                simulated: simulated,
+              ),
+              density: TransferDensity.dense,
+              semanticsLabel: context.l10n.downloadProgressLabel(suffix),
+              caption: context.l10n.downloadProgressLabel(suffix),
+              // The status row above already reads "Downloading 1.42 GB of
+              // 3.30 GB · simulated"; the card does not say it twice.
+              showBytes: false,
             ),
           ],
           // Inside the card, not hoisted above the list: slotted at the top it
@@ -572,14 +582,10 @@ class _ModelCard extends ConsumerWidget {
           ),
       ],
     );
-    final cancel = CupertinoButton(
+    final cancel = GolemButton.destructive(
       key: Key('model-cancel-${entry.key}'),
-      minimumSize: const Size.fromHeight(48),
+      label: context.l10n.cancelAndDiscard,
       onPressed: () => controller.cancel(entry.key),
-      child: Text(
-        context.l10n.cancelAndDiscard,
-        style: const TextStyle(color: GolemTheme.destructive),
-      ),
     );
     return switch (status.phase) {
       ArtifactPhase.notDownloaded => [const SizedBox(height: 14), download],
@@ -597,16 +603,12 @@ class _ModelCard extends ConsumerWidget {
       ArtifactPhase.verifying => const [],
       ArtifactPhase.installed => [
         const SizedBox(height: 14),
-        CupertinoButton(
+        GolemButton.destructive(
           key: Key('model-delete-${entry.key}'),
-          minimumSize: const Size.fromHeight(48),
+          label: context.l10n.deleteDownload,
           onPressed: generating
               ? null
               : () => _confirmDelete(context, controller),
-          child: Text(
-            context.l10n.deleteDownload,
-            style: const TextStyle(color: GolemTheme.destructive),
-          ),
         ),
       ],
     };
@@ -644,20 +646,6 @@ class _ModelCard extends ConsumerWidget {
     ],
   );
 
-  /// The right-aligned line under the bar: live time left while downloading
-  /// (absent until the pace sampler is warm), amount left while paused.
-  String? _progressDetail(BuildContext context, WidgetRef ref) {
-    if (status.phase == ArtifactPhase.paused) {
-      return context.l10n.amountLeft(
-        gigabytes(entry.totalBytes - status.downloadedBytes),
-      );
-    }
-    final pace = ref.watch(downloadPaceProvider);
-    final eta = pace?.artifactKey == entry.key ? pace?.eta : null;
-    if (status.phase != ArtifactPhase.downloading || eta == null) return null;
-    return context.l10n.etaAboutMinutesLeft(aboutMinutesLeft(eta));
-  }
-
   String _statusLabel(BuildContext context, String suffix) =>
       switch (status.phase) {
         ArtifactPhase.notDownloaded => context.l10n.notDownloaded,
@@ -685,37 +673,6 @@ class _ModelCard extends ConsumerWidget {
   };
 }
 
-class _ModelStateBadge extends StatelessWidget {
-  const _ModelStateBadge({required this.label, this.emphasized = false});
-
-  final String label;
-  final bool emphasized;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    decoration: BoxDecoration(
-      color: CupertinoDynamicColor.resolve(
-        emphasized ? GolemTheme.accentSoft : GolemTheme.fillQuiet,
-        context,
-      ),
-      borderRadius: BorderRadius.circular(GolemRadius.badge),
-    ),
-    child: Text(
-      label,
-      style:
-          localizedLabelStyle(
-            GolemText.badge,
-            Localizations.localeOf(context),
-          ).copyWith(
-            color: emphasized
-                ? CupertinoDynamicColor.resolve(GolemTheme.accent, context)
-                : null,
-          ),
-    ),
-  );
-}
-
 class _Status extends StatelessWidget {
   const _Status({required this.icon, required this.label});
   final IconData icon;
@@ -734,71 +691,6 @@ class _Status extends StatelessWidget {
         child: Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
       ),
     ],
-  );
-}
-
-class _Progress extends StatelessWidget {
-  const _Progress({
-    required this.value,
-    required this.label,
-    this.detail,
-    this.progressKey,
-  });
-  final double value;
-  final String label;
-
-  /// The time or amount left, shown under the bar. Inside the same excluded
-  /// subtree: the accessible reading stays label plus percent, unchanged.
-  final String? detail;
-  final Key? progressKey;
-
-  @override
-  // The bar carries no semantics of its own, and split across three nodes the
-  // caption and the number read as unrelated fragments. Deliberately not a
-  // live region: re-announcing every tick of a multi-gigabyte download would
-  // talk over everything else on the screen.
-  Widget build(BuildContext context) => Semantics(
-    key: progressKey,
-    container: true,
-    label: label,
-    value: context.l10n.percentValue((value * 100).round()),
-    child: ExcludeSemantics(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(label, style: const TextStyle(fontSize: 13)),
-              ),
-              Text(
-                '${(value * 100).round()}%',
-                style: const TextStyle(fontSize: 13),
-              ),
-            ],
-          ),
-          const SizedBox(height: 7),
-          ProgressTrack(
-            value: value,
-            trackColor: GolemTheme.divider,
-            fillColor: GolemTheme.accent,
-          ),
-          if (detail case final detail?) ...[
-            const SizedBox(height: 7),
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: Text(
-                detail,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    ),
   );
 }
 

@@ -1,5 +1,6 @@
 /// Download pace: a trailing-window rate estimate over observed byte counts,
-/// plus the spike-#36 throughput constants the foreground-download note quotes.
+/// the snapshot the surfaces read it as, and the spike-#36 throughput
+/// constants the foreground-download note quotes.
 ///
 /// The estimator carries no clock and no platform knowledge — callers feed it
 /// `(elapsed, bytes)` observations and read decimal MB/s back (the same
@@ -43,6 +44,33 @@ int aboutMinutes(double mbs, int remainingBytes) {
 int aboutMinutesLeft(Duration eta) {
   final rounded = (eta.inSeconds / 60).ceil();
   return rounded < 1 ? 1 : rounded;
+}
+
+/// One artifact's live transfer pace, published only while a rate is honest.
+final class DownloadPaceSnapshot {
+  const DownloadPaceSnapshot({
+    required this.artifactKey,
+    required this.mbPerSecond,
+    this.eta,
+  });
+
+  final String artifactKey;
+
+  /// Decimal MB/s over the estimator's trailing window.
+  final double mbPerSecond;
+
+  /// Time left at the current rate, when the catalog knows the total size.
+  final Duration? eta;
+
+  @override
+  bool operator ==(Object other) =>
+      other is DownloadPaceSnapshot &&
+      other.artifactKey == artifactKey &&
+      other.mbPerSecond == mbPerSecond &&
+      other.eta == eta;
+
+  @override
+  int get hashCode => Object.hash(artifactKey, mbPerSecond, eta);
 }
 
 /// A trailing-window average over `(elapsed, bytes)` observations.

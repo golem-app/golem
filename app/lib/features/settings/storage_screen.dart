@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/chrome/golem_alert.dart';
-import '../../core/chrome/golem_chrome.dart';
+import '../../core/chrome/golem_icon_button.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_toast.dart';
 import '../../core/domain/byte_format.dart';
@@ -298,18 +298,12 @@ class _DownloadedModels extends ConsumerWidget {
                   style: GolemText.body.copyWith(color: muted),
                 ),
                 const SizedBox(width: 4),
-                CupertinoButton(
+                GolemIconButton(
                   key: Key('storage-delete-${entry.key}'),
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.square(
-                    GolemChrome.current.minimumTapTarget,
-                  ),
+                  icon: CupertinoIcons.trash,
+                  size: 20,
+                  color: GolemTheme.destructive,
                   onPressed: () => _confirmDelete(context, ref, entry),
-                  child: const Icon(
-                    CupertinoIcons.trash,
-                    size: 20,
-                    color: GolemTheme.destructive,
-                  ),
                 ),
               ],
             ),

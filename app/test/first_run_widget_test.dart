@@ -563,10 +563,10 @@ void main() {
       'A draft stays editable',
     );
     await tester.pump();
-    final blocked = tester.widget<CupertinoButton>(
-      find.byKey(const Key('send-button')),
+    expect(
+      pressedHandler(tester, find.byKey(const Key('send-button'))),
+      isNull,
     );
-    expect(blocked.onPressed, isNull);
     expect(find.byKey(const Key('open-drawer')), findsOneWidget);
 
     await pumpWithRepositories(
@@ -586,10 +586,10 @@ void main() {
       'Ready to send',
     );
     await tester.pump();
-    final ready = tester.widget<CupertinoButton>(
-      find.byKey(const Key('send-button')),
+    expect(
+      pressedHandler(tester, find.byKey(const Key('send-button'))),
+      isNotNull,
     );
-    expect(ready.onPressed, isNotNull);
   });
 
   testWidgets(
@@ -637,9 +637,7 @@ void main() {
       );
       await tester.pump();
       expect(
-        tester
-            .widget<CupertinoButton>(find.byKey(const Key('send-button')))
-            .onPressed,
+        pressedHandler(tester, find.byKey(const Key('send-button'))),
         isNotNull,
       );
     },

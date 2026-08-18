@@ -12,33 +12,6 @@ part 'download_pace_providers.g.dart';
 @Riverpod(keepAlive: true, retry: noRetry)
 DateTime Function() paceClock(Ref ref) => DateTime.now;
 
-/// One artifact's live transfer pace, published only while a rate is honest.
-final class DownloadPaceSnapshot {
-  const DownloadPaceSnapshot({
-    required this.artifactKey,
-    required this.mbPerSecond,
-    this.eta,
-  });
-
-  final String artifactKey;
-
-  /// Decimal MB/s over the estimator's trailing window.
-  final double mbPerSecond;
-
-  /// Time left at the current rate, when the catalog knows the total size.
-  final Duration? eta;
-
-  @override
-  bool operator ==(Object other) =>
-      other is DownloadPaceSnapshot &&
-      other.artifactKey == artifactKey &&
-      other.mbPerSecond == mbPerSecond &&
-      other.eta == eta;
-
-  @override
-  int get hashCode => Object.hash(artifactKey, mbPerSecond, eta);
-}
-
 /// Live rate/ETA for the single in-flight download, derived by sampling
 /// [ModelController]'s byte counts against the injected clock. `null` until
 /// the trailing window can quote an honest figure, and again the moment the

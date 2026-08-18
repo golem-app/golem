@@ -3,8 +3,8 @@ import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
+import '../../core/chrome/golem_tappable.dart';
 import '../../core/domain/app_state.dart';
 import '../../core/domain/models.dart';
 import '../../core/providers/app_providers.dart';
@@ -237,12 +237,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ),
                         // Contained glass follows the iOS 26 toolbar style;
                         // bare nav-bar glyphs read too small next to it.
-                        leading: CupertinoButton(
+                        leading: GolemTappable(
                           key: const Key('open-drawer'),
                           padding: EdgeInsets.zero,
-                          minimumSize: Size.square(
-                            GolemChrome.current.minimumTapTarget,
-                          ),
                           onPressed: blocked
                               ? null
                               : () {
@@ -263,12 +260,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             ),
                           ),
                         ),
-                        trailing: CupertinoButton(
+                        trailing: GolemTappable(
                           key: const Key('new-chat-header'),
                           padding: EdgeInsets.zero,
-                          minimumSize: Size.square(
-                            GolemChrome.current.minimumTapTarget,
-                          ),
                           onPressed: blocked
                               ? null
                               : () => ref

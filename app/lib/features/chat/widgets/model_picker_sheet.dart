@@ -4,14 +4,15 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/chrome/golem_badge.dart';
 import '../../../core/chrome/golem_button.dart';
-import '../../../core/chrome/golem_chrome.dart';
 import '../../../core/chrome/golem_sheet.dart';
+import '../../../core/chrome/golem_tappable.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
-import '../../../core/widgets/progress_track.dart';
+import '../../../core/widgets/labeled_progress.dart';
 import '../../../l10n/l10n.dart';
 import '../../models/application/model_providers.dart';
+import '../../models/artifact_transfer.dart';
 import '../../models/model_download_consent.dart';
 import '../../preferences/application/preferences_providers.dart';
 import '../application/active_model_providers.dart';
@@ -131,12 +132,10 @@ final class _ModelPickerContent extends ConsumerWidget {
                     style: GolemText.caption.copyWith(color: muted),
                   ),
                 ),
-            CupertinoButton(
+            GolemTappable(
               key: const Key('model-picker-manage'),
+              shape: GolemTapShape.wide,
               padding: const EdgeInsetsDirectional.only(start: _rowTextInset),
-              minimumSize: Size.fromHeight(
-                GolemChrome.current.minimumTapTarget,
-              ),
               alignment: AlignmentDirectional.centerStart,
               onPressed: () {
                 Navigator.pop(context);
@@ -194,13 +193,14 @@ final class _ModelPickerContent extends ConsumerWidget {
       await controller.download(choice.entry.key);
     }
 
-    return switch (choice.transfer) {
+    return switch (choice.transfer?.affordance) {
       null => null,
-      ModelTransferOffer(:final enabled) when !enabled => null,
-      ModelTransferOffer() => start,
-      ModelTransferProgress(:final pausable) when pausable =>
-        () => controller.pause(choice.entry.key),
-      ModelTransferProgress() => null,
+      TransferOffer(:final enabled) when !enabled => null,
+      TransferOffer() => start,
+      TransferInFlight(pausable: true) => () => controller.pause(
+        choice.entry.key,
+      ),
+      TransferInFlight() => null,
     };
   }
 }
@@ -248,12 +248,10 @@ final class _ModelRow extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            CupertinoButton(
+            GolemTappable(
               key: Key('model-picker-${choice.entry.key}'),
+              shape: GolemTapShape.wide,
               padding: const EdgeInsets.symmetric(vertical: GolemSpace.s2),
-              minimumSize: Size.fromHeight(
-                GolemChrome.current.minimumTapTarget,
-              ),
               onPressed: onSelect,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -333,39 +331,27 @@ final class _ModelRow extends StatelessWidget {
   }
 
   List<Widget> _transfer(BuildContext context, Color muted, Color accent) =>
-      switch (choice.transfer) {
+      switch (choice.transfer?.affordance) {
         null => const [],
-        final ModelTransferProgress progress => [
+        final TransferInFlight progress => [
           const SizedBox(height: GolemSpace.s3),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  progress.label,
-                  style: GolemText.caption.copyWith(color: muted),
-                ),
-              ),
-              if (progress.pausable)
-                Text(
-                  '${(progress.fraction * 100).round()}%',
-                  style: GolemText.caption.copyWith(color: muted),
-                ),
-            ],
-          ),
-          const SizedBox(height: 7),
-          ProgressTrack(
-            value: progress.fraction,
-            trackColor: GolemTheme.divider,
-            fillColor: GolemTheme.accent,
+          LabeledProgress(
+            semanticsLabel: choice.transferLabel!,
+            caption: choice.transferLabel!,
+            captionStyle: GolemText.caption.copyWith(color: muted),
+            fraction: choice.transfer!.fraction,
+            percent: choice.transfer!.percent,
+            // A verification is not 40% verified — neither painted nor read
+            // out; the caption carries the phase.
+            showPercent: progress.pausable,
+            announcePercent: progress.pausable,
           ),
           if (progress.pausable) ...[
             const SizedBox(height: GolemSpace.s2),
-            CupertinoButton(
+            GolemTappable(
               key: Key('model-picker-pause-${choice.entry.key}'),
+              shape: GolemTapShape.wide,
               padding: EdgeInsets.zero,
-              minimumSize: Size.fromHeight(
-                GolemChrome.current.minimumTapTarget,
-              ),
               onPressed: onTransfer,
               child: Text(
                 context.l10n.pause,
@@ -375,7 +361,7 @@ final class _ModelRow extends StatelessWidget {
           ],
           const SizedBox(height: GolemSpace.s3),
         ],
-        final ModelTransferOffer offer => [
+        final TransferOffer offer => [
           if (offer.note != null) ...[
             const SizedBox(height: 3),
             Text(offer.note!, style: GolemText.caption.copyWith(color: muted)),
@@ -388,7 +374,7 @@ final class _ModelRow extends StatelessWidget {
             const SizedBox(height: GolemSpace.s2),
             GolemButton.tinted(
               key: Key('model-picker-download-${choice.entry.key}'),
-              label: offer.label,
+              label: choice.transferLabel!,
               onPressed: onTransfer,
             ),
           ],

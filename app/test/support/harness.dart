@@ -10,6 +10,9 @@ import 'package:golem_flutter/app/launch_composition.dart';
 import 'package:golem_flutter/broker/backend_policy.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/app_identity.dart';
+import 'package:golem_flutter/core/chrome/golem_tappable.dart';
+import 'package:golem_flutter/core/chrome/golem_icon_button.dart';
+import 'package:golem_flutter/core/chrome/golem_button.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
@@ -23,6 +26,7 @@ import 'package:golem_flutter/core/services/device_storage.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/search_screen.dart';
+import 'package:golem_flutter/core/domain/download_pace.dart';
 import 'package:golem_flutter/features/models/application/download_pace_providers.dart';
 import 'package:golem_flutter/l10n/l10n.dart';
 
@@ -88,6 +92,21 @@ AccessibilityGuideline get tapTargetGuideline =>
     debugDefaultTargetPlatformOverride == TargetPlatform.android
     ? androidTapTargetGuideline
     : iOSTapTargetGuideline;
+
+/// The tap handler behind a control, whichever chrome wrapper builds it —
+/// `null` means disabled, which is what nearly every caller is asserting.
+/// Written once so a control moving between [GolemButton], [GolemIconButton]
+/// and [GolemTappable] is not a test change (#131).
+VoidCallback? pressedHandler(WidgetTester tester, Finder finder) =>
+    switch (tester.widget(finder)) {
+      GolemButton(:final onPressed) => onPressed,
+      GolemIconButton(:final onPressed) => onPressed,
+      GolemTappable(:final onPressed) => onPressed,
+      CupertinoButton(:final onPressed) => onPressed,
+      final other => throw ArgumentError(
+        '${other.runtimeType} is not a button',
+      ),
+    };
 
 Widget wrapApp({
   required Widget child,

@@ -146,14 +146,13 @@ void main() {
     // at a value the engines would reject on every send.
     final plus = find.byKey(const Key('gen-max-tokens-gemma4-plus'));
     for (var i = 0; i < 30; i++) {
-      final button = tester.widget<CupertinoButton>(plus);
-      if (button.onPressed == null) break;
+      if (pressedHandler(tester, plus) == null) break;
       await tester.tap(plus);
       await tester.pumpAndSettle();
     }
     expect(settings.settings.overridesFor('gemma4').maxTokens, 8192 - 512);
     expect(
-      tester.widget<CupertinoButton>(plus).onPressed,
+      pressedHandler(tester, plus),
       isNull,
       reason: 'the ceiling reserves prompt tokens by construction',
     );

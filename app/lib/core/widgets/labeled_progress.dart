@@ -1,0 +1,173 @@
+import 'package:flutter/cupertino.dart';
+
+import '../../l10n/l10n.dart';
+import '../theme/golem_theme.dart';
+import 'progress_track.dart';
+
+/// A determinate bar that reads as one thing.
+///
+/// Split across three nodes — a caption, a number, an unlabelled groove — a
+/// transfer announced as unrelated fragments, and two of the four surfaces
+/// showing one announced nothing at all. The whole widget is a single
+/// semantics container carrying the caption and the percentage, with its
+/// children excluded, and deliberately not a live region: re-announcing every
+/// tick of a multi-gigabyte download would talk over the rest of the screen.
+///
+/// [captionStyle] and [detailStyle] are parameters because the same bar is a
+/// muted caption inside a picker row and body-ink inside a settings card; the
+/// layout, the spacing and the reading are what is shared.
+class LabeledProgress extends StatelessWidget {
+  const LabeledProgress({
+    required this.semanticsLabel,
+    required this.fraction,
+    required this.percent,
+    this.caption,
+    this.captionStyle,
+    this.trailing,
+    this.showPercent = true,
+    this.announcePercent = true,
+    this.announceDetail = false,
+    this.detail,
+    this.detailStyle,
+    this.detailLeading,
+    this.trackHeight = 6,
+    this.spacing = 7,
+    super.key,
+  });
+
+  /// What the bar is for, as a screen reader hears it. Present even where no
+  /// caption is painted.
+  final String semanticsLabel;
+
+  final double fraction;
+  final int percent;
+
+  /// The painted caption, or null for a bar that stands under copy which
+  /// already says what it is.
+  final String? caption;
+  final TextStyle? captionStyle;
+
+  /// A chip or badge riding the caption line, right of the caption and left of
+  /// the percentage.
+  final Widget? trailing;
+
+  /// Whether the percentage is painted. Off where the caption already carries
+  /// it, or where the surface has no room for it.
+  final bool showPercent;
+
+  /// Whether the percentage is *announced*. Off where the phase makes it
+  /// meaningless — a verification is not 40% verified — and deliberately
+  /// separate from [showPercent], because the chat setup banner paints no
+  /// number and is the only thing carrying how far along the transfer is.
+  final bool announcePercent;
+
+  /// Whether the figures under the bar read as their own nodes.
+  ///
+  /// A row inside a list keeps them silent: split across three nodes, the
+  /// caption and the number announce as unrelated fragments. A card that is
+  /// the whole screen does the opposite — the size, the rate and the time left
+  /// are the only place a user can learn them, and first run has always read
+  /// them out.
+  final bool announceDetail;
+
+  /// The time or amount left, under the bar and right-aligned. Inside the same
+  /// excluded subtree: the reading stays caption plus percentage.
+  final String? detail;
+  final TextStyle? detailStyle;
+
+  /// The left half of the line under the bar — the byte count a prominent card
+  /// quotes beside its time left. Null where that line carries one figure.
+  final String? detailLeading;
+
+  final double trackHeight;
+
+  /// The gap above and below the bar. Wider on a card that leads with the
+  /// percentage than on a row inside a list.
+  final double spacing;
+
+  @override
+  Widget build(BuildContext context) {
+    final captionText = captionStyle ?? GolemText.caption;
+    final hasHeader = caption != null || trailing != null || showPercent;
+    final bar = ExcludeSemantics(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (hasHeader) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: caption == null
+                      ? const SizedBox.shrink()
+                      : Text(caption!, style: captionText),
+                ),
+                ?trailing,
+                if (showPercent) Text('$percent%', style: captionText),
+              ],
+            ),
+            SizedBox(height: spacing),
+          ],
+          ProgressTrack(
+            value: fraction,
+            trackColor: GolemTheme.divider,
+            fillColor: GolemTheme.accent,
+            height: trackHeight,
+          ),
+        ],
+      ),
+    );
+
+    Widget? figures;
+    if (detail != null || detailLeading != null) {
+      figures = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: detailLeading == null
+                ? const SizedBox.shrink()
+                : Text(
+                    detailLeading!,
+                    style: GolemText.footnote.copyWith(
+                      color: CupertinoDynamicColor.resolve(
+                        GolemTheme.mutedInk,
+                        context,
+                      ),
+                    ),
+                  ),
+          ),
+          // Flexible, not bare: in a Row a non-flexible child is measured
+          // against infinity, so a long "About 14 minutes left" would size
+          // past the card and paint an overflow stripe instead of wrapping.
+          if (detail case final detail?)
+            Flexible(
+              child: Text(
+                detail,
+                style: detailStyle ?? GolemText.captionStrong,
+              ),
+            ),
+        ],
+      );
+      if (!announceDetail) figures = ExcludeSemantics(child: figures);
+    }
+
+    // explicitChildNodes: the figures under the bar keep their own readings
+    // where a surface wants them; without it this container would swallow
+    // their labels into its own and announce one run-on string.
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: semanticsLabel,
+      value: announcePercent ? context.l10n.percentValue(percent) : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          bar,
+          if (figures case final figures?) ...[
+            SizedBox(height: spacing),
+            figures,
+          ],
+        ],
+      ),
+    );
+  }
+}

@@ -5,13 +5,14 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_sheet.dart';
+import '../../core/chrome/golem_tappable.dart';
 import '../../core/domain/app_state.dart';
 import '../../core/domain/models.dart';
-import 'application/benchmark_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/labeled_row.dart';
 import '../../core/widgets/section_header.dart';
 import '../../l10n/l10n.dart';
+import 'application/benchmark_providers.dart';
 
 class BenchmarkScreen extends ConsumerWidget {
   const BenchmarkScreen({super.key});
@@ -43,7 +44,7 @@ class BenchmarkScreen extends ConsumerWidget {
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
-                  CupertinoButton(
+                  GolemTappable(
                     key: const Key('benchmark-case-picker'),
                     padding: EdgeInsets.zero,
                     onPressed: () => _pickCase(context, ref, benchmark.caseId),
@@ -157,13 +158,14 @@ class BenchmarkScreen extends ConsumerWidget {
                     value: context.l10n.no,
                   ),
                   const SizedBox(height: 16),
-                  CupertinoButton(
+                  GolemTappable(
                     key: Key(
                       benchmark.isRunning
                           ? 'benchmark-stop-button'
                           : 'benchmark-run-button',
                     ),
-                    minimumSize: const Size.fromHeight(50),
+                    shape: GolemTapShape.wide,
+                    minimumHeight: GolemSize.button,
                     color: benchmark.isRunning ? null : GolemTheme.accent,
                     onPressed: benchmark.isRunning
                         ? () => ref
@@ -283,9 +285,10 @@ class _ResultCard extends ConsumerWidget {
             value: context.l10n.simulatedEndOfTurn,
           ),
           const SizedBox(height: 16),
-          CupertinoButton(
+          GolemTappable(
             key: const Key('benchmark-export-button'),
-            minimumSize: const Size.fromHeight(50),
+            shape: GolemTapShape.wide,
+            minimumHeight: GolemSize.button,
             color: GolemTheme.accent,
             onPressed: () async {
               final path = await ref
