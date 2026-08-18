@@ -134,7 +134,9 @@ Future<void> showGolemActions({
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(sheetContext),
-          child: Text(context.l10n.cancel),
+          // sheetContext, not the caller's: this closure re-runs whenever the
+          // route rebuilds, and the caller's element may be gone by then.
+          child: Text(sheetContext.l10n.cancel),
         ),
       ),
     );
