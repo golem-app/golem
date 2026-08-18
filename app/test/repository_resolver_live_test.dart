@@ -7,8 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_profile.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/repository_resolution.dart';
-import 'package:golem_flutter/core/services/hugging_face_api.dart';
 import 'package:golem_flutter/core/repositories/hugging_face_repository_resolver.dart';
+import 'package:golem_flutter/core/services/hugging_face_api.dart';
 
 /// Resolution against the real Hugging Face Hub.
 ///

@@ -28,9 +28,17 @@ const _layers = <List<String>>[
 
 const _libRoot = 'app/lib';
 
+/// Line-anchored, so an import path quoted in prose — which the ADRs and the
+/// doc comments are full of — is not read as a directive. Each match is then
+/// scanned for *every* quoted string up to its semicolon, so a conditional
+/// `if (dart.library.io) 'other.dart'` clause cannot slip a target past the
+/// direction; `check_inferno_imports.dart` guards its boundary the same way.
 final _directive = RegExp(
-  r'''(?:import|export)\s+(?:[^;]*?\s)?['"]([^'"]+)['"]''',
+  r'''^\s*(?:import|export)\s[^;]*;''',
+  multiLine: true,
 );
+
+final _quoted = RegExp(r'''['"]([^'"]+)['"]''');
 
 int? _rankOf(String feature) {
   for (var index = 0; index < _layers.length; index++) {
@@ -72,27 +80,43 @@ Future<void> main() async {
     final fromRank = from == null ? null : _rankOf(from);
     if (from != null && fromRank == null) unknown.add(from);
 
-    for (final match in _directive.allMatches(source)) {
-      final target = _targetOf(match.group(1)!, relative);
-      final to = target == null ? null : _featureOf(target);
-      if (to == null) continue;
+    for (final directive in _directive.allMatches(source)) {
+      for (final quoted in _quoted.allMatches(directive.group(0)!)) {
+        final target = _targetOf(quoted.group(1)!, relative);
+        if (target == null) continue;
+        final to = _featureOf(target);
 
-      if (relative.startsWith('core/')) {
-        violations.add('$relative -> $target (core may not import a feature)');
-        continue;
-      }
-      if (from == null || to == from || fromRank == null) continue;
+        if (from == null) {
+          // core, l10n, broker: everything a feature reads, so an edge the
+          // other way is a cycle with all of them at once.
+          if (to != null) {
+            violations.add(
+              '$relative -> $target '
+              '(only features and the composition root may import a feature)',
+            );
+          }
+          continue;
+        }
+        if (target == 'main.dart' || target.startsWith('app/')) {
+          violations.add(
+            '$relative -> $target '
+            '(a feature may not import the composition root)',
+          );
+          continue;
+        }
+        if (to == null || to == from || fromRank == null) continue;
 
-      final toRank = _rankOf(to);
-      if (toRank == null) {
-        unknown.add(to);
-        continue;
+        final toRank = _rankOf(to);
+        if (toRank == null) {
+          unknown.add(to);
+          continue;
+        }
+        if (toRank < fromRank) continue;
+        violations.add(
+          '$relative -> $target ($from may not import $to: '
+          '${toRank == fromRank ? "same layer" : "$to is above $from"})',
+        );
       }
-      if (toRank < fromRank) continue;
-      violations.add(
-        '$relative -> $target ($from may not import $to: '
-        '${toRank == fromRank ? "same layer" : "$to is above $from"})',
-      );
     }
   }
 

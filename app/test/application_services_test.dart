@@ -7,10 +7,10 @@ import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/application/storage_breakdown_service.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
-import 'package:golem_flutter/core/domain/repository_resolution.dart';
-import 'package:golem_flutter/core/domain/resolved_repository.dart';
 import 'package:golem_flutter/core/domain/model_profile_spec.dart';
 import 'package:golem_flutter/core/domain/models.dart';
+import 'package:golem_flutter/core/domain/repository_resolution.dart';
+import 'package:golem_flutter/core/domain/resolved_repository.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_repository_resolver.dart';
 import 'package:golem_flutter/core/services/cache_probe.dart';
@@ -281,6 +281,59 @@ void main() {
       expect(
         container.read(customRepositoryControllerProvider).outcome,
         isA<AddIdle>(),
+      );
+    });
+
+    test('an answer for a revision the user retagged is dropped', () async {
+      // The revision belongs in the stale guard as much as the repository:
+      // add() records state.ref beside the commit the resolution pinned, so a
+      // published answer for the old ref would store a spec whose revision and
+      // commit describe two different trees.
+      final resolver = _GatedResolver();
+      final container = containerWith(resolver);
+      final controller = container.read(
+        customRepositoryControllerProvider.notifier,
+      );
+      controller.edit(repository: 'org/slow');
+      final pending = controller.resolve();
+      controller.edit(revision: 'v0.2');
+      resolver.complete(
+        RepositoryResolved(
+          resolved: _resolved,
+          profile: null,
+          templateFingerprint: null,
+        ),
+      );
+      await pending;
+      expect(
+        container.read(customRepositoryControllerProvider).outcome,
+        isA<AddIdle>(),
+      );
+    });
+
+    test('a committed add keeps the engine the user chose', () async {
+      // The engine is a standing choice about what this build loads, not part
+      // of the repository just added; snapping it back to the default would
+      // resolve the next one against the wrong file selection.
+      final container = containerWith(
+        _ScriptedResolver([
+          RepositoryResolved(
+            resolved: _resolved,
+            profile: null,
+            templateFingerprint: null,
+          ),
+        ]),
+      );
+      final controller = container.read(
+        customRepositoryControllerProvider.notifier,
+      );
+      controller.selectEngine(ModelEngine.gguf);
+      controller.edit(repository: 'org/tiny-GGUF');
+      await controller.resolve();
+      expect(await controller.add(), isTrue);
+      expect(
+        container.read(customRepositoryControllerProvider).engine,
+        ModelEngine.gguf,
       );
     });
 

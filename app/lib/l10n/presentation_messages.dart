@@ -1,5 +1,5 @@
-import '../core/domain/device_eligibility.dart';
 import '../core/domain/byte_format.dart';
+import '../core/domain/device_eligibility.dart';
 import '../core/domain/model_admission.dart';
 import '../core/domain/model_catalog.dart';
 import '../core/domain/models.dart';

@@ -7,6 +7,8 @@ import '../../../core/domain/app_state.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
+import '../../../l10n/l10n.dart';
+import '../../../l10n/presentation_messages.dart';
 import '../../models/widgets/model_setup_banner.dart';
 import 'attach_sheet.dart';
 import 'composer.dart';
@@ -14,8 +16,6 @@ import 'empty_chat.dart';
 import 'message_bubble.dart';
 import 'persistence_recovery_banner.dart';
 import 'recovery_banner.dart';
-import '../../../l10n/l10n.dart';
-import '../../../l10n/presentation_messages.dart';
 
 class ChatCanvas extends ConsumerWidget {
   const ChatCanvas({

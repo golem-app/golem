@@ -95,7 +95,7 @@ class CustomRepositoryController extends _$CustomRepositoryController {
     state = state.copyWith(
       repository: repository,
       revision: revision,
-      outcome: state.outcome is AddIdle ? null : const AddIdle(),
+      outcome: const AddIdle(),
     );
   }
 
@@ -120,20 +120,28 @@ class CustomRepositoryController extends _$CustomRepositoryController {
         ref.read(preferencesControllerProvider).value?.customModels ??
         const <CustomModelSpec>[];
     final engine = state.engine;
-    final ref_ = state.ref;
+    final revision = state.ref;
     state = state.copyWith(outcome: const AddResolving());
     final outcome = await workflow.resolve(
       repository: repository,
       engine: engine,
-      ref: ref_,
+      ref: revision,
       weightsFile: weightsFile,
       pinned: pinned,
       custom: custom,
     );
-    // The user may have retyped or switched engines while the Hub was read;
-    // that edit already published AddIdle, and this answer describes what they
-    // no longer have on screen.
-    if (state.repository.trim() != repository || state.engine != engine) return;
+    // The user may have retyped, retagged or switched engines while the Hub
+    // was read; that edit already published AddIdle, and this answer describes
+    // what they no longer have on screen. The revision belongs in the guard as
+    // much as the repository does: `add()` records `state.ref` beside the
+    // commit this resolution pinned, so publishing an answer for a ref the
+    // field no longer holds would store a spec whose revision and commit
+    // describe two different trees.
+    if (state.repository.trim() != repository ||
+        state.engine != engine ||
+        state.ref != revision) {
+      return;
+    }
     state = state.copyWith(
       outcome: switch (outcome) {
         RepositoryResolved() => AddResolved(outcome),
@@ -161,7 +169,10 @@ class CustomRepositoryController extends _$CustomRepositoryController {
             resolved: outcome.resolution.resolved,
           ),
         );
-    if (added) state = const CustomRepositoryDraft();
+    // The engine survives: it is a standing choice about what this build
+    // loads, not part of the repository that was just added, and snapping it
+    // back would resolve the next one against the wrong file selection.
+    if (added) state = CustomRepositoryDraft(engine: state.engine);
     return added;
   }
 }

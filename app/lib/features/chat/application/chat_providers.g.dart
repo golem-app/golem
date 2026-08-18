@@ -39,7 +39,7 @@ final class ChatControllerProvider
   ChatController create() => ChatController();
 }
 
-String _$chatControllerHash() => r'fbefa92424bd00656d1d6588bcb9e085946edddf';
+String _$chatControllerHash() => r'0fbb0d6d218a94914080d97905007745235171ad';
 
 /// KeepAlive: the chat session aggregate — in-flight generation and unsaved
 /// turns must survive every route transition.

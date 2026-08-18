@@ -33,11 +33,13 @@ Bottom to top. A feature imports strictly downward, and never sideways.
 
 Two rules complete it:
 
-- `core/` may not import `features/` at all. It is what every feature reads,
-  so an edge the other way is a cycle with all of them at once.
-- `app/lib/app/` and `main.dart` may name every feature. The composition root
-  is where features are wired together, which `launch_composition.dart` already
-  says of itself.
+- **Nothing below the features may import one.** `core/`, `l10n/` and
+  `broker/` are what every feature reads, so an edge the other way is a cycle
+  with all of them at once.
+- **Only the composition root may name them all,** and only downward.
+  `app/lib/app/` and `main.dart` may import any feature — that is where
+  features are wired together, which `launch_composition.dart` already says of
+  itself — and no feature may import back into `app/`.
 
 `tool/check_feature_imports.dart` enforces all three, the way
 `check_inferno_imports.dart` enforces the Inferno boundary, and

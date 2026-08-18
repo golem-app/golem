@@ -96,11 +96,12 @@ final class HttpClientHuggingFaceApi implements HuggingFaceApi {
            client ??
            (HttpClient()
              ..userAgent = 'golem-app'
-             // Bounds what a process-lifetime client retains. Nothing closes
-             // this one: `detached` is the only teardown signal the app gets
-             // and Flutter permits `detached -> resumed`, so a forced close
-             // there would fail the next resolution as a network error
-             // (ADR 0014).
+             // dart:io's own default, pinned here so the only bound on what a
+             // process-lifetime client retains is stated where that lifetime
+             // is. Nothing closes this one: `detached` is the only teardown
+             // signal the app gets and Flutter permits `detached -> resumed`,
+             // so a forced close there would fail the next resolution as a
+             // network error (ADR 0014).
              ..idleTimeout = const Duration(seconds: 15));
 
   final HttpClient _client;
@@ -171,7 +172,11 @@ final class HttpClientHuggingFaceApi implements HuggingFaceApi {
     }
     final status = response.statusCode;
     if (status != HttpStatus.ok && status != HttpStatus.partialContent) {
-      await response.drain<void>().catchError((_) {});
+      // Deadlined like the success path below, and for the same reason: a
+      // server that answers 4xx/5xx and then holds the socket open would
+      // otherwise hang here, where the status is already known and the body
+      // is being drained only to free the connection.
+      await response.drain<void>().timeout(timeout).catchError((Object _) {});
       throw HubException(_kindFor(status), status: status);
     }
     final builder = BytesBuilder(copy: false);

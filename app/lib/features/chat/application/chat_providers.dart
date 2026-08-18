@@ -83,13 +83,17 @@ class ChatController extends _$ChatController {
     return hydrated;
   }
 
-  /// Republishes the storage breakdown when this session's contribution to it
-  /// changes. Metadata-only writes — a rename, a pin, a model switch — leave
-  /// the counts alone and cost nothing.
-  void _invalidateStorage(ChatState value) {
+  /// Republishes the storage breakdown once this session's contribution to it
+  /// has actually reached disk. Metadata-only writes — a rename, a pin, a
+  /// model switch — leave the counts alone and cost nothing.
+  ///
+  /// [force] covers the writes no conversation count describes: the
+  /// save-history toggle empties the whole store, or writes it all back,
+  /// without adding or removing a single message.
+  void _invalidateStorage(ChatState value, {bool force = false}) {
     if (!ref.mounted) return;
     final volume = _volumeOf(value);
-    if (volume == _storedVolume) return;
+    if (!force && volume == _storedVolume) return;
     _storedVolume = volume;
     ref.invalidate(storageBreakdownProvider);
   }
@@ -123,11 +127,11 @@ class ChatController extends _$ChatController {
   Future<void> _persist(
     ChatState value, {
     bool showRetryProgress = false,
+    bool forceStorage = false,
   }) async {
     final epoch = ++_persistenceEpoch;
     final persistence = _persistence();
     final saveHistory = _saveHistory;
-    _invalidateStorage(value);
 
     if (showRetryProgress && ref.mounted && epoch == _persistenceEpoch) {
       _setPersistencePhase(ChatPersistencePhase.retrying);
@@ -137,6 +141,7 @@ class ChatController extends _$ChatController {
       // With history off, attachment bytes follow the live session instead of
       // a durable snapshot. No history write or retry is permitted here.
       await persistence.retainReferenced(value.conversations);
+      _invalidateStorage(value, force: forceStorage);
       if (ref.mounted && epoch == _persistenceEpoch) {
         _setPersistencePhase(ChatPersistencePhase.idle);
       }
@@ -157,6 +162,10 @@ class ChatController extends _$ChatController {
     if (epoch != _persistenceEpoch) return;
     if (ref.mounted) _setPersistencePhase(ChatPersistencePhase.idle);
     await persistence.retainReferenced(snapshot.conversations);
+    // Last, so the probes read the bytes this attempt wrote and the ones its
+    // attachment collection freed. A failed write above returns without
+    // recording the volume, which is what lets a later Retry republish.
+    _invalidateStorage(value, force: forceStorage);
   }
 
   void _setPersistencePhase(ChatPersistencePhase phase) {
@@ -164,10 +173,13 @@ class ChatController extends _$ChatController {
     state = AsyncData(_value.copyWith(persistencePhase: phase));
   }
 
-  /// The save-history re-enable path.
+  /// The save-history toggle's entry point, in both directions: one side has
+  /// already emptied the store on disk and the other is about to fill it back
+  /// in. Neither moves a conversation count, so the breakdown is republished
+  /// unconditionally — the store's size changed by everything it held.
   Future<void> persistCurrent() async {
     if (!state.hasValue) return;
-    await _persist(_value);
+    await _persist(_value, forceStorage: true);
   }
 
   /// User-triggered recovery for the standing persistence notice. The latest

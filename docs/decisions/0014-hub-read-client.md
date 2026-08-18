@@ -71,20 +71,24 @@ already existed:
 | Bound | Value | Why |
 | --- | --- | --- |
 | Connect and response-header deadline | 20 s | A server that never answers. |
+| **Body-read inactivity deadline** | **20 s** | **New** — and it applies to the error path's drain too. |
 | JSON body cap | 8 MiB | A revision listing is kilobytes; nothing legitimate approaches this. |
 | Text body cap | 4 MiB | Chat templates and configs. |
 | Range read | exactly the requested span | A server that ignores `Range` and starts sending a 4 GiB file is `tooLarge`, never a download. |
-| **Body-read inactivity deadline** | **20 s** | **New.** |
 
-The last one is the gap this ticket closes. Connecting was bounded and reading
-the status line was bounded, but the loop draining the response body was not:
-a server that accepted the connection, returned `200`, sent one chunk and then
-stalled hung `resolve()` for as long as the socket stayed open — behind a
-spinner, with the Add button gone and no way back. It is an *inactivity*
-deadline rather than a total one, because a slow but live connection on a bad
-network is not a failure. It folds into `HubErrorKind.network` with every other
-transport failure, since "the request never completed" is the only distinction
-a user can act on.
+The body deadline is the gap this ticket closes. Connecting was bounded and
+reading the status line was bounded, but the loop draining the response body
+was not: a server that accepted the connection, returned `200`, sent one chunk
+and then stalled hung `resolve()` for as long as the socket stayed open —
+behind a spinner, with the Add button gone and no way back. The same deadline
+covers the non-2xx path, where the status is already known and the body is
+drained only to free the connection: a `403` that then holds the socket open
+would hang in exactly the same way.
+
+It is an *inactivity* deadline rather than a total one, because a slow but live
+connection on a bad network is not a failure. It folds into
+`HubErrorKind.network` with every other transport failure, since "the request
+never completed" is the only distinction a user can act on.
 
 ## The client is not closed on teardown
 
@@ -98,8 +102,11 @@ reason. A `close(force: true)` is not reversible: the next resolution after a
 returning `detached` would fail against a dead client, and it would fail as
 `HubErrorKind.network`, which reads as "your connection" rather than "our bug".
 
-So the client is a process-lifetime singleton, and what would have leaked is
-bounded in code instead: `idleTimeout` is set explicitly, so idle keep-alive
-sockets are reclaimed rather than held for the life of the process. `close()`
-stays, because the loopback suite in `hugging_face_api_test.dart` builds and
-tears down a client per test and must not leak one into the next.
+So the client is a process-lifetime singleton. What that retains is already
+bounded — `HttpClient.idleTimeout` defaults to 15 seconds, so idle keep-alive
+sockets are reclaimed rather than held for the life of the process — and the
+constructor now assigns that same value explicitly. That adds no bound it did
+not have; it states the one bound this lifetime rests on where the lifetime is
+decided, so a future SDK default cannot move it silently. `close()` stays,
+because the loopback suite in `hugging_face_api_test.dart` builds and tears
+down a client per test and must not leak one into the next.

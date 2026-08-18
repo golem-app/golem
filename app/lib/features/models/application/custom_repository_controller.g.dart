@@ -74,7 +74,7 @@ final class CustomRepositoryControllerProvider
 }
 
 String _$customRepositoryControllerHash() =>
-    r'1573daef40a4b9534f67c3316e5d442d89dd82d5';
+    r'c0049e3485d3f1129816be1cf1bd4c4df8a41678';
 
 /// The Advanced-mode add-a-repository flow (#129). It was a `sealed` state
 /// machine owned by `_ModelsScreenState`, driven through `setState` callbacks

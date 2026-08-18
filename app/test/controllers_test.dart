@@ -23,9 +23,9 @@ import 'package:golem_flutter/core/services/device_storage.dart';
 import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
-import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
-import 'package:golem_flutter/features/preferences/application/generation_settings_providers.dart';
 import 'package:golem_flutter/features/models/application/storage_providers.dart';
+import 'package:golem_flutter/features/preferences/application/generation_settings_providers.dart';
+import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
 
 import 'support/in_memory_attachment_repository.dart';
 import 'support/in_memory_chat_history_repository.dart';
@@ -1428,6 +1428,13 @@ void main() {
     expect(await chat.deleteAllChats(), isTrue);
     await container.read(storageBreakdownProvider.future);
     expect(recomputes, 4, reason: 'the wipe never persists, so it says so');
+
+    // The save-history toggle empties the store on disk, or writes it all
+    // back, without moving a single count — so the one path a count can never
+    // describe republishes unconditionally.
+    await chat.persistCurrent();
+    await container.read(storageBreakdownProvider.future);
+    expect(recomputes, 5);
   });
 
   test('pin, message delete, and branch round-trip and persist', () async {
