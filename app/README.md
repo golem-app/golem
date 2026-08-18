@@ -274,7 +274,9 @@ reports instead — the trade, and what it costs, is recorded in
 repository
 downloads, verifies, and activates through the same paths as a pinned one; the
 fake simulates the whole flow, and an unresolved entry still refuses to download
-because its file list is synthesized.
+because its file list is synthesized. What a resolution is allowed to trust,
+and the five bounds on reading a stranger's server, are recorded in
+[ADR 0014](../docs/decisions/0014-hub-read-client.md).
 
 Assistant messages render a scoped markdown subset (paragraphs, emphasis,
 inline code, one-level lists, fenced code with a fixed dark card in both
