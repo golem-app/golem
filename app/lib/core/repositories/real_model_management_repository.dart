@@ -152,6 +152,18 @@ final class RealModelManagementRepository implements ModelManagementRepository {
         _ when _active.contains(entry.key) => status,
         ArtifactPhase.installed when !await _installVerified(entry) =>
           const ArtifactStatus(),
+        // Disk decides in both directions. Without this the store only ever
+        // demotes, so a state that had to be reset — a schema move, a corrupt
+        // file — reports weights sitting verified on disk as never downloaded,
+        // and offers a multi-gigabyte re-download as the only way back (#130).
+        // Receipts are revision-scoped and written only by a completed
+        // hash-verified transfer, so this cannot claim a hand-provisioned
+        // directory; addModel already promotes on the same evidence.
+        ArtifactPhase.notDownloaded when await _installVerified(entry) =>
+          ArtifactStatus(
+            phase: ArtifactPhase.installed,
+            downloadedBytes: entry.totalBytes,
+          ),
         ArtifactPhase.downloading ||
         ArtifactPhase.verifying ||
         ArtifactPhase.paused => await _reconcileTransfer(entry),
