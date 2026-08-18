@@ -123,8 +123,17 @@ final class InfernoInferenceRepository implements InferenceRepository {
         await pending;
       } catch (_) {}
     }
-    if (_resident == null) return;
-    await _runtime.unload();
+    final resident = _resident;
+    if (resident == null) return;
+    try {
+      await _runtime.unload();
+    } catch (error) {
+      // The load path logs its own (phase: 'load'), so without this the unload
+      // half is the one engine failure nothing in the process records: the
+      // controller above classifies it as a kind and drops the error (#130).
+      _logFailure(resident.engine, phase: 'unload', error: error);
+      rethrow;
+    }
     _resident = null;
     _residency.value = const InferenceResidency.unloaded();
   }

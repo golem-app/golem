@@ -159,6 +159,9 @@ final class RealModelManagementRepository implements ModelManagementRepository {
         // Receipts are revision-scoped and written only by a completed
         // hash-verified transfer, so this cannot claim a hand-provisioned
         // directory; addModel already promotes on the same evidence.
+        // A delete whose sweep failed leaves both behind and is therefore
+        // re-reported as installed: disk decides, and weights that are still
+        // there are better named than hidden behind an offer to re-fetch them.
         ArtifactPhase.notDownloaded when await _installVerified(entry) =>
           ArtifactStatus(
             phase: ArtifactPhase.installed,
@@ -212,6 +215,9 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   }
 
   Future<bool> _installVerified(ModelCatalogEntry entry) async {
+    // No files is no evidence. Vacuously true was harmless while this only
+    // guarded a demotion; the promotion arm would read it as an install.
+    if (entry.files.isEmpty) return false;
     final receipt = await _readReceipt(entry);
     for (final spec in entry.files) {
       if (!_receiptCovers(receipt, spec) || !await _sizeMatches(entry, spec)) {

@@ -737,6 +737,12 @@ final class ModelState {
   /// schema 2 is still read, and its sentence is dropped rather than kept as a
   /// kind nobody can derive from prose (#130). The file name stays v2 — it
   /// marks a change of *location*, which this is not.
+  ///
+  /// The move is one-way: a build that predates schema 3 rejects this file and
+  /// falls back to defaults, so a rollback re-offers every install as a
+  /// download. Accepted rather than dodged by leaving the number at 2 — the
+  /// field changed type, and a version that does not say so is the lie the
+  /// version exists to prevent.
   static const schemaVersion = 3;
 
   // activeArtifactKey and simulated are stamped from repository wiring on
