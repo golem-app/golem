@@ -8,7 +8,7 @@ import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
-import 'package:golem_flutter/features/settings/application/settings_providers.dart';
+import 'package:golem_flutter/features/preferences/application/generation_settings_providers.dart';
 import 'package:golem_flutter/features/settings/response_style_screen.dart';
 
 import 'support/harness.dart';

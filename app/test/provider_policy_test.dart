@@ -17,8 +17,8 @@ import 'package:golem_flutter/features/models/application/download_pace_provider
 import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/onboarding/application/onboarding_controller.dart';
 import 'package:golem_flutter/features/onboarding/application/startup_gate_controller.dart';
-import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
-import 'package:golem_flutter/features/settings/application/settings_providers.dart';
+import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
+import 'package:golem_flutter/features/preferences/application/generation_settings_providers.dart';
 import 'package:golem_flutter/features/settings/application/storage_providers.dart';
 import 'package:golem_flutter/features/splash/application/startup_providers.dart';
 

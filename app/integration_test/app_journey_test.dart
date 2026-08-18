@@ -11,7 +11,7 @@ import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/widgets/attach_sheet.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/onboarding/first_run_gate.dart';
-import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
+import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
 import 'package:golem_flutter/main.dart' as app;
 import 'package:integration_test/integration_test.dart';
 

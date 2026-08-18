@@ -16,7 +16,7 @@ import '../features/legal/open_source_licenses_screen.dart';
 import '../features/models/application/model_providers.dart';
 import '../features/onboarding/first_run_gate.dart';
 import '../features/settings/appearance_screen.dart';
-import '../features/settings/application/preferences_providers.dart';
+import '../features/preferences/application/preferences_providers.dart';
 import '../features/settings/language_screen.dart';
 import '../features/settings/models_screen.dart';
 import '../features/settings/privacy_screen.dart';

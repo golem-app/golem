@@ -15,7 +15,7 @@ import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../../../l10n/bidi.dart';
 import '../../../l10n/l10n.dart';
-import '../../settings/application/preferences_providers.dart';
+import '../../preferences/application/preferences_providers.dart';
 import '../application/chat_providers.dart';
 import 'markdown/golem_markdown.dart';
 

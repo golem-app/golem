@@ -9,7 +9,7 @@ import 'package:golem_flutter/core/services/repository_resolver.dart';
 import 'package:golem_flutter/core/theme/golem_typography.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
-import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
+import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
 import 'package:golem_flutter/features/settings/language_screen.dart';
 import 'package:golem_flutter/l10n/bidi.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_ar.dart';

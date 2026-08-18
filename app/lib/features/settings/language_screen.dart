@@ -6,7 +6,7 @@ import '../../core/domain/app_preferences.dart';
 import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
 import '../../l10n/l10n.dart';
-import 'application/preferences_providers.dart';
+import '../preferences/application/preferences_providers.dart';
 import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
 

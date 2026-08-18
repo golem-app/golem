@@ -30,7 +30,7 @@ import '../models/application/model_providers.dart';
 import '../models/widgets/download_note_banner.dart';
 import '../onboarding/model_download_consent.dart';
 import 'application/custom_repository_workflow.dart';
-import 'application/preferences_providers.dart';
+import '../preferences/application/preferences_providers.dart';
 import 'widgets/settings_rows.dart';
 
 enum _CatalogTab { all, installed }

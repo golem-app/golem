@@ -21,7 +21,7 @@ import '../legal/ai_disclaimer.dart';
 import '../models/application/download_pace_providers.dart';
 import '../models/application/model_providers.dart';
 import '../models/widgets/download_note_banner.dart';
-import '../settings/application/preferences_providers.dart';
+import '../preferences/application/preferences_providers.dart';
 import 'application/onboarding_controller.dart';
 import 'model_download_consent.dart';
 

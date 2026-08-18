@@ -19,8 +19,8 @@ import '../../core/widgets/section_header.dart';
 import '../../l10n/l10n.dart';
 import '../chat/model_label.dart';
 import '../models/application/model_providers.dart';
-import 'application/preferences_providers.dart';
-import 'application/settings_providers.dart';
+import '../preferences/application/preferences_providers.dart';
+import '../preferences/application/generation_settings_providers.dart';
 import 'save_feedback.dart';
 import 'widgets/settings_rows.dart';
 

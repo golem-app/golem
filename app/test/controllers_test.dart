@@ -23,8 +23,8 @@ import 'package:golem_flutter/core/services/device_storage.dart';
 import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
-import 'package:golem_flutter/features/settings/application/preferences_providers.dart';
-import 'package:golem_flutter/features/settings/application/settings_providers.dart';
+import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
+import 'package:golem_flutter/features/preferences/application/generation_settings_providers.dart';
 import 'package:golem_flutter/features/settings/application/storage_providers.dart';
 
 import 'support/in_memory_attachment_repository.dart';

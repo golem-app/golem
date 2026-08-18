@@ -13,7 +13,7 @@ import '../../l10n/l10n.dart';
 import '../../l10n/presentation_messages.dart';
 import '../models/application/model_providers.dart';
 import '../models/widgets/download_note_banner.dart';
-import '../settings/application/preferences_providers.dart';
+import '../preferences/application/preferences_providers.dart';
 import 'model_download_consent.dart';
 
 /// The recoverable path promised when first-run consent is declined. It reads

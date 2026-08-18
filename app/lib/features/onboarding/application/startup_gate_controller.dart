@@ -12,7 +12,7 @@ import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/retry.dart';
 import '../../chat/application/chat_providers.dart';
 import '../../models/application/model_providers.dart';
-import '../../settings/application/preferences_providers.dart';
+import '../../preferences/application/preferences_providers.dart';
 import '../domain/onboarding_policy.dart';
 
 part 'startup_gate_controller.g.dart';
