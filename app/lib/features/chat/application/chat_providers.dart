@@ -12,8 +12,9 @@ import '../../../core/providers/retry.dart';
 import '../../../core/repositories/contracts.dart';
 import '../../../core/services/image_intake.dart';
 import '../../models/application/model_providers.dart';
-import '../../preferences/application/preferences_providers.dart';
+import '../../models/application/storage_providers.dart';
 import '../../preferences/application/generation_settings_providers.dart';
+import '../../preferences/application/preferences_providers.dart';
 import 'chat_conversation_edits.dart';
 import 'chat_failure_classifier.dart';
 import 'chat_persistence.dart';
@@ -21,30 +22,6 @@ import 'generation_event_reducer.dart';
 import 'generation_target.dart';
 
 part 'chat_providers.g.dart';
-
-/// A cheap signature that changes only when conversations or messages are added
-/// or removed. ChatController reassigns state on every streaming delta, so
-/// anything as heavy as disk probing must key on this rather than the raw chat
-/// state, or it re-runs per token for the always-mounted drawer meter.
-/// KeepAlive, deliberately (#69): would classify as an autoDispose derived
-/// value, but on the pinned flutter_riverpod (3.3.2) a widget-watched
-/// derivation over an async controller still trips Flutter's element-update
-/// invariant when a provider scope is swapped mid-test — the class of bug
-/// fixed upstream in 3.4.0 ("markNeedsBuild ... inside Widget lifecycle").
-/// The pin cannot move on this SDK — flutter_test's test_api caps analyzer
-/// below the ^13 the newer generator needs, and the family is exact-pinned
-/// end to end (docs/notes/dependencies.md). Revisit on the SDK bump (#38).
-@Riverpod(keepAlive: true, retry: noRetry)
-(int, int) chatStorageSignature(Ref ref) {
-  final conversations =
-      ref.watch(chatControllerProvider).value?.conversations ??
-      const <ChatConversation>[];
-  var messages = 0;
-  for (final conversation in conversations) {
-    messages += conversation.messages.length;
-  }
-  return (conversations.length, messages);
-}
 
 // The decisions this notifier used to hold inline now live beside it and are
 // unit tested without a container (#127): chat_persistence, conversation edits,
@@ -58,6 +35,17 @@ part 'chat_providers.g.dart';
 class ChatController extends _$ChatController {
   int _generationEpoch = 0;
   int _persistenceEpoch = 0;
+
+  /// Conversation and message counts as of the last storage invalidation.
+  /// The breakdown is disk probing, and this notifier reassigns state on every
+  /// streaming delta, so it must key on a count rather than on the state — or
+  /// it re-runs per token for the always-mounted drawer meter.
+  ///
+  /// Held here rather than derived over there because storage accounting sits
+  /// below chat in the feature direction (#129): a signal travels the opposite
+  /// way from a dependency, so the writer invalidates instead of the reader
+  /// watching upward.
+  (int, int) _storedVolume = (0, 0);
 
   /// The repository behind the generation currently in flight, captured when it
   /// starts. Held rather than read on demand because [Ref] is unusable inside a
@@ -85,10 +73,33 @@ class ChatController extends _$ChatController {
     final persistence = _persistence();
     final snapshot = await persistence.load();
     await persistence.retainReferenced(snapshot.conversations);
-    return ChatState(
+    final hydrated = ChatState(
       conversations: snapshot.conversations,
       activeId: snapshot.activeId,
     );
+    // Recorded, not published: the breakdown reads the store's bytes off disk,
+    // so hydration changes no figure it reports.
+    _storedVolume = _volumeOf(hydrated);
+    return hydrated;
+  }
+
+  /// Republishes the storage breakdown when this session's contribution to it
+  /// changes. Metadata-only writes — a rename, a pin, a model switch — leave
+  /// the counts alone and cost nothing.
+  void _invalidateStorage(ChatState value) {
+    if (!ref.mounted) return;
+    final volume = _volumeOf(value);
+    if (volume == _storedVolume) return;
+    _storedVolume = volume;
+    ref.invalidate(storageBreakdownProvider);
+  }
+
+  static (int, int) _volumeOf(ChatState value) {
+    var messages = 0;
+    for (final conversation in value.conversations) {
+      messages += conversation.messages.length;
+    }
+    return (value.conversations.length, messages);
   }
 
   /// Every seam read before the first await: a persistence attempt outlives its
@@ -116,6 +127,7 @@ class ChatController extends _$ChatController {
     final epoch = ++_persistenceEpoch;
     final persistence = _persistence();
     final saveHistory = _saveHistory;
+    _invalidateStorage(value);
 
     if (showRetryProgress && ref.mounted && epoch == _persistenceEpoch) {
       _setPersistencePhase(ChatPersistencePhase.retrying);
@@ -180,6 +192,8 @@ class ChatController extends _$ChatController {
     // fails, that attempt must still be allowed to settle the recovery notice.
     _persistenceEpoch++;
     if (ref.mounted) state = const AsyncData(ChatState());
+    // The one emptying path that never persists, so it invalidates by hand.
+    _invalidateStorage(const ChatState());
     await persistence.retainReferenced(const []);
     return true;
   }

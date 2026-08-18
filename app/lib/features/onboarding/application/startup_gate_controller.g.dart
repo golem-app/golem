@@ -61,7 +61,7 @@ final class StartupGateControllerProvider
 }
 
 String _$startupGateControllerHash() =>
-    r'd99acbf38979617847a129ed0a0baa4924081b01';
+    r'cadf614d4a37f1094bebde62ab318f3d3b52d508';
 
 /// The app root's admission decision (#126). It was a widget state machine:
 /// sideload validation ran from a post-frame callback into `setState`, the

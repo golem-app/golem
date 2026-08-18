@@ -8,7 +8,7 @@ import '../../../l10n/l10n.dart';
 import '../../../l10n/presentation_messages.dart';
 import '../../models/application/model_providers.dart';
 import '../application/chat_providers.dart';
-import '../model_label.dart';
+import '../../models/model_label.dart';
 
 class EmptyChat extends ConsumerWidget {
   const EmptyChat({required this.onStarter, super.key});

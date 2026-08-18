@@ -9,7 +9,7 @@ import '../../core/widgets/section_header.dart';
 import '../../l10n/l10n.dart';
 import '../preferences/application/preferences_providers.dart';
 import 'save_feedback.dart';
-import 'widgets/settings_rows.dart';
+import '../../core/widgets/settings_rows.dart';
 
 /// Appearance: theme, text size, and the transcript toggles.
 class AppearanceScreen extends ConsumerWidget {

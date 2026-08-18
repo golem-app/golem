@@ -12,13 +12,13 @@ import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
 import '../../l10n/l10n.dart';
-import '../chat/model_label.dart';
+import '../models/model_label.dart';
 import '../legal/ai_disclaimer.dart';
 import '../models/application/model_providers.dart';
 import '../preferences/application/preferences_providers.dart';
-import 'application/storage_providers.dart';
+import '../models/application/storage_providers.dart';
 import 'save_feedback.dart';
-import 'widgets/settings_rows.dart';
+import '../../core/widgets/settings_rows.dart';
 
 /// The minimal settings root: model and app rows, the Advanced mode
 /// switch, and About. Everything heavier lives one screen deeper.

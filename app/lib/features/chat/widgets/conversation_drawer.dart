@@ -20,10 +20,10 @@ import '../../../core/theme/golem_theme.dart';
 import '../../../l10n/bidi.dart';
 import '../../../l10n/l10n.dart';
 import '../../models/application/model_providers.dart';
-import '../../settings/application/storage_providers.dart';
+import '../../models/application/storage_providers.dart';
 import '../application/chat_providers.dart';
 import '../domain/chat_sections.dart';
-import '../model_label.dart';
+import '../../models/model_label.dart';
 
 class ConversationDrawer extends ConsumerStatefulWidget {
   const ConversationDrawer({

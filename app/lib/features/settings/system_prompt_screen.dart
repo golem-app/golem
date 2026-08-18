@@ -10,7 +10,7 @@ import '../../l10n/bidi.dart';
 import '../../l10n/l10n.dart';
 import '../preferences/application/preferences_providers.dart';
 import 'save_feedback.dart';
-import 'widgets/settings_rows.dart';
+import '../../core/widgets/settings_rows.dart';
 
 /// The Advanced-mode system prompt editor. The draft is widget-local and
 /// commits debounced on text changes (a TextEditingController also

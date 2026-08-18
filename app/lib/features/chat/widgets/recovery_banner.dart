@@ -9,7 +9,7 @@ import '../../../core/theme/golem_theme.dart';
 import '../../../l10n/bidi.dart';
 import '../../../l10n/l10n.dart';
 import '../../models/application/model_providers.dart';
-import '../../onboarding/model_download_consent.dart';
+import '../../models/model_download_consent.dart';
 import '../application/chat_providers.dart';
 import 'model_picker_sheet.dart';
 

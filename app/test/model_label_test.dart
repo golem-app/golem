@@ -4,7 +4,7 @@ import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_activation.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
-import 'package:golem_flutter/features/chat/model_label.dart';
+import 'package:golem_flutter/features/models/model_label.dart';
 
 void main() {
   const real = InferenceBackendConfig(

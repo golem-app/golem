@@ -40,8 +40,8 @@ _CustomModelsSelection _customModelsFrom(AsyncValue<AppPreferences> value) =>
 /// so the pinned manifest stays the single source of model knowledge.
 /// KeepAlive, deliberately (#69): watched by always-mounted chat surfaces
 /// (composer, drawer, recovery banner), so disposal would never fire in
-/// practice — and the 3.3.2 scope-swap hazard (see chatStorageSignature,
-/// which records why the pin cannot move) rules autoDispose out.
+/// practice — and the 3.3.2 scope-swap hazard (see storageBreakdown, which
+/// records why the pin cannot move) rules autoDispose out.
 @Riverpod(keepAlive: true, retry: noRetry)
 List<ModelCatalogEntry> effectiveModelCatalog(Ref ref) {
   final pinned = ref.watch(modelCatalogEntriesProvider);

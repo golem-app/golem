@@ -16,8 +16,8 @@ import '../../core/widgets/section_header.dart';
 import '../../l10n/l10n.dart';
 import '../chat/application/chat_providers.dart';
 import '../models/application/model_providers.dart';
-import 'application/storage_providers.dart';
-import 'widgets/settings_rows.dart';
+import '../models/application/storage_providers.dart';
+import '../../core/widgets/settings_rows.dart';
 
 class StorageScreen extends ConsumerWidget {
   const StorageScreen({super.key});

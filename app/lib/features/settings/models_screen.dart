@@ -28,10 +28,10 @@ import '../chat/application/chat_providers.dart';
 import '../models/application/download_pace_providers.dart';
 import '../models/application/model_providers.dart';
 import '../models/widgets/download_note_banner.dart';
-import '../onboarding/model_download_consent.dart';
+import '../models/model_download_consent.dart';
 import 'application/custom_repository_workflow.dart';
 import '../preferences/application/preferences_providers.dart';
-import 'widgets/settings_rows.dart';
+import '../../core/widgets/settings_rows.dart';
 
 enum _CatalogTab { all, installed }
 

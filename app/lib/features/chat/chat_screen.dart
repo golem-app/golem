@@ -13,7 +13,7 @@ import '../../core/widgets/retry_pane.dart';
 import '../../l10n/l10n.dart';
 import '../models/application/model_providers.dart';
 import 'application/chat_providers.dart';
-import 'model_label.dart';
+import '../models/model_label.dart';
 import 'widgets/attach_sheet.dart';
 import 'widgets/chat_canvas.dart';
 import 'widgets/conversation_drawer.dart';

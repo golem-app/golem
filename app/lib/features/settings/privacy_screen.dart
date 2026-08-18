@@ -11,7 +11,7 @@ import '../../l10n/l10n.dart';
 import '../chat/application/chat_providers.dart';
 import '../preferences/application/preferences_providers.dart';
 import 'save_feedback.dart';
-import 'widgets/settings_rows.dart';
+import '../../core/widgets/settings_rows.dart';
 
 /// Privacy & data: the no-network statement, chat-history retention, and
 /// the user's own-data actions.

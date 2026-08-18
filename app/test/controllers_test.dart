@@ -25,7 +25,7 @@ import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
 import 'package:golem_flutter/features/preferences/application/generation_settings_providers.dart';
-import 'package:golem_flutter/features/settings/application/storage_providers.dart';
+import 'package:golem_flutter/features/models/application/storage_providers.dart';
 
 import 'support/in_memory_attachment_repository.dart';
 import 'support/in_memory_chat_history_repository.dart';
@@ -1341,11 +1341,14 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
-    // An active subscription, as the Storage screen would hold: the
-    // breakdown watches chat state, and an invalidation that lands
-    // mid-computation only recomputes for a live listener.
+    // An active subscription, as the Storage screen would hold: chat
+    // invalidates the breakdown when its counts move (#129), and an
+    // invalidation only recomputes for a live listener.
     final subscription = container.listen(storageBreakdownProvider, (_, _) {});
     addTearDown(subscription.close);
+    // Hydrated explicitly: the breakdown no longer reaches up into chat, so
+    // nothing else in this container builds the controller send() commands.
+    await container.read(chatControllerProvider.future);
     final before = await container.read(storageBreakdownProvider.future);
     expect(before.modelsBytes, 1000);
     expect(before.cacheBytes, 500);
@@ -1359,6 +1362,72 @@ void main() {
     await container.read(chatControllerProvider.notifier).send('Grow the file');
     final after = await container.read(storageBreakdownProvider.future);
     expect(after.chatsBytes, greaterThan(before.chatsBytes));
+  });
+
+  test('chat republishes the breakdown only when its counts move', () async {
+    // The inverted edge (#129): storage sits below chat, so the writer
+    // invalidates rather than the reader watching upward. What that has to
+    // preserve is the old signature's economy — metadata-only writes cost
+    // nothing, or the always-mounted drawer meter re-probes disk on every
+    // rename, pin and model switch.
+    final container = ProviderContainer(
+      overrides: [
+        diskFreeSpaceProbeProvider.overrideWithValue(const _UnknownDiskSpace()),
+        deviceCapacityProbeProvider.overrideWithValue(
+          const _UnknownDiskCapacity(),
+        ),
+        documentsPathProvider.overrideWithValue(Directory.systemTemp.path),
+        modelCatalogEntriesProvider.overrideWithValue(
+          const <ModelCatalogEntry>[],
+        ),
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(
+          FakeInferenceRepository(eventDelay: Duration.zero),
+        ),
+        preferencesRepositoryProvider.overrideWithValue(
+          InMemoryPreferencesRepository(),
+        ),
+        modelManagementRepositoryProvider.overrideWithValue(
+          _StaticState(const ModelState()),
+        ),
+        cacheProbeProvider.overrideWithValue(FakeCacheProbe()),
+      ],
+    );
+    addTearDown(container.dispose);
+    var recomputes = 0;
+    final subscription = container.listen(storageBreakdownProvider, (_, next) {
+      if (next.isLoading) recomputes++;
+    });
+    addTearDown(subscription.close);
+    await container.read(storageBreakdownProvider.future);
+    final chat = container.read(chatControllerProvider.notifier);
+    await container.read(chatControllerProvider.future);
+
+    await chat.newChat();
+    await container.read(storageBreakdownProvider.future);
+    expect(recomputes, 1);
+
+    final id = container.read(chatControllerProvider).requireValue.activeId!;
+    await chat.renameConversation(id, 'Renamed');
+    await chat.togglePinned(id);
+    await container.read(storageBreakdownProvider.future);
+    expect(recomputes, 1, reason: 'a rename and a pin move no count');
+
+    await chat.deleteConversation(id);
+    await container.read(storageBreakdownProvider.future);
+    expect(recomputes, 2);
+
+    await chat.newChat();
+    await container.read(storageBreakdownProvider.future);
+    expect(recomputes, 3);
+    expect(await chat.deleteAllChats(), isTrue);
+    await container.read(storageBreakdownProvider.future);
+    expect(recomputes, 4, reason: 'the wipe never persists, so it says so');
   });
 
   test('pin, message delete, and branch round-trip and persist', () async {

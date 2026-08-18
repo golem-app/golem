@@ -23,7 +23,7 @@ import '../models/application/model_providers.dart';
 import '../models/widgets/download_note_banner.dart';
 import '../preferences/application/preferences_providers.dart';
 import 'application/onboarding_controller.dart';
-import 'model_download_consent.dart';
+import '../models/model_download_consent.dart';
 
 class FirstRunScreen extends ConsumerWidget {
   const FirstRunScreen({this.initialStep, super.key});

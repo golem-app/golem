@@ -19,7 +19,7 @@ import 'package:golem_flutter/features/onboarding/application/onboarding_control
 import 'package:golem_flutter/features/onboarding/application/startup_gate_controller.dart';
 import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
 import 'package:golem_flutter/features/preferences/application/generation_settings_providers.dart';
-import 'package:golem_flutter/features/settings/application/storage_providers.dart';
+import 'package:golem_flutter/features/models/application/storage_providers.dart';
 import 'package:golem_flutter/features/splash/application/startup_providers.dart';
 
 /// Every generated provider, so a new annotation missing `retry: noRetry`
@@ -45,7 +45,6 @@ final _allProviders = <String, ProviderOrFamily>{
   'modelSessionBridge': modelSessionBridgeProvider,
   'deviceCapacityProbe': deviceCapacityProbeProvider,
   'documentsPath': documentsPathProvider,
-  'chatStorageSignature': chatStorageSignatureProvider,
   'storageBreakdown': storageBreakdownProvider,
   'effectiveModelCatalog': effectiveModelCatalogProvider,
   'loadableModelKeys': loadableModelKeysProvider,

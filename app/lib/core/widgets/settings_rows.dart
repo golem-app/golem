@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
-import '../../../core/chrome/golem_chrome.dart';
-import '../../../core/theme/golem_theme.dart';
+import '../chrome/golem_chrome.dart';
+import '../theme/golem_theme.dart';
 
 /// The grouped settings card: surface fill, card radius, hairline border,
 /// and children separated by inset dividers — the handoff's list card.
