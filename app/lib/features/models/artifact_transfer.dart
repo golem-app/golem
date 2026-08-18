@@ -19,6 +19,7 @@
 library;
 
 import '../../core/domain/byte_format.dart';
+import '../../core/domain/device_eligibility.dart';
 import '../../core/domain/download_pace.dart';
 import '../../core/domain/model_catalog.dart';
 import '../../core/domain/models.dart';
@@ -142,18 +143,13 @@ final class ArtifactTransferPresentation {
 /// backend loads every format, so its caller passes true rather than having
 /// [simulated] stand in for it. [simulated] means only that the *download* is
 /// simulated, which is a different flag on a different seam.
-///
-/// [localizations] is nullable to match `model_choice.dart`, whose pure tests
-/// run without a widget tree. The English fallbacks are the ones that already
-/// lived at the call sites; growing that set is #130's to undo, not this
-/// file's to add to.
 ArtifactTransferPresentation artifactTransfer({
   required ModelCatalogEntry entry,
   required ArtifactStatus status,
-  required AppLocalizations? localizations,
+  required AppLocalizations localizations,
   DownloadPaceSnapshot? pace,
   bool simulated = false,
-  String? deviceRefusal,
+  DeviceIneligibilityReason? deviceRefusal,
   bool sideloaded = false,
   bool admitted = true,
   bool downloadable = true,
@@ -174,9 +170,7 @@ ArtifactTransferPresentation artifactTransfer({
   final snapshot = pace?.artifactKey == entry.key ? pace : null;
   // The qualifier every phase appends: a simulated download must never read
   // like a real one, and all four surfaces describe one repository.
-  final suffix = simulated
-      ? ' · ${localizations?.simulated ?? 'simulated'}'
-      : '';
+  final suffix = simulated ? ' · ${localizations.simulated}' : '';
 
   return ArtifactTransferPresentation(
     phase: status.phase,
@@ -212,13 +206,13 @@ ArtifactTransferPresentation artifactTransfer({
 String? _chip(
   ArtifactPhase phase,
   DownloadPaceSnapshot? snapshot,
-  AppLocalizations? localizations,
+  AppLocalizations localizations,
 ) => switch (phase) {
-  ArtifactPhase.downloading when snapshot != null =>
-    localizations?.rateMbs(snapshot.mbPerSecond.toStringAsFixed(1)) ??
-        '${snapshot.mbPerSecond.toStringAsFixed(1)} MB/s',
-  ArtifactPhase.paused => localizations?.paused ?? 'Paused',
-  ArtifactPhase.failed => localizations?.stopped ?? 'Stopped',
+  ArtifactPhase.downloading when snapshot != null => localizations.rateMbs(
+    snapshot.mbPerSecond.toStringAsFixed(1),
+  ),
+  ArtifactPhase.paused => localizations.paused,
+  ArtifactPhase.failed => localizations.stopped,
   _ => null,
 };
 
@@ -227,16 +221,12 @@ String? _remainder({
   required DownloadPaceSnapshot? snapshot,
   required int percent,
   required int remaining,
-  required AppLocalizations? localizations,
+  required AppLocalizations localizations,
 }) => switch (phase) {
   ArtifactPhase.downloading when snapshot?.eta != null =>
-    localizations?.etaAboutMinutesLeft(aboutMinutesLeft(snapshot!.eta!)) ??
-        'About ${aboutMinutesLeft(snapshot!.eta!)} minutes left',
-  ArtifactPhase.paused =>
-    localizations?.amountLeft(gigabytes(remaining)) ??
-        '${gigabytes(remaining)} left',
-  ArtifactPhase.failed =>
-    localizations?.stoppedAtPercent(percent) ?? 'Stopped at $percent%',
+    localizations.etaAboutMinutesLeft(aboutMinutesLeft(snapshot!.eta!)),
+  ArtifactPhase.paused => localizations.amountLeft(gigabytes(remaining)),
+  ArtifactPhase.failed => localizations.stoppedAtPercent(percent),
   _ => null,
 };
 
@@ -250,13 +240,13 @@ TransferAffordance? _affordance({
   required ModelCatalogEntry entry,
   required ArtifactStatus status,
   required String suffix,
-  required String? deviceRefusal,
+  required DeviceIneligibilityReason? deviceRefusal,
   required bool sideloaded,
   required bool admitted,
   required bool downloadable,
   required bool loadsHere,
   required String? transferringKey,
-  required AppLocalizations? localizations,
+  required AppLocalizations localizations,
 }) {
   switch (status.phase) {
     case ArtifactPhase.installed:
@@ -294,18 +284,15 @@ TransferAffordance? _affordance({
     note: blocked.$1 != null
         ? blocked.$2
         : switch (status.phase) {
-            ArtifactPhase.paused =>
-              localizations?.pausedDownloadAmount(
-                    gigabytes(status.downloadedBytes),
-                    gigabytes(entry.totalBytes),
-                    suffix,
-                  ) ??
-                  'Paused at ${gigabytes(status.downloadedBytes)} '
-                      'of ${gigabytes(entry.totalBytes)}$suffix.',
-            ArtifactPhase.failed =>
-              localizations == null
-                  ? status.failure ?? 'Download failed.'
-                  : artifactFailureMessage(localizations, status),
+            ArtifactPhase.paused => localizations.pausedDownloadAmount(
+              gigabytes(status.downloadedBytes),
+              gigabytes(entry.totalBytes),
+              suffix,
+            ),
+            ArtifactPhase.failed => artifactFailureMessage(
+              localizations,
+              status,
+            ),
             _ => null,
           },
   );
@@ -324,13 +311,13 @@ TransferAffordance? _affordance({
 /// A second copy here would be copy nobody reads, drifting quietly.
 (TransferBlock?, String?) _block({
   required ModelCatalogEntry entry,
-  required String? deviceRefusal,
+  required DeviceIneligibilityReason? deviceRefusal,
   required bool sideloaded,
   required bool admitted,
   required bool downloadable,
   required bool loadsHere,
   required String? transferringKey,
-  required AppLocalizations? localizations,
+  required AppLocalizations localizations,
 }) {
   if (deviceRefusal != null) return (TransferBlock.deviceRefused, null);
   if (sideloaded) return (TransferBlock.sideload, null);
@@ -342,10 +329,7 @@ TransferAffordance? _affordance({
   // previous build installed it.
   if (!loadsHere) return (TransferBlock.otherEngine, null);
   if (transferringKey != null && transferringKey != entry.key) {
-    return (
-      TransferBlock.busy,
-      localizations?.anotherModelDownloading ?? 'Another model is downloading.',
-    );
+    return (TransferBlock.busy, localizations.anotherModelDownloading);
   }
   return (null, null);
 }

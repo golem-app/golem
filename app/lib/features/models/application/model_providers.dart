@@ -334,6 +334,9 @@ class ModelController extends _$ModelController {
     }
   }
 
+  /// The kind is what persists and what presentation words; `'$error'` rides
+  /// along only in memory, where a maintainer and the acceptance suites can
+  /// still read what actually threw (#130).
   void _publishFailure(String artifactKey, Object error) {
     if (!ref.mounted) return;
     final current = state.value;
@@ -369,10 +372,13 @@ class ModelController extends _$ModelController {
         if (ref.read(chatSessionBridgeProvider).generationActive()) return;
         try {
           await ref.read(inferenceRepositoryProvider).unload();
-        } catch (error) {
+        } catch (_) {
           if (!ref.mounted) return;
           state = AsyncData(
-            current.copyWith(runtime: RuntimePhase.failed, failure: '$error'),
+            current.copyWith(
+              runtime: RuntimePhase.failed,
+              failure: RuntimeFailureKind.engineUnload,
+            ),
           );
           return;
         }
@@ -393,7 +399,7 @@ class ModelController extends _$ModelController {
         if (refusal != null) {
           final value = await repository.recordRuntime(
             RuntimePhase.failed,
-            failure: refusal,
+            failure: RuntimeFailureKind.deviceRefused,
           );
           if (!ref.mounted) return;
           state = AsyncData(value);
@@ -404,7 +410,7 @@ class ModelController extends _$ModelController {
           // Refuse with a persisted failed phase; the engine is never touched.
           final value = await repository.recordRuntime(
             RuntimePhase.failed,
-            failure: _installFirstFailure(),
+            failure: RuntimeFailureKind.notInstalled,
           );
           if (!ref.mounted) return;
           state = AsyncData(value);
@@ -412,10 +418,13 @@ class ModelController extends _$ModelController {
         }
         try {
           await ref.read(inferenceRepositoryProvider).prepare(modelKey: target);
-        } catch (error) {
+        } catch (_) {
           if (!ref.mounted) return;
           state = AsyncData(
-            current.copyWith(runtime: RuntimePhase.failed, failure: '$error'),
+            current.copyWith(
+              runtime: RuntimePhase.failed,
+              failure: RuntimeFailureKind.engineLoad,
+            ),
           );
           return;
         }
@@ -532,13 +541,5 @@ class ModelController extends _$ModelController {
           .value
           ?.onboardingModelKey,
     );
-  }
-
-  /// The load-refusal copy for a not-installed target. Owned here since #42:
-  /// the management repository no longer knows why a load was refused.
-  String _installFirstFailure() {
-    return ref.read(inferenceBackendProvider).simulatedInference
-        ? 'Install the selected simulated model first.'
-        : 'Download and install the active model first.';
   }
 }

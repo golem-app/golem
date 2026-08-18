@@ -12,13 +12,6 @@ import 'device_eligibility.dart';
 import 'inference_backend.dart';
 import 'model_catalog.dart';
 
-/// Why a hand-added repository cannot be fetched. One sentence, because the
-/// Settings card and the chat picker both refuse it and had already drifted
-/// apart by a clause on the day they were written.
-const unresolvedRepositoryReason =
-    'This repository has not been resolved against Hugging Face, so its files '
-    'are unknown. Add it again to resolve it.';
-
 enum ModelAdmissionBlock { otherEngine, needsPreferredTier, unsupportedDevice }
 
 final class ModelAdmissionOption {
@@ -39,20 +32,6 @@ final class ModelAdmissionOption {
   /// tier is also where an unreadable probe lands, and unknown is not a low
   /// value (ADR 0007) — so the refusal may not describe it as one.
   final bool memoryKnown;
-
-  String? get disabledReason => switch (block) {
-    ModelAdmissionBlock.otherEngine =>
-      'This build uses the '
-          '${entry.engine == ModelEngine.mlx ? 'GGUF' : 'MLX'} engine.',
-    ModelAdmissionBlock.needsPreferredTier when !memoryKnown =>
-      'Golem could not read this phone’s memory, so it ships the lighter '
-          'model here.',
-    ModelAdmissionBlock.needsPreferredTier =>
-      'Needs more memory than this phone reports.',
-    ModelAdmissionBlock.unsupportedDevice =>
-      'Models are unavailable on this device.',
-    null => null,
-  };
 }
 
 /// The pinned catalog stays visible in QA and on production devices. Entries

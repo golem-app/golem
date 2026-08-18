@@ -60,7 +60,7 @@ void main() {
       expect(xr.tier, DeviceTier.unsupported);
       expect(xr.reason, DeviceIneligibilityReason.belowMemoryFloor);
       expect(xr.runsModels, isFalse);
-      expect(xr.message, isNotNull);
+      expect(xr.refusal, DeviceIneligibilityReason.belowMemoryFloor);
     });
 
     test(
@@ -87,7 +87,7 @@ void main() {
       final refused = _classify(memory: 12 * _gib, engineSupported: false);
       expect(refused.tier, DeviceTier.unsupported);
       expect(refused.reason, DeviceIneligibilityReason.missingInstructionSet);
-      expect(refused.message, contains('instruction set'));
+      expect(refused.refusal, DeviceIneligibilityReason.missingInstructionSet);
     });
 
     test('it decides before memory, including when memory is unknown', () {
@@ -120,7 +120,7 @@ void main() {
     const value = DeviceEligibility.unclassified();
     expect(value.runsModels, isTrue);
     expect(value.reason, isNull);
-    expect(value.message, isNull);
+    expect(value.refusal, isNull);
   });
 
   test('eligibility is value-equal so widgets can select on it', () {

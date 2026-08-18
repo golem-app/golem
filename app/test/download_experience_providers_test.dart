@@ -37,8 +37,10 @@ final class _ScriptedModels implements ModelManagementRepository {
   @override
   Future<ModelState> delete(String artifactKey) async => initial;
   @override
-  Future<ModelState> recordRuntime(RuntimePhase phase, {String? failure}) =>
-      Future.value(initial);
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    RuntimeFailureKind? failure,
+  }) => Future.value(initial);
   @override
   Future<ModelState> addModel(ModelCatalogEntry entry) async => initial;
 }

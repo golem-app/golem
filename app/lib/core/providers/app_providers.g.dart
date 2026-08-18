@@ -658,31 +658,42 @@ final class DeviceEligibilityProvider
 
 String _$deviceEligibilityHash() => r'd623c80a62b116f77443a56cb163d7cd2d4b904b';
 
-/// The refusal an unsupported device must present before any download or load,
-/// or null when this device may run models. Derived once and watched by every
-/// surface that gates on it, so the rule — including that a simulated backend
-/// is never gated, since it loads no weights and gating it would only make QA
-/// depend on hardware — exists in exactly one place.
+/// Why an unsupported device is refused before any download or load, or null
+/// when this device may run models. Derived once and watched by every surface
+/// that gates on it, so the rule — including that a simulated backend is never
+/// gated, since it loads no weights and gating it would only make QA depend on
+/// hardware — exists in exactly one place. The reason, not the sentence: the
+/// three surfaces that print it word it with `deviceRefusalMessage`, which is
+/// what keeps thirteen locales out of `core/domain/` (#130).
 /// KeepAlive: derived from two process-constant boot values.
 
 @ProviderFor(deviceRefusal)
 final deviceRefusalProvider = DeviceRefusalProvider._();
 
-/// The refusal an unsupported device must present before any download or load,
-/// or null when this device may run models. Derived once and watched by every
-/// surface that gates on it, so the rule — including that a simulated backend
-/// is never gated, since it loads no weights and gating it would only make QA
-/// depend on hardware — exists in exactly one place.
+/// Why an unsupported device is refused before any download or load, or null
+/// when this device may run models. Derived once and watched by every surface
+/// that gates on it, so the rule — including that a simulated backend is never
+/// gated, since it loads no weights and gating it would only make QA depend on
+/// hardware — exists in exactly one place. The reason, not the sentence: the
+/// three surfaces that print it word it with `deviceRefusalMessage`, which is
+/// what keeps thirteen locales out of `core/domain/` (#130).
 /// KeepAlive: derived from two process-constant boot values.
 
 final class DeviceRefusalProvider
-    extends $FunctionalProvider<String?, String?, String?>
-    with $Provider<String?> {
-  /// The refusal an unsupported device must present before any download or load,
-  /// or null when this device may run models. Derived once and watched by every
-  /// surface that gates on it, so the rule — including that a simulated backend
-  /// is never gated, since it loads no weights and gating it would only make QA
-  /// depend on hardware — exists in exactly one place.
+    extends
+        $FunctionalProvider<
+          DeviceIneligibilityReason?,
+          DeviceIneligibilityReason?,
+          DeviceIneligibilityReason?
+        >
+    with $Provider<DeviceIneligibilityReason?> {
+  /// Why an unsupported device is refused before any download or load, or null
+  /// when this device may run models. Derived once and watched by every surface
+  /// that gates on it, so the rule — including that a simulated backend is never
+  /// gated, since it loads no weights and gating it would only make QA depend on
+  /// hardware — exists in exactly one place. The reason, not the sentence: the
+  /// three surfaces that print it word it with `deviceRefusalMessage`, which is
+  /// what keeps thirteen locales out of `core/domain/` (#130).
   /// KeepAlive: derived from two process-constant boot values.
   DeviceRefusalProvider._()
     : super(
@@ -700,24 +711,25 @@ final class DeviceRefusalProvider
 
   @$internal
   @override
-  $ProviderElement<String?> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
+  $ProviderElement<DeviceIneligibilityReason?> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
 
   @override
-  String? create(Ref ref) {
+  DeviceIneligibilityReason? create(Ref ref) {
     return deviceRefusal(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(String? value) {
+  Override overrideWithValue(DeviceIneligibilityReason? value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<String?>(value),
+      providerOverride: $SyncValueProvider<DeviceIneligibilityReason?>(value),
     );
   }
 }
 
-String _$deviceRefusalHash() => r'468361a06ea6560745860b6503ccdea28219b622';
+String _$deviceRefusalHash() => r'2f2c361756526a3983356bfddc192ec3b7186a85';
 
 /// The catalog key of the model resident in the engine, straight from the
 /// residency owner (#42). Null while the engine is empty — label helpers fall

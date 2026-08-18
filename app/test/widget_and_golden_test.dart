@@ -323,7 +323,6 @@ void main() {
       eligibility: const DeviceEligibility(
         tier: DeviceTier.unsupported,
         reason: DeviceIneligibilityReason.belowMemoryFloor,
-        message: 'This device cannot run local models.',
       ),
       model: const ModelState(simulated: false),
       child: const FirstRunScreen(initialStep: FirstRunStep.unsupported),
@@ -1573,10 +1572,6 @@ void main() {
     const refused = DeviceEligibility(
       tier: DeviceTier.unsupported,
       reason: DeviceIneligibilityReason.belowMemoryFloor,
-      message:
-          'This device has less memory than the smallest model Golem ships '
-          'needs to run, so downloads are turned off here. Your chats and '
-          'settings are unaffected.',
     );
 
     for (final brightness in Brightness.values) {

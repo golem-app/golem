@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../l10n/l10n.dart';
 import '../theme/golem_theme.dart';
 import 'golem_chrome.dart';
 
@@ -106,11 +107,15 @@ class GolemSheetAction {
 /// The adaptive action list. Cupertino uses the native action sheet with
 /// a cancel button; Android chrome uses a [showGolemSheet] list of
 /// rows dismissed by the scrim.
+///
+/// The cancel label is resolved here rather than taken from a caller: it used
+/// to default to the English word and no caller ever passed anything else, so
+/// twelve locales read "Cancel" on the one button every action sheet has
+/// (#130).
 Future<void> showGolemActions({
   required BuildContext context,
   required List<GolemSheetAction> actions,
   String? title,
-  String cancelLabel = 'Cancel',
 }) {
   if (GolemChrome.current == GolemChrome.cupertino) {
     return showCupertinoModalPopup<void>(
@@ -129,7 +134,9 @@ Future<void> showGolemActions({
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(sheetContext),
-          child: Text(cancelLabel),
+          // sheetContext, not the caller's: this closure re-runs whenever the
+          // route rebuilds, and the caller's element may be gone by then.
+          child: Text(sheetContext.l10n.cancel),
         ),
       ),
     );

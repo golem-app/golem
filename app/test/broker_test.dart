@@ -797,6 +797,62 @@ void main() {
         ),
       );
     });
+
+    // The translation is a relabelling, not an origin. A `throw` here would
+    // start the stack at the adapter, discarding the one frame that says where
+    // the engine actually failed (#130).
+    test('keeps the origin stack across the load translation', () async {
+      final adapter = InfernoRuntimeAdapter(
+        Inferno.withBackend(
+          MockInfernoBackend(
+            failLoad: const InfernoException(
+              InfernoErrorCode.loadFailed,
+              'native detail',
+            ),
+          ),
+        ),
+      );
+      try {
+        await adapter.load(engine: BrokerEngine.llamaCpp, modelPath: modelPath);
+        fail('expected a BrokerRuntimeException');
+      } on BrokerRuntimeException catch (_, stackTrace) {
+        expect(stackTrace.toString(), contains('MockInfernoBackend.load'));
+      }
+    });
+
+    test('keeps the origin stack across the generation translation', () async {
+      final adapter = InfernoRuntimeAdapter(
+        Inferno.withBackend(
+          MockInfernoBackend(
+            failGeneration: const InfernoException(
+              InfernoErrorCode.generationFailed,
+              'native detail',
+            ),
+          ),
+        ),
+      );
+      await adapter.load(engine: BrokerEngine.llamaCpp, modelPath: modelPath);
+      try {
+        await adapter
+            .generate(
+              const BrokerGenerationRequest(
+                prompt: 'p',
+                sampling: BrokerSamplingParameters(
+                  maxTokens: 8,
+                  temperature: 1,
+                  topP: 1,
+                  seed: null,
+                  stopSequences: [],
+                  stopTokenIds: [],
+                ),
+              ),
+            )
+            .drain<void>();
+        fail('expected a BrokerRuntimeException');
+      } on BrokerRuntimeException catch (_, stackTrace) {
+        expect(stackTrace.toString(), contains('MockInfernoBackend.generate'));
+      }
+    });
   });
 
   group('residency (#42)', () {

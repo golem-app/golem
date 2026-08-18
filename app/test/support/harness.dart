@@ -488,10 +488,15 @@ final class RecordingModels implements ModelManagementRepository {
   @override
   Future<ModelState> recordRuntime(
     RuntimePhase phase, {
-    String? failure,
+    RuntimeFailureKind? failure,
   }) async {
     recordRuntimeCalls++;
-    return state = state.copyWith(runtime: phase, failure: failure);
+    // Both real implementations clear on a null kind rather than letting
+    // copyWith's `failure ?? this.failure` carry the old one forward; a fake
+    // that keeps it reports a stale failure under a loaded runtime.
+    return state = failure == null
+        ? state.copyWith(runtime: phase, clearFailure: true)
+        : state.copyWith(runtime: phase, failure: failure);
   }
 
   @override
@@ -518,8 +523,10 @@ final class StaticModels implements ModelManagementRepository {
   @override
   Future<ModelState> load() async => state;
   @override
-  Future<ModelState> recordRuntime(RuntimePhase phase, {String? failure}) =>
-      Future.value(state);
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    RuntimeFailureKind? failure,
+  }) => Future.value(state);
   @override
   Stream<ModelState> download(String artifactKey) => Stream.value(state);
   @override

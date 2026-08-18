@@ -94,14 +94,16 @@ InferenceBackendConfig inferenceBackend(Ref ref) =>
 DeviceEligibility deviceEligibility(Ref ref) =>
     const DeviceEligibility.unclassified();
 
-/// The refusal an unsupported device must present before any download or load,
-/// or null when this device may run models. Derived once and watched by every
-/// surface that gates on it, so the rule — including that a simulated backend
-/// is never gated, since it loads no weights and gating it would only make QA
-/// depend on hardware — exists in exactly one place.
+/// Why an unsupported device is refused before any download or load, or null
+/// when this device may run models. Derived once and watched by every surface
+/// that gates on it, so the rule — including that a simulated backend is never
+/// gated, since it loads no weights and gating it would only make QA depend on
+/// hardware — exists in exactly one place. The reason, not the sentence: the
+/// three surfaces that print it word it with `deviceRefusalMessage`, which is
+/// what keeps thirteen locales out of `core/domain/` (#130).
 /// KeepAlive: derived from two process-constant boot values.
 @Riverpod(keepAlive: true, retry: noRetry)
-String? deviceRefusal(Ref ref) =>
+DeviceIneligibilityReason? deviceRefusal(Ref ref) =>
     ref.watch(inferenceBackendProvider).simulatedInference
     ? null
     : ref.watch(deviceEligibilityProvider).refusal;

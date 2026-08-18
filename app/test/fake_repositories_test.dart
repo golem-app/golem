@@ -11,6 +11,26 @@ import 'package:golem_flutter/core/repositories/fake_benchmark_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 import 'package:golem_flutter/core/repositories/fake_model_management_repository.dart';
 
+import 'support/harness.dart';
+
+/// Every implementation of the contract clears on a null kind. `copyWith`
+/// resolves `failure ?? this.failure`, so a recorder that forwards the
+/// argument keeps a stale kind and Settings prints the destructive line under
+/// a runtime that loaded (#130 review).
+void _recordRuntimeClears() {
+  test('recording a phase without a kind clears the recorded one', () async {
+    final recording = RecordingModels(
+      const ModelState(
+        runtime: RuntimePhase.failed,
+        failure: RuntimeFailureKind.engineLoad,
+      ),
+    );
+    final cleared = await recording.recordRuntime(RuntimePhase.loaded);
+    expect(cleared.runtime, RuntimePhase.loaded);
+    expect(cleared.failure, isNull);
+  });
+}
+
 Future<String> _fixtureAsset(String key) async =>
     '[{"role": "user", "content": "${'x' * 400}"}]';
 
@@ -40,6 +60,8 @@ const _catalog = [
 ];
 
 void main() {
+  _recordRuntimeClears();
+
   test(
     'fake inference streams reasoning, answer, metrics, then completion',
     () async {
@@ -183,14 +205,14 @@ void main() {
       final initial = await repository.load();
       expect(initial.simulated, isTrue);
       expect(initial.activeArtifactKey, 'test-mlx');
-      // A refused load records a failed phase with its message (the
-      // refusal decision itself lives in ModelController since #42).
+      // A refused load records a failed phase with its kind (the refusal
+      // decision itself lives in ModelController since #42).
       final refused = await repository.recordRuntime(
         RuntimePhase.failed,
-        failure: 'Install the selected simulated model first.',
+        failure: RuntimeFailureKind.notInstalled,
       );
       expect(refused.runtime, RuntimePhase.failed);
-      expect(refused.failure, contains('simulated model'));
+      expect(refused.failure, RuntimeFailureKind.notInstalled);
       final subscription = repository.download('test-mlx').listen((_) {});
       await Future<void>.delayed(const Duration(milliseconds: 5));
       final paused = await repository.pause('test-mlx');

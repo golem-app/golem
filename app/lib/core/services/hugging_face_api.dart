@@ -123,8 +123,11 @@ final class HttpClientHuggingFaceApi implements HuggingFaceApi {
         throw const HubException(HubErrorKind.malformed);
       }
       return Map<String, Object?>.from(decoded);
-    } on FormatException catch (error) {
-      throw HubException(HubErrorKind.malformed, cause: error);
+    } on FormatException catch (error, stackTrace) {
+      Error.throwWithStackTrace(
+        HubException(HubErrorKind.malformed, cause: error),
+        stackTrace,
+      );
     }
   }
 
@@ -133,8 +136,11 @@ final class HttpClientHuggingFaceApi implements HuggingFaceApi {
     final body = await _get(url, maxBytes: maxBytes);
     try {
       return utf8.decode(body);
-    } on FormatException catch (error) {
-      throw HubException(HubErrorKind.malformed, cause: error);
+    } on FormatException catch (error, stackTrace) {
+      Error.throwWithStackTrace(
+        HubException(HubErrorKind.malformed, cause: error),
+        stackTrace,
+      );
     }
   }
 
@@ -165,10 +171,15 @@ final class HttpClientHuggingFaceApi implements HuggingFaceApi {
       headers.forEach(request.headers.set);
       request.followRedirects = true;
       response = await request.close().timeout(timeout);
-    } on Object catch (error) {
+    } on Object catch (error, stackTrace) {
       // Every transport failure folds to one kind: socket error, timeout and
-      // bad host are not actionable distinctions for a user.
-      throw HubException(HubErrorKind.network, cause: error);
+      // bad host are not actionable distinctions for a user. The origin trace
+      // still travels with it, or a socket fault reads as if it began here
+      // (#130).
+      Error.throwWithStackTrace(
+        HubException(HubErrorKind.network, cause: error),
+        stackTrace,
+      );
     }
     final status = response.statusCode;
     if (status != HttpStatus.ok && status != HttpStatus.partialContent) {
@@ -193,8 +204,11 @@ final class HttpClientHuggingFaceApi implements HuggingFaceApi {
       }
     } on HubException {
       rethrow;
-    } on Object catch (error) {
-      throw HubException(HubErrorKind.network, cause: error);
+    } on Object catch (error, stackTrace) {
+      Error.throwWithStackTrace(
+        HubException(HubErrorKind.network, cause: error),
+        stackTrace,
+      );
     }
     return builder.takeBytes();
   }

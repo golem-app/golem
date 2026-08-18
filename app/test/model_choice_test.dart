@@ -3,13 +3,18 @@ import 'package:golem_flutter/broker/backend_policy.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
-import 'package:golem_flutter/core/domain/model_admission.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/chat/model_choice.dart';
 import 'package:golem_flutter/features/models/artifact_transfer.dart';
+import 'package:golem_flutter/l10n/bidi.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_en.dart';
 
 void main() {
+  // The picker's copy is the ARB's, and the pure tests read it from the same
+  // place the app does rather than restating it (#130).
+  final en = AppLocalizationsEn();
+
   InferenceBackendConfig auto(DeviceTier tier) => resolveBackendPolicy(
     backendName: 'auto',
     profileDefine: '',
@@ -65,7 +70,7 @@ void main() {
     DeviceEligibility eligibility = const DeviceEligibility(
       tier: DeviceTier.preferred,
     ),
-    String? deviceRefusal,
+    DeviceIneligibilityReason? deviceRefusal,
     bool advanced = false,
     bool? simulatedTransfers,
     Set<String>? downloadableKeys,
@@ -78,6 +83,7 @@ void main() {
     return buildModelPickerView(
       catalog: catalog ?? modelCatalog,
       pinnedCatalog: modelCatalog,
+      localizations: en,
       simulatedTransfers: simulatedTransfers ?? backend.simulatedInference,
       downloadableKeys:
           downloadableKeys ?? {for (final e in catalog ?? modelCatalog) e.key},
@@ -172,8 +178,31 @@ void main() {
               'the artifact belongs on the Advanced line, not in the name '
               '(docs/decisions/0008-model-presentation.md)',
         );
-        expect(entry.summary, isNotNull);
       }
+    });
+
+    // Replaces an assertion that every pinned entry carried a `summary`
+    // field. The field is gone — it was English on the manifest — and the
+    // copy now comes from the ARB by key prefix, so this pins the thing that
+    // can actually break: a pinned model added without copy silently reads as
+    // a hand-added repository (#130).
+    test('every pinned model is described, not treated as hand-added', () {
+      final built = view(backend: fake);
+      for (final entry in modelCatalog) {
+        final row = rowFor(built, entry.key);
+        expect(row.summary, isNotNull, reason: entry.key);
+        expect(
+          row.summary,
+          isNot(en.customModelSummary),
+          reason: '${entry.key} needs a summary key and a prefix branch',
+        );
+      }
+      // The 2B prefix has to be tested before the family prefix it starts
+      // with, or the smallest model describes itself as the one that leans
+      // towards code and thinks a problem through.
+      expect(rowFor(built, 'qwen35-2b-gguf').summary, en.qwenTwoBModelSummary);
+      expect(rowFor(built, 'qwen35-gguf').summary, en.qwenFourBModelSummary);
+      expect(rowFor(built, 'gemma4-mlx').summary, en.gemmaModelSummary);
     });
   });
 
@@ -253,9 +282,8 @@ void main() {
         eligibility: const DeviceEligibility(
           tier: DeviceTier.unsupported,
           reason: DeviceIneligibilityReason.belowMemoryFloor,
-          message: 'no memory here',
         ),
-        deviceRefusal: 'no memory here',
+        deviceRefusal: DeviceIneligibilityReason.belowMemoryFloor,
       );
       expect(
         built.choices.every((choice) => choice.recommendation == null),
@@ -273,8 +301,10 @@ void main() {
       );
       expect(
         built.footnote,
-        'no memory here',
-        reason: 'the verdict is spelled out once, not once per row',
+        en.deviceBelowMemoryFloor,
+        reason:
+            'the verdict is spelled out once, not once per row, and in '
+            'the locale rather than in whatever the gate happened to carry',
       );
     });
   });
@@ -404,7 +434,7 @@ void main() {
       );
       final row = rowFor(built, 'custom-unresolved');
       expect(row.block, ModelBlock.unresolvedRepository);
-      expect(row.blockReason, unresolvedRepositoryReason);
+      expect(row.blockReason, en.unresolvedRepositoryReason);
       expect(row.transfer, isNull);
     });
 
@@ -566,7 +596,14 @@ void main() {
         models: stateWith({
           'qwen35-2b-gguf': const ArtifactStatus(
             phase: ArtifactPhase.failed,
-            failure: 'Needs 2.00 GB free; 0.40 GB available.',
+            // The diagnostic beside the kind can name a path on the device, so
+            // the row words the kind and its redacted figures (#130).
+            failure: '/Users/someone/Library/models/x.gguf',
+            failureReason: ArtifactFailure(
+              ArtifactFailureKind.insufficientStorage,
+              requiredBytes: 2000000000,
+              availableBytes: 400000000,
+            ),
           ),
         }),
       );
@@ -574,7 +611,13 @@ void main() {
       final offer = row.transfer!.affordance! as TransferOffer;
       expect(offer.action, TransferAction.retry);
       expect(row.transferLabel, 'Retry');
-      expect(offer.note, 'Needs 2.00 GB free; 0.40 GB available.');
+      expect(
+        offer.note,
+        en.downloadInsufficientStorage(
+          ltrIsolate('2.00 GB'),
+          ltrIsolate('0.40 GB'),
+        ),
+      );
     });
 
     test('one transfer at a time, and the others say so', () {
@@ -647,16 +690,15 @@ void main() {
         eligibility: const DeviceEligibility(
           tier: DeviceTier.unsupported,
           reason: DeviceIneligibilityReason.belowMemoryFloor,
-          message: 'This device cannot run models.',
         ),
-        deviceRefusal: 'This device cannot run models.',
+        deviceRefusal: DeviceIneligibilityReason.belowMemoryFloor,
       );
       for (final choice in built.choices) {
         expect(choice.selectable, isFalse, reason: choice.entry.key);
         expect(choice.block, ModelBlock.deviceRefused);
         expect(choice.transfer, isNull);
       }
-      expect(built.footnote, 'This device cannot run models.');
+      expect(built.footnote, en.deviceBelowMemoryFloor);
     });
 
     test('the fake honours any row, installed or not', () {
@@ -743,13 +785,17 @@ void main() {
     ];
     for (final backend in [llama, mlx, fake, sideload]) {
       for (final status in states) {
-        for (final refusal in [null, 'refused']) {
+        for (final refusal in [
+          null,
+          DeviceIneligibilityReason.belowMemoryFloor,
+        ]) {
           final models = stateWith({
             for (final entry in modelCatalog) entry.key: status,
           });
           final built = buildModelPickerView(
             catalog: modelCatalog,
             pinnedCatalog: modelCatalog,
+            localizations: en,
             simulatedTransfers: backend.simulatedInference,
             downloadableKeys: {for (final e in modelCatalog) e.key},
             backend: backend,

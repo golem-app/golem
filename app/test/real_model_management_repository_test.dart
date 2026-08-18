@@ -494,18 +494,20 @@ void main() {
     await repo.load();
     await repo.download('test-mlx').drain<void>();
 
-    // Receipt present: a lost state file re-earns installed with no
-    // network and no re-hash prompt to the user beyond one tap.
+    // Receipt present: a lost state file re-earns installed on the load
+    // itself, with no network and nothing for the user to do. Before #130
+    // reconciliation only ever demoted, so a reset store offered a
+    // multi-gigabyte re-download for weights verifiably already here.
     File('${temp.path}/state/flutter-model-v2.json').deleteSync();
-    final rebuilt = repository();
-    expect(
-      (await rebuilt.load()).statusOf('test-mlx').phase,
-      ArtifactPhase.notDownloaded,
-    );
     downloader.requestedUrls.clear();
-    final states = await rebuilt.download('test-mlx').toList();
+    final rebuilt = await repository().load();
+    expect(rebuilt.statusOf('test-mlx').phase, ArtifactPhase.installed);
+    expect(
+      rebuilt.statusOf('test-mlx').downloadedBytes,
+      _entry().totalBytes,
+      reason: 'a repaired install reports the whole artifact, not zero',
+    );
     expect(downloader.requestedUrls, isEmpty);
-    expect(states.last.statusOf('test-mlx').phase, ArtifactPhase.installed);
 
     // Receipt missing: "installed" is not re-earned by size alone on load…
     File(
@@ -522,6 +524,43 @@ void main() {
       contains(ArtifactPhase.verifying),
     );
     expect(rehashed.last.statusOf('test-mlx').phase, ArtifactPhase.installed);
+  });
+
+  test('a receipt from another revision does not repair an install', () async {
+    final repo = repository();
+    await repo.load();
+    await repo.download('test-mlx').drain<void>();
+    File('${temp.path}/state/flutter-model-v2.json').deleteSync();
+
+    // The same bytes under a different commit are unproven: the catalog can
+    // re-pin an artifact, and a receipt is scoped to the revision it verified.
+    final receipt = File(
+      '${temp.path}/documents/models/test-mlx/.golem-verified.json',
+    );
+    final json = Map<String, Object?>.from(
+      jsonDecode(receipt.readAsStringSync()) as Map,
+    );
+    receipt.writeAsStringSync(
+      jsonEncode({...json, 'revision': 'a-later-commit'}),
+    );
+
+    final loaded = await repository().load();
+    expect(loaded.statusOf('test-mlx').phase, ArtifactPhase.notDownloaded);
+  });
+
+  test('a short file is not repaired by its receipt alone', () async {
+    final repo = repository();
+    await repo.load();
+    await repo.download('test-mlx').drain<void>();
+    File('${temp.path}/state/flutter-model-v2.json').deleteSync();
+    // Truncated after verification — the receipt still names it, so only the
+    // size check stands between a half file and an "installed" card.
+    File(
+      '${temp.path}/documents/models/test-mlx/$_fileOne',
+    ).writeAsStringSync('x');
+
+    final loaded = await repository().load();
+    expect(loaded.statusOf('test-mlx').phase, ArtifactPhase.notDownloaded);
   });
 
   test(
@@ -598,17 +637,17 @@ void main() {
     expect(states.last.statusOf('test-mlx').phase, ArtifactPhase.installed);
   });
 
-  test('a recorded failed phase persists with its message', () async {
+  test('a recorded failed phase persists with its kind', () async {
     // The refusal decision lives in ModelController since #42 (covered in
     // controllers_test); the repository just records what it is told.
     final repo = repository();
     await repo.load();
     final failed = await repo.recordRuntime(
       RuntimePhase.failed,
-      failure: 'Inference is a build-time opt-in; no backend is configured.',
+      failure: RuntimeFailureKind.notInstalled,
     );
     expect(failed.runtime, RuntimePhase.failed);
-    expect(failed.failure, contains('build-time opt-in'));
+    expect(failed.failure, RuntimeFailureKind.notInstalled);
 
     final cleared = await repo.recordRuntime(RuntimePhase.unloaded);
     expect(cleared.runtime, RuntimePhase.unloaded);

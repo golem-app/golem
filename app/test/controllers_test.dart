@@ -192,8 +192,10 @@ final class _StaticState implements ModelManagementRepository {
   @override
   Future<ModelState> load() async => state;
   @override
-  Future<ModelState> recordRuntime(RuntimePhase phase, {String? failure}) =>
-      Future.value(state);
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    RuntimeFailureKind? failure,
+  }) => Future.value(state);
   @override
   Stream<ModelState> download(String artifactKey) => Stream.value(state);
   @override
@@ -235,7 +237,7 @@ final class _ReconcilingModels implements ModelManagementRepository {
   @override
   Future<ModelState> recordRuntime(
     RuntimePhase phase, {
-    String? failure,
+    RuntimeFailureKind? failure,
   }) async => _latest;
   @override
   Future<ModelState> pause(String artifactKey) async => _latest;
@@ -266,7 +268,7 @@ final class _ThrowingOnSecondLoad implements ModelManagementRepository {
   @override
   Future<ModelState> recordRuntime(
     RuntimePhase phase, {
-    String? failure,
+    RuntimeFailureKind? failure,
   }) async => _installed;
   @override
   Future<ModelState> pause(String artifactKey) async => _installed;
@@ -308,7 +310,7 @@ final class _TransferRecorder implements ModelManagementRepository {
   @override
   Future<ModelState> recordRuntime(
     RuntimePhase phase, {
-    String? failure,
+    RuntimeFailureKind? failure,
   }) async => _state;
   @override
   Future<ModelState> pause(String artifactKey) async => _state;
@@ -344,7 +346,7 @@ final class _GatedTransfer implements ModelManagementRepository {
   @override
   Future<ModelState> recordRuntime(
     RuntimePhase phase, {
-    String? failure,
+    RuntimeFailureKind? failure,
   }) async => _state;
   @override
   Future<ModelState> pause(String artifactKey) async => _state;
@@ -1929,12 +1931,15 @@ void main() {
     );
   });
 
-  test('toggling without an installed model refuses per backend', () async {
+  test('toggling without an installed model refuses either backend', () async {
     final directory = Directory.systemTemp.createTempSync('golem-refuse-test-');
     addTearDown(() => directory.deleteSync(recursive: true));
     final inference = _RecordingInferenceRepository();
 
-    // Fake backend copy: nothing installed yet, fake wording.
+    // Nothing installed yet, under either backend. The two used to persist
+    // different English sentences here and no surface read either — Settings
+    // prints one line for any runtime failure — so the kind is what remains
+    // (#130).
     final fakeContainer = ProviderContainer(
       overrides: [
         attachmentRepositoryProvider.overrideWithValue(
@@ -1952,10 +1957,10 @@ void main() {
     await fakeContainer.read(modelControllerProvider.notifier).toggleRuntime();
     final refused = fakeContainer.read(modelControllerProvider).requireValue;
     expect(refused.runtime, RuntimePhase.failed);
-    expect(refused.failure, 'Install the selected simulated model first.');
+    expect(refused.failure, RuntimeFailureKind.notInstalled);
     expect(inference.prepares, 0, reason: 'the engine is never touched');
 
-    // Real backend copy: the same refusal names the download instead.
+    // The real backend reaches the same refusal for the same reason.
     final realContainer = ProviderContainer(
       overrides: [
         attachmentRepositoryProvider.overrideWithValue(
@@ -1984,7 +1989,7 @@ void main() {
         .read(modelControllerProvider)
         .requireValue;
     expect(realRefused.runtime, RuntimePhase.failed);
-    expect(realRefused.failure, 'Download and install the active model first.');
+    expect(realRefused.failure, RuntimeFailureKind.notInstalled);
     expect(inference.prepares, 0);
   });
 
@@ -2011,7 +2016,7 @@ void main() {
 
     final state = container.read(modelControllerProvider).requireValue;
     expect(state.runtime, RuntimePhase.failed);
-    expect(state.failure, contains('prepare failure'));
+    expect(state.failure, RuntimeFailureKind.engineLoad);
     // The failure stays in-memory: a relaunch reconciles to unloaded, and
     // loaded was never recorded for an engine that holds nothing.
     final relaunched = await fakeModels(directory).load();
@@ -2232,7 +2237,7 @@ void main() {
     await controller.toggleRuntime();
     final state = container.read(modelControllerProvider).requireValue;
     expect(state.runtime, RuntimePhase.failed);
-    expect(state.failure, contains('unload failure'));
+    expect(state.failure, RuntimeFailureKind.engineUnload);
     // The persist layer never recorded unloaded for an engine still
     // holding weights. (This is the fake's simulated phase; the real
     // repository additionally reconciles any persisted loaded back to
@@ -2323,7 +2328,6 @@ void main() {
     const refusal = DeviceEligibility(
       tier: DeviceTier.unsupported,
       reason: DeviceIneligibilityReason.belowMemoryFloor,
-      message: 'This device cannot run models.',
     );
     const realBackend = InferenceBackendConfig(
       kind: InferenceBackendKind.mlx,
@@ -2468,7 +2472,7 @@ void main() {
 
       final state = container.read(modelControllerProvider).requireValue;
       expect(state.runtime, RuntimePhase.failed);
-      expect(state.failure, refusal.message);
+      expect(state.failure, RuntimeFailureKind.deviceRefused);
       expect(inference.prepares, 0);
     });
 

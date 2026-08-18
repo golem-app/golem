@@ -1029,7 +1029,7 @@ final class _PausableModels implements ModelManagementRepository {
   @override
   Future<ModelState> recordRuntime(
     RuntimePhase phase, {
-    String? failure,
+    RuntimeFailureKind? failure,
   }) async => _state;
 
   @override

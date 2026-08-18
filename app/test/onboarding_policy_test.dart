@@ -4,11 +4,14 @@ import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
+import 'package:golem_flutter/core/domain/model_activation.dart';
+import 'package:golem_flutter/core/domain/model_admission.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/onboarding/domain/onboarding_policy.dart';
-import 'package:golem_flutter/core/domain/model_activation.dart';
-import 'package:golem_flutter/core/domain/model_admission.dart';
+import 'package:golem_flutter/l10n/bidi.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_en.dart';
+import 'package:golem_flutter/l10n/presentation_messages.dart';
 
 void main() {
   group('first-run decision', () {
@@ -205,15 +208,18 @@ void main() {
     // is the opposite of the one the refused artifact needs.
     test('a refused artifact names the engine this build runs', () {
       String reasonFor(InferenceBackendConfig backend, String key) =>
-          modelAdmissionOptions(
-            catalog: modelCatalog,
-            backend: backend,
-            eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
-          ).firstWhere((option) => option.entry.key == key).disabledReason!;
+          modelAdmissionReason(
+            AppLocalizationsEn(),
+            modelAdmissionOptions(
+              catalog: modelCatalog,
+              backend: backend,
+              eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+            ).firstWhere((option) => option.entry.key == key),
+          );
 
       expect(
         reasonFor(llama, 'gemma4-mlx'),
-        'This build uses the GGUF engine.',
+        AppLocalizationsEn().otherEngineAdmission(ltrIsolate('GGUF')),
       );
       expect(
         reasonFor(
@@ -226,7 +232,7 @@ void main() {
           ),
           'gemma4-gguf',
         ),
-        'This build uses the MLX engine.',
+        AppLocalizationsEn().otherEngineAdmission(ltrIsolate('MLX')),
       );
     });
 

@@ -5,7 +5,7 @@ import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 
 void main() {
-  test('model state v2 round-trips artifacts and drops wiring stamps', () {
+  test('model state v3 round-trips artifacts and drops wiring stamps', () {
     const state = ModelState(
       artifacts: {
         'gemma4-mlx': ArtifactStatus(
@@ -24,22 +24,30 @@ void main() {
         ),
       },
       runtime: RuntimePhase.loaded,
-      failure: 'runtime message',
+      failure: RuntimeFailureKind.engineLoad,
       activeArtifactKey: 'gemma4-mlx',
       simulated: true,
     );
     final json = state.toJson();
-    expect(json['schemaVersion'], 2);
+    expect(json['schemaVersion'], 3);
     // Wiring stamps come from the repository configuration on every load;
     // persisting them would let stale configuration lie after a rebuild.
     expect(json.containsKey('activeArtifactKey'), isFalse);
     expect(json.containsKey('simulated'), isFalse);
+    // The artifact diagnostic quotes whatever failed — a platform message, an
+    // exception, a path on this device — so it never reaches the file (#130).
+    final artifact = json['artifacts']! as Map;
+    expect(
+      (artifact['qwen35-gguf']! as Map).containsKey('failure'),
+      isFalse,
+      reason: 'the diagnostic is in-memory only; failureReason is the record',
+    );
 
     final decoded = ModelState.fromJson(json);
     expect(decoded.statusOf('gemma4-mlx').phase, ArtifactPhase.paused);
     expect(decoded.statusOf('gemma4-mlx').downloadedBytes, 123456789);
     expect(decoded.statusOf('qwen35-gguf').phase, ArtifactPhase.failed);
-    expect(decoded.statusOf('qwen35-gguf').failure, contains('3.4 GB'));
+    expect(decoded.statusOf('qwen35-gguf').failure, isNull);
     expect(
       decoded.statusOf('qwen35-gguf').failureReason,
       const ArtifactFailure(
@@ -49,7 +57,7 @@ void main() {
       ),
     );
     expect(decoded.runtime, RuntimePhase.loaded);
-    expect(decoded.failure, 'runtime message');
+    expect(decoded.failure, RuntimeFailureKind.engineLoad);
     expect(decoded.activeArtifactKey, isNull);
     expect(decoded.simulated, isFalse);
 
@@ -72,6 +80,48 @@ void main() {
       () => ModelState.fromJson({'schemaVersion': 1, 'backend': 'mlx'}),
       throwsFormatException,
     );
+  });
+
+  // Reading v2 keeps a user's installs; its runtime sentence is dropped rather
+  // than kept, because no kind can be recovered from prose and prose is what
+  // #130 exists to get out of the store.
+  test('a v2 store reads, and its free-text runtime failure does not', () {
+    final decoded = ModelState.fromJson({
+      'schemaVersion': 2,
+      'runtime': 'failed',
+      'failure': 'Install the selected simulated model first.',
+      'artifacts': {
+        'gemma4-mlx': {
+          'phase': 'installed',
+          'downloadedBytes': 3300000000,
+          'failure': '/Users/someone/Library/.../model.safetensors is missing.',
+        },
+      },
+    });
+    expect(decoded.runtime, RuntimePhase.failed);
+    expect(decoded.failure, isNull);
+    expect(decoded.statusOf('gemma4-mlx').phase, ArtifactPhase.installed);
+    expect(decoded.statusOf('gemma4-mlx').downloadedBytes, 3300000000);
+    expect(decoded.statusOf('gemma4-mlx').failure, isNull);
+  });
+
+  test('an unrecognized runtime failure name reads as nothing classified', () {
+    final decoded = ModelState.fromJson({
+      'schemaVersion': 3,
+      'runtime': 'failed',
+      'failure': 'somethingALaterBuildAdded',
+      'artifacts': const <String, Object?>{},
+    });
+    expect(decoded.failure, isNull);
+  });
+
+  test('every runtime failure kind survives the file', () {
+    for (final kind in RuntimeFailureKind.values) {
+      final decoded = ModelState.fromJson(
+        ModelState(runtime: RuntimePhase.failed, failure: kind).toJson(),
+      );
+      expect(decoded.failure, kind, reason: kind.name);
+    }
   });
 
   test('the broker catalog mirrors the pinned Inferno manifest', () {

@@ -1,8 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/download_pace.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/models/artifact_transfer.dart';
+import 'package:golem_flutter/l10n/bidi.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_en.dart';
 
 /// A four-gigabyte artifact in round numbers, so a quarter is exactly 25%.
 const _entry = ModelCatalogEntry(
@@ -23,7 +26,7 @@ void main() {
     ArtifactStatus status, {
     DownloadPaceSnapshot? pace,
     bool simulated = false,
-    String? deviceRefusal,
+    DeviceIneligibilityReason? deviceRefusal,
     bool sideloaded = false,
     bool admitted = true,
     bool downloadable = true,
@@ -32,7 +35,7 @@ void main() {
   }) => artifactTransfer(
     entry: _entry,
     status: status,
-    localizations: null,
+    localizations: AppLocalizationsEn(),
     pace: pace,
     simulated: simulated,
     deviceRefusal: deviceRefusal,
@@ -99,7 +102,7 @@ void main() {
           files: [],
         ),
         status: const ArtifactStatus(phase: ArtifactPhase.downloading),
-        localizations: null,
+        localizations: AppLocalizationsEn(),
       );
       expect(transfer.fraction, 0);
       expect(transfer.percent, 0);
@@ -129,6 +132,24 @@ void main() {
       );
       expect(transfer.chip, '44.0 MB/s');
       expect(transfer.remainder, 'About 2 minutes left');
+    });
+
+    // The English fallback this file used to carry was flat, so the last
+    // minute of every download read "About 1 minutes left". The ARB has always
+    // held the plural; taking localizations non-null is what reaches it (#130).
+    test('the last minute is singular', () {
+      final transfer = project(
+        const ArtifactStatus(
+          phase: ArtifactPhase.downloading,
+          downloadedBytes: 3900000000,
+        ),
+        pace: const DownloadPaceSnapshot(
+          artifactKey: 'test-gguf',
+          mbPerSecond: 43.96,
+          eta: Duration(seconds: 20),
+        ),
+      );
+      expect(transfer.remainder, 'About 1 minute left');
     });
 
     test('a snapshot for another artifact is not borrowed', () {
@@ -242,16 +263,43 @@ void main() {
       expect(offer.note, 'Paused at 1.00 GB of 4.00 GB · simulated.');
     });
 
-    test('a failure quotes the failure, not the phase', () {
+    // The kind and its redacted arguments, never the diagnostic string beside
+    // them: that one quotes platform text and can name a path (#130).
+    test('a failure words its kind, not the phase', () {
       final offer =
           project(
                 const ArtifactStatus(
                   phase: ArtifactPhase.failed,
-                  failure: 'Needs 2.00 GB free; 0.40 GB available.',
+                  failure: '/Users/someone/models/x.gguf is missing.',
+                  failureReason: ArtifactFailure(
+                    ArtifactFailureKind.insufficientStorage,
+                    requiredBytes: 2000000000,
+                    availableBytes: 400000000,
+                  ),
                 ),
               ).affordance!
               as TransferOffer;
-      expect(offer.note, 'Needs 2.00 GB free; 0.40 GB available.');
+      expect(
+        offer.note,
+        AppLocalizationsEn().downloadInsufficientStorage(
+          ltrIsolate('2.00 GB'),
+          ltrIsolate('0.40 GB'),
+        ),
+      );
+      expect(offer.note, isNot(contains('/Users/')));
+    });
+
+    test('an unclassified failure still offers a retry with a sentence', () {
+      final offer =
+          project(
+                const ArtifactStatus(
+                  phase: ArtifactPhase.failed,
+                  failureReason: ArtifactFailure(ArtifactFailureKind.transfer),
+                ),
+              ).affordance!
+              as TransferOffer;
+      expect(offer.action, TransferAction.retry);
+      expect(offer.note, AppLocalizationsEn().downloadFailed);
     });
   });
 
@@ -282,7 +330,7 @@ void main() {
       final offer =
           project(
                 const ArtifactStatus(),
-                deviceRefusal: 'no',
+                deviceRefusal: DeviceIneligibilityReason.belowMemoryFloor,
                 sideloaded: true,
                 downloadable: false,
                 transferringKey: 'someone-else',
@@ -321,7 +369,10 @@ void main() {
       // blockReason, Settings in its own order under its own button — so a
       // second copy here would be copy nobody reads.
       for (final blocked in [
-        () => project(const ArtifactStatus(), deviceRefusal: 'no'),
+        () => project(
+          const ArtifactStatus(),
+          deviceRefusal: DeviceIneligibilityReason.belowMemoryFloor,
+        ),
         () => project(const ArtifactStatus(), sideloaded: true),
         () => project(const ArtifactStatus(), admitted: false),
         () => project(const ArtifactStatus(), downloadable: false),
@@ -361,7 +412,7 @@ void main() {
       final transfer = project(
         const ArtifactStatus(phase: ArtifactPhase.downloading),
         admitted: false,
-        deviceRefusal: 'no',
+        deviceRefusal: DeviceIneligibilityReason.belowMemoryFloor,
       );
       expect(transfer.affordance, isA<TransferInFlight>());
     });

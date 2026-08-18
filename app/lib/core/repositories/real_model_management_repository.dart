@@ -152,6 +152,21 @@ final class RealModelManagementRepository implements ModelManagementRepository {
         _ when _active.contains(entry.key) => status,
         ArtifactPhase.installed when !await _installVerified(entry) =>
           const ArtifactStatus(),
+        // Disk decides in both directions. Without this the store only ever
+        // demotes, so a state that had to be reset — a schema move, a corrupt
+        // file — reports weights sitting verified on disk as never downloaded,
+        // and offers a multi-gigabyte re-download as the only way back (#130).
+        // Receipts are revision-scoped and written only by a completed
+        // hash-verified transfer, so this cannot claim a hand-provisioned
+        // directory; addModel already promotes on the same evidence.
+        // A delete whose sweep failed leaves both behind and is therefore
+        // re-reported as installed: disk decides, and weights that are still
+        // there are better named than hidden behind an offer to re-fetch them.
+        ArtifactPhase.notDownloaded when await _installVerified(entry) =>
+          ArtifactStatus(
+            phase: ArtifactPhase.installed,
+            downloadedBytes: entry.totalBytes,
+          ),
         ArtifactPhase.downloading ||
         ArtifactPhase.verifying ||
         ArtifactPhase.paused => await _reconcileTransfer(entry),
@@ -200,6 +215,9 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   }
 
   Future<bool> _installVerified(ModelCatalogEntry entry) async {
+    // No files is no evidence. Vacuously true was harmless while this only
+    // guarded a demotion; the promotion arm would read it as an install.
+    if (entry.files.isEmpty) return false;
     final receipt = await _readReceipt(entry);
     for (final spec in entry.files) {
       if (!_receiptCovers(receipt, spec) || !await _sizeMatches(entry, spec)) {
@@ -653,12 +671,14 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   }
 
   @override
-  Future<ModelState> recordRuntime(RuntimePhase phase, {String? failure}) =>
-      _persist(
-        failure == null
-            ? _state.copyWith(runtime: phase, clearFailure: true)
-            : _state.copyWith(runtime: phase, failure: failure),
-      );
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    RuntimeFailureKind? failure,
+  }) => _persist(
+    failure == null
+        ? _state.copyWith(runtime: phase, clearFailure: true)
+        : _state.copyWith(runtime: phase, failure: failure),
+  );
 
   @override
   Future<ModelState> addModel(ModelCatalogEntry entry) async {

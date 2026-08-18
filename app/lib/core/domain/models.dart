@@ -540,6 +540,24 @@ final class CompletedEvent extends InferenceEvent {
   final int? rawTextLength;
 }
 
+/// Why the engine is not holding weights. Persisted, so it names the cause
+/// rather than quoting an exception: `'$error'` can carry an absolute path off
+/// the device into the user's store, and hand-written copy there is copy no
+/// locale can translate (#130).
+enum RuntimeFailureKind {
+  /// This device is outside every supported tier (#27).
+  deviceRefused,
+
+  /// No installed artifact the composed engine could load.
+  notInstalled,
+
+  /// `prepare()` threw.
+  engineLoad,
+
+  /// `unload()` threw.
+  engineUnload,
+}
+
 /// A stable model-transfer failure classification. The diagnostic [failure]
 /// string on [ArtifactStatus] remains available for logs, while presentation
 /// localizes this value and its safe parameters without parsing prose.
@@ -608,7 +626,10 @@ final class ArtifactStatus {
   /// catalog's total, so persistence never stores a stale percentage.
   final int downloadedBytes;
 
-  /// Internal diagnostic, never rendered directly.
+  /// Internal diagnostic — never rendered, and never written to disk. It
+  /// quotes whatever failed, which for a transfer means a platform message or
+  /// an exception that can name a path on this device; [failureReason] is what
+  /// survives a relaunch and what presentation words (#130).
   final String? failure;
 
   /// Localizable failure classification and safe presentation parameters.
@@ -630,7 +651,6 @@ final class ArtifactStatus {
   Map<String, Object?> toJson() => {
     'phase': phase.name,
     'downloadedBytes': downloadedBytes,
-    'failure': failure,
     'failureReason': failureReason?.toJson(),
   };
 
@@ -639,7 +659,6 @@ final class ArtifactStatus {
       json['phase'] as String? ?? 'notDownloaded',
     ),
     downloadedBytes: json['downloadedBytes'] as int? ?? 0,
-    failure: json['failure'] as String?,
     failureReason: json['failureReason'] is Map
         ? ArtifactFailure.fromJson(
             Map<String, Object?>.from(json['failureReason']! as Map),
@@ -671,7 +690,9 @@ final class ModelState {
 
   final Map<String, ArtifactStatus> _artifacts;
   final RuntimePhase runtime;
-  final String? failure;
+
+  /// Why [runtime] is not `loaded`, or null while nothing has failed.
+  final RuntimeFailureKind? failure;
 
   /// Unmodifiable — transitions go through [withArtifact]/[copyWith].
   Map<String, ArtifactStatus> get artifacts => UnmodifiableMapView(_artifacts);
@@ -689,7 +710,7 @@ final class ModelState {
   ModelState copyWith({
     Map<String, ArtifactStatus>? artifacts,
     RuntimePhase? runtime,
-    String? failure,
+    RuntimeFailureKind? failure,
     bool clearFailure = false,
   }) => ModelState(
     artifacts: artifacts ?? _artifacts,
@@ -712,12 +733,24 @@ final class ModelState {
         simulated: simulated,
       );
 
+  /// Schema 3 replaced a free-text `failure` with a [RuntimeFailureKind] name;
+  /// schema 2 is still read, and its sentence is dropped rather than kept as a
+  /// kind nobody can derive from prose (#130). The file name stays v2 — it
+  /// marks a change of *location*, which this is not.
+  ///
+  /// The move is one-way: a build that predates schema 3 rejects this file and
+  /// falls back to defaults, so a rollback re-offers every install as a
+  /// download. Accepted rather than dodged by leaving the number at 2 — the
+  /// field changed type, and a version that does not say so is the lie the
+  /// version exists to prevent.
+  static const schemaVersion = 3;
+
   // activeArtifactKey and simulated are stamped from repository wiring on
   // every load, so persisting them would only let stale configuration lie.
   Map<String, Object?> toJson() => {
-    'schemaVersion': 2,
+    'schemaVersion': schemaVersion,
     'runtime': runtime.name,
-    'failure': failure,
+    'failure': failure?.name,
     'artifacts': _artifacts.map(
       (key, status) => MapEntry(key, status.toJson()),
     ),
@@ -742,7 +775,8 @@ final class ModelState {
   );
 
   factory ModelState.fromJson(Map<String, Object?> json) {
-    if (json['schemaVersion'] != 2) {
+    final version = json['schemaVersion'];
+    if (version != 2 && version != schemaVersion) {
       throw const FormatException('Unsupported model state schema');
     }
     final artifacts = (json['artifacts'] as Map? ?? const {}).map(
@@ -756,7 +790,12 @@ final class ModelState {
       runtime: RuntimePhase.values.byName(
         json['runtime'] as String? ?? 'unloaded',
       ),
-      failure: json['failure'] as String?,
+      // Tolerant on purpose: a schema-2 store holds an English sentence here,
+      // and an unrecognized name from any build is a value this one cannot act
+      // on. Both read as "nothing classified".
+      failure: RuntimeFailureKind.values
+          .where((kind) => kind.name == json['failure'])
+          .firstOrNull,
     );
   }
 }

@@ -809,7 +809,7 @@ final class _OnboardingDownloadModels implements ModelManagementRepository {
   @override
   Future<ModelState> recordRuntime(
     RuntimePhase phase, {
-    String? failure,
+    RuntimeFailureKind? failure,
   }) async => _state;
 }
 
@@ -843,6 +843,6 @@ final class _DeletableModels implements ModelManagementRepository {
   @override
   Future<ModelState> recordRuntime(
     RuntimePhase phase, {
-    String? failure,
+    RuntimeFailureKind? failure,
   }) async => _state;
 }

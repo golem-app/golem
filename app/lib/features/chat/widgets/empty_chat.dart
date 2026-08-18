@@ -27,10 +27,7 @@ class EmptyChat extends ConsumerWidget {
     final refusal = ref.watch(deviceRefusalProvider);
     final refusalMessage = refusal == null
         ? null
-        : deviceRefusalMessage(
-            context.l10n,
-            ref.watch(deviceEligibilityProvider).reason,
-          );
+        : deviceRefusalMessage(context.l10n, refusal);
     // Only the supported copy names a model, so only it pays for the label —
     // and only it subscribes this widget to residency and the catalog.
     final label = refusal != null

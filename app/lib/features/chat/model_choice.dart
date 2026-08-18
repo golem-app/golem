@@ -25,6 +25,7 @@ import '../../core/domain/model_catalog.dart';
 import '../../core/domain/model_speed.dart';
 import '../../core/domain/models.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../l10n/presentation_messages.dart';
 import '../models/artifact_transfer.dart';
 
 /// Why a row cannot be chosen. Carried alongside the copy rather than instead
@@ -62,7 +63,7 @@ final class ModelChoice {
     required this.selected,
     required this.selectable,
     this.needsConsent = false,
-    this.summary,
+    required this.summary,
     this.artifactLine,
     this.recommendation,
     this.block,
@@ -87,9 +88,10 @@ final class ModelChoice {
   /// Size, proven capability, and measured speed — `1.58 GB · reads pictures`.
   final String detail;
 
-  /// What the model is *for*, in a user's words; null for a hand-added
-  /// repository, which nobody has characterized.
-  final String? summary;
+  /// What the model is *for*, in a user's words. Always present: a hand-added
+  /// repository gets the sentence that says nobody characterized it, which is
+  /// still copy the picker owes the row.
+  final String summary;
 
   /// `GGUF · Q4_0 · unsloth/…`. Non-null only under Advanced mode: the exact
   /// artifact stays discoverable for operators without leading with it
@@ -148,7 +150,8 @@ final class ModelPickerView {
 /// [deviceRefusal] is `deviceRefusalProvider`'s answer, passed in rather than
 /// re-derived from [eligibility]: the refusal rule — including that a simulated
 /// backend is never gated — has one owner, and this is not it. [eligibility] is
-/// read only for the tier that explains the recommendation.
+/// read only for the tier that explains the recommendation; the footnote words
+/// [deviceRefusal] itself, so the two cannot disagree.
 ModelPickerView buildModelPickerView({
   required List<ModelCatalogEntry> catalog,
 
@@ -163,10 +166,10 @@ ModelPickerView buildModelPickerView({
   required Set<String> loadableKeys,
   required List<ChatConversation> conversations,
   required DeviceEligibility eligibility,
-  required String? deviceRefusal,
+  required DeviceIneligibilityReason? deviceRefusal,
   required bool advanced,
   required bool simulatedTransfers,
-  AppLocalizations? localizations,
+  required AppLocalizations localizations,
   String? selectedKey,
 }) {
   assert(
@@ -282,19 +285,14 @@ ModelPickerView buildModelPickerView({
     hiddenCount: hidden,
     hiddenNote: hidden == 0
         ? null
-        : localizations?.hiddenEngineModels(
-                hidden,
-                engineName(_composedEngine(backend)),
-              ) ??
-              '$hidden other '
-                  '${hidden == 1 ? 'model is' : 'models are'} built for a '
-                  'different engine and ${hidden == 1 ? 'is' : 'are'} not listed. '
-                  'This build runs ${engineName(_composedEngine(backend))}.',
+        : localizations.hiddenEngineModels(
+            hidden,
+            engineName(_composedEngine(backend)),
+          ),
     footnote: _footnote(
       backend: backend,
       deviceRefusal: deviceRefusal,
       localizations: localizations,
-      eligibility: eligibility,
     ),
   );
 }
@@ -304,7 +302,7 @@ ModelChoice _choiceFor({
   required InferenceBackendConfig backend,
   required ModelState? models,
   required Set<String> loadableKeys,
-  required String? deviceRefusal,
+  required DeviceIneligibilityReason? deviceRefusal,
   required bool advanced,
   required String? selectedKey,
   required bool ambiguousName,
@@ -314,7 +312,7 @@ ModelChoice _choiceFor({
   required ModelAdmissionOption? admission,
   required Map<String, double> speeds,
   required bool downloadable,
-  required AppLocalizations? localizations,
+  required AppLocalizations localizations,
 }) {
   final simulated = backend.simulatedInference;
   final status = models?.statusOf(entry.key) ?? const ArtifactStatus();
@@ -351,40 +349,39 @@ ModelChoice _choiceFor({
     // can do nothing about.
     false when deviceRefusal != null => (
       ModelBlock.deviceRefused,
-      localizations?.notAvailableOnDevice ?? 'Not available on this device.',
+      localizations.notAvailableOnDevice,
     ),
     false when backend.sideloaded => (
       ModelBlock.sideload,
-      localizations?.pinnedByBuild ?? 'Pinned by this build.',
+      localizations.pinnedByBuild,
     ),
     // Not installed, and this device was sized against it: first run refuses
     // the same artifact for the same reason, in the same words.
     false
         when !installed &&
             admission?.block == ModelAdmissionBlock.needsPreferredTier =>
-      (ModelBlock.needsMoreMemory, _admissionReason(localizations, admission!)),
+      (
+        ModelBlock.needsMoreMemory,
+        modelAdmissionReason(localizations, admission!),
+      ),
     // Nothing can be fetched for a repository that never resolved, so the row
     // must not tell the user to download it. Settings says the same.
     false when !installed && !downloadable => (
       ModelBlock.unresolvedRepository,
-      localizations?.unresolvedRepositoryReason ?? unresolvedRepositoryReason,
+      localizations.unresolvedRepositoryReason,
     ),
     false when installed && !loadsHere => (
       ModelBlock.otherEngine,
       // Plural deliberately: "a MLX" and "an MLX" are both wrong depending on
       // how the reader says it, and no copy is worth an article rule.
-      localizations?.installedOtherEngine(
-            engineName(_composedEngine(backend)),
-            engineFormat(entry.engine),
-          ) ??
-          'Installed, but this build runs ${engineName(_composedEngine(backend))} '
-              'and cannot load ${engineFormat(entry.engine)} models.',
+      localizations.installedOtherEngine(
+        engineName(_composedEngine(backend)),
+        engineFormat(entry.engine),
+      ),
     ),
     false when installed && entry.profileKey == unresolvedProfileKey => (
       ModelBlock.unrecognizedTemplate,
-      localizations?.unrecognizedChatTemplate ??
-          'Installed, but Golem does not recognize this model’s chat template, so '
-              'it cannot prompt it.',
+      localizations.unrecognizedChatTemplate,
     ),
     // "Not installed" covers a transfer that has not started, one running, and
     // one stopped part-way. Telling a user to download a model they already
@@ -392,25 +389,16 @@ ModelChoice _choiceFor({
     false => (
       ModelBlock.notInstalled,
       switch (status.phase) {
-        ArtifactPhase.downloading || ArtifactPhase.verifying =>
-          localizations?.pickAfterDownload ??
-              'Pick it once the download finishes.',
-        ArtifactPhase.paused =>
-          localizations?.resumeForChat ??
-              'Resume the download to use it in this chat.',
-        ArtifactPhase.failed =>
-          localizations?.unfinishedDownload ??
-              'The download did not finish, so it cannot be picked yet.',
-        _ =>
-          localizations?.downloadForChat ??
-              'Download it to use it in this chat.',
+        ArtifactPhase.downloading ||
+        ArtifactPhase.verifying => localizations.pickAfterDownload,
+        ArtifactPhase.paused => localizations.resumeForChat,
+        ArtifactPhase.failed => localizations.unfinishedDownload,
+        _ => localizations.downloadForChat,
       },
     ),
   };
 
-  final suffix = simulatedTransfers
-      ? ' · ${localizations?.simulated ?? 'simulated'}'
-      : '';
+  final suffix = simulatedTransfers ? ' · ${localizations.simulated}' : '';
   // Nothing is offered under either of these, so nothing is projected: the
   // sheet rebuilds on every download-progress snapshot, and a refused device
   // would otherwise pay for a full projection per row on every tick.
@@ -444,9 +432,6 @@ ModelChoice _choiceFor({
       simulated: simulated,
       localizations: localizations,
     ),
-    // Every pinned entry carries copy by construction, so a missing summary
-    // means a hand-added repository — which nobody has characterized and this
-    // project will not characterize on its behalf.
     summary: _localizedSummary(entry, localizations),
     artifactLine: advanced
         ? '${engineFormat(entry.engine)} · ${entry.quantization} · '
@@ -497,22 +482,16 @@ String? _transferLabel(
   ArtifactTransferPresentation? transfer, {
   required ModelCatalogEntry entry,
   required String suffix,
-  required AppLocalizations? localizations,
+  required AppLocalizations localizations,
 }) => switch (transfer?.affordance) {
   null => null,
-  TransferInFlight(pausable: true) =>
-    localizations?.downloadingStatus(suffix) ?? 'Downloading$suffix',
-  TransferInFlight() =>
-    localizations?.verifyingFilesPicker(suffix) ?? 'Verifying files$suffix',
-  TransferOffer(action: TransferAction.resume) =>
-    localizations?.resume ?? 'Resume',
-  TransferOffer(action: TransferAction.retry) =>
-    localizations?.retry ?? 'Retry',
-  TransferOffer() =>
-    localizations?.downloadSizeAction(
-          '${gigabytes(entry.totalBytes)}$suffix',
-        ) ??
-        'Download · ${gigabytes(entry.totalBytes)}$suffix',
+  TransferInFlight(pausable: true) => localizations.downloadingStatus(suffix),
+  TransferInFlight() => localizations.verifyingFilesPicker(suffix),
+  TransferOffer(action: TransferAction.resume) => localizations.resume,
+  TransferOffer(action: TransferAction.retry) => localizations.retry,
+  TransferOffer() => localizations.downloadSizeAction(
+    '${gigabytes(entry.totalBytes)}$suffix',
+  ),
 };
 
 /// Size first, because it is the cost; then capability, which is proven per
@@ -522,17 +501,15 @@ String _detailLine({
   required ModelCatalogEntry entry,
   required double? measured,
   required bool simulated,
-  required AppLocalizations? localizations,
+  required AppLocalizations localizations,
 }) {
   return [
     gigabytes(entry.totalBytes),
-    if (entry.supportsImages) localizations?.readsPictures ?? 'reads pictures',
+    if (entry.supportsImages) localizations.readsPictures,
     if (measured != null)
       simulated
-          ? localizations?.modelSpeedSimulated(measured.toStringAsFixed(1)) ??
-                '${measured.toStringAsFixed(1)} tok/s simulated'
-          : localizations?.modelSpeedOnPhone(measured.toStringAsFixed(1)) ??
-                '${measured.toStringAsFixed(1)} tok/s on this phone',
+          ? localizations.modelSpeedSimulated(measured.toStringAsFixed(1))
+          : localizations.modelSpeedOnPhone(measured.toStringAsFixed(1)),
   ].join(' · ');
 }
 
@@ -542,39 +519,27 @@ String _detailLine({
 /// tier sentences are the user-facing half of the classification recorded in
 /// `docs/decisions/0007-supported-device-policy.md`.
 String _recommendationReason({
-  required AppLocalizations? localizations,
+  required AppLocalizations localizations,
   required bool simulated,
   required DeviceTier tier,
   required bool memoryKnown,
   required bool fromDevicePolicy,
 }) {
-  if (simulated) {
-    return localizations?.buildDefaultModel ?? 'This build’s default model.';
-  }
+  if (simulated) return localizations.buildDefaultModel;
   // An explicit GOLEM_MODEL_ARTIFACT or GOLEM_MODEL_PROFILE fixes the artifact
   // and the tier is never read (backend_policy.dart), so a memory sentence
   // there would credit a classification that played no part. The build says
   // which case it is rather than the copy guessing from a key prefix.
-  if (!fromDevicePolicy) {
-    return localizations?.buildDefaultModel ?? 'This build’s default model.';
-  }
+  if (!fromDevicePolicy) return localizations.buildDefaultModel;
   // The light tier is also where an unreadable probe lands (ADR 0007: unknown
   // is not a refusal), and absence of evidence is not a low reading.
-  if (!memoryKnown) {
-    return localizations?.lighterModelUnknownMemory ??
-        'The lighter model, picked because this phone’s memory could '
-            'not be read.';
-  }
+  if (!memoryKnown) return localizations.lighterModelUnknownMemory;
   return switch (tier) {
-    DeviceTier.preferred =>
-      localizations?.largerModelFits ??
-          'This phone has the memory for the larger model.',
-    DeviceTier.light =>
-      localizations?.sizedForPhone ?? 'Sized to fit this phone’s memory.',
+    DeviceTier.preferred => localizations.largerModelFits,
+    DeviceTier.light => localizations.sizedForPhone,
     // Unreachable while a refusal suppresses the badge; stated rather than
     // asserted so a future caller cannot get a blank reason.
-    DeviceTier.unsupported =>
-      localizations?.buildDefaultModel ?? 'This build’s default model.',
+    DeviceTier.unsupported => localizations.buildDefaultModel,
   };
 }
 
@@ -585,65 +550,41 @@ String _recommendationReason({
 /// (`sideloadedModelLabel`).
 String? _footnote({
   required InferenceBackendConfig backend,
-  required String? deviceRefusal,
-  required AppLocalizations? localizations,
-  required DeviceEligibility eligibility,
+  required DeviceIneligibilityReason? deviceRefusal,
+  required AppLocalizations localizations,
 }) {
   if (backend.simulatedInference) return null;
   if (deviceRefusal != null) {
-    return switch (eligibility.reason) {
-      DeviceIneligibilityReason.missingInstructionSet =>
-        localizations?.deviceMissingInstructionSet ?? deviceRefusal,
-      DeviceIneligibilityReason.belowMemoryFloor =>
-        localizations?.deviceBelowMemoryFloor ?? deviceRefusal,
-      null => deviceRefusal,
-    };
+    return deviceRefusalMessage(localizations, deviceRefusal);
   }
   if (backend.sideloaded) {
-    return localizations?.sideloadPreventsSwitch(
-          sideloadedModelLabel(backend.modelPath!),
-        ) ??
-        'This build runs ${sideloadedModelLabel(backend.modelPath!)} from a '
-            'path it pins, so this chat cannot switch models.';
+    return localizations.sideloadPreventsSwitch(
+      sideloadedModelLabel(backend.modelPath!),
+    );
   }
-  return localizations?.modelLoadsNextMessage ??
-      'The model you pick loads with your next message.';
+  return localizations.modelLoadsNextMessage;
 }
 
-String _admissionReason(
-  AppLocalizations? localizations,
-  ModelAdmissionOption admission,
-) => switch (admission.block) {
-  ModelAdmissionBlock.otherEngine =>
-    localizations?.otherEngineAdmission(
-          admission.entry.engine == ModelEngine.mlx ? 'GGUF' : 'MLX',
-        ) ??
-        admission.disabledReason!,
-  ModelAdmissionBlock.needsPreferredTier when !admission.memoryKnown =>
-    localizations?.memoryUnreadableLighterModel ?? admission.disabledReason!,
-  ModelAdmissionBlock.needsPreferredTier =>
-    localizations?.needsMoreReportedMemory ?? admission.disabledReason!,
-  ModelAdmissionBlock.unsupportedDevice =>
-    localizations?.modelsUnavailableOnDevice ?? admission.disabledReason!,
-  null => '',
-};
-
+/// Pinned entries are described from the ARB rather than by a field on the
+/// entry: the copy is one of thirteen catalogs, and a `summary` string on the
+/// manifest would be the English one nobody translates (#130).
+///
+/// Exact keys, not prefixes. A `qwen35-7b-` added later matches `qwen35-` and
+/// would present the 4B copy — leans towards code, thinks a problem through —
+/// for a model nobody characterized, with nothing failing. Falling through
+/// instead makes it read as hand-added, which `model_choice_test` catches for
+/// every key in `modelCatalog`.
 String _localizedSummary(
   ModelCatalogEntry entry,
-  AppLocalizations? localizations,
-) {
-  if (localizations == null) {
-    return entry.summary ?? 'Added by you from Hugging Face.';
-  }
-  if (entry.key.startsWith('gemma4-')) return localizations.gemmaModelSummary;
-  if (entry.key.startsWith('qwen35-2b-')) {
-    return localizations.qwenTwoBModelSummary;
-  }
-  if (entry.key.startsWith('qwen35-')) {
-    return localizations.qwenFourBModelSummary;
-  }
-  return localizations.customModelSummary;
-}
+  AppLocalizations localizations,
+) => switch (entry.key) {
+  'gemma4-mlx' || 'gemma4-gguf' => localizations.gemmaModelSummary,
+  'qwen35-2b-mlx' || 'qwen35-2b-gguf' => localizations.qwenTwoBModelSummary,
+  'qwen35-mlx' || 'qwen35-gguf' => localizations.qwenFourBModelSummary,
+  // A hand-added repository, which nobody has characterized and this project
+  // will not characterize on its behalf.
+  _ => localizations.customModelSummary,
+};
 
 /// Which artifact holds the single transfer slot, mirroring the Settings rule
 /// that one download runs at a time (`models_screen.dart`).

@@ -137,10 +137,7 @@ class ChatCanvas extends ConsumerWidget {
         // (#27). Exactly one of the three is ever on screen.
         else if (hasMessages && refusal != null)
           _DeviceRefusalNotice(
-            message: deviceRefusalMessage(
-              context.l10n,
-              ref.watch(deviceEligibilityProvider).reason,
-            ),
+            message: deviceRefusalMessage(context.l10n, refusal),
           ),
         if (chat.failure == null && refusal == null) const ModelSetupBanner(),
         Composer(
