@@ -366,12 +366,19 @@ class ModelController extends _$ModelController {
     _busy = true;
     _engineBusy = true;
     try {
+      // Read ahead of the guarded engine calls below: a container failure is
+      // a programming error to surface, not an engine fault to report (#127).
       final repository = ref.read(modelManagementRepositoryProvider);
+      final inference = ref.read(inferenceRepositoryProvider);
       final current = state.requireValue;
+      // Ahead of both arms: after a failed unload the phase reads `failed`
+      // while the weights stay mapped, so a live answer can still be streaming
+      // on the engine the load arm would prepare — and a different target
+      // there swaps the engine under it (#124).
+      if (ref.read(chatSessionBridgeProvider).generationActive()) return;
       if (current.runtime == RuntimePhase.loaded) {
-        if (ref.read(chatSessionBridgeProvider).generationActive()) return;
         try {
-          await ref.read(inferenceRepositoryProvider).unload();
+          await inference.unload();
         } catch (_) {
           if (!ref.mounted) return;
           state = AsyncData(
@@ -417,7 +424,7 @@ class ModelController extends _$ModelController {
           return;
         }
         try {
-          await ref.read(inferenceRepositoryProvider).prepare(modelKey: target);
+          await inference.prepare(modelKey: target);
         } catch (_) {
           if (!ref.mounted) return;
           state = AsyncData(

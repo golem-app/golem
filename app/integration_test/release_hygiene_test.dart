@@ -28,9 +28,6 @@ final class _ModelFreeRuntime implements BrokerRuntime {
   void releaseEngine() {}
 
   @override
-  Future<void> dispose() async {}
-
-  @override
   Future<void> cancel() async {}
 
   @override

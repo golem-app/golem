@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
@@ -13,6 +14,7 @@ import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/models.dart';
+import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
@@ -1560,6 +1562,50 @@ void main() {
     },
     variant: iosChrome,
   );
+
+  testWidgets('the toggle is withheld mid-answer on an unloaded phase', (
+    tester,
+  ) async {
+    // A simulated backend never reflects its phase to loaded, so the whole
+    // answer streams on `unloaded`; the controller refuses the load arm
+    // then, and a live "Load" button would be a dead tap (#124).
+    final container = buildContainer(
+      inference: FakeInferenceRepository(
+        eventDelay: const Duration(seconds: 30),
+      ),
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: wrapApp(child: const ModelsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await container.read(chatControllerProvider.future);
+    unawaited(container.read(chatControllerProvider.notifier).send('hi'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      container.read(chatControllerProvider).requireValue.generation,
+      isIn([GenerationPhase.preparing, GenerationPhase.streaming]),
+    );
+    await revealIn(
+      tester,
+      const Key('models-list'),
+      const Key('runtime-toggle-button'),
+    );
+    final toggle = tester.widget<GolemButton>(
+      find.byKey(const Key('runtime-toggle-button')),
+    );
+    expect(toggle.label, startsWith('Load'));
+    expect(toggle.onPressed, isNull);
+
+    container.read(chatControllerProvider.notifier).stop();
+    // Drains the fake's parked event timer, which stop() does not cancel.
+    await tester.pump(const Duration(seconds: 31));
+    await tester.pumpAndSettle();
+  }, variant: iosChrome);
 
   group('an unsupported device (#27)', () {
     const backend = InferenceBackendConfig(

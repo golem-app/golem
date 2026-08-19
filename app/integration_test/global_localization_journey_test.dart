@@ -6,6 +6,8 @@ import 'package:golem_flutter/l10n/l10n.dart';
 import 'package:golem_flutter/main.dart' as app;
 import 'package:integration_test/integration_test.dart';
 
+import 'support/first_run.dart';
+
 const _localeCases = [
   (
     key: 'language-spanish',
@@ -143,25 +145,11 @@ Future<void> _launchToChat(WidgetTester tester) async {
     await tester.tap(find.byKey(const Key('first-run-download')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('model-download-confirm')));
-    await _waitForVerifiedFirstRunModel(tester);
+    await waitForVerifiedFirstRunModel(tester);
     await tester.tap(find.byKey(const Key('first-run-start-chatting')));
     await tester.pumpAndSettle(const Duration(seconds: 2));
   }
   if (find.byType(ChatScreen).evaluate().isEmpty) {
     fail('Chat screen did not become available.');
-  }
-}
-
-Future<void> _waitForVerifiedFirstRunModel(WidgetTester tester) async {
-  final button = find.descendant(
-    of: find.byKey(const Key('first-run-start-chatting')),
-    matching: find.byType(CupertinoButton),
-  );
-  final deadline = DateTime.now().add(const Duration(seconds: 10));
-  while (tester.widget<CupertinoButton>(button).onPressed == null) {
-    if (DateTime.now().isAfter(deadline)) {
-      fail('The simulated first-run model was never verified.');
-    }
-    await tester.pump(const Duration(milliseconds: 100));
   }
 }

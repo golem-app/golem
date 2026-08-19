@@ -16,9 +16,6 @@ final class _StubRuntime implements BrokerRuntime {
   void releaseEngine() {}
 
   @override
-  Future<void> dispose() async {}
-
-  @override
   Future<void> load({
     required BrokerEngine engine,
     required String modelPath,

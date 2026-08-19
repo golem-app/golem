@@ -186,9 +186,6 @@ abstract interface class BrokerRuntime {
   /// isolate's destruction, and a worker that outlives it aborts the process
   /// from the token trampoline (#124).
   void releaseEngine();
-
-  /// [releaseEngine] plus the callback listener. Terminal.
-  Future<void> dispose();
 }
 
 /// The only adapter between Flutter application code and package:inferno.
@@ -234,7 +231,10 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
   @override
   void releaseEngine() => _inferno.releaseEngine();
 
-  @override
+  /// [releaseEngine] plus the callback listener. Terminal, and deliberately
+  /// not on [BrokerRuntime]: the app's only teardown is [releaseEngine]; this
+  /// serves harnesses that build one adapter per model and must not leak
+  /// listeners between them.
   Future<void> dispose() => _translating(_inferno.dispose);
 
   @override
