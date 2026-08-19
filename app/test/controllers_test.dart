@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
@@ -80,6 +81,15 @@ FakeModelManagementRepository fakeModels(Directory directory) =>
       activeArtifactKey: 'test-mlx',
       stepDelay: Duration.zero,
     );
+
+/// Parks until the fake has taken the send out of idle, for tests that need a
+/// deterministically in-flight generation.
+Future<void> awaitGenerationStarted(ProviderContainer container) async {
+  while (container.read(chatControllerProvider).requireValue.generation ==
+      GenerationPhase.idle) {
+    await Future<void>.delayed(const Duration(milliseconds: 1));
+  }
+}
 
 Future<void> installActiveModel(ProviderContainer container) async {
   await container.read(modelControllerProvider.future);
@@ -625,10 +635,7 @@ void main() {
         final controller = container.read(chatControllerProvider.notifier);
         final send = controller.send('Stop this');
 
-        while (container.read(chatControllerProvider).requireValue.generation ==
-            GenerationPhase.idle) {
-          await Future<void>.delayed(const Duration(milliseconds: 1));
-        }
+        await awaitGenerationStarted(container);
         history.failingSaves = 1;
         controller.stop();
         await send;
@@ -1727,10 +1734,7 @@ void main() {
     inference.generateGate = Completer<void>();
     final chat = container.read(chatControllerProvider.notifier);
     final send = chat.send('slow question');
-    while (container.read(chatControllerProvider).requireValue.generation ==
-        GenerationPhase.idle) {
-      await Future<void>.delayed(const Duration(milliseconds: 1));
-    }
+    await awaitGenerationStarted(container);
     await models.releaseEngineWhileInactive();
     expect(inference.unloads, 0, reason: 'a visible stream must survive');
     inference.generateGate!.complete();
@@ -1819,10 +1823,7 @@ void main() {
     inference.generateGate = Completer<void>();
     final chat = container.read(chatControllerProvider.notifier);
     final send = chat.send('slow question');
-    while (container.read(chatControllerProvider).requireValue.generation ==
-        GenerationPhase.idle) {
-      await Future<void>.delayed(const Duration(milliseconds: 1));
-    }
+    await awaitGenerationStarted(container);
 
     await models.toggleRuntime();
     expect(inference.unloads, 0, reason: 'unload must not truncate an answer');
@@ -1837,6 +1838,94 @@ void main() {
     // Idle again, so the same command now applies.
     await models.toggleRuntime();
     expect(inference.unloads, 1);
+  });
+
+  test('the load arm refuses while an answer is streaming too', () async {
+    // A failed unload leaves the weights mapped under a `failed` phase, so
+    // the next toggle takes the load arm while an answer can still stream
+    // on the resident engine. It must not prepare under it (#124).
+    final directory = Directory.systemTemp.createTempSync('golem-loadarm-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final inference = _RecordingInferenceRepository(failUnload: true);
+    final container = ProviderContainer(
+      overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(inference),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
+      ],
+    );
+    addTearDown(container.dispose);
+    await installActiveModel(container);
+    await container.read(chatControllerProvider.future);
+    final models = container.read(modelControllerProvider.notifier);
+    await models.toggleRuntime();
+    await models.toggleRuntime();
+    expect(
+      container.read(modelControllerProvider).requireValue.runtime,
+      RuntimePhase.failed,
+    );
+
+    inference.generateGate = Completer<void>();
+    final chat = container.read(chatControllerProvider.notifier);
+    final send = chat.send('slow question');
+    await awaitGenerationStarted(container);
+    // After the send's own lazy prepare, so only the toggle's would count.
+    final preparesBefore = inference.prepares;
+
+    await models.toggleRuntime();
+    expect(
+      inference.prepares,
+      preparesBefore,
+      reason: 'load must not swap the engine under an answer',
+    );
+    expect(
+      container.read(modelControllerProvider).requireValue.runtime,
+      RuntimePhase.failed,
+      reason: 'a refused toggle publishes nothing',
+    );
+
+    inference.generateGate!.complete();
+    await send;
+  });
+
+  test('a container failure is not reported as an engine fault', () async {
+    // #127's rule, which #141 had undone at the toggle: the provider read
+    // sits outside the guarded engine call, so a container that cannot hand
+    // out the repository surfaces instead of posing as engineLoad.
+    final directory = Directory.systemTemp.createTempSync('golem-container-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final container = ProviderContainer(
+      overrides: [
+        attachmentRepositoryProvider.overrideWithValue(
+          InMemoryAttachmentRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWith(
+          (ref) => throw StateError('injected container failure'),
+        ),
+        modelManagementRepositoryProvider.overrideWithValue(
+          fakeModels(directory),
+        ),
+        modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
+      ],
+    );
+    addTearDown(container.dispose);
+    await installActiveModel(container);
+    final models = container.read(modelControllerProvider.notifier);
+    await expectLater(
+      models.toggleRuntime(),
+      throwsA(isA<ProviderException>()),
+    );
+    final state = container.read(modelControllerProvider).requireValue;
+    expect(state.runtime, isNot(RuntimePhase.failed));
+    expect(state.failure, isNull);
   });
 
   test('teardown releases the engine synchronously, mid-answer', () async {
@@ -1870,10 +1959,7 @@ void main() {
     inference.generateGate = Completer<void>();
     final chat = container.read(chatControllerProvider.notifier);
     final send = chat.send('slow question');
-    while (container.read(chatControllerProvider).requireValue.generation ==
-        GenerationPhase.idle) {
-      await Future<void>.delayed(const Duration(milliseconds: 1));
-    }
+    await awaitGenerationStarted(container);
 
     models.releaseEngineForTeardown();
     expect(

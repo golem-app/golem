@@ -283,9 +283,10 @@ class _RuntimeCard extends ConsumerWidget {
                       : simulatedInference
                       ? context.l10n.loadSimulatedRuntime
                       : context.l10n.loadRuntime,
-                  onPressed:
-                      model.runtime == RuntimePhase.loading ||
-                          (model.runtime == RuntimePhase.loaded && generating)
+                  // Withheld in either direction while an answer streams: the
+                  // controller refuses both arms then, and a simulated backend
+                  // streams its whole answer on an `unloaded` phase (#124).
+                  onPressed: model.runtime == RuntimePhase.loading || generating
                       ? null
                       : () => ref
                             .read(modelControllerProvider.notifier)

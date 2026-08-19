@@ -19,15 +19,11 @@ final class _ScriptedRuntime implements BrokerRuntime {
   final renderedPrompts = <String>[];
   var loads = 0;
   var unloads = 0;
-  var disposes = 0;
   var releases = 0;
 
   @override
   void releaseEngine() => releases++;
   var _generateCalls = 0;
-
-  @override
-  Future<void> dispose() async => disposes++;
 
   @override
   Future<void> load({

@@ -16,6 +16,7 @@ import 'package:golem_flutter/main.dart' as app;
 import 'package:integration_test/integration_test.dart';
 
 import '../test/support/image_fixtures.dart';
+import 'support/first_run.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -46,7 +47,7 @@ void main() {
       expect(find.byKey(const Key('model-download-consent')), findsOneWidget);
       expect(find.textContaining('no network'), findsOneWidget);
       await tester.tap(find.byKey(const Key('model-download-confirm')));
-      await _waitForVerifiedFirstRunModel(tester);
+      await waitForVerifiedFirstRunModel(tester);
       expect(
         find.byKey(const Key('first-run-download-progress')),
         findsOneWidget,
@@ -580,21 +581,6 @@ Future<void> _pumpUntilFound(
   }
   if (finder.evaluate().isEmpty) {
     fail('Timed out waiting for $finder.');
-  }
-}
-
-Future<void> _waitForVerifiedFirstRunModel(WidgetTester tester) async {
-  final button = find.descendant(
-    of: find.byKey(const Key('first-run-start-chatting')),
-    matching: find.byType(CupertinoButton),
-  );
-  final deadline = DateTime.now().add(const Duration(seconds: 10));
-  while (button.evaluate().isEmpty ||
-      tester.widget<CupertinoButton>(button).onPressed == null) {
-    if (DateTime.now().isAfter(deadline)) {
-      fail('The simulated first-run model was never verified.');
-    }
-    await tester.pump(const Duration(milliseconds: 100));
   }
 }
 
