@@ -243,7 +243,6 @@ class _ModelScreen extends ConsumerWidget {
             onPressed: () =>
                 ref.read(firstRunControllerProvider.notifier).showCatalog(),
           ),
-          const _PageDots(index: 1),
         ],
       ),
     );
@@ -955,32 +954,6 @@ class _UnsupportedScreen extends ConsumerWidget {
       ],
     ),
     action: const SizedBox(height: 44),
-  );
-}
-
-class _PageDots extends StatelessWidget {
-  const _PageDots({required this.index});
-
-  final int index;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      for (var i = 0; i < 2; i++)
-        Container(
-          width: i == index ? 6 : 4,
-          height: i == index ? 6 : 4,
-          margin: const EdgeInsets.symmetric(horizontal: 3),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: CupertinoDynamicColor.resolve(
-              i == index ? GolemTheme.accent : GolemTheme.borderStrong,
-              context,
-            ),
-          ),
-        ),
-    ],
   );
 }
 
