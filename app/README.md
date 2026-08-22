@@ -97,8 +97,8 @@ production ignores both defines.
 Model **downloads** are real in the `dev` and `production` flavors:
 Settings lists the pinned catalog (`lib/broker/model_catalog.dart`,
 mirroring the Inferno manifest) and downloads artifacts from Hugging Face
-with per-file SHA-256 verification, pause/resume, cancel, disk-space
-preflight, and delete. Downloads install under
+with SHA-256 verification of every file once the whole artifact has arrived,
+pause/resume, cancel, disk-space preflight, and delete. Downloads install under
 `Documents/models/<catalog-key>/` — resolvable as
 `documents:models/<catalog-key>/<file>` — and are excluded from platform
 backups (iOS/macOS `NSURLIsExcludedFromBackupKey`, Android
@@ -220,11 +220,20 @@ the phase's affordance and why it is blocked. First run, Settings ▸ Models,
 the chat setup banner and the model picker all read that one answer — the two
 card surfaces through `TransferCard` at two densities, the rest through
 `LabeledProgress`, which is also the only place a progress bar states its
-accessible reading. Two things stay per surface, on purpose: the copy (the
-same decision is "Resume download" under a full-width primary and "Resume"
-inside a picker row, so the projection carries the action and not the
-sentence), and whether a blocked offer is dimmed or withheld — the picker
-withholds it per [ADR 0007](../docs/decisions/0007-supported-device-policy.md),
+accessible reading. Verification is a determinate phase of its own (#143):
+the repository transfers every file first and hashes them all afterwards,
+counting hashed bytes in `ArtifactStatus.verifiedBytes` (in-memory, never
+persisted), so the projection reads each phase's own counter, the pace
+notifier opens a fresh window at the phase edge, and the chip quotes MB/s for
+a download but only names a verification — a hash throughput would read as a
+download that slowed down. Within one attempt the bar never steps back; the
+one path that returns from verifying to downloading is a sideloaded file that
+fails its hash and is re-fetched. Two things stay per surface, on purpose:
+the copy (the same decision is "Resume download" under a full-width primary
+and "Resume" inside a picker row, so the projection carries the action and
+not the sentence), and whether a blocked offer is dimmed or withheld — the
+picker withholds it per
+[ADR 0007](../docs/decisions/0007-supported-device-policy.md),
 Settings dims it and prints the reason in its own order, because an unresolved
 repository is the more specific problem there. Only the busy slot's sentence
 is shared; a second copy of the rest would be copy nobody reads.
@@ -274,7 +283,9 @@ markdown transcript with syntax-highlighted code cards, reasoning and answer
 streaming (blinking caret + live generating pill), stop and failure recovery
 with the ephemeral stopped-tokens caption, message actions (copy, regenerate,
 branch-from-here, share, delete), edit-and-truncate, the sectioned edge-swipe
-conversation drawer with pinning and a storage meter, full-screen cross-chat
+conversation drawer with pinning and a storage meter that frames Golem's
+usage against the free space left (the two figures Settings ▸ Storage leads
+with), full-screen cross-chat
 search, the per-chat model picker, image attachment from the photo library,
 camera, or a file — gated on what the selected model can actually read —
 confirmation toasts, the redesigned minimal Settings (root rows plus Models,
@@ -344,7 +355,9 @@ footnote while each row says only that it is refused.
 Stable keys/semantics preserve the native automation vocabulary. The most useful
 identifiers are `launch-splash`, `chat-composer`, `send-button`, `stop-button`,
 `reasoning-toggle`, `reasoning-card-header` (the transcript card's own
-disclosure, which reports Expanded/Collapsed as its semantic value),
+disclosure, which reports Expanded/Collapsed as its semantic value; cards
+arrive collapsed and, while live, show a three-line `reasoning-peek` that is
+excluded from semantics),
 `composer-attach`, `composer-model-chip`,
 `starter-chip-<name>`, `generating-pill`, `stopped-caption`,
 `message-copy-<id>`, `message-regenerate-<id>`, `message-share-<id>`,
