@@ -544,6 +544,11 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String verifiedAmount(String verified, String total) {
+    return '$total 중 $verified 확인됨';
+  }
+
+  @override
   String get downloadNote => 'Golem을 열어 두세요 — 앱이 화면에 있을 때 다운로드가 가장 빠릅니다.';
 
   @override

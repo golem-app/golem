@@ -35,10 +35,20 @@ void main() {
     },
   );
 
+  testWidgets('the advice holds through verification', (tester) async {
+    // A suspended app stops the hash as surely as the download, and the
+    // note leaving at the verify edge re-centred the first-run card.
+    await pumpWithRepositories(
+      tester,
+      model: state(ArtifactPhase.verifying),
+      child: Column(children: [DownloadNoteBanner(entry: entry)]),
+    );
+    expect(find.textContaining('Keep Golem open'), findsOneWidget);
+  });
+
   for (final phase in [
     ArtifactPhase.notDownloaded,
     ArtifactPhase.paused,
-    ArtifactPhase.verifying,
     ArtifactPhase.failed,
     ArtifactPhase.installed,
   ]) {

@@ -541,53 +541,66 @@ class _ReasoningPeek extends StatelessWidget {
 
   static const _lines = 3;
 
-  /// More than three lines at any text scale; the rest of a long chain of
-  /// thought is never laid out for a peek that clips it anyway.
-  static const _tailLength = 600;
+  /// More than three lines at any text scale (a phone line holds ~45
+  /// footnote glyphs at 1×, ~20 at 2×); the rest of a long chain of thought
+  /// is never shaped for a peek that clips it anyway. Cut by grapheme, not
+  /// code unit, or an emoji on the boundary paints as U+FFFD.
+  static const _tailLength = 300;
 
   @override
   Widget build(BuildContext context) {
     final style = GolemText.footnote;
-    final tail = text.length > _tailLength
-        ? text.substring(text.length - _tailLength)
+    final tail = text.characters.length > _tailLength
+        ? text.characters.takeLast(_tailLength).toString()
         : text;
     final height =
         MediaQuery.textScalerOf(context).scale(style.fontSize!) *
         style.height! *
         _lines;
+    final surface = CupertinoDynamicColor.resolve(
+      GolemTheme.reasoningSurface,
+      context,
+    );
     return ExcludeSemantics(
-      child: ShaderMask(
-        shaderCallback: (bounds) => const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0x00FFFFFF), Color(0xFFFFFFFF)],
-          stops: [0.0, 0.35],
-        ).createShader(bounds),
-        blendMode: BlendMode.dstIn,
-        child: SizedBox(
-          key: const Key('reasoning-peek'),
-          height: height,
-          width: double.infinity,
-          child: Stack(
-            clipBehavior: Clip.hardEdge,
-            children: [
-              PositionedDirectional(
-                bottom: 0,
-                start: 0,
-                end: 0,
-                child: Text(
-                  tail,
-                  textDirection: textDirection,
-                  style: style.copyWith(
-                    color: CupertinoDynamicColor.resolve(
-                      GolemTheme.mutedInk,
-                      context,
+      child: SizedBox(
+        key: const Key('reasoning-peek'),
+        height: height,
+        width: double.infinity,
+        child: Stack(
+          clipBehavior: Clip.hardEdge,
+          children: [
+            PositionedDirectional(
+              bottom: 0,
+              start: 0,
+              end: 0,
+              child: Text(
+                tail,
+                textDirection: textDirection,
+                style: style.copyWith(
+                  color: CupertinoDynamicColor.resolve(
+                    GolemTheme.mutedInk,
+                    context,
+                  ),
+                ),
+              ),
+            ),
+            // A painted fade in the card's own colour, not a ShaderMask: the
+            // mask forced a saveLayer on every streamed token.
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [surface, surface.withValues(alpha: 0)],
+                      stops: const [0.0, 0.35],
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

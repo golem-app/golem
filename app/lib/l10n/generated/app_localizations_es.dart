@@ -559,6 +559,11 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String verifiedAmount(String verified, String total) {
+    return '$verified de $total verificados';
+  }
+
+  @override
   String get downloadNote =>
       'Mantén Golem abierto: las descargas son más rápidas en primer plano.';
 

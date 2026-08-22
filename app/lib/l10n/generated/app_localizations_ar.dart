@@ -554,6 +554,11 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String verifiedAmount(String verified, String total) {
+    return 'تم التحقق من $verified من $total';
+  }
+
+  @override
   String get downloadNote =>
       'أبقِ Golem مفتوحًا — يكون التنزيل أسرع عندما يكون التطبيق في المقدمة.';
 

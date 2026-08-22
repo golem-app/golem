@@ -49,6 +49,10 @@ final class _FakePlatform {
 
   final List<String> requestedUrls = [];
 
+  /// Runs after a file has been written, for tests that disturb the
+  /// directory between the transfer and the hash.
+  void Function(String filename)? afterWrite;
+
   /// Every destination a transfer was started for. A second entry for one
   /// destination is a second writer.
   final List<String> enqueued = [];
@@ -137,6 +141,7 @@ final class _ScriptedDownloader implements ArtifactFileDownloader {
         );
         await file.parent.create(recursive: true);
         await file.writeAsString(platform.contents[ref.filename]!);
+        platform.afterWrite?.call(ref.filename);
         yield ArtifactFileProgress(ref.expectedBytes);
       }
       yield terminal;
@@ -203,6 +208,7 @@ void main() {
     // The fixtures are a few dozen bytes; a stride below their size makes
     // every hashed file a visible step.
     verifyProgressStride: 4,
+    verifyEmitInterval: Duration.zero,
   );
 
   setUp(() {
@@ -583,6 +589,49 @@ void main() {
       ).existsSync(),
       isTrue,
     );
+  });
+
+  test('a file that vanishes under the hash is fetched again, once', () async {
+    // config.json is gone by the time the hash reaches it — an external
+    // sweep between the transfer and the verify pass. Unproven, not forged:
+    // it is fetched again and the artifact still installs.
+    final first = File('${temp.path}/documents/models/test-mlx/$_fileOne');
+    downloader.platform.afterWrite = (name) {
+      if (_fileTwo.endsWith(name) && first.existsSync()) first.deleteSync();
+    };
+    final repo = repository();
+    await repo.load();
+    final states = await repo.download('test-mlx').toList();
+    expect(states.last.statusOf('test-mlx').phase, ArtifactPhase.installed);
+    expect(downloader.requestedUrls, hasLength(3));
+    expect(first.existsSync(), isTrue);
+  });
+
+  test('a file that vanishes twice fails as a transfer fault', () async {
+    final first = File('${temp.path}/documents/models/test-mlx/$_fileOne');
+    downloader.platform.afterWrite = (name) {
+      if (_fileTwo.endsWith(name) && first.existsSync()) first.deleteSync();
+    };
+    final repo = repository();
+    await repo.load();
+    // The generator pauses on every yield, so deleting on the second pass's
+    // opening verifying emit lands before its hash starts.
+    var verifyPasses = 0;
+    var previous = ArtifactPhase.notDownloaded;
+    final states = <ModelState>[];
+    await for (final state in repo.download('test-mlx')) {
+      states.add(state);
+      final phase = state.statusOf('test-mlx').phase;
+      if (phase == ArtifactPhase.verifying && previous != phase) {
+        verifyPasses++;
+        if (verifyPasses == 2 && first.existsSync()) first.deleteSync();
+      }
+      previous = phase;
+    }
+    final status = states.last.statusOf('test-mlx');
+    expect(status.phase, ArtifactPhase.failed);
+    expect(status.failureReason?.kind, ArtifactFailureKind.transfer);
+    expect(downloader.requestedUrls, hasLength(3));
   });
 
   test('a read fault keeps the file and is not a hash mismatch', () async {

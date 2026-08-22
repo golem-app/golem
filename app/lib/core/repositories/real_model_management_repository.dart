@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 
@@ -31,6 +32,7 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     this.activeArtifactKey,
     this.diskSpaceMargin = modelDownloadFreeSpaceMargin,
     this.verifyProgressStride = 8 << 20,
+    this.verifyEmitInterval = const Duration(milliseconds: 250),
   }) : catalog = [...catalog] {
     _state = ModelState(activeArtifactKey: activeArtifactKey);
   }
@@ -54,6 +56,10 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   /// emit; tests pass a few bytes to watch every step. See [_hashProgress]
   /// for why 8 MiB.
   final int verifyProgressStride;
+
+  /// The least time between two verification emits; the stride is the
+  /// isolate's reporting granularity, this is the UI's.
+  final Duration verifyEmitInterval;
 
   late ModelState _state;
   final Set<String> _stopRequested = {};
@@ -346,6 +352,9 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     // round. One fetched here that still fails is a transfer fault and fails
     // the artifact, so the loop ends within two rounds.
     final fetched = <ModelArtifactFile>{};
+    // Files that vanished under the hash once: a second disappearance is a
+    // fault to report, not a loop to run.
+    final vanishedOnce = <ModelArtifactFile>{};
     while (pending.isNotEmpty) {
       // Transfer first: every file arrives before any is hashed.
       for (final spec in pending) {
@@ -460,15 +469,21 @@ final class RealModelManagementRepository implements ModelManagementRepository {
       counted = verifiedBytes;
       yield await _persist(_state.withArtifact(artifactKey, verifying(0)));
       final refetch = <ModelArtifactFile>[];
+      // Emits are paced by the clock, not the byte stride: at real hash
+      // speed the stride alone fired ~15 state rebuilds a second.
+      var lastEmit = DateTime.now();
       for (final spec in pending) {
         final file = File('${_rootFor(entry)}/${spec.path}');
         String? actual;
+        var vanished = false;
         try {
           await for (final step in _hashProgress(file)) {
             if (_stopRequested.contains(artifactKey)) return;
             if (step.digest case final digest?) {
               actual = digest.toString();
-            } else {
+            } else if (DateTime.now().difference(lastEmit) >=
+                verifyEmitInterval) {
+              lastEmit = DateTime.now();
               // In memory only: verifiedBytes is not serialized, so a
               // durable write here would fsync the same bytes every stride.
               yield _emit(
@@ -478,15 +493,39 @@ final class RealModelManagementRepository implements ModelManagementRepository {
           }
         } on FileSystemException {
           // A file that vanished under the hash — a cancel racing the read,
-          // or an external deletion — is unproven and fetched again below.
-          // Any other read fault is the device's, not the bytes': the file
-          // stays, and the attempt fails the way every thrown fault does
-          // rather than as a hash mismatch.
+          // or an external deletion — is unproven and fetched again below,
+          // once. Any other read fault is the device's, not the bytes': the
+          // file stays, and the attempt fails the way every thrown fault
+          // does rather than as a hash mismatch.
           if (await file.exists()) rethrow;
+          vanished = true;
         }
         if (_stopRequested.contains(artifactKey)) return;
 
         final expected = spec.sha256;
+        if (vanished) {
+          onDisk -= spec.bytes;
+          counted += spec.bytes;
+          if (vanishedOnce.add(spec)) {
+            refetch.add(spec);
+            continue;
+          }
+          yield await _persist(
+            _state.withArtifact(
+              artifactKey,
+              ArtifactStatus(
+                phase: ArtifactPhase.failed,
+                downloadedBytes: onDisk,
+                failure:
+                    '${spec.path} disappeared before it could be verified.',
+                failureReason: const ArtifactFailure(
+                  ArtifactFailureKind.transfer,
+                ),
+              ),
+            ),
+          );
+          return;
+        }
         if (actual == null || (expected != null && actual != expected)) {
           if (await file.exists()) {
             await file.delete();
@@ -581,22 +620,70 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   /// verdict so an unhashed file is receipted by content. The stride is the
   /// pace estimator's only sample of a hash; past its 4 s window between
   /// samples the ETA never appears, so 8 MiB keeps it alive down to 2 MB/s.
+  /// The hash runs on its own isolate: pure-Dart SHA-256 over gigabytes is
+  /// ~30 s of uninterruptible CPU on a laptop core and longer on a phone,
+  /// and on the UI isolate every frame of the determinate bar paid for it.
+  /// Messages are hashed-byte counts, then the hex digest, then done; a read
+  /// fault crosses back as a FileSystemException so the caller's handling
+  /// is the same as for an inline read.
   Stream<({int hashed, Digest? digest})> _hashProgress(File file) async* {
+    final port = ReceivePort();
+    final isolate = await Isolate.spawn(_hashFile, (
+      path: file.path,
+      stride: verifyProgressStride,
+      port: port.sendPort,
+    ), onError: port.sendPort);
+    try {
+      await for (final message in port) {
+        switch (message) {
+          case final int hashed:
+            yield (hashed: hashed, digest: null);
+          case final String hex:
+            yield (hashed: 0, digest: Digest(_hexBytes(hex)));
+          case (final String path, final String detail):
+            throw FileSystemException(detail, path);
+          case final List<Object?> error:
+            throw StateError('${error.first}');
+          case _:
+            return;
+        }
+      }
+    } finally {
+      isolate.kill(priority: Isolate.immediate);
+      port.close();
+    }
+  }
+
+  static Future<void> _hashFile(
+    ({String path, int stride, SendPort port}) job,
+  ) async {
     final sink = _DigestCatch();
     final input = sha256.startChunkedConversion(sink);
     var hashed = 0;
     var reported = 0;
-    await for (final chunk in file.openRead()) {
-      input.add(chunk);
-      hashed += chunk.length;
-      if (hashed - reported >= verifyProgressStride) {
-        reported = hashed;
-        yield (hashed: hashed, digest: null);
+    try {
+      await for (final chunk in File(job.path).openRead()) {
+        input.add(chunk);
+        hashed += chunk.length;
+        if (hashed - reported >= job.stride) {
+          reported = hashed;
+          job.port.send(hashed);
+        }
       }
+    } on FileSystemException catch (error) {
+      job.port.send((job.path, error.message));
+      job.port.send(null);
+      return;
     }
     input.close();
-    yield (hashed: hashed, digest: sink.value);
+    job.port.send(sink.value!.toString());
+    job.port.send(null);
   }
+
+  static List<int> _hexBytes(String hex) => [
+    for (var i = 0; i < hex.length; i += 2)
+      int.parse(hex.substring(i, i + 2), radix: 16),
+  ];
 
   static const _receiptName = '.golem-verified.json';
 

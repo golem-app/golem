@@ -561,6 +561,11 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
+  String verifiedAmount(String verified, String total) {
+    return '$verified sur $total vérifiés';
+  }
+
+  @override
   String get downloadNote =>
       'Gardez Golem ouvert — les téléchargements sont plus rapides au premier plan.';
 

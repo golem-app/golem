@@ -797,7 +797,12 @@ class _DownloadModelCard extends ConsumerWidget {
                   simulated: simulated,
                 ),
                 density: TransferDensity.prominent,
-                semanticsLabel: context.l10n.downloadProgress,
+                // The bar names its own phase, as on the Settings card and
+                // the chat banner: "Download progress, 25 percent" the instant
+                // the download completed read as a regression.
+                semanticsLabel: status.phase == ArtifactPhase.verifying
+                    ? context.l10n.verifyingStatus('')
+                    : context.l10n.downloadProgress,
               ),
             ),
           ],

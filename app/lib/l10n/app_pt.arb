@@ -162,6 +162,7 @@
   "downloadSimulationComplete": "A simulação determinística de QA foi concluída; nenhum peso foi armazenado.",
   "downloadComplete": "Verificado neste dispositivo. Agora o Golem pode responder sem conexão de rede.",
   "downloadAmount": "{downloaded} de {total}",
+  "verifiedAmount": "{verified} de {total} verificados",
   "downloadNote": "Mantenha o Golem aberto — os downloads são mais rápidos em primeiro plano.",
   "etaAboutMinutesLeft": "{count, plural, =1{Falta cerca de 1 minuto} other{Faltam cerca de {count} minutos}}",
   "amountLeft": "Faltam {amount}",

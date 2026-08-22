@@ -1091,6 +1091,12 @@ abstract class AppLocalizations {
   /// **'{downloaded} of {total}'**
   String downloadAmount(String downloaded, String total);
 
+  /// Hashed and total bytes while verifying.
+  ///
+  /// In en, this message translates to:
+  /// **'{verified} of {total} verified'**
+  String verifiedAmount(String verified, String total);
+
   /// One-line foreground-speed note under a running download.
   ///
   /// In en, this message translates to:

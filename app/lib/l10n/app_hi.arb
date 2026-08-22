@@ -162,6 +162,7 @@
   "downloadSimulationComplete": "निश्चित QA सिम्युलेशन पूरा हुआ; कोई वेट स्टोर नहीं किया गया।",
   "downloadComplete": "इस डिवाइस पर सत्यापित। Golem अब नेटवर्क कनेक्शन के बिना जवाब दे सकता है।",
   "downloadAmount": "{total} में से {downloaded}",
+  "verifiedAmount": "{total} में से {verified} सत्यापित",
   "downloadNote": "Golem को खुला रखें — ऐप सामने रहने पर डाउनलोड सबसे तेज़ होता है।",
   "etaAboutMinutesLeft": "{count, plural, =1{लगभग 1 मिनट बाकी} other{लगभग {count} मिनट बाकी}}",
   "amountLeft": "{amount} बाकी",

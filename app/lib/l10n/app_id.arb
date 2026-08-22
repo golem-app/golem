@@ -162,6 +162,7 @@
   "downloadSimulationComplete": "Simulasi QA deterministik selesai; tidak ada bobot yang disimpan.",
   "downloadComplete": "Terverifikasi di perangkat ini. Golem kini dapat menjawab tanpa koneksi jaringan.",
   "downloadAmount": "{downloaded} dari {total}",
+  "verifiedAmount": "{verified} dari {total} terverifikasi",
   "downloadNote": "Biarkan Golem tetap terbuka — unduhan paling cepat saat aplikasi di depan.",
   "etaAboutMinutesLeft": "{count, plural, other{Sekitar {count} menit lagi}}",
   "amountLeft": "Tersisa {amount}",

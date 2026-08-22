@@ -557,6 +557,11 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String verifiedAmount(String verified, String total) {
+    return 'Đã xác minh $verified / $total';
+  }
+
+  @override
   String get downloadNote =>
       'Giữ Golem mở — tải xuống nhanh nhất khi ứng dụng ở nền trước.';
 

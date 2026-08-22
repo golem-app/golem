@@ -162,6 +162,7 @@
   "downloadSimulationComplete": "결정론적 QA 시뮬레이션이 완료되었으며 가중치는 저장되지 않았습니다.",
   "downloadComplete": "이 기기에서 확인되었습니다. 이제 Golem은 네트워크 연결 없이 답할 수 있습니다.",
   "downloadAmount": "{total} 중 {downloaded}",
+  "verifiedAmount": "{total} 중 {verified} 확인됨",
   "downloadNote": "Golem을 열어 두세요 — 앱이 화면에 있을 때 다운로드가 가장 빠릅니다.",
   "etaAboutMinutesLeft": "{count, plural, other{약 {count}분 남음}}",
   "amountLeft": "{amount} 남음",

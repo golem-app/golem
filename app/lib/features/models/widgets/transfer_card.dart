@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../core/domain/models.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../../../core/widgets/labeled_progress.dart';
 import '../../../core/widgets/text_measure.dart';
@@ -33,6 +34,7 @@ class TransferCard extends StatelessWidget {
     required this.semanticsLabel,
     this.caption,
     this.showBytes = true,
+    this.showChip = true,
     super.key,
   });
 
@@ -52,10 +54,14 @@ class TransferCard extends StatelessWidget {
   /// a second copy is both noise and, at large text, a wrapped one.
   final bool showBytes;
 
+  /// Whether the rate/state chip is painted. Off where the surface already
+  /// names the phase on the line above and the chip would only repeat it.
+  final bool showChip;
+
   @override
   Widget build(BuildContext context) {
     final prominent = density == TransferDensity.prominent;
-    final chip = transfer.chip == null
+    final chip = transfer.chip == null || !showChip
         ? null
         : _PaceChip(
             label: transfer.chip!,
@@ -82,9 +88,14 @@ class TransferCard extends StatelessWidget {
       // The size, the rate and the time left are the only place a user on the
       // first-run screen can learn them, and they read out there.
       announceDetail: prominent,
-      detailLeading: showBytes
-          ? context.l10n.downloadAmount(transfer.transferred, transfer.total)
-          : null,
+      // The figure is the phase's own counter, and the sentence says which:
+      // "0.90 GB of 3.58 GB" the instant a download completed read as the
+      // transfer falling back to a quarter.
+      detailLeading: !showBytes
+          ? null
+          : transfer.phase == ArtifactPhase.verifying
+          ? context.l10n.verifiedAmount(transfer.transferred, transfer.total)
+          : context.l10n.downloadAmount(transfer.transferred, transfer.total),
       detail: transfer.remainder,
       detailStyle: prominent
           ? GolemText.footnoteStrong

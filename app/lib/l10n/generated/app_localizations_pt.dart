@@ -562,6 +562,11 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String verifiedAmount(String verified, String total) {
+    return '$verified de $total verificados';
+  }
+
+  @override
   String get downloadNote =>
       'Mantenha o Golem aberto — os downloads são mais rápidos em primeiro plano.';
 
@@ -2453,6 +2458,11 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String downloadAmount(String downloaded, String total) {
     return '$downloaded de $total';
+  }
+
+  @override
+  String verifiedAmount(String verified, String total) {
+    return '$verified de $total verificados';
   }
 
   @override

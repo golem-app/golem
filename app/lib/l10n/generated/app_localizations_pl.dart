@@ -558,6 +558,11 @@ class AppLocalizationsPl extends AppLocalizations {
   }
 
   @override
+  String verifiedAmount(String verified, String total) {
+    return '$verified z $total zweryfikowane';
+  }
+
+  @override
   String get downloadNote =>
       'Nie zamykaj Golema — pobieranie jest najszybsze na pierwszym planie.';
 

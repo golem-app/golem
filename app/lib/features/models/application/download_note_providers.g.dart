@@ -8,23 +8,32 @@ part of 'download_note_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// The one statement of the note's visibility rule: the artifact is actively
-/// downloading. Applies in simulated mode too — QA drives the fake backend,
-/// and the surfaces already carry their own simulation labeling.
+/// The one statement of the note's visibility rule: the artifact is in
+/// flight — downloading, or hashing what it downloaded, which a suspended
+/// app also stops. Holding through the verify edge keeps the first-run card
+/// from re-centring when the note would otherwise leave. Applies in
+/// simulated mode too — QA drives the fake backend, and the surfaces already
+/// carry their own simulation labeling.
 
 @ProviderFor(downloadNoteVisible)
 final downloadNoteVisibleProvider = DownloadNoteVisibleFamily._();
 
-/// The one statement of the note's visibility rule: the artifact is actively
-/// downloading. Applies in simulated mode too — QA drives the fake backend,
-/// and the surfaces already carry their own simulation labeling.
+/// The one statement of the note's visibility rule: the artifact is in
+/// flight — downloading, or hashing what it downloaded, which a suspended
+/// app also stops. Holding through the verify edge keeps the first-run card
+/// from re-centring when the note would otherwise leave. Applies in
+/// simulated mode too — QA drives the fake backend, and the surfaces already
+/// carry their own simulation labeling.
 
 final class DownloadNoteVisibleProvider
     extends $FunctionalProvider<bool, bool, bool>
     with $Provider<bool> {
-  /// The one statement of the note's visibility rule: the artifact is actively
-  /// downloading. Applies in simulated mode too — QA drives the fake backend,
-  /// and the surfaces already carry their own simulation labeling.
+  /// The one statement of the note's visibility rule: the artifact is in
+  /// flight — downloading, or hashing what it downloaded, which a suspended
+  /// app also stops. Holding through the verify edge keeps the first-run card
+  /// from re-centring when the note would otherwise leave. Applies in
+  /// simulated mode too — QA drives the fake backend, and the surfaces already
+  /// carry their own simulation labeling.
   DownloadNoteVisibleProvider._({
     required DownloadNoteVisibleFamily super.from,
     required String super.argument,
@@ -77,11 +86,14 @@ final class DownloadNoteVisibleProvider
 }
 
 String _$downloadNoteVisibleHash() =>
-    r'a866c4a1e89db832229285998efd4dbd06698c8b';
+    r'be5a483f4e37ea2be6dbdb513c9348680c39e161';
 
-/// The one statement of the note's visibility rule: the artifact is actively
-/// downloading. Applies in simulated mode too — QA drives the fake backend,
-/// and the surfaces already carry their own simulation labeling.
+/// The one statement of the note's visibility rule: the artifact is in
+/// flight — downloading, or hashing what it downloaded, which a suspended
+/// app also stops. Holding through the verify edge keeps the first-run card
+/// from re-centring when the note would otherwise leave. Applies in
+/// simulated mode too — QA drives the fake backend, and the surfaces already
+/// carry their own simulation labeling.
 
 final class DownloadNoteVisibleFamily extends $Family
     with $FunctionalFamilyOverride<bool, String> {
@@ -94,9 +106,12 @@ final class DownloadNoteVisibleFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// The one statement of the note's visibility rule: the artifact is actively
-  /// downloading. Applies in simulated mode too — QA drives the fake backend,
-  /// and the surfaces already carry their own simulation labeling.
+  /// The one statement of the note's visibility rule: the artifact is in
+  /// flight — downloading, or hashing what it downloaded, which a suspended
+  /// app also stops. Holding through the verify edge keeps the first-run card
+  /// from re-centring when the note would otherwise leave. Applies in
+  /// simulated mode too — QA drives the fake backend, and the surfaces already
+  /// carry their own simulation labeling.
 
   DownloadNoteVisibleProvider call(String artifactKey) =>
       DownloadNoteVisibleProvider._(argument: artifactKey, from: this);

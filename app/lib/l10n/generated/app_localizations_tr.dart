@@ -556,6 +556,11 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
+  String verifiedAmount(String verified, String total) {
+    return '$verified / $total doğrulandı';
+  }
+
+  @override
   String get downloadNote =>
       'Golem’i açık tutun — indirmeler uygulama öndeyken en hızlıdır.';
 

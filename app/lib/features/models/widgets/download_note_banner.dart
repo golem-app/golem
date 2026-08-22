@@ -10,7 +10,7 @@ import '../application/download_note_providers.dart';
 /// fastest in the foreground. The #36 evidence behind it (measured
 /// background pacing, minute figures, a dismiss control) used to be quoted in
 /// full and read as a warning nobody finished; the advice is the whole note
-/// now. Renders nothing outside `downloading`, so surfaces embed it
+/// now. Renders nothing outside a transfer in flight, so surfaces embed it
 /// unconditionally.
 class DownloadNoteBanner extends ConsumerWidget {
   const DownloadNoteBanner({required this.entry, this.margin, super.key});

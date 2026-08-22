@@ -558,6 +558,11 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
+  String verifiedAmount(String verified, String total) {
+    return '$verified dari $total terverifikasi';
+  }
+
+  @override
   String get downloadNote =>
       'Biarkan Golem tetap terbuka — unduhan paling cepat saat aplikasi di depan.';
 

@@ -850,11 +850,11 @@ void main() {
         verifiedBytes: 900000000,
       ),
     );
-    // The note belongs to a running download, so the card sits higher while
-    // downloading; the action slot — where Cancel lands — is one height in
-    // every phase, and the two note-free phases match exactly.
-    expect(verifying, paused);
-    expect(downloading.$2, paused.$2);
+    // The note holds through the verify edge, so the card does not move
+    // there; a pause drops the note, and the action slot — where Cancel
+    // lands — is one height in every phase.
+    expect(verifying, downloading);
+    expect(paused.$2, downloading.$2);
   }, variant: bothChromes);
 
   testWidgets(

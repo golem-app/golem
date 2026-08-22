@@ -65,6 +65,10 @@ case "$platform" in
     fvm flutter build apk --release --flavor "$flavor" "${defines[@]}"
     fresh "$apk"
     actual=$(unzip -p "$apk" AndroidManifest.xml 2>/dev/null | strings | grep -m1 -o 'app\.golem[a-z.]*' || true)
+    if [ -n "$actual" ] && [ "$actual" != "$bundle" ]; then
+      echo "application id $actual is not $bundle — not installing" >&2; exit 1
+    fi
+    [ -n "$actual" ] || echo "warning: could not read the application id from $apk; relying on the post-install check"
     adb -s "$device" install -r "$apk"
     adb -s "$device" shell pm list packages | grep -qx "package:$bundle" || { echo "$bundle not installed" >&2; exit 1; }
     ;;

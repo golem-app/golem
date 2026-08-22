@@ -543,6 +543,11 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String verifiedAmount(String verified, String total) {
+    return '$total中$verifiedを検証済み';
+  }
+
+  @override
   String get downloadNote => 'Golem を開いたままにしてください。バックグラウンドではダウンロードが遅くなります。';
 
   @override

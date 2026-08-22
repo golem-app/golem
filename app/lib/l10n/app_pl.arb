@@ -162,6 +162,7 @@
   "downloadSimulationComplete": "Deterministyczna symulacja QA została ukończona. Nie zapisano wag modelu.",
   "downloadComplete": "Pliki zweryfikowano na tym urządzeniu. Golem może teraz odpowiadać bez połączenia z siecią.",
   "downloadAmount": "{downloaded} z {total}",
+  "verifiedAmount": "{verified} z {total} zweryfikowane",
   "downloadNote": "Nie zamykaj Golema — pobieranie jest najszybsze na pierwszym planie.",
   "etaAboutMinutesLeft": "{count, plural, =1{Jeszcze około 1 minuty} few{Jeszcze około {count} minut} many{Jeszcze około {count} minut} other{Jeszcze około {count} minuty}}",
   "amountLeft": "Pozostało {amount}",

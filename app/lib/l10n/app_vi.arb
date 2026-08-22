@@ -162,6 +162,7 @@
   "downloadSimulationComplete": "Mô phỏng QA xác định đã hoàn tất; không có trọng số nào được lưu.",
   "downloadComplete": "Đã xác minh trên thiết bị này. Golem giờ có thể trả lời mà không cần kết nối mạng.",
   "downloadAmount": "{downloaded} / {total}",
+  "verifiedAmount": "Đã xác minh {verified} / {total}",
   "downloadNote": "Giữ Golem mở — tải xuống nhanh nhất khi ứng dụng ở nền trước.",
   "etaAboutMinutesLeft": "{count, plural, other{Còn khoảng {count} phút}}",
   "amountLeft": "Còn lại {amount}",

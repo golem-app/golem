@@ -162,6 +162,7 @@
   "downloadSimulationComplete": "決定論的なQAシミュレーションが完了しました。重みは保存されていません。",
   "downloadComplete": "この端末で検証されました。Golemはネットワーク接続なしで応答できます。",
   "downloadAmount": "{total}中{downloaded}",
+  "verifiedAmount": "{total}中{verified}を検証済み",
   "downloadNote": "Golem を開いたままにしてください。バックグラウンドではダウンロードが遅くなります。",
   "etaAboutMinutesLeft": "{count, plural, other{残り約{count}分}}",
   "amountLeft": "残り {amount}",

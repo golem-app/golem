@@ -324,6 +324,8 @@
   "@downloadComplete": {"description": "Production model install completion."},
   "downloadAmount": "{downloaded} of {total}",
   "@downloadAmount": {"description": "Downloaded and total bytes.", "placeholders": {"downloaded": {"type": "String"}, "total": {"type": "String"}}},
+  "verifiedAmount": "{verified} of {total} verified",
+  "@verifiedAmount": {"description": "Hashed and total bytes while verifying.", "placeholders": {"verified": {"type": "String"}, "total": {"type": "String"}}},
   "downloadNote": "Keep Golem open — downloads are fastest in the foreground.",
   "@downloadNote": {"description": "One-line foreground-speed note under a running download."},
   "etaAboutMinutesLeft": "{count, plural, =1{About 1 minute left} other{About {count} minutes left}}",

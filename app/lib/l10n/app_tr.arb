@@ -162,6 +162,7 @@
   "downloadSimulationComplete": "Belirlenimci QA simülasyonu tamamlandı; hiçbir ağırlık depolanmadı.",
   "downloadComplete": "Bu cihazda doğrulandı. Golem artık ağ bağlantısı olmadan yanıt verebilir.",
   "downloadAmount": "{downloaded} / {total}",
+  "verifiedAmount": "{verified} / {total} doğrulandı",
   "downloadNote": "Golem’i açık tutun — indirmeler uygulama öndeyken en hızlıdır.",
   "etaAboutMinutesLeft": "{count, plural, =1{Yaklaşık 1 dakika kaldı} other{Yaklaşık {count} dakika kaldı}}",
   "amountLeft": "{amount} kaldı",

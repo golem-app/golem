@@ -162,6 +162,7 @@
   "downloadSimulationComplete": "اكتملت محاكاة QA الحتمية، ولم تُحفظ أي أوزان.",
   "downloadComplete": "تم التحقق على هذا الجهاز. يستطيع Golem الآن الإجابة بلا اتصال بالشبكة.",
   "downloadAmount": "{downloaded} من {total}",
+  "verifiedAmount": "تم التحقق من {verified} من {total}",
   "downloadNote": "أبقِ Golem مفتوحًا — يكون التنزيل أسرع عندما يكون التطبيق في المقدمة.",
   "etaAboutMinutesLeft": "{count, plural, one{بقيت نحو دقيقة واحدة} two{بقيت نحو دقيقتين} few{بقيت نحو {count} دقائق} many{بقيت نحو {count} دقيقة} other{بقيت نحو {count} دقيقة}}",
   "amountLeft": "المتبقي {amount}",

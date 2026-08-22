@@ -8,14 +8,18 @@ import 'model_providers.dart';
 
 part 'download_note_providers.g.dart';
 
-/// The one statement of the note's visibility rule: the artifact is actively
-/// downloading. Applies in simulated mode too — QA drives the fake backend,
-/// and the surfaces already carry their own simulation labeling.
+/// The one statement of the note's visibility rule: the artifact is in
+/// flight — downloading, or hashing what it downloaded, which a suspended
+/// app also stops. Holding through the verify edge keeps the first-run card
+/// from re-centring when the note would otherwise leave. Applies in
+/// simulated mode too — QA drives the fake backend, and the surfaces already
+/// carry their own simulation labeling.
 @Riverpod(retry: noRetry)
-bool downloadNoteVisible(Ref ref, String artifactKey) =>
-    ref.watch(
-      modelControllerProvider.select(
-        (value) => value.value?.statusOf(artifactKey).phase,
-      ),
-    ) ==
-    ArtifactPhase.downloading;
+bool downloadNoteVisible(Ref ref, String artifactKey) {
+  final phase = ref.watch(
+    modelControllerProvider.select(
+      (value) => value.value?.statusOf(artifactKey).phase,
+    ),
+  );
+  return phase == ArtifactPhase.downloading || phase == ArtifactPhase.verifying;
+}

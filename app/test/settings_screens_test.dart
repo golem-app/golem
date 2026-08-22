@@ -221,6 +221,48 @@ void main() {
     expect(find.byKey(const Key('download-note-dismiss')), findsNothing);
   });
 
+  for (final (locale, scale) in [
+    (const Locale('en'), 1.0),
+    (const Locale('pl'), 1.6),
+  ]) {
+    testWidgets('a verifying card names the phase once and offers Cancel '
+        '(${locale.languageCode} @ $scale)', (tester) async {
+      // Three "Verifying" on one card — status row, bar caption, chip —
+      // overflowed the row by 58 px in Polish.
+      await pumpWithRepositories(
+        tester,
+        locale: locale,
+        textScale: scale,
+        model: const ModelState(
+          simulated: true,
+          artifacts: {
+            'gemma4-mlx': ArtifactStatus(
+              phase: ArtifactPhase.verifying,
+              downloadedBytes: 3583086498,
+              verifiedBytes: 900000000,
+            ),
+          },
+        ),
+        child: const ModelsScreen(),
+      );
+      expect(tester.takeException(), isNull);
+      final card = find.byKey(const Key('model-card-gemma4-mlx'));
+      expect(
+        find.descendant(
+          of: card,
+          matching: find.textContaining(RegExp('Verif|Weryf')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('model-progress-gemma4-mlx')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('model-cancel-gemma4-mlx')), findsOneWidget);
+      expect(find.byKey(const Key('model-pause-gemma4-mlx')), findsNothing);
+    });
+  }
+
   testWidgets('a paused card quotes the amount left under its bar', (
     tester,
   ) async {

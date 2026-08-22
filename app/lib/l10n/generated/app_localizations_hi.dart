@@ -558,6 +558,11 @@ class AppLocalizationsHi extends AppLocalizations {
   }
 
   @override
+  String verifiedAmount(String verified, String total) {
+    return '$total में से $verified सत्यापित';
+  }
+
+  @override
   String get downloadNote =>
       'Golem को खुला रखें — ऐप सामने रहने पर डाउनलोड सबसे तेज़ होता है।';
 
