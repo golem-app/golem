@@ -10,6 +10,8 @@ library;
 
 import 'package:flutter/foundation.dart' show TargetPlatform;
 
+import 'models.dart';
+
 /// Foreground in-app throughput measured in the #36 spike (round 2): the
 /// shipping downloader saturated the link at ~44 MB/s on both the OnePlus 12R
 /// and the iPhone 17.
@@ -46,31 +48,39 @@ int aboutMinutesLeft(Duration eta) {
   return rounded < 1 ? 1 : rounded;
 }
 
-/// One artifact's live transfer pace, published only while a rate is honest.
+/// One artifact's live pace, published only while a rate is honest.
 final class DownloadPaceSnapshot {
   const DownloadPaceSnapshot({
     required this.artifactKey,
     required this.mbPerSecond,
     this.eta,
+    this.phase = ArtifactPhase.downloading,
   });
 
   final String artifactKey;
 
-  /// Decimal MB/s over the estimator's trailing window.
+  /// Decimal MB/s over the estimator's trailing window — of the network while
+  /// [phase] is downloading, of the hash while it is verifying. Only the
+  /// former is quoted as a rate; the latter exists for its [eta].
   final double mbPerSecond;
 
   /// Time left at the current rate, when the catalog knows the total size.
   final Duration? eta;
+
+  /// Which in-flight phase the window measured, so a surface never reads a
+  /// hash rate as a transfer rate across the phase edge.
+  final ArtifactPhase phase;
 
   @override
   bool operator ==(Object other) =>
       other is DownloadPaceSnapshot &&
       other.artifactKey == artifactKey &&
       other.mbPerSecond == mbPerSecond &&
-      other.eta == eta;
+      other.eta == eta &&
+      other.phase == phase;
 
   @override
-  int get hashCode => Object.hash(artifactKey, mbPerSecond, eta);
+  int get hashCode => Object.hash(artifactKey, mbPerSecond, eta, phase);
 }
 
 /// A trailing-window average over `(elapsed, bytes)` observations.

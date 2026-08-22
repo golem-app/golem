@@ -85,6 +85,7 @@ void main() {
       expect(a, b);
       expect(a.hashCode, b.hashCode);
       expect(a, isNot(b.copyWith(runtime: RuntimePhase.loaded)));
+      expect(status, isNot(status.copyWith(verifiedBytes: 1)));
       // The unstamped simulated/activeArtifactKey fields participate too.
       expect(a.stamp(simulated: true), isNot(a));
     });

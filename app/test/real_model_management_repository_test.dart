@@ -200,6 +200,9 @@ void main() {
     backupExclusion: backup,
     activeArtifactKey: activeKey,
     diskSpaceMargin: 10,
+    // The fixtures are a few dozen bytes; a stride below their size makes
+    // every hashed file a visible step.
+    verifyProgressStride: 4,
   );
 
   setUp(() {
@@ -244,6 +247,80 @@ void main() {
       RuntimePhase.loaded,
     );
   });
+
+  test('verification is one phase whose counter only climbs', () async {
+    final repo = repository();
+    await repo.load();
+    final statuses = (await repo.download('test-mlx').toList())
+        .map((state) => state.statusOf('test-mlx'))
+        .toList();
+    final phases = statuses.map((status) => status.phase).toList();
+    // Every byte arrives before any is hashed: the bar reaches the total once
+    // and verification follows as a single phase, never interleaved per file.
+    final firstVerify = phases.indexOf(ArtifactPhase.verifying);
+    expect(firstVerify, greaterThan(0));
+    expect(
+      phases.sublist(0, firstVerify),
+      everyElement(ArtifactPhase.downloading),
+    );
+    expect(
+      phases.sublist(firstVerify, phases.length - 1),
+      everyElement(ArtifactPhase.verifying),
+    );
+    expect(phases.last, ArtifactPhase.installed);
+    final verifying = statuses
+        .where((status) => status.phase == ArtifactPhase.verifying)
+        .toList();
+    expect(
+      verifying.map((status) => status.downloadedBytes),
+      everyElement(_entry().totalBytes),
+      reason: 'the transfer is complete throughout verification',
+    );
+    final hashed = verifying.map((status) => status.verifiedBytes).toList();
+    expect(hashed, [0, _contentOne.length, _entry().totalBytes]);
+    expect(
+      statuses.last.verifiedBytes,
+      0,
+      reason: 'the counter belongs to the verifying phase alone',
+    );
+  });
+
+  test(
+    'cancel during verification stops the hash and writes no receipt',
+    () async {
+      final repo = repository();
+      await repo.load();
+      final states = <ModelState>[];
+      await for (final state in repo.download('test-mlx')) {
+        states.add(state);
+        if (state.statusOf('test-mlx').phase == ArtifactPhase.verifying) {
+          await repo.cancel('test-mlx');
+        }
+      }
+      // The generator noticed the stop between chunks: nothing after the first
+      // verifying snapshot, no receipt re-creating the directory _discard
+      // emptied, and the artifact stays discarded on the next load.
+      expect(
+        states.map((state) => state.statusOf('test-mlx').phase).toList(),
+        isNot(contains(ArtifactPhase.installed)),
+      );
+      expect(
+        states.where(
+          (state) =>
+              state.statusOf('test-mlx').phase == ArtifactPhase.verifying,
+        ),
+        hasLength(1),
+      );
+      expect(
+        Directory('${temp.path}/documents/models/test-mlx').existsSync(),
+        isFalse,
+      );
+      expect(
+        (await repository().load()).statusOf('test-mlx').phase,
+        ArtifactPhase.notDownloaded,
+      );
+    },
+  );
 
   test('skip-if-valid never re-downloads verified files', () async {
     final repo = repository();
@@ -478,9 +555,15 @@ void main() {
     final repo = repository();
     await repo.load();
     final states = await repo.download('test-mlx').toList();
-    // Both forgeries were hashed, deleted, and downloaded for real.
+    // Both forgeries were hashed, deleted, and downloaded for real — the one
+    // path on which a bar returns from verifying to downloading.
     expect(downloader.requestedUrls, hasLength(2));
     expect(states.last.statusOf('test-mlx').phase, ArtifactPhase.installed);
+    final phases = states.map((state) => state.statusOf('test-mlx').phase);
+    expect(
+      phases.toList().indexOf(ArtifactPhase.verifying),
+      lessThan(phases.toList().lastIndexOf(ArtifactPhase.downloading)),
+    );
     expect(
       File(
         '${temp.path}/documents/models/test-mlx/.golem-verified.json',

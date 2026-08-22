@@ -11,6 +11,7 @@ void main() {
         'gemma4-mlx': ArtifactStatus(
           phase: ArtifactPhase.paused,
           downloadedBytes: 123456789,
+          verifiedBytes: 5,
         ),
         'qwen35-gguf': ArtifactStatus(
           phase: ArtifactPhase.failed,
@@ -42,10 +43,16 @@ void main() {
       isFalse,
       reason: 'the diagnostic is in-memory only; failureReason is the record',
     );
+    // A verify phase never survives a relaunch, so its counter is not stored.
+    expect(
+      (artifact['gemma4-mlx']! as Map).containsKey('verifiedBytes'),
+      isFalse,
+    );
 
     final decoded = ModelState.fromJson(json);
     expect(decoded.statusOf('gemma4-mlx').phase, ArtifactPhase.paused);
     expect(decoded.statusOf('gemma4-mlx').downloadedBytes, 123456789);
+    expect(decoded.statusOf('gemma4-mlx').verifiedBytes, 0);
     expect(decoded.statusOf('qwen35-gguf').phase, ArtifactPhase.failed);
     expect(decoded.statusOf('qwen35-gguf').failure, isNull);
     expect(
