@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
@@ -124,7 +125,7 @@ class MessageBubble extends ConsumerWidget {
                 style: GolemText.body.copyWith(
                   color: CupertinoDynamicColor.resolve(GolemTheme.ink, context),
                 ),
-                child: GolemMarkdown(
+                child: _StreamingAnswer(
                   text: message.text,
                   streaming: message.isStreaming,
                 ),
@@ -640,6 +641,135 @@ class _GeneratingPill extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The answer, once it is really the answer.
+///
+/// Gemma opens a turn on the visible channel and only then labels the run as
+/// reasoning, at which point the broker retracts what it already published
+/// (`AnswerResetEvent`, `gemma4_chat_template.dart`). Painting that opening as
+/// it arrives makes the bubble flicker — text in, text out, and the pending
+/// dot back — so an opening is held for [_grace] and shown only once it has
+/// survived. A settled message paints at once; the delay is a streaming
+/// concern and nothing else.
+final class _StreamingAnswer extends StatefulWidget {
+  const _StreamingAnswer({required this.text, required this.streaming});
+
+  final String text;
+  final bool streaming;
+
+  /// Comfortably longer than the retraction takes to arrive — it follows the
+  /// opening by a token or two, which is ~100ms at the ~20 tok/s these phones
+  /// decode at — and short enough to read as part of the first paint.
+  static const _grace = Duration(milliseconds: 220);
+
+  @override
+  State<_StreamingAnswer> createState() => _StreamingAnswerState();
+}
+
+final class _StreamingAnswerState extends State<_StreamingAnswer> {
+  Timer? _timer;
+  bool _survived = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(covariant _StreamingAnswer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _sync();
+  }
+
+  void _sync() {
+    if (widget.text.isEmpty) {
+      // Either the turn has not opened yet or its opening was retracted;
+      // both are the pending state, and neither may leave a timer running.
+      _timer?.cancel();
+      _timer = null;
+      _survived = false;
+      return;
+    }
+    if (!widget.streaming) {
+      _timer?.cancel();
+      _timer = null;
+      _survived = true;
+      return;
+    }
+    if (_survived || _timer != null) return;
+    _timer = Timer(_StreamingAnswer._grace, () {
+      if (mounted) setState(() => _survived = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      _survived ? GolemMarkdown(text: widget.text) : const _PendingDot();
+}
+
+/// The whole of "running, nothing to show yet": one accent dot pulsing where
+/// the first word will land. A caret was a terminal's idea of this — the
+/// blinking block this replaces also had to be dropped onto a line of its own
+/// whenever the answer ended in a list or a code card, which is how an empty
+/// bubble came to hold nothing but a floating rectangle (#147). Once a token
+/// arrives there is nothing here but the text.
+class _PendingDot extends StatefulWidget {
+  const _PendingDot();
+
+  @override
+  State<_PendingDot> createState() => _PendingDotState();
+}
+
+class _PendingDotState extends State<_PendingDot>
+    with SingleTickerProviderStateMixin {
+  // Its own animation rather than the pill's [_BlinkDot]: that one sits beside
+  // a line of text that already says what is happening, so a shallow fade is
+  // enough. This one is alone in an empty bubble and has to carry the whole
+  // signal, so it breathes in size as well as opacity.
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat(reverse: true);
+  late final Animation<double> _pulse = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeInOut,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: Padding(
+      key: const Key('typing-indicator'),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: FadeTransition(
+        opacity: _pulse.drive(Tween(begin: 0.25, end: 1)),
+        child: ScaleTransition(
+          scale: _pulse.drive(Tween(begin: 0.7, end: 1.15)),
+          child: Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: CupertinoDynamicColor.resolve(GolemTheme.accent, context),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _BlinkDot extends StatefulWidget {
