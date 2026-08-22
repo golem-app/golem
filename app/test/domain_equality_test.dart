@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
+import 'package:golem_flutter/core/domain/download_pace.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
@@ -85,8 +86,50 @@ void main() {
       expect(a, b);
       expect(a.hashCode, b.hashCode);
       expect(a, isNot(b.copyWith(runtime: RuntimePhase.loaded)));
+      expect(status, isNot(status.copyWith(verifiedBytes: 1)));
       // The unstamped simulated/activeArtifactKey fields participate too.
       expect(a.stamp(simulated: true), isNot(a));
+    });
+
+    test('DownloadPaceSnapshot compares by content, phase included', () {
+      const snapshot = DownloadPaceSnapshot(
+        artifactKey: 'gemma4-mlx',
+        mbPerSecond: 44.0,
+        eta: Duration(seconds: 54),
+      );
+      expect(
+        snapshot,
+        const DownloadPaceSnapshot(
+          artifactKey: 'gemma4-mlx',
+          mbPerSecond: 44.0,
+          eta: Duration(seconds: 54),
+        ),
+      );
+      expect(snapshot.hashCode, snapshot.hashCode);
+      // A verify window and a download window are different figures even
+      // when they happen to share a rate, so the phase tells them apart.
+      for (final other in const [
+        DownloadPaceSnapshot(
+          artifactKey: 'gemma4-mlx',
+          mbPerSecond: 44.0,
+          eta: Duration(seconds: 54),
+          phase: ArtifactPhase.verifying,
+        ),
+        DownloadPaceSnapshot(
+          artifactKey: 'gemma4-gguf',
+          mbPerSecond: 44.0,
+          eta: Duration(seconds: 54),
+        ),
+        DownloadPaceSnapshot(
+          artifactKey: 'gemma4-mlx',
+          mbPerSecond: 45.0,
+          eta: Duration(seconds: 54),
+        ),
+        DownloadPaceSnapshot(artifactKey: 'gemma4-mlx', mbPerSecond: 44.0),
+      ]) {
+        expect(snapshot, isNot(other));
+        expect(snapshot.hashCode, isNot(other.hashCode));
+      }
     });
 
     test('ModelCatalogEntry compares by content', () {

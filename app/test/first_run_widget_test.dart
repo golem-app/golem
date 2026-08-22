@@ -4,11 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
+import 'package:golem_flutter/core/domain/download_pace.dart';
 import 'package:golem_flutter/core/domain/inference_backend.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
+import 'package:golem_flutter/features/models/application/download_pace_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/onboarding/application/onboarding_controller.dart';
 import 'package:golem_flutter/features/onboarding/first_run_gate.dart';
@@ -314,13 +316,11 @@ void main() {
     expect(find.byKey(const Key('first-run-pause-download')), findsOneWidget);
     expect(find.byKey(const Key('first-run-cancel-download')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('download-note-dismiss')));
-    await tester.pump();
-    expect(find.text('Keep Golem open for full speed.'), findsNothing);
+    expect(find.textContaining('Keep Golem open'), findsOneWidget);
     expect(
-      find.byKey(const Key('first-run-cancel-download')),
-      findsOneWidget,
-      reason: 'dismissing the note leaves the transfer controls alone',
+      find.byKey(const Key('download-note-dismiss')),
+      findsNothing,
+      reason: 'the note is advice, not a banner to wave away',
     );
   });
 
@@ -370,7 +370,7 @@ void main() {
       findsOneWidget,
       reason: 'the banner widget mounts but renders nothing while failed',
     );
-    expect(find.text('Keep Golem open for full speed.'), findsNothing);
+    expect(find.textContaining('Keep Golem open'), findsNothing);
   });
 
   testWidgets(
@@ -528,16 +528,9 @@ void main() {
     );
     expect(find.byKey(const Key('model-setup-banner')), findsOneWidget);
     expect(find.byKey(const Key('chat-download-note')), findsOneWidget);
-    expect(find.text('Keep Golem open for full speed.'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('download-note-dismiss')));
-    await tester.pump();
-    expect(find.text('Keep Golem open for full speed.'), findsNothing);
-    expect(
-      find.byKey(const Key('model-setup-pause')),
-      findsOneWidget,
-      reason: 'dismissing the note keeps the banner controls',
-    );
+    expect(find.textContaining('Keep Golem open'), findsOneWidget);
+    expect(find.byKey(const Key('download-note-dismiss')), findsNothing);
+    expect(find.byKey(const Key('model-setup-pause')), findsOneWidget);
   });
 
   testWidgets('deferred setup is persistent and gates only sending', (
@@ -643,135 +636,314 @@ void main() {
     },
   );
 
-  testWidgets(
-    'first run survives large text, RTL, and platform tap targets',
-    (tester) async {
-      await pumpWithRepositories(
-        tester,
-        eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
-        model: const ModelState(simulated: true),
-        child: const Directionality(
-          textDirection: TextDirection.rtl,
-          child: MediaQuery(
-            data: MediaQueryData(textScaler: TextScaler.linear(1.6)),
-            child: FirstRunScreen(),
-          ),
+  testWidgets('first run survives large text, RTL, and platform tap targets', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+      model: const ModelState(simulated: true),
+      child: const Directionality(
+        textDirection: TextDirection.rtl,
+        child: MediaQuery(
+          data: MediaQueryData(textScaler: TextScaler.linear(1.6)),
+          child: FirstRunScreen(),
         ),
-      );
-      expect(tester.takeException(), isNull);
-      await tester.tap(find.byKey(const Key('first-run-get-started')));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      await tester.tap(find.byKey(const Key('first-run-choose-model')));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('first-run-get-started')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('first-run-choose-model')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
 
-      final guideline =
-          debugDefaultTargetPlatformOverride == TargetPlatform.android
-          ? androidTapTargetGuideline
-          : iOSTapTargetGuideline;
-      await expectLater(tester, meetsGuideline(guideline));
-    },
-    variant: bothChromes,
-  );
+    final guideline =
+        debugDefaultTargetPlatformOverride == TargetPlatform.android
+        ? androidTapTargetGuideline
+        : iOSTapTargetGuideline;
+    await expectLater(tester, meetsGuideline(guideline));
+  }, variant: bothChromes);
 
-  testWidgets(
-    'blocking setup survives large text and announces progress',
-    (tester) async {
-      final semantics = tester.ensureSemantics();
+  testWidgets('blocking setup survives large text and announces progress', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await pumpWithRepositories(
+      tester,
+      textScale: 1.6,
+      eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+      model: const ModelState(
+        simulated: true,
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(
+            phase: ArtifactPhase.downloading,
+            downloadedBytes: 900000000,
+          ),
+        },
+      ),
+      child: const FirstRunScreen(initialStep: FirstRunStep.download),
+    );
+
+    expect(tester.takeException(), isNull);
+    final progress = find.byWidgetPredicate(
+      (widget) =>
+          widget is Semantics && widget.properties.label == 'Download progress',
+    );
+    expect(progress, findsOneWidget);
+    expect(tester.getSemantics(progress).value, isNotEmpty);
+    expect(find.byKey(const Key('first-run-start-chatting')), findsNothing);
+    semantics.dispose();
+  }, variant: bothChromes);
+
+  testWidgets('the download card and note keep their rects across ETA ticks', (
+    tester,
+  ) async {
+    final pace = _TickingPace(
+      const DownloadPaceSnapshot(
+        artifactKey: 'gemma4-mlx',
+        mbPerSecond: 44.0,
+        eta: Duration(seconds: 54),
+      ),
+    );
+    await pumpWithRepositories(
+      tester,
+      textScale: 1.3,
+      eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+      model: const ModelState(
+        simulated: true,
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(
+            phase: ArtifactPhase.downloading,
+            downloadedBytes: 900000000,
+          ),
+        },
+      ),
+      overrides: [downloadPaceProvider.overrideWith(() => pace)],
+      child: const FirstRunScreen(initialStep: FirstRunStep.download),
+    );
+    final track = find.byKey(const Key('first-run-download-track'));
+    final note = find.byKey(const Key('first-run-download-note'));
+    final cancel = find.byKey(const Key('first-run-cancel-download'));
+    expect(find.text('About 1 minute left'), findsOneWidget);
+    final before = [track, note, cancel].map(tester.getRect).toList();
+
+    pace.tick(
+      const DownloadPaceSnapshot(
+        artifactKey: 'gemma4-mlx',
+        mbPerSecond: 9.5,
+        eta: Duration(minutes: 14),
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('About 14 minutes left'), findsOneWidget);
+    expect([track, note, cancel].map(tester.getRect).toList(), before);
+  });
+
+  testWidgets('the download step fits the phone without scrolling', (
+    tester,
+  ) async {
+    // 402×874 at default text: the note's last line sat under the fold on a
+    // production phone (#143 QA), hidden by a scroll nobody expects there.
+    setViewport(tester);
+    for (final simulated in [false, true]) {
       await pumpWithRepositories(
         tester,
-        textScale: 1.6,
         eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
-        model: const ModelState(
-          simulated: true,
-          artifacts: {
+        model: ModelState(
+          simulated: simulated,
+          artifacts: const {
             'gemma4-mlx': ArtifactStatus(
               phase: ArtifactPhase.downloading,
               downloadedBytes: 900000000,
             ),
           },
         ),
+        overrides: [
+          downloadPaceProvider.overrideWith(
+            () => FixedDownloadPace(
+              const DownloadPaceSnapshot(
+                artifactKey: 'gemma4-mlx',
+                mbPerSecond: 44.0,
+                eta: Duration(minutes: 14),
+              ),
+            ),
+          ),
+        ],
         child: const FirstRunScreen(initialStep: FirstRunStep.download),
       );
-
-      expect(tester.takeException(), isNull);
-      final progress = find.byWidgetPredicate(
-        (widget) =>
-            widget is Semantics &&
-            widget.properties.label == 'Download progress',
-      );
-      expect(progress, findsOneWidget);
-      expect(tester.getSemantics(progress).value, isNotEmpty);
+      final position = tester
+          .state<ScrollableState>(
+            find.descendant(
+              of: find.byType(FirstRunScreen),
+              matching: find.byType(Scrollable),
+            ),
+          )
+          .position;
+      expect(position.maxScrollExtent, 0, reason: 'simulated: $simulated');
       expect(
-        tester
-            .widget<CupertinoButton>(
-              find.descendant(
-                of: find.byKey(const Key('first-run-start-chatting')),
-                matching: find.byType(CupertinoButton),
-              ),
-            )
-            .onPressed,
-        isNull,
+        tester.getRect(find.byKey(const Key('first-run-download-note'))).bottom,
+        lessThanOrEqualTo(tester.getRect(find.byType(Scrollable)).bottom),
+        reason: 'simulated: $simulated',
       );
-      semantics.dispose();
-    },
-    variant: bothChromes,
-  );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    }
+  }, variant: iosChrome);
+
+  testWidgets('the action slot is one height in every in-flight phase', (
+    tester,
+  ) async {
+    // Which artifact first run features follows the platform (#118).
+    final featured =
+        debugDefaultTargetPlatformOverride == TargetPlatform.android
+        ? 'gemma4-gguf'
+        : 'gemma4-mlx';
+    Future<(Rect, Rect)> rects(ArtifactStatus status) async {
+      await pumpWithRepositories(
+        tester,
+        eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+        model: ModelState(simulated: true, artifacts: {featured: status}),
+        overrides: [
+          downloadPaceProvider.overrideWith(() => FixedDownloadPace(null)),
+        ],
+        child: const FirstRunScreen(initialStep: FirstRunStep.download),
+      );
+      expect(find.byKey(const Key('first-run-start-chatting')), findsNothing);
+      if (status.phase == ArtifactPhase.verifying) {
+        expect(
+          find.byKey(const Key('first-run-verify-spacer')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('first-run-pause-download')), findsNothing);
+      }
+      final measured = (
+        tester.getRect(find.byKey(const Key('first-run-download-track'))),
+        tester.getRect(find.byKey(const Key('first-run-cancel-download'))),
+      );
+      // Dismantle the tree here, not at teardown: a scope torn down by the
+      // framework strands a provider-dispose timer behind the next pump.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      return measured;
+    }
+
+    final downloading = await rects(
+      const ArtifactStatus(
+        phase: ArtifactPhase.downloading,
+        downloadedBytes: 900000000,
+      ),
+    );
+    final paused = await rects(
+      const ArtifactStatus(
+        phase: ArtifactPhase.paused,
+        downloadedBytes: 900000000,
+      ),
+    );
+    final verifying = await rects(
+      const ArtifactStatus(
+        phase: ArtifactPhase.verifying,
+        downloadedBytes: 3583086498,
+        verifiedBytes: 900000000,
+      ),
+    );
+    // The note holds through the verify edge, so the card does not move
+    // there; a pause drops the note, and the action slot — where Cancel
+    // lands — is one height in every phase.
+    expect(verifying, downloading);
+    expect(paused.$2, downloading.$2);
+  }, variant: bothChromes);
 
   testWidgets(
-    'verification uses honest indeterminate progress with accessible status',
+    'verification keeps the determinate card inside one live announcement',
     (tester) async {
       final semantics = tester.ensureSemantics();
+      // Both engines, because which artifact first run features follows the
+      // platform the variant runs (#118) — the subject here is the
+      // verification card, not the choice.
+      final featured =
+          debugDefaultTargetPlatformOverride == TargetPlatform.android
+          ? 'gemma4-gguf'
+          : 'gemma4-mlx';
       await pumpWithRepositories(
         tester,
         textScale: 1.6,
         eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
-        // Both engines, because which artifact first run features follows the
-        // platform the variant runs (#118) — the subject here is the
-        // verification pane, not the choice.
         model: const ModelState(
           simulated: false,
           artifacts: {
             'gemma4-mlx': ArtifactStatus(
               phase: ArtifactPhase.verifying,
               downloadedBytes: 3583086498,
+              verifiedBytes: 1791543249,
             ),
             'gemma4-gguf': ArtifactStatus(
               phase: ArtifactPhase.verifying,
               downloadedBytes: 3183086498,
+              verifiedBytes: 1591543249,
             ),
           },
         ),
+        overrides: [
+          downloadPaceProvider.overrideWith(
+            () => FixedDownloadPace(
+              DownloadPaceSnapshot(
+                artifactKey: featured,
+                mbPerSecond: 150,
+                eta: const Duration(seconds: 12),
+                phase: ArtifactPhase.verifying,
+              ),
+            ),
+          ),
+        ],
         child: const FirstRunScreen(initialStep: FirstRunStep.download),
-        settle: false,
       );
 
       expect(tester.takeException(), isNull);
       final progress = find.byKey(const Key('first-run-verification-progress'));
       expect(progress, findsOneWidget);
-      expect(find.byKey(const Key('first-run-download-track')), findsNothing);
-      expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
+      expect(
+        find.descendant(
+          of: progress,
+          matching: find.byKey(const Key('first-run-download-track')),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byType(CupertinoActivityIndicator), findsNothing);
+      expect(find.text('50%'), findsOneWidget);
+      expect(find.text('Verifying'), findsOneWidget);
+      expect(find.text('About 1 minute left'), findsOneWidget);
       expect(tester.getSemantics(progress).label, 'Verifying Gemma 4 E2B');
       expect(
         tester.getSemantics(progress).value,
         'Checking the downloaded files before they can run.',
       );
+      expect(find.byKey(const Key('first-run-start-chatting')), findsNothing);
+      expect(find.byKey(const Key('first-run-pause-download')), findsNothing);
       expect(
-        tester
-            .widget<CupertinoButton>(
-              find.descendant(
-                of: find.byKey(const Key('first-run-start-chatting')),
-                matching: find.byType(CupertinoButton),
-              ),
-            )
-            .onPressed,
-        isNull,
+        find.byKey(const Key('first-run-cancel-download')),
+        findsOneWidget,
       );
       semantics.dispose();
     },
     variant: bothChromes,
   );
+}
+
+/// A pace the test advances by hand, so a surface can be measured before and
+/// after an ETA changes length.
+final class _TickingPace extends DownloadPace {
+  _TickingPace(this.initial);
+
+  final DownloadPaceSnapshot initial;
+
+  @override
+  DownloadPaceSnapshot? build() => initial;
+
+  void tick(DownloadPaceSnapshot snapshot) => state = snapshot;
 }
 
 final class _OnboardingDownloadModels implements ModelManagementRepository {

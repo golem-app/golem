@@ -8,69 +8,49 @@
 /// constants below were measured).
 library;
 
-import 'package:flutter/foundation.dart' show TargetPlatform;
+import 'models.dart';
 
-/// Foreground in-app throughput measured in the #36 spike (round 2): the
-/// shipping downloader saturated the link at ~44 MB/s on both the OnePlus 12R
-/// and the iPhone 17.
-const double downloadForegroundMbs = 44.0;
-
-/// Backgrounded throughput measured in the same spike: nsurlsessiond paces a
-/// suspended app's transfer to ~3.8 MB/s on iOS.
-const double iosBackgroundMbs = 3.8;
-
-/// Backgrounded throughput on Android: OxygenOS paced the DownloadWorker to
-/// ~1.2 MB/s once the app left the foreground.
-const double androidBackgroundMbs = 1.2;
-
-/// The background pacing figure the note quotes for [platform].
-double backgroundMbsFor(TargetPlatform platform) => switch (platform) {
-  TargetPlatform.android || TargetPlatform.fuchsia => androidBackgroundMbs,
-  _ => iosBackgroundMbs,
-};
-
-/// Whole minutes, rounded up, that [remainingBytes] takes at [mbs] — the
-/// "about N minutes" figure. Clamped to at least one minute: the note never
-/// promises sub-minute precision.
-int aboutMinutes(double mbs, int remainingBytes) {
-  if (remainingBytes <= 0) return 1;
-  final minutes = remainingBytes / (mbs * 1000000) / 60;
-  final rounded = minutes.ceil();
-  return rounded < 1 ? 1 : rounded;
-}
-
-/// The same round-up-floor-one rule for an already-computed [eta], so every
+/// Whole minutes, rounded up and floored at one, for an already-computed
+/// [eta], so every
 /// surface quoting an ETA shares one minutes policy.
 int aboutMinutesLeft(Duration eta) {
   final rounded = (eta.inSeconds / 60).ceil();
   return rounded < 1 ? 1 : rounded;
 }
 
-/// One artifact's live transfer pace, published only while a rate is honest.
+/// One artifact's live pace, published only while a rate is honest.
 final class DownloadPaceSnapshot {
   const DownloadPaceSnapshot({
     required this.artifactKey,
     required this.mbPerSecond,
     this.eta,
+    this.phase = ArtifactPhase.downloading,
   });
 
   final String artifactKey;
 
-  /// Decimal MB/s over the estimator's trailing window.
+  /// Decimal MB/s over the estimator's trailing window — of the network while
+  /// [phase] is downloading, of the hash while it is verifying. Only the
+  /// former is quoted as a rate; the latter exists for its [eta].
   final double mbPerSecond;
 
   /// Time left at the current rate, when the catalog knows the total size.
   final Duration? eta;
+
+  /// Which in-flight phase the window measured, so a surface never reads a
+  /// hash rate as a transfer rate across the phase edge.
+  final ArtifactPhase phase;
 
   @override
   bool operator ==(Object other) =>
       other is DownloadPaceSnapshot &&
       other.artifactKey == artifactKey &&
       other.mbPerSecond == mbPerSecond &&
-      other.eta == eta;
+      other.eta == eta &&
+      other.phase == phase;
 
   @override
-  int get hashCode => Object.hash(artifactKey, mbPerSecond, eta);
+  int get hashCode => Object.hash(artifactKey, mbPerSecond, eta, phase);
 }
 
 /// A trailing-window average over `(elapsed, bytes)` observations.

@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../../l10n/l10n.dart';
 import '../theme/golem_theme.dart';
 import 'progress_track.dart';
+import 'text_measure.dart';
 
 /// A determinate bar that reads as one thing.
 ///
@@ -24,6 +25,8 @@ class LabeledProgress extends StatelessWidget {
     this.caption,
     this.captionStyle,
     this.trailing,
+    this.captionSlot,
+    this.captionYields = true,
     this.showPercent = true,
     this.announcePercent = true,
     this.announceDetail = false,
@@ -51,14 +54,25 @@ class LabeledProgress extends StatelessWidget {
   /// the percentage.
   final Widget? trailing;
 
+  /// A value at least as wide as any [caption] this bar will paint, reserved
+  /// and right-aligned so the caption's last glyph — the "%" of a hero
+  /// percentage — never moves as the digits before it come and go.
+  final String? captionSlot;
+
+  /// Which of the caption and [trailing] gives way on a short line. A row
+  /// inside a list wraps its caption and keeps the chip whole; a card led by a
+  /// hero percentage keeps that on one line — split one glyph per line, "25%"
+  /// was three lines tall and moved the whole first-run screen (#143) — and
+  /// lets the chip trim itself instead.
+  final bool captionYields;
+
   /// Whether the percentage is painted. Off where the caption already carries
   /// it, or where the surface has no room for it.
   final bool showPercent;
 
-  /// Whether the percentage is *announced*. Off where the phase makes it
-  /// meaningless — a verification is not 40% verified — and deliberately
-  /// separate from [showPercent], because the chat setup banner paints no
-  /// number and is the only thing carrying how far along the transfer is.
+  /// Whether the percentage is *announced*. Deliberately separate from
+  /// [showPercent], because the chat setup banner paints no number and is the
+  /// only thing carrying how far along the transfer is.
   final bool announcePercent;
 
   /// Whether the figures under the bar read as their own nodes.
@@ -89,6 +103,22 @@ class LabeledProgress extends StatelessWidget {
   Widget build(BuildContext context) {
     final captionText = captionStyle ?? GolemText.caption;
     final hasHeader = caption != null || trailing != null || showPercent;
+    final captionWidget = caption == null
+        ? const SizedBox.shrink()
+        : ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: captionSlot == null
+                  ? 0
+                  : textWidth(context, captionSlot!, captionText),
+            ),
+            child: Text(
+              caption!,
+              style: captionText,
+              maxLines: captionYields ? null : 1,
+              softWrap: captionYields,
+              textAlign: captionSlot == null ? null : TextAlign.end,
+            ),
+          );
     final bar = ExcludeSemantics(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,12 +126,18 @@ class LabeledProgress extends StatelessWidget {
           if (hasHeader) ...[
             Row(
               children: [
-                Expanded(
-                  child: caption == null
-                      ? const SizedBox.shrink()
-                      : Text(caption!, style: captionText),
-                ),
-                ?trailing,
+                if (captionYields) ...[
+                  Expanded(child: captionWidget),
+                  ?trailing,
+                ] else ...[
+                  captionWidget,
+                  Expanded(
+                    child: Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: trailing ?? const SizedBox.shrink(),
+                    ),
+                  ),
+                ],
                 if (showPercent) Text('$percent%', style: captionText),
               ],
             ),
@@ -119,30 +155,57 @@ class LabeledProgress extends StatelessWidget {
 
     Widget? figures;
     if (detail != null || detailLeading != null) {
+      // One line each, tabular digits, and an ellipsis rather than a wrap:
+      // the figures tick every second, and a wrap is a height change that
+      // moved the whole first-run screen under the reader (#143). Each
+      // figure's flex is the width it needs, so both stay whole whenever the
+      // row has room for both and trim in proportion when it does not —
+      // split half and half, Android's wider face cut "About 2 minutes
+      // left" short while the row still had room. No LayoutBuilder: the
+      // first-run body sits under an IntrinsicHeight, which cannot ask one
+      // for a height.
+      const tabular = [FontFeature.tabularFigures()];
+      final leadingStyle = GolemText.footnote.copyWith(
+        fontFeatures: tabular,
+        color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
+      );
+      final detailTextStyle = (detailStyle ?? GolemText.captionStrong).copyWith(
+        fontFeatures: tabular,
+      );
+      int needs(String text, TextStyle style) {
+        final width = textWidth(context, text, style).ceil();
+        return width < 1 ? 1 : width;
+      }
+
       figures = Row(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            child: detailLeading == null
-                ? const SizedBox.shrink()
-                : Text(
-                    detailLeading!,
-                    style: GolemText.footnote.copyWith(
-                      color: CupertinoDynamicColor.resolve(
-                        GolemTheme.mutedInk,
-                        context,
-                      ),
-                    ),
-                  ),
-          ),
-          // Flexible, not bare: in a Row a non-flexible child is measured
-          // against infinity, so a long "About 14 minutes left" would size
-          // past the card and paint an overflow stripe instead of wrapping.
+          if (detailLeading case final leading?)
+            Flexible(
+              flex: needs(leading, leadingStyle),
+              child: Text(
+                leading,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: leadingStyle,
+              ),
+            )
+          else
+            const Expanded(child: SizedBox.shrink()),
           if (detail case final detail?)
             Flexible(
-              child: Text(
-                detail,
-                style: detailStyle ?? GolemText.captionStrong,
+              // The gap is part of what this child needs, or the figure is
+              // short by exactly that much on the widths where it just fits.
+              flex: needs(detail, detailTextStyle) + 8,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(start: 8),
+                child: Text(
+                  detail,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: detailTextStyle,
+                ),
               ),
             ),
         ],

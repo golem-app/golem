@@ -242,7 +242,6 @@ class _ModelScreen extends ConsumerWidget {
             onPressed: () =>
                 ref.read(firstRunControllerProvider.notifier).showCatalog(),
           ),
-          const _PageDots(index: 1),
         ],
       ),
     );
@@ -595,7 +594,7 @@ class _DownloadScreen extends ConsumerWidget {
                 style: GolemText.footnote.copyWith(color: muted),
               ),
             ] else if (simulated) ...[
-              const SizedBox(height: GolemSpace.s3),
+              const SizedBox(height: GolemSpace.s2),
               Text(
                 context.l10n.qaDownloadShort,
                 textAlign: TextAlign.center,
@@ -619,18 +618,23 @@ class _DownloadScreen extends ConsumerWidget {
           const Spacer(),
         ],
       ),
+      // One control set per phase. Start chatting exists only once the model
+      // is installed — a disabled button above the transfer controls read as
+      // a broken one — and every in-flight phase is two rows tall, so the
+      // body above keeps its height from the first byte to the last hash
+      // (#143). A failure offers nothing here: the banner in the body owns
+      // Retry and Discard.
       action: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          GolemButton.filled(
-            key: const Key('first-run-start-chatting'),
-            label: context.l10n.startChatting,
-            onPressed: status.phase == ArtifactPhase.installed
-                ? () => ref.read(firstRunControllerProvider.notifier).complete()
-                : null,
-          ),
           if (selected != null)
             switch (status.phase) {
+              ArtifactPhase.installed => GolemButton.filled(
+                key: const Key('first-run-start-chatting'),
+                label: context.l10n.startChatting,
+                onPressed: () =>
+                    ref.read(firstRunControllerProvider.notifier).complete(),
+              ),
               ArtifactPhase.downloading => Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -659,6 +663,26 @@ class _DownloadScreen extends ConsumerWidget {
                   _CancelDownloadButton(entry: selected),
                 ],
               ),
+              // Nothing pauses a hash, so the top row is the Pause button
+              // itself, invisible and inert, keeping exactly its height —
+              // Cancel stays where it was a moment ago.
+              ArtifactPhase.verifying => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Visibility(
+                    key: const Key('first-run-verify-spacer'),
+                    visible: false,
+                    maintainSize: true,
+                    maintainAnimation: true,
+                    maintainState: true,
+                    child: GolemButton.plain(
+                      label: context.l10n.pauseDownload,
+                      onPressed: null,
+                    ),
+                  ),
+                  _CancelDownloadButton(entry: selected),
+                ],
+              ),
               // Cancel and discard land here: without a restart affordance
               // the required-setup step would be a dead end until relaunch.
               ArtifactPhase.notDownloaded => GolemButton.tinted(
@@ -669,7 +693,7 @@ class _DownloadScreen extends ConsumerWidget {
                 onPressed: () =>
                     unawaited(_requestDownload(context, ref, selected)),
               ),
-              _ => const SizedBox(height: 44),
+              ArtifactPhase.failed => const SizedBox.shrink(),
             },
           // Below the buttons per the handoff, and outside the scroll view so
           // the reassurance is never clipped mid-sentence by a tall action
@@ -699,7 +723,8 @@ class _DownloadScreen extends ConsumerWidget {
 /// The download card from the first-download handoff: name and format line,
 /// then the live transfer block — big tabular percent, a rate/state chip, the
 /// progress track, and a bytes row with the time or amount left. Verifying
-/// and installed swap the transfer block for their own rows.
+/// keeps the block, wrapped in the one announcement that the phase changed;
+/// installed swaps it for a row of its own.
 class _DownloadModelCard extends ConsumerWidget {
   const _DownloadModelCard({
     required this.entry,
@@ -733,32 +758,7 @@ class _DownloadModelCard extends ConsumerWidget {
             '${formatModelBytes(entry.totalBytes)}',
             style: GolemText.footnote.copyWith(color: muted),
           ),
-          if (status.phase == ArtifactPhase.verifying)
-            Padding(
-              padding: const EdgeInsetsDirectional.only(top: GolemSpace.s4),
-              child: Semantics(
-                key: const Key('first-run-verification-progress'),
-                container: true,
-                liveRegion: true,
-                label: context.l10n.modelVerifying(entry.displayName),
-                value: context.l10n.checkingDownloadedFiles,
-                child: ExcludeSemantics(
-                  child: Row(
-                    children: [
-                      const CupertinoActivityIndicator(),
-                      const SizedBox(width: GolemSpace.s3),
-                      Expanded(
-                        child: Text(
-                          context.l10n.checkingDownloadedFiles,
-                          style: GolemText.footnote.copyWith(color: muted),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            )
-          else if (status.phase == ArtifactPhase.installed)
+          if (status.phase == ArtifactPhase.installed)
             Padding(
               padding: const EdgeInsetsDirectional.only(top: GolemSpace.s4),
               child: Row(
@@ -785,23 +785,46 @@ class _DownloadModelCard extends ConsumerWidget {
             )
           else ...[
             const SizedBox(height: GolemSpace.s4),
-            TransferCard(
-              key: const Key('first-run-download-track'),
-              transfer: artifactTransfer(
-                entry: entry,
-                status: status,
-                localizations: context.l10n,
-                pace: ref.watch(downloadPaceProvider),
-                simulated: simulated,
+            _liveRegion(
+              context,
+              TransferCard(
+                key: const Key('first-run-download-track'),
+                transfer: artifactTransfer(
+                  entry: entry,
+                  status: status,
+                  localizations: context.l10n,
+                  pace: ref.watch(downloadPaceProvider),
+                  simulated: simulated,
+                ),
+                density: TransferDensity.prominent,
+                // The bar names its own phase, as on the Settings card and
+                // the chat banner: "Download progress, 25 percent" the instant
+                // the download completed read as a regression.
+                semanticsLabel: status.phase == ArtifactPhase.verifying
+                    ? context.l10n.verifyingStatus('')
+                    : context.l10n.downloadProgress,
               ),
-              density: TransferDensity.prominent,
-              semanticsLabel: context.l10n.downloadProgress,
             ),
           ],
         ],
       ),
     );
   }
+
+  /// The transfer block itself is deliberately not live — every tick of a
+  /// multi-gigabyte download would talk over the screen — so the switch to
+  /// hashing is announced here, once, by the region appearing around it.
+  Widget _liveRegion(BuildContext context, Widget child) =>
+      status.phase == ArtifactPhase.verifying
+      ? Semantics(
+          key: const Key('first-run-verification-progress'),
+          container: true,
+          liveRegion: true,
+          label: context.l10n.modelVerifying(entry.displayName),
+          value: context.l10n.checkingDownloadedFiles,
+          child: child,
+        )
+      : child;
 }
 
 /// Failed transfers keep their explanation and both ways out on one surface,
@@ -943,32 +966,6 @@ class _UnsupportedScreen extends ConsumerWidget {
   );
 }
 
-class _PageDots extends StatelessWidget {
-  const _PageDots({required this.index});
-
-  final int index;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      for (var i = 0; i < 2; i++)
-        Container(
-          width: i == index ? 6 : 4,
-          height: i == index ? 6 : 4,
-          margin: const EdgeInsets.symmetric(horizontal: 3),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: CupertinoDynamicColor.resolve(
-              i == index ? GolemTheme.accent : GolemTheme.borderStrong,
-              context,
-            ),
-          ),
-        ),
-    ],
-  );
-}
-
 class _FailureText extends StatelessWidget {
   const _FailureText(this.failure);
 
@@ -998,30 +995,29 @@ class _FirstRunScaffold extends StatelessWidget {
   final Widget action;
 
   @override
+  // The body's minimum height is its own viewport, measured after the action
+  // column has taken its rows: a guessed "column minus 108" left the body
+  // 88pt taller than the space it had, so every first-run step scrolled
+  // through blank space whether its content fit or not (#143 QA).
   Widget build(BuildContext context) => CupertinoPageScaffold(
     child: SafeArea(
-      child: LayoutBuilder(
-        builder: (context, constraints) => Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(22, 8, 22, 12),
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(22, 8, 22, 12),
+        child: Column(
+          children: [
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, viewport) => SingleChildScrollView(
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: (constraints.maxHeight - 108).clamp(
-                        0,
-                        double.infinity,
-                      ),
-                    ),
+                    constraints: BoxConstraints(minHeight: viewport.maxHeight),
                     child: IntrinsicHeight(child: body),
                   ),
                 ),
               ),
-              const SizedBox(height: GolemSpace.s3),
-              action,
-            ],
-          ),
+            ),
+            const SizedBox(height: GolemSpace.s3),
+            action,
+          ],
         ),
       ),
     ),

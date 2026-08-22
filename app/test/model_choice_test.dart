@@ -104,11 +104,11 @@ void main() {
   group('what the sheet lists', () {
     test('a real build lists its own engine and counts the rest', () {
       final built = view();
-      expect(
-        built.choices.map((choice) => choice.entry.key),
-        ['gemma4-gguf', 'qwen35-2b-gguf', 'qwen35-gguf'],
-        reason: 'catalog order, filtered to what llama.cpp can load',
-      );
+      expect(built.choices.map((choice) => choice.entry.key), [
+        'gemma4-gguf',
+        'qwen35-2b-gguf',
+        'qwen35-gguf',
+      ], reason: 'catalog order, filtered to what llama.cpp can load');
       expect(built.hiddenCount, 3);
       expect(
         built.hiddenNote,

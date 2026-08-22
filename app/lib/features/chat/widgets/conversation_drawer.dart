@@ -545,8 +545,10 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
 }
 
 /// The storage footer: Golem's bytes on this device (models, chats, and
-/// cache) over the volume's capacity. Hidden entirely when the capacity
-/// is unknown.
+/// cache) against what is still free, the same two figures Settings ▸
+/// Storage leads with. Not against the volume's capacity: a 4 GB model on
+/// a 256 GB phone painted a 2 % sliver that read as "nothing here" (#143).
+/// Hidden entirely when free space is unknown.
 final class _StorageMeter extends ConsumerWidget {
   const _StorageMeter();
 
@@ -555,8 +557,10 @@ final class _StorageMeter extends ConsumerWidget {
     // Deliberate .value degrade: an inline meter hides while loading or
     // failed — the Storage screen owns the full error surface.
     final overview = ref.watch(storageBreakdownProvider).value;
-    final total = overview?.totalBytes;
-    if (overview == null || total == null) return const SizedBox.shrink();
+    final free = overview?.freeBytes;
+    if (overview == null || free == null) return const SizedBox.shrink();
+    final used = overview.usedBytes;
+    final span = used + free;
     final muted = CupertinoDynamicColor.resolve(
       GolemTheme.drawerMutedInk,
       context,
@@ -576,9 +580,9 @@ final class _StorageMeter extends ConsumerWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  context.l10n.storageAmount(
-                    gigabytes(overview.usedBytes),
-                    gigabytes(total),
+                  context.l10n.storageUsedAndFree(
+                    gigabytes(used),
+                    gigabytes(free),
                   ),
                   textAlign: TextAlign.end,
                   maxLines: 1,
@@ -612,7 +616,7 @@ final class _StorageMeter extends ConsumerWidget {
                       // Left-anchored: the default centers the fill, which
                       // would float it in the middle of the track.
                       alignment: AlignmentDirectional.centerStart,
-                      widthFactor: (overview.usedBytes / total).clamp(0.0, 1.0),
+                      widthFactor: span == 0 ? 0.0 : used / span,
                       child: ColoredBox(
                         color: CupertinoDynamicColor.resolve(
                           GolemTheme.accent,

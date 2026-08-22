@@ -313,9 +313,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadProgress => 'Download progress';
 
   @override
-  String get verifyingFiles => 'Verifying files…';
-
-  @override
   String get keep => 'Keep';
 
   @override
@@ -558,28 +555,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'Keep Golem open for full speed.';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return 'Leaving is fine — $platform slows background downloads to about $rate, so this would take $backgroundDuration instead of $foregroundDuration.';
+  String verifiedAmount(String verified, String total) {
+    return '$verified of $total verified';
   }
 
   @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'about $count minutes',
-      one: 'about 1 minute',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote =>
+      'Keep Golem open — downloads are fastest in the foreground.';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -625,9 +607,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get privacyFootnote =>
       'The model is stored on this device. Nothing you type is uploaded.';
-
-  @override
-  String get dismissNote => 'Dismiss';
 
   @override
   String get chatsStayAvailable => 'Chats stay available.';
@@ -738,8 +717,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatDeleted => 'Chat deleted';
 
   @override
-  String storageAmount(String used, String total) {
-    return '$used of $total';
+  String storageUsedAndFree(String used, String free) {
+    return '$used used · $free free';
   }
 
   @override
@@ -1532,11 +1511,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String downloadProgressLabel(String suffix) {
     return 'Download$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return 'Verifying files$suffix…';
   }
 
   @override

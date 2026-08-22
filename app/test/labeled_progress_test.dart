@@ -116,6 +116,60 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets('the figures share the row by need, then trim in proportion', (
+    tester,
+  ) async {
+    const leading = '0.21 GB of 3.18 GB';
+    const detail = 'About 14 minutes left';
+    Future<void> pumpAt(double width) => tester.pumpWidget(
+      wrapApp(
+        child: Center(
+          child: SizedBox(
+            width: width,
+            child: const LabeledProgress(
+              semanticsLabel: 'Download progress',
+              fraction: 0.07,
+              percent: 7,
+              showPercent: false,
+              detailLeading: leading,
+              detail: detail,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Unconstrained, each figure shows what it needs.
+    await pumpAt(1000);
+    final naturalLeading = tester.getSize(find.text(leading)).width;
+    final naturalDetail = tester.getSize(find.text(detail)).width;
+
+    // Room for both: neither is trimmed, whatever their ratio. Split half and
+    // half, the longer figure lost its tail while the row still had space.
+    await pumpAt(naturalLeading + naturalDetail + 20);
+    expect(tester.takeException(), isNull);
+    expect(tester.getSize(find.text(leading)).width, naturalLeading);
+    expect(tester.getSize(find.text(detail)).width, naturalDetail);
+    expect(
+      tester.getRect(find.text(detail)).right,
+      tester.getRect(find.byType(LabeledProgress)).right,
+      reason: 'the time left is right-aligned',
+    );
+
+    // Room for neither: both give up width in proportion, no overflow.
+    await pumpAt(200);
+    expect(tester.takeException(), isNull);
+    final shortLeading = tester.getSize(find.text(leading)).width;
+    final shortDetail = tester.getSize(find.text(detail)).width;
+    expect(shortLeading, lessThan(naturalLeading));
+    expect(shortDetail, lessThan(naturalDetail));
+    expect(
+      shortDetail / naturalDetail,
+      closeTo(shortLeading / naturalLeading, 0.1),
+      reason: 'each gives up the same share',
+    );
+  });
+
   testWidgets('a phase with no percentage announces none', (tester) async {
     final handle = tester.ensureSemantics();
     await pump(

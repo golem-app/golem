@@ -315,9 +315,6 @@ class AppLocalizationsId extends AppLocalizations {
   String get downloadProgress => 'Kemajuan unduhan';
 
   @override
-  String get verifyingFiles => 'Memverifikasi file…';
-
-  @override
   String get keep => 'Pertahankan';
 
   @override
@@ -561,28 +558,13 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle =>
-      'Biarkan Golem terbuka untuk kecepatan penuh.';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return 'Keluar tidak masalah — $platform memperlambat unduhan latar belakang menjadi sekitar $rate, jadi prosesnya akan memakan $backgroundDuration, bukan $foregroundDuration.';
+  String verifiedAmount(String verified, String total) {
+    return '$verified dari $total terverifikasi';
   }
 
   @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'sekitar $count menit',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote =>
+      'Biarkan Golem tetap terbuka — unduhan paling cepat saat aplikasi di depan.';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -627,9 +609,6 @@ class AppLocalizationsId extends AppLocalizations {
   @override
   String get privacyFootnote =>
       'Model disimpan di perangkat ini. Tidak ada yang Anda ketik yang diunggah.';
-
-  @override
-  String get dismissNote => 'Tutup';
 
   @override
   String get chatsStayAvailable => 'Percakapan tetap tersedia.';
@@ -741,8 +720,8 @@ class AppLocalizationsId extends AppLocalizations {
   String get chatDeleted => 'Percakapan dihapus';
 
   @override
-  String storageAmount(String used, String total) {
-    return '$used dari $total';
+  String storageUsedAndFree(String used, String free) {
+    return '$used terpakai · $free kosong';
   }
 
   @override
@@ -1532,11 +1511,6 @@ class AppLocalizationsId extends AppLocalizations {
   @override
   String downloadProgressLabel(String suffix) {
     return 'Unduhan$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return 'Memverifikasi file$suffix…';
   }
 
   @override

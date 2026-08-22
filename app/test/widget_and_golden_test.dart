@@ -9,6 +9,7 @@ import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/chrome/golem_button.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
+import 'package:golem_flutter/core/domain/byte_format.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
@@ -27,6 +28,7 @@ import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
 import 'package:golem_flutter/features/chat/widgets/recovery_banner.dart';
 import 'package:golem_flutter/features/legal/model_attribution_screen.dart';
 import 'package:golem_flutter/features/legal/open_source_licenses_screen.dart';
+import 'package:golem_flutter/features/models/application/storage_providers.dart';
 import 'package:golem_flutter/features/onboarding/application/onboarding_controller.dart';
 import 'package:golem_flutter/features/onboarding/first_run_screen.dart';
 import 'package:golem_flutter/features/settings/appearance_screen.dart';
@@ -220,6 +222,7 @@ void main() {
           status: const ArtifactStatus(
             phase: ArtifactPhase.verifying,
             downloadedBytes: 3583086498,
+            verifiedBytes: 1433234599,
           ),
           theme: Brightness.light,
         ),
@@ -247,7 +250,6 @@ void main() {
         ),
       ]) {
     testWidgets('required setup ${setup.name} golden', (tester) async {
-      final verifying = setup.status.phase == ArtifactPhase.verifying;
       await pumpWithRepositories(
         tester,
         brightness: setup.theme,
@@ -259,29 +261,29 @@ void main() {
         overrides: [
           // A live sampler never feeds a golden; the chip and ETA are pinned.
           downloadPaceProvider.overrideWith(
-            () => FixedDownloadPace(
-              setup.status.phase == ArtifactPhase.downloading
-                  ? const DownloadPaceSnapshot(
-                      artifactKey: 'gemma4-mlx',
-                      mbPerSecond: 44.0,
-                      eta: Duration(seconds: 54),
-                    )
-                  : null,
-            ),
+            () => FixedDownloadPace(switch (setup.status.phase) {
+              ArtifactPhase.downloading => const DownloadPaceSnapshot(
+                artifactKey: 'gemma4-mlx',
+                mbPerSecond: 44.0,
+                eta: Duration(seconds: 54),
+              ),
+              ArtifactPhase.verifying => const DownloadPaceSnapshot(
+                artifactKey: 'gemma4-mlx',
+                mbPerSecond: 180.0,
+                eta: Duration(seconds: 12),
+                phase: ArtifactPhase.verifying,
+              ),
+              _ => null,
+            }),
           ),
         ],
         child: const FirstRunScreen(initialStep: FirstRunStep.download),
-        settle: !verifying,
       );
       final context = tester.element(find.byType(FirstRunScreen));
       await tester.runAsync(
         () => precacheImage(AssetImage(AppIdentity.current.iconAsset), context),
       );
-      if (verifying) {
-        await tester.pump(const Duration(milliseconds: 300));
-      } else {
-        await tester.pumpAndSettle();
-      }
+      await tester.pumpAndSettle();
       await expectLater(
         find.byType(FirstRunScreen),
         matchesGoldenFile(
@@ -390,6 +392,43 @@ void main() {
       );
     }, variant: bothChromes);
 
+    testWidgets('live reasoning peek ${brightness.name} golden', (
+      tester,
+    ) async {
+      if (chromeSuffix().isNotEmpty) return;
+      // A streaming bubble blinks its caret forever: one frame, no settle.
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        settle: false,
+        child: Column(
+          children: [
+            MessageBubble(
+              message: ChatMessage.text(
+                id: 'assistant-live',
+                role: MessageRole.assistant,
+                text: '',
+                createdAt: DateTime.utc(2026, 8, 22),
+                reasoning:
+                    'The user wants a short answer. I should check the units '
+                    'first, then the arithmetic, then phrase it in one line. '
+                    'Units: metres and seconds, so the result is in m/s. '
+                    'Arithmetic: 120 over 8 is 15. One line it is.',
+                isStreaming: true,
+              ),
+              canRegenerate: false,
+              idle: false,
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+      await expectLater(
+        find.byType(MessageBubble),
+        matchesGoldenFile('goldens/reasoning-live-peek-${brightness.name}.png'),
+      );
+    }, variant: bothChromes);
+
     testWidgets('populated reasoning ${brightness.name} golden', (
       tester,
     ) async {
@@ -493,55 +532,53 @@ void main() {
   }
 
   for (final brightness in Brightness.values) {
-    testWidgets(
-      'model picker on a real backend ${brightness.name} golden',
-      (tester) async {
-        // The states only a real engine can produce (#79): the recommendation
-        // and its device-tier reason, an installed artifact of the *other*
-        // engine explaining why it cannot be chosen, the count of what is not
-        // listed, and — with Advanced on — the exact artifact behind each name.
-        // Geometry is chrome-independent here, so iOS records it.
-        await pumpWithRepositories(
-          tester,
-          brightness: brightness,
-          history: markdownHistory(),
-          // Resolved by the real policy, not hand-built: a literal config
-          // leaves artifactFromDevicePolicy false, and the device-tier
-          // sentence this golden exists to record would quietly degrade to
-          // the generic fallback without a test noticing.
-          backend: resolveBackendPolicy(
-            backendName: 'auto',
-            profileDefine: '',
-            artifactDefine: '',
-            modelPathDefine: '',
-            tier: DeviceTier.preferred,
-          ),
-          eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
-          preferences: InMemoryPreferencesRepository(
-            const AppPreferences(advancedMode: true),
-          ),
-          model: const ModelState(
-            artifacts: {
-              'gemma4-gguf': ArtifactStatus(phase: ArtifactPhase.installed),
-              'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
-              'qwen35-2b-gguf': ArtifactStatus(
-                phase: ArtifactPhase.paused,
-                downloadedBytes: 620000000,
-              ),
-            },
-            activeArtifactKey: 'gemma4-gguf',
-          ),
-          child: const ChatScreen(),
-        );
-        await tester.tap(find.byKey(const Key('composer-model-chip')));
-        await tester.pumpAndSettle();
-        await expectLater(
-          find.byKey(const Key('model-picker-sheet')),
-          matchesGoldenFile('goldens/model-picker-real-${brightness.name}.png'),
-        );
-      },
-      variant: iosChrome,
-    );
+    testWidgets('model picker on a real backend ${brightness.name} golden', (
+      tester,
+    ) async {
+      // The states only a real engine can produce (#79): the recommendation
+      // and its device-tier reason, an installed artifact of the *other*
+      // engine explaining why it cannot be chosen, the count of what is not
+      // listed, and — with Advanced on — the exact artifact behind each name.
+      // Geometry is chrome-independent here, so iOS records it.
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        history: markdownHistory(),
+        // Resolved by the real policy, not hand-built: a literal config
+        // leaves artifactFromDevicePolicy false, and the device-tier
+        // sentence this golden exists to record would quietly degrade to
+        // the generic fallback without a test noticing.
+        backend: resolveBackendPolicy(
+          backendName: 'auto',
+          profileDefine: '',
+          artifactDefine: '',
+          modelPathDefine: '',
+          tier: DeviceTier.preferred,
+        ),
+        eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+        preferences: InMemoryPreferencesRepository(
+          const AppPreferences(advancedMode: true),
+        ),
+        model: const ModelState(
+          artifacts: {
+            'gemma4-gguf': ArtifactStatus(phase: ArtifactPhase.installed),
+            'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+            'qwen35-2b-gguf': ArtifactStatus(
+              phase: ArtifactPhase.paused,
+              downloadedBytes: 620000000,
+            ),
+          },
+          activeArtifactKey: 'gemma4-gguf',
+        ),
+        child: const ChatScreen(),
+      );
+      await tester.tap(find.byKey(const Key('composer-model-chip')));
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byKey(const Key('model-picker-sheet')),
+        matchesGoldenFile('goldens/model-picker-real-${brightness.name}.png'),
+      );
+    }, variant: iosChrome);
   }
 
   for (final brightness in Brightness.values) {
@@ -1342,6 +1379,42 @@ void main() {
     expect(sizes.last.width, lessThan(sizes.first.width));
   }, variant: iosChrome);
 
+  testWidgets('the storage meter frames Golem against free space', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      history: seedHistory(),
+      child: const ChatScreen(),
+    );
+    await tester.tap(find.byKey(const Key('open-drawer')));
+    await tester.pumpAndSettle();
+    final meter = find.byKey(const Key('storage-meter'));
+    final breakdown = ProviderScope.containerOf(
+      tester.element(meter),
+    ).read(storageBreakdownProvider).value!;
+    final used = breakdown.usedBytes;
+    final free = breakdown.freeBytes!;
+    expect(used, greaterThan(0));
+    // The two figures Settings ▸ Storage leads with, not the volume's
+    // capacity: against 256 GB a model was a sliver that read as nothing.
+    expect(
+      find.descendant(
+        of: meter,
+        matching: find.text(
+          '${gigabytes(used)} used · ${gigabytes(free)} free',
+        ),
+      ),
+      findsOneWidget,
+    );
+    final bars = find
+        .descendant(of: meter, matching: find.byType(ColoredBox))
+        .evaluate()
+        .map((element) => (element.renderObject! as RenderBox).size.width)
+        .toList();
+    expect(bars.last / bars.first, closeTo(used / (used + free), 0.01));
+  }, variant: iosChrome);
+
   // The drawer's own inks, asserted against the tokens the way
   // code_block_test.dart asserts the syntax palette. This is what keeps the
   // dark column honest while `textContrastGuideline` runs light-only above,
@@ -1532,36 +1605,34 @@ void main() {
     }
   }, variant: iosChrome);
 
-  testWidgets(
-    'an empty failed assistant message renders no ghost bubble',
-    (tester) async {
-      Widget wrap(ChatMessage message) => ProviderScope(
-        child: wrapApp(
-          child: MessageBubble(
-            message: message,
-            canRegenerate: false,
-            idle: false,
-          ),
+  testWidgets('an empty failed assistant message renders no ghost bubble', (
+    tester,
+  ) async {
+    Widget wrap(ChatMessage message) => ProviderScope(
+      child: wrapApp(
+        child: MessageBubble(
+          message: message,
+          canRegenerate: false,
+          idle: false,
         ),
-      );
-      final ghost = ChatMessage.text(
-        id: 'assistant-ghost',
-        role: MessageRole.assistant,
-        text: '',
-        createdAt: DateTime.utc(2026, 8, 5),
-      );
-      // A failure can strand an assistant message with no text, reasoning, or
-      // metrics; it must vanish instead of painting an empty bubble shell.
-      await tester.pumpWidget(wrap(ghost));
-      expect(find.byKey(const Key('message-assistant-ghost')), findsNothing);
+      ),
+    );
+    final ghost = ChatMessage.text(
+      id: 'assistant-ghost',
+      role: MessageRole.assistant,
+      text: '',
+      createdAt: DateTime.utc(2026, 8, 5),
+    );
+    // A failure can strand an assistant message with no text, reasoning, or
+    // metrics; it must vanish instead of painting an empty bubble shell.
+    await tester.pumpWidget(wrap(ghost));
+    expect(find.byKey(const Key('message-assistant-ghost')), findsNothing);
 
-      // While streaming, the same empty message is the typing indicator
-      // (the blinking caret) and must stay visible.
-      await tester.pumpWidget(wrap(ghost.copyWith(isStreaming: true)));
-      expect(find.byKey(const Key('message-assistant-ghost')), findsOneWidget);
-    },
-    variant: iosChrome,
-  );
+    // While streaming, the same empty message is the typing indicator
+    // (the blinking caret) and must stay visible.
+    await tester.pumpWidget(wrap(ghost.copyWith(isStreaming: true)));
+    expect(find.byKey(const Key('message-assistant-ghost')), findsOneWidget);
+  }, variant: iosChrome);
 
   testWidgets('the toggle is withheld mid-answer on an unloaded phase', (
     tester,

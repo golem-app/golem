@@ -285,7 +285,7 @@ final class ModelControllerProvider
   ModelController create() => ModelController();
 }
 
-String _$modelControllerHash() => r'eb8fef7e74da73228849654a35de38bb44b60537';
+String _$modelControllerHash() => r'f889ff9ebc3ae938939563730a39fecec5f6e285';
 
 /// KeepAlive: a command controller whose downloads, busy guard, and epochs
 /// must survive leaving the Models screen (handbook v5.0 §3.4 — an

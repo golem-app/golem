@@ -719,12 +719,6 @@ abstract class AppLocalizations {
   /// **'Download progress'**
   String get downloadProgress;
 
-  /// Model verification status.
-  ///
-  /// In en, this message translates to:
-  /// **'Verifying files…'**
-  String get verifyingFiles;
-
   /// Keep model action.
   ///
   /// In en, this message translates to:
@@ -1097,28 +1091,17 @@ abstract class AppLocalizations {
   /// **'{downloaded} of {total}'**
   String downloadAmount(String downloaded, String total);
 
-  /// Foreground-speed note headline.
+  /// Hashed and total bytes while verifying.
   ///
   /// In en, this message translates to:
-  /// **'Keep Golem open for full speed.'**
-  String get downloadNoteTitle;
+  /// **'{verified} of {total} verified'**
+  String verifiedAmount(String verified, String total);
 
-  /// Foreground-speed note body quoting measured background pacing.
+  /// One-line foreground-speed note under a running download.
   ///
   /// In en, this message translates to:
-  /// **'Leaving is fine — {platform} slows background downloads to about {rate}, so this would take {backgroundDuration} instead of {foregroundDuration}.'**
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  );
-
-  /// Approximate duration in minutes.
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{about 1 minute} other{about {count} minutes}}'**
-  String aboutMinutes(int count);
+  /// **'Keep Golem open — downloads are fastest in the foreground.'**
+  String get downloadNote;
 
   /// Approximate time left on a running download.
   ///
@@ -1173,12 +1156,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The model is stored on this device. Nothing you type is uploaded.'**
   String get privacyFootnote;
-
-  /// Dismiss the foreground-speed note.
-  ///
-  /// In en, this message translates to:
-  /// **'Dismiss'**
-  String get dismissNote;
 
   /// Unsupported-device onboarding headline.
   ///
@@ -1354,11 +1331,11 @@ abstract class AppLocalizations {
   /// **'Chat deleted'**
   String get chatDeleted;
 
-  /// Used and total storage.
+  /// Golem's usage beside the free space left.
   ///
   /// In en, this message translates to:
-  /// **'{used} of {total}'**
-  String storageAmount(String used, String total);
+  /// **'{used} used · {free} free'**
+  String storageUsedAndFree(String used, String free);
 
   /// Dismiss conversation drawer accessibility label.
   ///
@@ -2619,12 +2596,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Download{suffix}'**
   String downloadProgressLabel(String suffix);
-
-  /// Model verification progress.
-  ///
-  /// In en, this message translates to:
-  /// **'Verifying files{suffix}…'**
-  String verifyingFilesStatus(String suffix);
 
   /// Open model repository accessibility label.
   ///

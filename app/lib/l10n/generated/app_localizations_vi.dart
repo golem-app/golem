@@ -314,9 +314,6 @@ class AppLocalizationsVi extends AppLocalizations {
   String get downloadProgress => 'Tiến trình tải xuống';
 
   @override
-  String get verifyingFiles => 'Đang xác minh tệp…';
-
-  @override
   String get keep => 'Giữ lại';
 
   @override
@@ -560,27 +557,13 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'Giữ Golem mở để tải với tốc độ tối đa.';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return 'Rời đi cũng không sao — $platform giảm tốc độ tải xuống trong nền còn khoảng $rate, nên sẽ mất $backgroundDuration thay vì $foregroundDuration.';
+  String verifiedAmount(String verified, String total) {
+    return 'Đã xác minh $verified / $total';
   }
 
   @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'khoảng $count phút',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote =>
+      'Giữ Golem mở — tải xuống nhanh nhất khi ứng dụng ở nền trước.';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -625,9 +608,6 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get privacyFootnote =>
       'Mô hình được lưu trên thiết bị này. Những gì bạn nhập không được tải lên.';
-
-  @override
-  String get dismissNote => 'Đóng';
 
   @override
   String get chatsStayAvailable => 'Các cuộc trò chuyện vẫn khả dụng.';
@@ -739,8 +719,8 @@ class AppLocalizationsVi extends AppLocalizations {
   String get chatDeleted => 'Đã xóa cuộc trò chuyện';
 
   @override
-  String storageAmount(String used, String total) {
-    return '$used / $total';
+  String storageUsedAndFree(String used, String free) {
+    return 'Đã dùng $used · Còn trống $free';
   }
 
   @override
@@ -1534,11 +1514,6 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String downloadProgressLabel(String suffix) {
     return 'Tải xuống$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return 'Đang xác minh tệp$suffix…';
   }
 
   @override

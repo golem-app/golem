@@ -146,25 +146,20 @@ void main() {
     expect(tester.getTopLeft(scroller).dx - cardLeft, viewportLeft - cardLeft);
   });
 
-  testWidgets(
-    'the header band holds the platform minimum height on its own',
-    (tester) async {
-      await pumpCard(tester, code: python, language: 'python');
-      final minimum = GolemChrome.current.minimumTapTarget;
-      // The band by key, not `byType(ConstrainedBox).first` — that would
-      // silently retarget the card itself the moment anything above the band
-      // gains constraints.
-      expect(
-        tester.getSize(find.byKey(const Key('code-header'))).height,
-        minimum,
-      );
-      expect(
-        tester.getSize(find.byKey(const Key('code-copy'))).height,
-        minimum,
-      );
-    },
-    variant: bothChromes,
-  );
+  testWidgets('the header band holds the platform minimum height on its own', (
+    tester,
+  ) async {
+    await pumpCard(tester, code: python, language: 'python');
+    final minimum = GolemChrome.current.minimumTapTarget;
+    // The band by key, not `byType(ConstrainedBox).first` — that would
+    // silently retarget the card itself the moment anything above the band
+    // gains constraints.
+    expect(
+      tester.getSize(find.byKey(const Key('code-header'))).height,
+      minimum,
+    );
+    expect(tester.getSize(find.byKey(const Key('code-copy'))).height, minimum);
+  }, variant: bothChromes);
 
   testWidgets('an untagged fence resolves through the real transcript', (
     tester,

@@ -49,6 +49,10 @@ final class _FakePlatform {
 
   final List<String> requestedUrls = [];
 
+  /// Runs after a file has been written, for tests that disturb the
+  /// directory between the transfer and the hash.
+  void Function(String filename)? afterWrite;
+
   /// Every destination a transfer was started for. A second entry for one
   /// destination is a second writer.
   final List<String> enqueued = [];
@@ -137,6 +141,7 @@ final class _ScriptedDownloader implements ArtifactFileDownloader {
         );
         await file.parent.create(recursive: true);
         await file.writeAsString(platform.contents[ref.filename]!);
+        platform.afterWrite?.call(ref.filename);
         yield ArtifactFileProgress(ref.expectedBytes);
       }
       yield terminal;
@@ -200,6 +205,10 @@ void main() {
     backupExclusion: backup,
     activeArtifactKey: activeKey,
     diskSpaceMargin: 10,
+    // The fixtures are a few dozen bytes; a stride below their size makes
+    // every hashed file a visible step.
+    verifyProgressStride: 4,
+    verifyEmitInterval: Duration.zero,
   );
 
   setUp(() {
@@ -244,6 +253,80 @@ void main() {
       RuntimePhase.loaded,
     );
   });
+
+  test('verification is one phase whose counter only climbs', () async {
+    final repo = repository();
+    await repo.load();
+    final statuses = (await repo.download('test-mlx').toList())
+        .map((state) => state.statusOf('test-mlx'))
+        .toList();
+    final phases = statuses.map((status) => status.phase).toList();
+    // Every byte arrives before any is hashed: the bar reaches the total once
+    // and verification follows as a single phase, never interleaved per file.
+    final firstVerify = phases.indexOf(ArtifactPhase.verifying);
+    expect(firstVerify, greaterThan(0));
+    expect(
+      phases.sublist(0, firstVerify),
+      everyElement(ArtifactPhase.downloading),
+    );
+    expect(
+      phases.sublist(firstVerify, phases.length - 1),
+      everyElement(ArtifactPhase.verifying),
+    );
+    expect(phases.last, ArtifactPhase.installed);
+    final verifying = statuses
+        .where((status) => status.phase == ArtifactPhase.verifying)
+        .toList();
+    expect(
+      verifying.map((status) => status.downloadedBytes),
+      everyElement(_entry().totalBytes),
+      reason: 'the transfer is complete throughout verification',
+    );
+    final hashed = verifying.map((status) => status.verifiedBytes).toList();
+    expect(hashed, [0, _contentOne.length, _entry().totalBytes]);
+    expect(
+      statuses.last.verifiedBytes,
+      0,
+      reason: 'the counter belongs to the verifying phase alone',
+    );
+  });
+
+  test(
+    'cancel during verification stops the hash and writes no receipt',
+    () async {
+      final repo = repository();
+      await repo.load();
+      final states = <ModelState>[];
+      await for (final state in repo.download('test-mlx')) {
+        states.add(state);
+        if (state.statusOf('test-mlx').phase == ArtifactPhase.verifying) {
+          await repo.cancel('test-mlx');
+        }
+      }
+      // The generator noticed the stop between chunks: nothing after the first
+      // verifying snapshot, no receipt re-creating the directory _discard
+      // emptied, and the artifact stays discarded on the next load.
+      expect(
+        states.map((state) => state.statusOf('test-mlx').phase).toList(),
+        isNot(contains(ArtifactPhase.installed)),
+      );
+      expect(
+        states.where(
+          (state) =>
+              state.statusOf('test-mlx').phase == ArtifactPhase.verifying,
+        ),
+        hasLength(1),
+      );
+      expect(
+        Directory('${temp.path}/documents/models/test-mlx').existsSync(),
+        isFalse,
+      );
+      expect(
+        (await repository().load()).statusOf('test-mlx').phase,
+        ArtifactPhase.notDownloaded,
+      );
+    },
+  );
 
   test('skip-if-valid never re-downloads verified files', () async {
     final repo = repository();
@@ -478,15 +561,95 @@ void main() {
     final repo = repository();
     await repo.load();
     final states = await repo.download('test-mlx').toList();
-    // Both forgeries were hashed, deleted, and downloaded for real.
+    // Both forgeries were hashed, deleted, and downloaded for real — the one
+    // path on which a bar returns from verifying to downloading.
     expect(downloader.requestedUrls, hasLength(2));
     expect(states.last.statusOf('test-mlx').phase, ArtifactPhase.installed);
+    final phases = states.map((state) => state.statusOf('test-mlx').phase);
+    expect(
+      phases.toList().indexOf(ArtifactPhase.verifying),
+      lessThan(phases.toList().lastIndexOf(ArtifactPhase.downloading)),
+    );
+    // Inside the first verify pass the counter never steps back: the first
+    // forgery's bytes stay counted while the second is hashed.
+    final firstPass = states
+        .map((state) => state.statusOf('test-mlx'))
+        .skipWhile((status) => status.phase != ArtifactPhase.verifying)
+        .takeWhile((status) => status.phase == ArtifactPhase.verifying)
+        .map((status) => status.verifiedBytes)
+        .toList();
+    expect(firstPass.length, greaterThan(2));
+    for (var i = 1; i < firstPass.length; i++) {
+      expect(firstPass[i], greaterThanOrEqualTo(firstPass[i - 1]));
+    }
+    expect(firstPass.last, greaterThan(_contentOne.length));
     expect(
       File(
         '${temp.path}/documents/models/test-mlx/.golem-verified.json',
       ).existsSync(),
       isTrue,
     );
+  });
+
+  test('a file that vanishes under the hash is fetched again, once', () async {
+    // config.json is gone by the time the hash reaches it — an external
+    // sweep between the transfer and the verify pass. Unproven, not forged:
+    // it is fetched again and the artifact still installs.
+    final first = File('${temp.path}/documents/models/test-mlx/$_fileOne');
+    downloader.platform.afterWrite = (name) {
+      if (_fileTwo.endsWith(name) && first.existsSync()) first.deleteSync();
+    };
+    final repo = repository();
+    await repo.load();
+    final states = await repo.download('test-mlx').toList();
+    expect(states.last.statusOf('test-mlx').phase, ArtifactPhase.installed);
+    expect(downloader.requestedUrls, hasLength(3));
+    expect(first.existsSync(), isTrue);
+  });
+
+  test('a file that vanishes twice fails as a transfer fault', () async {
+    final first = File('${temp.path}/documents/models/test-mlx/$_fileOne');
+    downloader.platform.afterWrite = (name) {
+      if (_fileTwo.endsWith(name) && first.existsSync()) first.deleteSync();
+    };
+    final repo = repository();
+    await repo.load();
+    // The generator pauses on every yield, so deleting on the second pass's
+    // opening verifying emit lands before its hash starts.
+    var verifyPasses = 0;
+    var previous = ArtifactPhase.notDownloaded;
+    final states = <ModelState>[];
+    await for (final state in repo.download('test-mlx')) {
+      states.add(state);
+      final phase = state.statusOf('test-mlx').phase;
+      if (phase == ArtifactPhase.verifying && previous != phase) {
+        verifyPasses++;
+        if (verifyPasses == 2 && first.existsSync()) first.deleteSync();
+      }
+      previous = phase;
+    }
+    final status = states.last.statusOf('test-mlx');
+    expect(status.phase, ArtifactPhase.failed);
+    expect(status.failureReason?.kind, ArtifactFailureKind.transfer);
+    expect(downloader.requestedUrls, hasLength(3));
+  });
+
+  test('a read fault keeps the file and is not a hash mismatch', () async {
+    // Right-length, unreadable: the device's fault, not the bytes'. Deleting
+    // the file and blaming the publisher would cost a re-download.
+    final file = File('${temp.path}/documents/models/test-mlx/$_fileTwo');
+    file.parent.createSync(recursive: true);
+    file.writeAsStringSync(_contentTwo);
+    await Process.run('chmod', ['000', file.path]);
+    addTearDown(() => Process.run('chmod', ['644', file.path]));
+    final repo = repository();
+    await repo.load();
+    await expectLater(
+      repo.download('test-mlx').toList(),
+      throwsA(isA<FileSystemException>()),
+    );
+    expect(file.existsSync(), isTrue);
+    expect(downloader.requestedUrls, [anything]);
   });
 
   test('the verified fast path needs the receipt, not just sizes', () async {

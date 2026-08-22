@@ -78,13 +78,18 @@ class ModelSetupBanner extends ConsumerWidget {
             ),
           ),
           if (status.phase == ArtifactPhase.downloading ||
+              status.phase == ArtifactPhase.verifying ||
               status.phase == ArtifactPhase.paused) ...[
             const SizedBox(height: 10),
             // The headline and detail above say what is happening; the bar is
             // the only thing carrying how far along it is, so it paints no
             // caption of its own.
             LabeledProgress(
-              semanticsLabel: context.l10n.download,
+              // The bar names its own phase: "Download" over a hash read as
+              // a download regressing from 100 % to 27 %.
+              semanticsLabel: status.phase == ArtifactPhase.verifying
+                  ? context.l10n.verifyingStatus('')
+                  : context.l10n.download,
               fraction: transfer.fraction,
               percent: transfer.percent,
               showPercent: false,
@@ -93,7 +98,6 @@ class ModelSetupBanner extends ConsumerWidget {
           DownloadNoteBanner(
             key: const Key('chat-download-note'),
             entry: entry,
-            compact: true,
             margin: const EdgeInsetsDirectional.only(top: 10),
           ),
           const SizedBox(height: 10),
@@ -131,9 +135,7 @@ class ModelSetupBanner extends ConsumerWidget {
                 ref.read(modelControllerProvider.notifier).download(key),
               ),
             ),
-            ArtifactPhase.verifying => const Center(
-              child: CupertinoActivityIndicator(),
-            ),
+            ArtifactPhase.verifying ||
             ArtifactPhase.installed => const SizedBox.shrink(),
           },
         ],

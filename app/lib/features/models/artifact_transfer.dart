@@ -105,6 +105,7 @@ final class ArtifactTransferPresentation {
     required this.remaining,
     required this.chipIsLive,
     this.chip,
+    this.chipSlot,
     this.remainder,
     this.affordance,
   });
@@ -112,11 +113,15 @@ final class ArtifactTransferPresentation {
   final ArtifactPhase phase;
 
   /// 0–1 against the catalog's total, so persistence never stores a stale
-  /// percentage (`ArtifactStatus.downloadedBytes`).
+  /// percentage. Each in-flight phase has its own counter: transferred bytes
+  /// until the bar reaches the total, hashed bytes while the files are
+  /// checked — so a finished download never steps back, and a verification
+  /// is no longer a full bar pretending (#143).
   final double fraction;
   final int percent;
 
-  /// The three byte figures, through the one formatter (`1.58 GB`).
+  /// The three byte figures, through the one formatter (`1.58 GB`): the
+  /// phase's own progress against the total, like [fraction].
   final String transferred, total, remaining;
 
   /// The state chip: a live rate while one is honest, else the phase — and
@@ -127,6 +132,11 @@ final class ArtifactTransferPresentation {
   /// Whether [chip] reports a running transfer, which is the difference
   /// between an accent chip and a quiet one.
   final bool chipIsLive;
+
+  /// A value at least as wide as anything [chip] will show, so the pill keeps
+  /// one width while its figure ticks — "9.8 MB/s" becoming "10.2 MB/s" used
+  /// to nudge the unit. Null for a chip that names a state.
+  final String? chipSlot;
 
   /// The trailing figure under the bar: time left while downloading, amount
   /// left while paused, where it stopped when it failed.
@@ -156,18 +166,17 @@ ArtifactTransferPresentation artifactTransfer({
   bool loadsHere = true,
   String? transferringKey,
 }) {
-  // Verification runs on a complete download, and the repository reports its
-  // byte count per verified file — so deriving a fraction there would collapse
-  // a full bar to one file's worth and step it back up (#131 review).
-  final fraction = status.phase == ArtifactPhase.verifying
-      ? 1.0
-      : entry.totalBytes <= 0
+  final progressed = status.progressBytes;
+  final fraction = entry.totalBytes <= 0
       ? 0.0
-      : (status.downloadedBytes / entry.totalBytes).clamp(0.0, 1.0).toDouble();
+      : (progressed / entry.totalBytes).clamp(0.0, 1.0).toDouble();
   final percent = (fraction * 100).round();
   // The pace notifier publishes one artifact at a time; a snapshot naming
-  // another belongs to a transfer this surface is not showing.
-  final snapshot = pace?.artifactKey == entry.key ? pace : null;
+  // another, or measured in the other phase, belongs to a transfer this
+  // surface is not showing.
+  final snapshot = pace?.artifactKey == entry.key && pace?.phase == status.phase
+      ? pace
+      : null;
   // The qualifier every phase appends: a simulated download must never read
   // like a real one, and all four surfaces describe one repository.
   final suffix = simulated ? ' · ${localizations.simulated}' : '';
@@ -176,16 +185,21 @@ ArtifactTransferPresentation artifactTransfer({
     phase: status.phase,
     fraction: fraction,
     percent: percent,
-    transferred: gigabytes(status.downloadedBytes),
+    transferred: gigabytes(progressed),
     total: gigabytes(entry.totalBytes),
-    remaining: gigabytes(entry.totalBytes - status.downloadedBytes),
-    chip: _chip(status.phase, snapshot, localizations),
-    chipIsLive: status.phase == ArtifactPhase.downloading,
+    remaining: gigabytes(entry.totalBytes - progressed),
+    chip: _chip(status.phase, snapshot, suffix, localizations),
+    chipSlot: status.phase == ArtifactPhase.downloading && snapshot != null
+        ? localizations.rateMbs('999.9')
+        : null,
+    chipIsLive:
+        status.phase == ArtifactPhase.downloading ||
+        status.phase == ArtifactPhase.verifying,
     remainder: _remainder(
       phase: status.phase,
       snapshot: snapshot,
       percent: percent,
-      remaining: entry.totalBytes - status.downloadedBytes,
+      remaining: entry.totalBytes - progressed,
       localizations: localizations,
     ),
     affordance: _affordance(
@@ -203,14 +217,18 @@ ArtifactTransferPresentation artifactTransfer({
   );
 }
 
+/// Only a transfer quotes its rate; a verification names its phase, because
+/// a hash throughput in MB/s would read as a download that slowed down.
 String? _chip(
   ArtifactPhase phase,
   DownloadPaceSnapshot? snapshot,
+  String suffix,
   AppLocalizations localizations,
 ) => switch (phase) {
   ArtifactPhase.downloading when snapshot != null => localizations.rateMbs(
     snapshot.mbPerSecond.toStringAsFixed(1),
   ),
+  ArtifactPhase.verifying => localizations.verifyingStatus(suffix),
   ArtifactPhase.paused => localizations.paused,
   ArtifactPhase.failed => localizations.stopped,
   _ => null,
@@ -223,7 +241,8 @@ String? _remainder({
   required int remaining,
   required AppLocalizations localizations,
 }) => switch (phase) {
-  ArtifactPhase.downloading when snapshot?.eta != null =>
+  ArtifactPhase.downloading || ArtifactPhase.verifying
+      when snapshot?.eta != null =>
     localizations.etaAboutMinutesLeft(aboutMinutesLeft(snapshot!.eta!)),
   ArtifactPhase.paused => localizations.amountLeft(gigabytes(remaining)),
   ArtifactPhase.failed => localizations.stoppedAtPercent(percent),

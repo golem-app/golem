@@ -28,6 +28,8 @@ void main() {
     WidgetTester tester, {
     required TransferDensity density,
     ArtifactPhase phase = ArtifactPhase.downloading,
+    int verifiedBytes = 0,
+    int downloadedBytes = 1000000000,
     DownloadPaceSnapshot? pace,
     bool simulated = false,
     bool showBytes = true,
@@ -44,7 +46,8 @@ void main() {
                   entry: _entry,
                   status: ArtifactStatus(
                     phase: phase,
-                    downloadedBytes: 1000000000,
+                    downloadedBytes: downloadedBytes,
+                    verifiedBytes: verifiedBytes,
                   ),
                   localizations: AppLocalizations.of(context),
                   pace: pace,
@@ -61,6 +64,42 @@ void main() {
       ),
     );
   }
+
+  testWidgets('the sign and the unit hold still while digits come and go', (
+    tester,
+  ) async {
+    // "9%"→"10%" and "9.8 MB/s"→"10.2 MB/s" used to nudge the "%" and the
+    // pill by a digit; each figure reserves its widest value instead.
+    final percentEdges = <double>[];
+    final pillWidths = <double>[];
+    for (final (bytes, rate, label) in [
+      (360000000, 9.8, '9%'),
+      (400000000, 10.2, '10%'),
+      (4000000000, 999.9, '100%'),
+    ]) {
+      await pump(
+        tester,
+        density: TransferDensity.prominent,
+        downloadedBytes: bytes,
+        pace: DownloadPaceSnapshot(
+          artifactKey: 'test-gguf',
+          mbPerSecond: rate,
+          eta: const Duration(seconds: 100),
+        ),
+      );
+      percentEdges.add(tester.getRect(find.text(label)).right);
+      final chip = find.text('${rate.toStringAsFixed(1)} MB/s');
+      pillWidths.add(
+        tester
+            .getSize(
+              find.ancestor(of: chip, matching: find.byType(Container)).first,
+            )
+            .width,
+      );
+    }
+    expect(percentEdges.toSet(), hasLength(1), reason: '$percentEdges');
+    expect(pillWidths.toSet(), hasLength(1), reason: '$pillWidths');
+  });
 
   testWidgets('both densities render the same projection', (tester) async {
     for (final density in TransferDensity.values) {
@@ -165,21 +204,19 @@ void main() {
     expect(find.text('3.00 GB left'), findsOneWidget);
   });
 
-  testWidgets('a verification fills the bar rather than emptying it', (
-    tester,
-  ) async {
-    // The repository counts verified bytes per file, so a fraction derived
-    // from them would collapse a finished download's bar to one file's worth.
+  testWidgets('a verification paints the hashed fraction', (tester) async {
     await pump(
       tester,
       density: TransferDensity.dense,
       phase: ArtifactPhase.verifying,
+      verifiedBytes: 3000000000,
     );
     expect(
       tester
           .widget<FractionallySizedBox>(find.byType(FractionallySizedBox))
           .widthFactor,
-      1.0,
+      0.75,
     );
+    expect(find.text('Verifying'), findsOneWidget);
   });
 }

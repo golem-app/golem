@@ -616,15 +616,31 @@ final class ArtifactStatus {
   const ArtifactStatus({
     this.phase = ArtifactPhase.notDownloaded,
     this.downloadedBytes = 0,
+    this.verifiedBytes = 0,
     this.failure,
     this.failureReason,
   });
 
   final ArtifactPhase phase;
 
-  /// Verified-plus-in-flight bytes on disk; the UI derives fractions from the
-  /// catalog's total, so persistence never stores a stale percentage.
+  /// Bytes on disk at their pinned size plus the in-flight transfer; the UI
+  /// derives fractions from the catalog's total, so persistence never stores
+  /// a stale percentage.
   final int downloadedBytes;
+
+  /// Bytes the current [ArtifactPhase.verifying] pass has hashed — the
+  /// receipted files plus every file read so far, whether it passed — the
+  /// determinate reading of a phase that used to be a spinner (#143). Never
+  /// decreases within a pass. In-memory like [failure]: a verify phase never
+  /// survives a relaunch (reconciliation re-derives it from the receipt), so
+  /// the store would only ever hold a stale count.
+  final int verifiedBytes;
+
+  /// The counter this phase is measured by: hashed bytes while verifying,
+  /// transferred bytes otherwise. The one rule every bar, percentage and
+  /// pace window reads, so none of them can disagree on which it is.
+  int get progressBytes =>
+      phase == ArtifactPhase.verifying ? verifiedBytes : downloadedBytes;
 
   /// Internal diagnostic — never rendered, and never written to disk. It
   /// quotes whatever failed, which for a transfer means a platform message or
@@ -638,12 +654,14 @@ final class ArtifactStatus {
   ArtifactStatus copyWith({
     ArtifactPhase? phase,
     int? downloadedBytes,
+    int? verifiedBytes,
     String? failure,
     ArtifactFailure? failureReason,
     bool clearFailure = false,
   }) => ArtifactStatus(
     phase: phase ?? this.phase,
     downloadedBytes: downloadedBytes ?? this.downloadedBytes,
+    verifiedBytes: verifiedBytes ?? this.verifiedBytes,
     failure: clearFailure ? null : failure ?? this.failure,
     failureReason: clearFailure ? null : failureReason ?? this.failureReason,
   );
@@ -671,12 +689,18 @@ final class ArtifactStatus {
       other is ArtifactStatus &&
       other.phase == phase &&
       other.downloadedBytes == downloadedBytes &&
+      other.verifiedBytes == verifiedBytes &&
       other.failure == failure &&
       other.failureReason == failureReason;
 
   @override
-  int get hashCode =>
-      Object.hash(phase, downloadedBytes, failure, failureReason);
+  int get hashCode => Object.hash(
+    phase,
+    downloadedBytes,
+    verifiedBytes,
+    failure,
+    failureReason,
+  );
 }
 
 final class ModelState {

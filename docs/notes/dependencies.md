@@ -1,10 +1,14 @@
 # Dependency blockers
 
-After #74 every direct and transitive package in the workspace sits at the
-newest version that resolves against the pinned Flutter 3.44.9 / Dart 3.12.2
-toolchain — `flutter pub outdated` reports `Current == Upgradable ==
-Resolvable` for every row. What remains is the gap to `Latest`, and each of
-those gaps has a cause recorded here.
+After #74 every direct and transitive package in the workspace sat at the
+newest version that resolved against the then-pinned Flutter 3.44.9 / Dart
+3.12.2 toolchain — `flutter pub outdated` reported `Current == Upgradable ==
+Resolvable` for every row. #143 moved the pin to Flutter 3.47.1 / Dart 3.13.1
+with `pub get` alone: the lockfile moved only where the SDK forced it (`intl`,
+`meta`, `matcher`, the `test` trio, `vector_math`), so the two chains below are
+now partly clear and the rows need re-deriving before the next reviewed
+`pub upgrade`. What remains is the gap to `Latest`, and each of those gaps has
+a cause recorded here.
 
 The version columns below are a snapshot, not a source of truth — `pubspec.lock`
 is. Nothing checks them, so re-derive from the lockfile and from pub.dev before
@@ -15,18 +19,19 @@ acting on any row; the chains move when the SDK does.
 Almost everything held back traces to one of two constraints, and both
 originate in the Flutter SDK rather than in this repository.
 
-### meta 1.18.0 — blocks the build hooks
+### meta — no longer blocks the build hooks
 
-`flutter/packages/flutter/pubspec.yaml` and `.../flutter_test/pubspec.yaml`
-both pin `meta: 1.18.0` exactly. `hooks` 2.1.0 requires `meta: ^1.19.0`, so
-`packages/inferno` holds `hooks` at 2.0.2.
+Flutter 3.44.9 pinned `meta: 1.18.0` exactly, and `hooks` 2.1.0 requires
+`meta: ^1.19.0`, so `packages/inferno` held `hooks` at 2.0.2. #143's move to
+Flutter 3.47.1 brought `meta` to 1.19.0, which clears the constraint; `hooks`
+stays at 2.0.2 only because #143 ran `pub get`, never `pub upgrade`.
 
 The only change between 2.0.2 and 2.1.0 is graduating
 `LinkInput.recordedUses` out of experimental — a link-hook API. Inferno has
 no `hook/link.dart`, only `hook/build.dart`, so nothing here consumes it and
 the pin costs nothing today.
 
-Clears with: an SDK bump (#38).
+Clears with: the next reviewed `pub upgrade`.
 
 ### analyzer < 13 — blocks the codegen stack
 

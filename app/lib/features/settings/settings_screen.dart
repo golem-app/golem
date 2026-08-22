@@ -207,7 +207,7 @@ class SettingsScreen extends ConsumerWidget {
                 SettingsNavRow(
                   key: const Key('about-row'),
                   label: l10n.settingsAboutGolem,
-                  value: appVersion,
+                  value: aboutVersionLabel(),
                   onTap: () => _showAbout(context, ref),
                 ),
               ],
@@ -237,7 +237,8 @@ class SettingsScreen extends ConsumerWidget {
             Text(context.l10n.settingsAboutGolem, style: GolemText.cardTitle),
             const SizedBox(height: 14),
             Text(
-              '${identity.displayName} $appVersion · ${identity.applicationId}',
+              '${identity.displayName} ${aboutVersionLabel()} · '
+              '${identity.applicationId}',
               style: GolemText.footnote.copyWith(
                 color: CupertinoDynamicColor.resolve(
                   GolemTheme.mutedInk,

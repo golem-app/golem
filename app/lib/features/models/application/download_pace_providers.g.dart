@@ -63,11 +63,12 @@ final class PaceClockProvider
 
 String _$paceClockHash() => r'3006b2ff67ca2d0bc66966a59d23d5118d1a4623';
 
-/// Live rate/ETA for the single in-flight download, derived by sampling
-/// [ModelController]'s byte counts against the injected clock. `null` until
-/// the trailing window can quote an honest figure, and again the moment the
-/// transfer leaves the `downloading` phase — surfaces render nothing rather
-/// than a stale or fabricated number.
+/// Live rate/ETA for the single in-flight artifact, derived by sampling
+/// [ModelController]'s byte counts against the injected clock — transferred
+/// bytes while downloading, hashed bytes while verifying, each phase its own
+/// window. `null` until the trailing window can quote an honest figure, and
+/// again the moment the artifact leaves both phases — surfaces render nothing
+/// rather than a stale or fabricated number.
 ///
 /// KeepAlive: the estimator's sample window lives in notifier fields, and the
 /// model stream must stay observed across screens the way the controller
@@ -77,11 +78,12 @@ String _$paceClockHash() => r'3006b2ff67ca2d0bc66966a59d23d5118d1a4623';
 @ProviderFor(DownloadPace)
 final downloadPaceProvider = DownloadPaceProvider._();
 
-/// Live rate/ETA for the single in-flight download, derived by sampling
-/// [ModelController]'s byte counts against the injected clock. `null` until
-/// the trailing window can quote an honest figure, and again the moment the
-/// transfer leaves the `downloading` phase — surfaces render nothing rather
-/// than a stale or fabricated number.
+/// Live rate/ETA for the single in-flight artifact, derived by sampling
+/// [ModelController]'s byte counts against the injected clock — transferred
+/// bytes while downloading, hashed bytes while verifying, each phase its own
+/// window. `null` until the trailing window can quote an honest figure, and
+/// again the moment the artifact leaves both phases — surfaces render nothing
+/// rather than a stale or fabricated number.
 ///
 /// KeepAlive: the estimator's sample window lives in notifier fields, and the
 /// model stream must stay observed across screens the way the controller
@@ -89,11 +91,12 @@ final downloadPaceProvider = DownloadPaceProvider._();
 /// publishes a tick, which keeps goldens and `pumpAndSettle` deterministic.
 final class DownloadPaceProvider
     extends $NotifierProvider<DownloadPace, DownloadPaceSnapshot?> {
-  /// Live rate/ETA for the single in-flight download, derived by sampling
-  /// [ModelController]'s byte counts against the injected clock. `null` until
-  /// the trailing window can quote an honest figure, and again the moment the
-  /// transfer leaves the `downloading` phase — surfaces render nothing rather
-  /// than a stale or fabricated number.
+  /// Live rate/ETA for the single in-flight artifact, derived by sampling
+  /// [ModelController]'s byte counts against the injected clock — transferred
+  /// bytes while downloading, hashed bytes while verifying, each phase its own
+  /// window. `null` until the trailing window can quote an honest figure, and
+  /// again the moment the artifact leaves both phases — surfaces render nothing
+  /// rather than a stale or fabricated number.
   ///
   /// KeepAlive: the estimator's sample window lives in notifier fields, and the
   /// model stream must stay observed across screens the way the controller
@@ -126,13 +129,14 @@ final class DownloadPaceProvider
   }
 }
 
-String _$downloadPaceHash() => r'481d1f397630a12fe4ca4d7054d9e6cf37e96c71';
+String _$downloadPaceHash() => r'd8b76d122a5520e03649171f9ec8beab414291ab';
 
-/// Live rate/ETA for the single in-flight download, derived by sampling
-/// [ModelController]'s byte counts against the injected clock. `null` until
-/// the trailing window can quote an honest figure, and again the moment the
-/// transfer leaves the `downloading` phase — surfaces render nothing rather
-/// than a stale or fabricated number.
+/// Live rate/ETA for the single in-flight artifact, derived by sampling
+/// [ModelController]'s byte counts against the injected clock — transferred
+/// bytes while downloading, hashed bytes while verifying, each phase its own
+/// window. `null` until the trailing window can quote an honest figure, and
+/// again the moment the artifact leaves both phases — surfaces render nothing
+/// rather than a stale or fabricated number.
 ///
 /// KeepAlive: the estimator's sample window lives in notifier fields, and the
 /// model stream must stay observed across screens the way the controller

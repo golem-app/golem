@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 
@@ -13,7 +14,8 @@ import 'contracts.dart';
 import 'persistence_io.dart';
 
 /// Real Hugging Face downloads: pinned repository + revision URLs, per-file
-/// SHA-256 verification, skip-if-valid, disk-space preflight. Artifacts install
+/// SHA-256 verification as one phase after every file has arrived,
+/// skip-if-valid, disk-space preflight. Artifacts install
 /// under `<documents>/models/<key>/` so the `documents:` model-path flow loads
 /// them unchanged. Verification is receipt-backed: a file that passes its
 /// SHA-256 gets an entry in a `.golem-verified.json` beside the install, and
@@ -29,6 +31,8 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     required this.backupExclusion,
     this.activeArtifactKey,
     this.diskSpaceMargin = modelDownloadFreeSpaceMargin,
+    this.verifyProgressStride = 8 << 20,
+    this.verifyEmitInterval = const Duration(milliseconds: 250),
   }) : catalog = [...catalog] {
     _state = ModelState(activeArtifactKey: activeArtifactKey);
   }
@@ -47,6 +51,15 @@ final class RealModelManagementRepository implements ModelManagementRepository {
 
   /// Free bytes that must remain after a download completes.
   final int diskSpaceMargin;
+
+  /// Bytes hashed between two verification snapshots, each an in-memory
+  /// emit; tests pass a few bytes to watch every step. See [_hashProgress]
+  /// for why 8 MiB.
+  final int verifyProgressStride;
+
+  /// The least time between two verification emits; the stride is the
+  /// isolate's reporting granularity, this is the UI's.
+  final Duration verifyEmitInterval;
 
   late ModelState _state;
   final Set<String> _stopRequested = {};
@@ -77,6 +90,10 @@ final class RealModelManagementRepository implements ModelManagementRepository {
 
   String _rootFor(ModelCatalogEntry entry) =>
       '$documentsDirectory/${entry.installDirectory}';
+
+  /// Publishes [value] without a durable write, for ticks whose only change
+  /// is a field the store never holds.
+  ModelState _emit(ModelState value) => _state = value;
 
   Future<ModelState> _persist(ModelState value) async {
     _state = value;
@@ -308,107 +325,199 @@ final class RealModelManagementRepository implements ModelManagementRepository {
       return;
     }
 
-    yield await _persist(
-      _state.withArtifact(
-        artifactKey,
-        ArtifactStatus(
-          phase: ArtifactPhase.downloading,
-          downloadedBytes: verifiedBytes,
-        ),
-      ),
+    // Bytes on disk at their pinned size. Every transfer moves this once and
+    // verification reads its own counter, so the bar climbs to the total
+    // exactly once (#143); a size-matching unreceipted file counts here the
+    // way reconciliation already counts it.
+    var onDisk = verifiedBytes + presentUnverifiedBytes;
+    // Bytes the verify counter has already walked through this pass: the
+    // receipted files plus every file hashed so far, passed or failed. A
+    // failed file keeps its bytes in the count — dropping them stepped the
+    // bar back mid-phase and reset the ETA window.
+    var counted = verifiedBytes;
+    ArtifactStatus downloading(int received) => ArtifactStatus(
+      phase: ArtifactPhase.downloading,
+      downloadedBytes: onDisk + received,
+    );
+    ArtifactStatus verifying(int hashed) => ArtifactStatus(
+      phase: ArtifactPhase.verifying,
+      downloadedBytes: onDisk,
+      verifiedBytes: counted + hashed,
     );
 
-    for (final spec in pending) {
-      // The install directory is keyed by artifact, not by commit, so a re-pin
-      // mid-download would land this commit's bytes under the new revision's
-      // name and let the engine map weights the catalog no longer describes.
-      if (_repinned(entry)) return;
-      // Local content first: a size-matching file without a receipt entry is
-      // hashed before any network use, then verifies in place or is re-fetched.
-      if (await _sizeMatches(entry, spec)) {
-        yield await _persist(
-          _state.withArtifact(
-            artifactKey,
-            ArtifactStatus(
-              phase: ArtifactPhase.verifying,
-              downloadedBytes: verifiedBytes + spec.bytes,
-            ),
-          ),
-        );
-        final digest = await _acceptableDigest(entry, spec);
-        if (digest != null) {
-          await _recordVerified(entry, spec, digest);
-          verifiedBytes += spec.bytes;
-          if (_stopRequested.contains(artifactKey)) return;
-          continue;
-        }
-        await File('${_rootFor(entry)}/${spec.path}').delete();
-      }
+    yield await _persist(_state.withArtifact(artifactKey, downloading(0)));
 
-      ArtifactFileEvent fileOutcome = const ArtifactFileComplete();
-      var lastReceived = 0;
-      await for (final event in downloader.download(_refFor(entry, spec))) {
-        if (event is ArtifactFileProgress) {
-          if (_stopRequested.contains(artifactKey)) continue;
-          lastReceived = event.bytesReceived;
-          yield await _persist(
-            _state.withArtifact(
-              artifactKey,
-              ArtifactStatus(
-                phase: ArtifactPhase.downloading,
-                downloadedBytes: verifiedBytes + event.bytesReceived,
+    // Files fetched in this attempt. A size-matching file that fails its hash
+    // is a sideload or a right-length forgery: deleted and fetched in a second
+    // round. One fetched here that still fails is a transfer fault and fails
+    // the artifact, so the loop ends within two rounds.
+    final fetched = <ModelArtifactFile>{};
+    // Files that vanished under the hash once: a second disappearance is a
+    // fault to report, not a loop to run.
+    final vanishedOnce = <ModelArtifactFile>{};
+    while (pending.isNotEmpty) {
+      // Transfer first: every file arrives before any is hashed.
+      for (final spec in pending) {
+        // The install directory is keyed by artifact, not by commit, so a
+        // re-pin mid-download would land this commit's bytes under the new
+        // revision's name and let the engine map weights the catalog no
+        // longer describes.
+        if (_repinned(entry)) return;
+        if (await _sizeMatches(entry, spec)) continue;
+        fetched.add(spec);
+
+        ArtifactFileEvent fileOutcome = const ArtifactFileComplete();
+        var lastReceived = 0;
+        await for (final event in downloader.download(_refFor(entry, spec))) {
+          if (event is ArtifactFileProgress) {
+            if (_stopRequested.contains(artifactKey)) continue;
+            lastReceived = event.bytesReceived;
+            yield await _persist(
+              _state.withArtifact(
+                artifactKey,
+                downloading(event.bytesReceived),
               ),
-            ),
-          );
-        } else {
-          fileOutcome = event;
+            );
+          } else {
+            fileOutcome = event;
+          }
         }
-      }
-      switch (fileOutcome) {
-        case ArtifactFilePaused(:final userInitiated, :final resumable):
-          // A user pause already persisted out of band; an uncommanded one
-          // (network loss, OS timeout) must be persisted here or the card
-          // freezes on "downloading".
-          if (!userInitiated && !_stopRequested.contains(artifactKey)) {
+        switch (fileOutcome) {
+          case ArtifactFilePaused(:final userInitiated, :final resumable):
+            // A user pause already persisted out of band; an uncommanded one
+            // (network loss, OS timeout) must be persisted here or the card
+            // freezes on "downloading".
+            if (!userInitiated && !_stopRequested.contains(artifactKey)) {
+              yield await _persist(
+                _state.withArtifact(
+                  artifactKey,
+                  ArtifactStatus(
+                    phase: ArtifactPhase.paused,
+                    // Streamed bytes count only while they can still be
+                    // resumed from. Crediting a partial the platform discarded
+                    // shows a card at 60% whose Resume restarts from zero, and
+                    // a bar that jumps backwards reads as lost work.
+                    downloadedBytes: resumable ? onDisk + lastReceived : onDisk,
+                  ),
+                ),
+              );
+            }
+            return;
+          case ArtifactFileCanceled(:final userInitiated):
+            if (!userInitiated && !_stopRequested.contains(artifactKey)) {
+              // The OS discarded the partial; pause at what is on disk.
+              yield await _persist(
+                _state.withArtifact(
+                  artifactKey,
+                  ArtifactStatus(
+                    phase: ArtifactPhase.paused,
+                    downloadedBytes: onDisk,
+                  ),
+                ),
+              );
+            }
+            return;
+          case ArtifactFileFailed(:final message):
             yield await _persist(
               _state.withArtifact(
                 artifactKey,
                 ArtifactStatus(
-                  phase: ArtifactPhase.paused,
-                  // Streamed bytes count only while they can still be resumed
-                  // from. Crediting a partial the platform discarded shows a
-                  // card at 60% whose Resume restarts from zero, and a bar that
-                  // jumps backwards reads as lost work.
-                  downloadedBytes: resumable
-                      ? verifiedBytes + lastReceived
-                      : verifiedBytes,
+                  phase: ArtifactPhase.failed,
+                  downloadedBytes: onDisk,
+                  failure: message,
+                  failureReason: const ArtifactFailure(
+                    ArtifactFailureKind.transfer,
+                  ),
                 ),
               ),
             );
+            return;
+          case ArtifactFileProgress() || ArtifactFileComplete():
+            break;
+        }
+
+        if (!await _sizeMatches(entry, spec)) {
+          final file = File('${_rootFor(entry)}/${spec.path}');
+          if (await file.exists()) {
+            await file.delete();
           }
-          return;
-        case ArtifactFileCanceled(:final userInitiated):
-          if (!userInitiated && !_stopRequested.contains(artifactKey)) {
-            // The OS discarded the partial; pause at the verified bytes.
-            yield await _persist(
-              _state.withArtifact(
-                artifactKey,
-                ArtifactStatus(
-                  phase: ArtifactPhase.paused,
-                  downloadedBytes: verifiedBytes,
-                ),
-              ),
-            );
-          }
-          return;
-        case ArtifactFileFailed(:final message):
           yield await _persist(
             _state.withArtifact(
               artifactKey,
               ArtifactStatus(
                 phase: ArtifactPhase.failed,
-                downloadedBytes: verifiedBytes,
-                failure: message,
+                downloadedBytes: onDisk,
+                failure: '${spec.path} did not arrive at its expected size.',
+                failureReason: ArtifactFailure(
+                  ArtifactFailureKind.unexpectedSize,
+                  fileName: spec.path,
+                ),
+              ),
+            ),
+          );
+          return;
+        }
+        onDisk += spec.bytes;
+        if (_stopRequested.contains(artifactKey)) return;
+      }
+
+      // Then verify: one phase over the whole artifact with its own counter.
+      // The hash loop yields between chunks, so a cancel lands before the next
+      // emit instead of after a multi-gigabyte read — and never after
+      // _discard has already emptied the directory.
+      if (_repinned(entry) || _stopRequested.contains(artifactKey)) return;
+      counted = verifiedBytes;
+      yield await _persist(_state.withArtifact(artifactKey, verifying(0)));
+      final refetch = <ModelArtifactFile>[];
+      // Emits are paced by the clock, not the byte stride: at real hash
+      // speed the stride alone fired ~15 state rebuilds a second.
+      var lastEmit = DateTime.now();
+      for (final spec in pending) {
+        final file = File('${_rootFor(entry)}/${spec.path}');
+        String? actual;
+        var vanished = false;
+        try {
+          await for (final step in _hashProgress(file)) {
+            if (_stopRequested.contains(artifactKey)) return;
+            if (step.digest case final digest?) {
+              actual = digest.toString();
+            } else if (DateTime.now().difference(lastEmit) >=
+                verifyEmitInterval) {
+              lastEmit = DateTime.now();
+              // In memory only: verifiedBytes is not serialized, so a
+              // durable write here would fsync the same bytes every stride.
+              yield _emit(
+                _state.withArtifact(artifactKey, verifying(step.hashed)),
+              );
+            }
+          }
+        } on FileSystemException {
+          // A file that vanished under the hash — a cancel racing the read,
+          // or an external deletion — is unproven and fetched again below,
+          // once. Any other read fault is the device's, not the bytes': the
+          // file stays, and the attempt fails the way every thrown fault
+          // does rather than as a hash mismatch.
+          if (await file.exists()) rethrow;
+          vanished = true;
+        }
+        if (_stopRequested.contains(artifactKey)) return;
+
+        final expected = spec.sha256;
+        if (vanished) {
+          onDisk -= spec.bytes;
+          counted += spec.bytes;
+          if (vanishedOnce.add(spec)) {
+            refetch.add(spec);
+            continue;
+          }
+          yield await _persist(
+            _state.withArtifact(
+              artifactKey,
+              ArtifactStatus(
+                phase: ArtifactPhase.failed,
+                downloadedBytes: onDisk,
+                failure:
+                    '${spec.path} disappeared before it could be verified.',
                 failureReason: const ArtifactFailure(
                   ArtifactFailureKind.transfer,
                 ),
@@ -416,54 +525,43 @@ final class RealModelManagementRepository implements ModelManagementRepository {
             ),
           );
           return;
-        case ArtifactFileProgress() || ArtifactFileComplete():
-          break;
-      }
-
-      yield await _persist(
-        _state.withArtifact(
-          artifactKey,
-          ArtifactStatus(
-            phase: ArtifactPhase.verifying,
-            downloadedBytes: verifiedBytes + spec.bytes,
-          ),
-        ),
-      );
-      final sized = await _sizeMatches(entry, spec);
-      final digest = sized ? await _acceptableDigest(entry, spec) : null;
-      if (digest == null) {
-        final file = File('${_rootFor(entry)}/${spec.path}');
-        if (await file.exists()) {
-          await file.delete();
         }
-        yield await _persist(
-          _state.withArtifact(
-            artifactKey,
-            ArtifactStatus(
-              phase: ArtifactPhase.failed,
-              downloadedBytes: verifiedBytes,
-              // A wrong length and wrong content are different facts, and a
-              // file published without a hash can only fail the first.
-              failure: sized
-                  ? '${spec.path} failed SHA-256 verification.'
-                  : '${spec.path} did not arrive at its expected size.',
-              failureReason: ArtifactFailure(
-                sized
-                    ? ArtifactFailureKind.hashVerification
-                    : ArtifactFailureKind.unexpectedSize,
-                fileName: spec.path,
+        if (actual == null || (expected != null && actual != expected)) {
+          if (await file.exists()) {
+            await file.delete();
+          }
+          onDisk -= spec.bytes;
+          counted += spec.bytes;
+          if (fetched.contains(spec)) {
+            yield await _persist(
+              _state.withArtifact(
+                artifactKey,
+                ArtifactStatus(
+                  phase: ArtifactPhase.failed,
+                  downloadedBytes: onDisk,
+                  failure: '${spec.path} failed SHA-256 verification.',
+                  failureReason: ArtifactFailure(
+                    ArtifactFailureKind.hashVerification,
+                    fileName: spec.path,
+                  ),
+                ),
               ),
-            ),
-          ),
-        );
-        return;
+            );
+            return;
+          }
+          refetch.add(spec);
+          continue;
+        }
+        await _recordVerified(entry, spec, actual);
+        verifiedBytes += spec.bytes;
+        counted += spec.bytes;
       }
-      await _recordVerified(entry, spec, digest);
-      verifiedBytes += spec.bytes;
-      if (_stopRequested.contains(artifactKey)) return;
+      pending
+        ..clear()
+        ..addAll(refetch);
     }
 
-    if (_repinned(entry)) return;
+    if (_repinned(entry) || _stopRequested.contains(artifactKey)) return;
     yield await _persist(
       _state.withArtifact(
         artifactKey,
@@ -517,18 +615,75 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     return await file.exists() && await file.length() == spec.bytes;
   }
 
-  /// Null when a pinned hash was published and these bytes do not match it. A
-  /// digest rather than a bool so an unhashed file is receipted by content.
-  Future<String?> _acceptableDigest(
-    ModelCatalogEntry entry,
-    ModelArtifactFile spec,
-  ) async {
-    final file = File('${_rootFor(entry)}/${spec.path}');
-    final digest = (await sha256.bind(file.openRead()).first).toString();
-    final expected = spec.sha256;
-    if (expected != null && digest != expected) return null;
-    return digest;
+  /// Hashes [file] in chunks, reporting the running byte count every
+  /// [verifyProgressStride] bytes and the digest last. A digest rather than a
+  /// verdict so an unhashed file is receipted by content. The stride is the
+  /// pace estimator's only sample of a hash; past its 4 s window between
+  /// samples the ETA never appears, so 8 MiB keeps it alive down to 2 MB/s.
+  /// The hash runs on its own isolate: pure-Dart SHA-256 over gigabytes is
+  /// ~30 s of uninterruptible CPU on a laptop core and longer on a phone,
+  /// and on the UI isolate every frame of the determinate bar paid for it.
+  /// Messages are hashed-byte counts, then the hex digest, then done; a read
+  /// fault crosses back as a FileSystemException so the caller's handling
+  /// is the same as for an inline read.
+  Stream<({int hashed, Digest? digest})> _hashProgress(File file) async* {
+    final port = ReceivePort();
+    final isolate = await Isolate.spawn(_hashFile, (
+      path: file.path,
+      stride: verifyProgressStride,
+      port: port.sendPort,
+    ), onError: port.sendPort);
+    try {
+      await for (final message in port) {
+        switch (message) {
+          case final int hashed:
+            yield (hashed: hashed, digest: null);
+          case final String hex:
+            yield (hashed: 0, digest: Digest(_hexBytes(hex)));
+          case (final String path, final String detail):
+            throw FileSystemException(detail, path);
+          case final List<Object?> error:
+            throw StateError('${error.first}');
+          case _:
+            return;
+        }
+      }
+    } finally {
+      isolate.kill(priority: Isolate.immediate);
+      port.close();
+    }
   }
+
+  static Future<void> _hashFile(
+    ({String path, int stride, SendPort port}) job,
+  ) async {
+    final sink = _DigestCatch();
+    final input = sha256.startChunkedConversion(sink);
+    var hashed = 0;
+    var reported = 0;
+    try {
+      await for (final chunk in File(job.path).openRead()) {
+        input.add(chunk);
+        hashed += chunk.length;
+        if (hashed - reported >= job.stride) {
+          reported = hashed;
+          job.port.send(hashed);
+        }
+      }
+    } on FileSystemException catch (error) {
+      job.port.send((job.path, error.message));
+      job.port.send(null);
+      return;
+    }
+    input.close();
+    job.port.send(sink.value!.toString());
+    job.port.send(null);
+  }
+
+  static List<int> _hexBytes(String hex) => [
+    for (var i = 0; i < hex.length; i += 2)
+      int.parse(hex.substring(i, i + 2), radix: 16),
+  ];
 
   static const _receiptName = '.golem-verified.json';
 
@@ -710,4 +865,15 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     }
     return _persist(_state.withArtifact(entry.key, const ArtifactStatus()));
   }
+}
+
+/// `crypto` keeps its own `DigestSink` private to the package.
+final class _DigestCatch implements Sink<Digest> {
+  Digest? value;
+
+  @override
+  void add(Digest data) => value = data;
+
+  @override
+  void close() {}
 }

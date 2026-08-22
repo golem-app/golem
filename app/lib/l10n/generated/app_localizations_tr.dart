@@ -312,9 +312,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get downloadProgress => 'İndirme ilerlemesi';
 
   @override
-  String get verifyingFiles => 'Dosyalar doğrulanıyor…';
-
-  @override
   String get keep => 'Tut';
 
   @override
@@ -559,28 +556,13 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'Tam hız için Golem’i açık tutun.';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return 'Çıkmak sorun değil — $platform arka plan indirmelerini yaklaşık $rate hızına düşürür; bu durumda işlem $foregroundDuration yerine $backgroundDuration sürer.';
+  String verifiedAmount(String verified, String total) {
+    return '$verified / $total doğrulandı';
   }
 
   @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'yaklaşık $count dakika',
-      one: 'yaklaşık 1 dakika',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote =>
+      'Golem’i açık tutun — indirmeler uygulama öndeyken en hızlıdır.';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -626,9 +608,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get privacyFootnote =>
       'Model bu cihazda saklanır. Yazdıklarınız hiçbir yere yüklenmez.';
-
-  @override
-  String get dismissNote => 'Kapat';
 
   @override
   String get chatsStayAvailable => 'Sohbetler kullanılabilir kalır.';
@@ -739,8 +718,8 @@ class AppLocalizationsTr extends AppLocalizations {
   String get chatDeleted => 'Sohbet silindi';
 
   @override
-  String storageAmount(String used, String total) {
-    return '$used / $total';
+  String storageUsedAndFree(String used, String free) {
+    return '$used kullanımda · $free boş';
   }
 
   @override
@@ -1533,11 +1512,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String downloadProgressLabel(String suffix) {
     return 'İndirme$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return 'Dosyalar doğrulanıyor$suffix…';
   }
 
   @override

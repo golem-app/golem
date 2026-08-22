@@ -6,7 +6,6 @@ import 'package:golem_flutter/app/launch_composition.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
-import 'package:golem_flutter/features/models/application/download_note_providers.dart';
 import 'package:golem_flutter/features/models/application/download_pace_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
 
@@ -58,6 +57,18 @@ ModelState _downloading(String key, int bytes) => ModelState(
 ModelState _phase(String key, ArtifactPhase phase, int bytes) => ModelState(
   simulated: true,
   artifacts: {key: ArtifactStatus(phase: phase, downloadedBytes: bytes)},
+);
+
+/// Every byte has arrived; [hashed] of the pinned total are verified.
+ModelState _verifying(String key, int hashed) => ModelState(
+  simulated: true,
+  artifacts: {
+    key: ArtifactStatus(
+      phase: ArtifactPhase.verifying,
+      downloadedBytes: 3583086498,
+      verifiedBytes: hashed,
+    ),
+  },
 );
 
 void main() {
@@ -141,140 +152,35 @@ void main() {
       },
     );
 
-    test('per-file verifying flips do not restart the warm-up', () async {
+    test('verification opens a fresh window over hashed bytes', () async {
       container.listen(downloadPaceProvider, (_, _) {});
       await startDownload();
       await tick(Duration.zero, _downloading(key, 0));
       await tick(const Duration(seconds: 1), _downloading(key, 44000000));
       expect(container.read(downloadPaceProvider), isNotNull);
-      // A finished file verifies, then the next file starts transferring.
-      await tick(
-        const Duration(seconds: 1),
-        _phase(key, ArtifactPhase.verifying, 44000000),
-      );
+      // Every byte has arrived; the hash starts with its own counter, and
+      // the network window is not averaged into it.
+      await tick(const Duration(seconds: 1), _verifying(key, 0));
       expect(container.read(downloadPaceProvider), isNull);
-      await tick(const Duration(seconds: 1), _downloading(key, 88000000));
-      expect(
-        container.read(downloadPaceProvider),
-        isNotNull,
-        reason: 'the window survives the file boundary',
-      );
+      await tick(const Duration(seconds: 1), _verifying(key, 150000000));
+      final snapshot = container.read(downloadPaceProvider);
+      expect(snapshot, isNotNull);
+      expect(snapshot!.phase, ArtifactPhase.verifying);
+      expect(snapshot.mbPerSecond, closeTo(150.0, 0.001));
+      expect(snapshot.eta, isNotNull, reason: 'the catalog knows the size');
     });
 
-    test('verification and completion clear the snapshot', () async {
+    test('completion clears the snapshot', () async {
       container.listen(downloadPaceProvider, (_, _) {});
       await startDownload();
-      await tick(Duration.zero, _downloading(key, 0));
-      await tick(const Duration(seconds: 1), _downloading(key, 44000000));
+      await tick(Duration.zero, _verifying(key, 0));
+      await tick(const Duration(seconds: 1), _verifying(key, 150000000));
+      expect(container.read(downloadPaceProvider), isNotNull);
       await tick(
         const Duration(seconds: 1),
-        _phase(key, ArtifactPhase.verifying, 88000000),
+        _phase(key, ArtifactPhase.installed, 3583086498),
       );
       expect(container.read(downloadPaceProvider), isNull);
-    });
-  });
-
-  group('downloadNoteDismissal', () {
-    test('visibility is downloading and not dismissed, per artifact', () async {
-      container.listen(downloadNoteVisibleProvider(key), (_, _) {});
-      expect(container.read(downloadNoteVisibleProvider(key)), isFalse);
-      await startDownload();
-      await tick(Duration.zero, _downloading(key, 0));
-      expect(container.read(downloadNoteVisibleProvider(key)), isTrue);
-
-      container.read(downloadNoteDismissalProvider.notifier).dismiss(key);
-      expect(container.read(downloadNoteVisibleProvider(key)), isFalse);
-      expect(
-        container.read(downloadNoteVisibleProvider('qwen35-gguf')),
-        isFalse,
-        reason: 'another artifact is simply not downloading',
-      );
-    });
-
-    test('a dismissal survives ticks but not a new attempt', () async {
-      container.listen(downloadNoteVisibleProvider(key), (_, _) {});
-      await startDownload();
-      await tick(Duration.zero, _downloading(key, 0));
-      container.read(downloadNoteDismissalProvider.notifier).dismiss(key);
-
-      await tick(const Duration(seconds: 1), _downloading(key, 44000000));
-      expect(
-        container.read(downloadNoteVisibleProvider(key)),
-        isFalse,
-        reason: 'progress ticks are the same attempt',
-      );
-
-      await tick(
-        const Duration(seconds: 1),
-        _phase(key, ArtifactPhase.paused, 44000000),
-      );
-      expect(container.read(downloadNoteVisibleProvider(key)), isFalse);
-
-      // Resume re-enters downloading: the trade-off is live again.
-      await tick(const Duration(seconds: 5), _downloading(key, 44000000));
-      expect(container.read(downloadNoteVisibleProvider(key)), isTrue);
-    });
-
-    test('a dismissal survives per-file verifying flips', () async {
-      container.listen(downloadNoteVisibleProvider(key), (_, _) {});
-      await startDownload();
-      await tick(Duration.zero, _downloading(key, 0));
-      container.read(downloadNoteDismissalProvider.notifier).dismiss(key);
-
-      // Multi-file artifact: each finished file verifies before the next
-      // file re-enters downloading. Same attempt — the note stays away.
-      for (var i = 1; i <= 3; i++) {
-        await tick(
-          const Duration(seconds: 1),
-          _phase(key, ArtifactPhase.verifying, 44000000 * i),
-        );
-        await tick(
-          const Duration(seconds: 1),
-          _downloading(key, 44000000 * (i + 1)),
-        );
-        expect(
-          container.read(downloadNoteVisibleProvider(key)),
-          isFalse,
-          reason: 'file boundary $i is not a new attempt',
-        );
-      }
-    });
-
-    test(
-      'note figures freeze at attempt start and refreeze on resume',
-      () async {
-        container.listen(downloadNoteFiguresProvider, (_, _) {});
-        await startDownload();
-        await tick(Duration.zero, _downloading(key, 5000000));
-        expect(container.read(downloadNoteFiguresProvider)[key], 5000000);
-
-        // Progress ticks and file-boundary verify flips leave the figure alone.
-        await tick(const Duration(seconds: 1), _downloading(key, 44000000));
-        await tick(
-          const Duration(seconds: 1),
-          _phase(key, ArtifactPhase.verifying, 44000000),
-        );
-        await tick(const Duration(seconds: 1), _downloading(key, 50000000));
-        expect(container.read(downloadNoteFiguresProvider)[key], 5000000);
-
-        // A pause ends the attempt; resuming freezes a fresh figure.
-        await tick(
-          const Duration(seconds: 1),
-          _phase(key, ArtifactPhase.paused, 60000000),
-        );
-        await tick(const Duration(seconds: 1), _downloading(key, 60000000));
-        expect(container.read(downloadNoteFiguresProvider)[key], 60000000);
-      },
-    );
-
-    test('dismissals are independent per artifact key', () async {
-      container.listen(downloadNoteVisibleProvider(key), (_, _) {});
-      await startDownload();
-      await tick(Duration.zero, _downloading(key, 0));
-      container
-          .read(downloadNoteDismissalProvider.notifier)
-          .dismiss('qwen35-gguf');
-      expect(container.read(downloadNoteVisibleProvider(key)), isTrue);
     });
   });
 }

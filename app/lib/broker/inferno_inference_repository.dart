@@ -259,7 +259,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
   /// does not resolve — the load itself reports missing files with better copy.
   static Future<int?> _modelSizeOnDisk(String path) async {
     try {
-      if (await File(path).exists()) return File(path).length();
+      if (await File(path).exists()) return await File(path).length();
       final directory = Directory(path);
       if (!await directory.exists()) return null;
       var total = 0;

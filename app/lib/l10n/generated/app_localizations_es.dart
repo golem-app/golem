@@ -314,9 +314,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get downloadProgress => 'Progreso de descarga';
 
   @override
-  String get verifyingFiles => 'Verificando archivos…';
-
-  @override
   String get keep => 'Conservar';
 
   @override
@@ -562,29 +559,13 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle =>
-      'Mantén Golem abierto para la velocidad máxima.';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return 'Puedes salir — $platform reduce las descargas en segundo plano a unos $rate, así que tardaría $backgroundDuration en lugar de $foregroundDuration.';
+  String verifiedAmount(String verified, String total) {
+    return '$verified de $total verificados';
   }
 
   @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'alrededor de $count minutos',
-      one: 'alrededor de 1 minuto',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote =>
+      'Mantén Golem abierto: las descargas son más rápidas en primer plano.';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -630,9 +611,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get privacyFootnote =>
       'El modelo se guarda en este dispositivo. Nada de lo que escribes se sube.';
-
-  @override
-  String get dismissNote => 'Cerrar';
 
   @override
   String get chatsStayAvailable => 'Los chats siguen disponibles.';
@@ -744,8 +722,8 @@ class AppLocalizationsEs extends AppLocalizations {
   String get chatDeleted => 'Chat eliminado';
 
   @override
-  String storageAmount(String used, String total) {
-    return '$used de $total';
+  String storageUsedAndFree(String used, String free) {
+    return '$used usados · $free libres';
   }
 
   @override
@@ -1548,11 +1526,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String downloadProgressLabel(String suffix) {
     return 'Descarga$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return 'Verificando archivos$suffix…';
   }
 
   @override

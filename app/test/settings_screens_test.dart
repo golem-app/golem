@@ -17,7 +17,6 @@ import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_repository_resolver.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
-import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/settings/appearance_screen.dart';
 import 'package:golem_flutter/features/settings/models_screen.dart';
@@ -99,35 +98,33 @@ void main() {
     expect(find.byKey(const Key('metrics-pill')), findsNothing);
   }, variant: iosChrome);
 
-  testWidgets(
-    'settled reasoning collapses unless the preference expands it',
-    (tester) async {
-      await pumpWithRepositories(
-        tester,
-        history: seedHistory(),
-        child: const ChatScreen(),
-      );
-      final reasoningText = find.textContaining('one small delight');
-      expect(reasoningText, findsNothing, reason: 'collapsed by default');
-      await tester.tap(find.byKey(const Key('reasoning-card')));
-      await tester.pumpAndSettle();
-      expect(reasoningText, findsOneWidget, reason: 'tap still discloses');
+  testWidgets('settled reasoning collapses unless the preference expands it', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      history: seedHistory(),
+      child: const ChatScreen(),
+    );
+    final reasoningText = find.textContaining('one small delight');
+    expect(reasoningText, findsNothing, reason: 'collapsed by default');
+    await tester.tap(find.byKey(const Key('reasoning-card')));
+    await tester.pumpAndSettle();
+    expect(reasoningText, findsOneWidget, reason: 'tap still discloses');
 
-      // Dismantle the tree first: an identical re-pump would reuse the
-      // card's State and mask the initial-expansion behavior under test.
-      await tester.pumpWidget(const SizedBox.shrink());
-      await pumpWithRepositories(
-        tester,
-        history: seedHistory(),
-        preferences: InMemoryPreferencesRepository(
-          const AppPreferences(expandReasoning: true),
-        ),
-        child: const ChatScreen(),
-      );
-      expect(reasoningText, findsOneWidget);
-    },
-    variant: iosChrome,
-  );
+    // Dismantle the tree first: an identical re-pump would reuse the
+    // card's State and mask the initial-expansion behavior under test.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await pumpWithRepositories(
+      tester,
+      history: seedHistory(),
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(expandReasoning: true),
+      ),
+      child: const ChatScreen(),
+    );
+    expect(reasoningText, findsOneWidget);
+  }, variant: iosChrome);
 
   testWidgets('appearance commits theme, and toggles persist', (tester) async {
     final preferences = InMemoryPreferencesRepository();
@@ -220,12 +217,51 @@ void main() {
       find.byKey(const Key('model-download-note-gemma4-mlx')),
       findsOneWidget,
     );
-    expect(find.text('Keep Golem open for full speed.'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('download-note-dismiss')));
-    await tester.pump();
-    expect(find.text('Keep Golem open for full speed.'), findsNothing);
+    expect(find.textContaining('Keep Golem open'), findsOneWidget);
+    expect(find.byKey(const Key('download-note-dismiss')), findsNothing);
   });
+
+  for (final (locale, scale) in [
+    (const Locale('en'), 1.0),
+    (const Locale('pl'), 1.6),
+  ]) {
+    testWidgets('a verifying card names the phase once and offers Cancel '
+        '(${locale.languageCode} @ $scale)', (tester) async {
+      // Three "Verifying" on one card — status row, bar caption, chip —
+      // overflowed the row by 58 px in Polish.
+      await pumpWithRepositories(
+        tester,
+        locale: locale,
+        textScale: scale,
+        model: const ModelState(
+          simulated: true,
+          artifacts: {
+            'gemma4-mlx': ArtifactStatus(
+              phase: ArtifactPhase.verifying,
+              downloadedBytes: 3583086498,
+              verifiedBytes: 900000000,
+            ),
+          },
+        ),
+        child: const ModelsScreen(),
+      );
+      expect(tester.takeException(), isNull);
+      final card = find.byKey(const Key('model-card-gemma4-mlx'));
+      expect(
+        find.descendant(
+          of: card,
+          matching: find.textContaining(RegExp('Verif|Weryf')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('model-progress-gemma4-mlx')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('model-cancel-gemma4-mlx')), findsOneWidget);
+      expect(find.byKey(const Key('model-pause-gemma4-mlx')), findsNothing);
+    });
+  }
 
   testWidgets('a paused card quotes the amount left under its bar', (
     tester,
@@ -250,7 +286,7 @@ void main() {
       find.byKey(const Key('model-download-note-gemma4-mlx')),
       findsOneWidget,
     );
-    expect(find.text('Keep Golem open for full speed.'), findsNothing);
+    expect(find.textContaining('Keep Golem open'), findsNothing);
     expect(find.textContaining(' left'), findsOneWidget);
   });
 
@@ -321,7 +357,7 @@ void main() {
       ),
       child: const ModelsScreen(),
     );
-    expect(find.text('Keep Golem open for full speed.'), findsOneWidget);
+    expect(find.textContaining('Keep Golem open'), findsOneWidget);
     final before = tester.getTopLeft(
       find.byKey(const Key('model-card-gemma4-mlx')),
     );
@@ -335,7 +371,7 @@ void main() {
     await container.read(modelControllerProvider.notifier).pause('gemma4-mlx');
     await tester.pumpAndSettle();
 
-    expect(find.text('Keep Golem open for full speed.'), findsNothing);
+    expect(find.textContaining('Keep Golem open'), findsNothing);
     expect(
       tester.getTopLeft(find.byKey(const Key('model-card-gemma4-mlx'))),
       before,
@@ -610,86 +646,45 @@ void main() {
     );
   }, variant: iosChrome);
 
-  testWidgets('reasoning opened by streaming latches when it settles', (
+  testWidgets('the root model row names the chat\'s model, not the boot one', (
     tester,
   ) async {
-    setViewport(tester);
-    final container = buildContainer();
-    addTearDown(container.dispose);
-    ChatMessage message({required bool streaming}) => ChatMessage.text(
-      id: 'a1',
-      role: MessageRole.assistant,
-      text: 'The answer.',
-      reasoning: 'a private mid-read thought',
-      createdAt: DateTime.utc(2026, 8, 2),
-      isStreaming: streaming,
-    );
-    Widget pump(ChatMessage m) => UncontrolledProviderScope(
-      container: container,
-      child: wrapApp(
-        child: CupertinoPageScaffold(
-          child: MessageBubble(
-            message: m,
-            canRegenerate: false,
-            idle: false,
-            stoppedTokens: null,
-          ),
-        ),
+    // The visible half of the one-derivation rule (#129). The row used to
+    // resolve from residency alone, so with nothing loaded yet it named the
+    // build's boot artifact while chat, the picker and the Models screen all
+    // named the conversation's choice.
+    await pumpWithRepositories(
+      tester,
+      backend: const InferenceBackendConfig(
+        kind: InferenceBackendKind.mlx,
+        profileKey: 'gemma4',
+        artifactKey: 'gemma4-mlx',
+        modelPath: '/models/gemma',
+        modelPathFromCatalog: true,
       ),
+      model: const ModelState(
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+          'qwen35-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+        },
+      ),
+      history: ChatHistorySnapshot(
+        activeId: 'chat',
+        conversations: [
+          ChatConversation(
+            id: 'chat',
+            title: 'Switched',
+            updatedAt: DateTime.utc(2026, 8, 18),
+            messages: const [],
+            modelKey: 'qwen35-mlx',
+          ),
+        ],
+      ),
+      child: const SettingsScreen(identity: AppIdentity.dev),
     );
-    await tester.pumpWidget(pump(message(streaming: true)));
-    await tester.pump();
-    final reasoning = find.text('a private mid-read thought');
-    expect(reasoning, findsOneWidget, reason: 'streaming shows live');
-
-    // The run settles with the reader mid-thought: the card must stay
-    // open, not snap shut with the default expand preference off.
-    await tester.pumpWidget(pump(message(streaming: false)));
-    await tester.pumpAndSettle();
-    expect(reasoning, findsOneWidget);
+    expect(find.text('Qwen 3.5 4B'), findsOneWidget);
+    expect(find.text('Gemma 4 E2B'), findsNothing);
   }, variant: iosChrome);
-
-  testWidgets(
-    'the root model row names the chat\'s model, not the boot one',
-    (tester) async {
-      // The visible half of the one-derivation rule (#129). The row used to
-      // resolve from residency alone, so with nothing loaded yet it named the
-      // build's boot artifact while chat, the picker and the Models screen all
-      // named the conversation's choice.
-      await pumpWithRepositories(
-        tester,
-        backend: const InferenceBackendConfig(
-          kind: InferenceBackendKind.mlx,
-          profileKey: 'gemma4',
-          artifactKey: 'gemma4-mlx',
-          modelPath: '/models/gemma',
-          modelPathFromCatalog: true,
-        ),
-        model: const ModelState(
-          artifacts: {
-            'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
-            'qwen35-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
-          },
-        ),
-        history: ChatHistorySnapshot(
-          activeId: 'chat',
-          conversations: [
-            ChatConversation(
-              id: 'chat',
-              title: 'Switched',
-              updatedAt: DateTime.utc(2026, 8, 18),
-              messages: const [],
-              modelKey: 'qwen35-mlx',
-            ),
-          ],
-        ),
-        child: const SettingsScreen(identity: AppIdentity.dev),
-      );
-      expect(find.text('Qwen 3.5 4B'), findsOneWidget);
-      expect(find.text('Gemma 4 E2B'), findsNothing);
-    },
-    variant: iosChrome,
-  );
 
   testWidgets('the root reflects the active style and advanced rows', (
     tester,

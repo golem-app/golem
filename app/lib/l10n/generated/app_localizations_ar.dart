@@ -312,9 +312,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get downloadProgress => 'تقدم التنزيل';
 
   @override
-  String get verifyingFiles => 'جارٍ التحقق من الملفات…';
-
-  @override
   String get keep => 'إبقاء';
 
   @override
@@ -557,31 +554,13 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'أبقِ Golem مفتوحًا للسرعة الكاملة.';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return 'لا بأس بالمغادرة — يبطئ $platform التنزيلات في الخلفية إلى نحو $rate، لذا سيستغرق الأمر $backgroundDuration بدلًا من $foregroundDuration.';
+  String verifiedAmount(String verified, String total) {
+    return 'تم التحقق من $verified من $total';
   }
 
   @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'نحو $count دقيقة',
-      many: 'نحو $count دقيقة',
-      few: 'نحو $count دقائق',
-      two: 'نحو دقيقتين',
-      one: 'نحو دقيقة واحدة',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote =>
+      'أبقِ Golem مفتوحًا — يكون التنزيل أسرع عندما يكون التطبيق في المقدمة.';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -630,9 +609,6 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get privacyFootnote =>
       'يُخزَّن النموذج على هذا الجهاز. لا يُرفَع أي شيء تكتبه.';
-
-  @override
-  String get dismissNote => 'إغلاق';
 
   @override
   String get chatsStayAvailable => 'تبقى المحادثات متاحة.';
@@ -739,8 +715,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chatDeleted => 'حُذفت المحادثة';
 
   @override
-  String storageAmount(String used, String total) {
-    return '$used من $total';
+  String storageUsedAndFree(String used, String free) {
+    return 'المستخدم $used · المتاح $free';
   }
 
   @override
@@ -1554,11 +1530,6 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String downloadProgressLabel(String suffix) {
     return 'التنزيل$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return 'جارٍ التحقق من الملفات$suffix…';
   }
 
   @override

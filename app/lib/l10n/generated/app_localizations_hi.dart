@@ -315,9 +315,6 @@ class AppLocalizationsHi extends AppLocalizations {
   String get downloadProgress => 'डाउनलोड की प्रगति';
 
   @override
-  String get verifyingFiles => 'फ़ाइलें जाँची जा रही हैं…';
-
-  @override
   String get keep => 'रखें';
 
   @override
@@ -561,28 +558,13 @@ class AppLocalizationsHi extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'पूरी गति के लिए Golem को खुला रखें।';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return 'बाहर जाना ठीक है — $platform बैकग्राउंड डाउनलोड को लगभग $rate तक धीमा कर देता है, इसलिए इसमें $foregroundDuration की जगह $backgroundDuration लगेंगे।';
+  String verifiedAmount(String verified, String total) {
+    return '$total में से $verified सत्यापित';
   }
 
   @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'लगभग $count मिनट',
-      one: 'लगभग 1 मिनट',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote =>
+      'Golem को खुला रखें — ऐप सामने रहने पर डाउनलोड सबसे तेज़ होता है।';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -628,9 +610,6 @@ class AppLocalizationsHi extends AppLocalizations {
   @override
   String get privacyFootnote =>
       'मॉडल इसी डिवाइस पर रहता है। आप जो लिखते हैं वह कहीं अपलोड नहीं होता।';
-
-  @override
-  String get dismissNote => 'बंद करें';
 
   @override
   String get chatsStayAvailable => 'चैट उपलब्ध रहती हैं।';
@@ -741,8 +720,8 @@ class AppLocalizationsHi extends AppLocalizations {
   String get chatDeleted => 'चैट मिटा दी गई';
 
   @override
-  String storageAmount(String used, String total) {
-    return '$total में से $used';
+  String storageUsedAndFree(String used, String free) {
+    return '$used उपयोग में · $free खाली';
   }
 
   @override
@@ -1533,11 +1512,6 @@ class AppLocalizationsHi extends AppLocalizations {
   @override
   String downloadProgressLabel(String suffix) {
     return 'डाउनलोड$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return 'फ़ाइलें जाँची जा रही हैं$suffix…';
   }
 
   @override

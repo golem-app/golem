@@ -28,6 +28,7 @@ import 'package:golem_flutter/features/models/application/storage_providers.dart
 import 'package:golem_flutter/features/preferences/application/generation_settings_providers.dart';
 import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
 
+import 'support/harness.dart';
 import 'support/in_memory_attachment_repository.dart';
 import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
@@ -369,6 +370,32 @@ final class _GatedTransfer implements ModelManagementRepository {
 }
 
 void main() {
+  test('toggling reasoning on a fresh session materializes the chat', () async {
+    // First run lands on "New chat" with no conversation yet; the toggle
+    // used to return early there, so the Think pill did nothing until a
+    // first message had materialized the chat (#143 QA).
+    final history = InMemoryChatHistoryRepository();
+    final container = buildContainer(chatHistory: history);
+    addTearDown(container.dispose);
+    await container.read(chatControllerProvider.future);
+    final controller = container.read(chatControllerProvider.notifier);
+    expect(container.read(chatControllerProvider).requireValue.active, isNull);
+
+    await controller.toggleReasoning();
+    var state = container.read(chatControllerProvider).requireValue;
+    expect(state.active?.reasoningEnabled, isTrue);
+    expect(state.conversations, hasLength(1));
+    expect(
+      (await history.load()).conversations.single.reasoningEnabled,
+      isTrue,
+    );
+
+    await controller.toggleReasoning();
+    state = container.read(chatControllerProvider).requireValue;
+    expect(state.active?.reasoningEnabled, isFalse);
+    expect(state.conversations, hasLength(1), reason: 'no second chat');
+  });
+
   ProviderContainer containerWith({Duration delay = Duration.zero}) {
     final directory = Directory.systemTemp.createTempSync(
       'golem-controller-test-',

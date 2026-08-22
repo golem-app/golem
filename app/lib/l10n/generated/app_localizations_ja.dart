@@ -309,9 +309,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get downloadProgress => 'ダウンロードの進行状況';
 
   @override
-  String get verifyingFiles => 'ファイルを検証中…';
-
-  @override
   String get keep => '保持';
 
   @override
@@ -546,27 +543,12 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'Golem を開いたままにすると全速でダウンロードできます。';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return '離れてもかまいません。$platform はバックグラウンドのダウンロードを約 $rate まで下げるため、所要時間は$foregroundDurationではなく$backgroundDurationになります。';
+  String verifiedAmount(String verified, String total) {
+    return '$total中$verifiedを検証済み';
   }
 
   @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '約$count分',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote => 'Golem を開いたままにしてください。バックグラウンドではダウンロードが遅くなります。';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -609,9 +591,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get privacyFootnote => 'モデルはこの端末に保存されます。入力した内容が送信されることはありません。';
-
-  @override
-  String get dismissNote => '閉じる';
 
   @override
   String get chatsStayAvailable => 'チャットは引き続き利用できます。';
@@ -714,8 +693,8 @@ class AppLocalizationsJa extends AppLocalizations {
   String get chatDeleted => 'チャットを削除しました';
 
   @override
-  String storageAmount(String used, String total) {
-    return '$total中$used';
+  String storageUsedAndFree(String used, String free) {
+    return '使用中$used · 空き容量$free';
   }
 
   @override
@@ -1480,11 +1459,6 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String downloadProgressLabel(String suffix) {
     return 'ダウンロード$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return 'ファイルを検証中$suffix…';
   }
 
   @override

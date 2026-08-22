@@ -355,6 +355,15 @@ class _ModelCard extends ConsumerWidget {
     final controller = ref.read(modelControllerProvider.notifier);
     final suffix = simulated ? ' · ${context.l10n.simulated}' : '';
     final statusLabel = _statusLabel(context, suffix);
+    // The bar names its own phase to a screen reader: "Download" over a
+    // hash read as a download regressing from 100 % to 27 %. Painted, the
+    // status row one line up already says "Verifying", so the bar carries no
+    // caption or chip in that phase — three "Verifying" on one card
+    // overflowed its row in Polish.
+    final verifying = status.phase == ArtifactPhase.verifying;
+    final barLabel = verifying
+        ? context.l10n.verifyingStatus(suffix)
+        : context.l10n.downloadProgressLabel(suffix);
     final chats = ref.watch(chatControllerProvider).value?.conversations;
     // Attribution comes from the shared helper, not a local fallback: the
     // picker quotes the same numbers, and a different default had one surface
@@ -404,6 +413,7 @@ class _ModelCard extends ConsumerWidget {
             child: _Status(icon: _statusIcon(), label: statusLabel),
           ),
           if (status.phase == ArtifactPhase.downloading ||
+              status.phase == ArtifactPhase.verifying ||
               status.phase == ArtifactPhase.paused) ...[
             const SizedBox(height: 14),
             TransferCard(
@@ -412,17 +422,18 @@ class _ModelCard extends ConsumerWidget {
                 entry: entry,
                 status: status,
                 localizations: context.l10n,
-                // Only a running transfer has a pace; watching it while
-                // paused would rebuild this card on every tick of a download
+                // Only a running phase has a pace; watching it while paused
+                // would rebuild this card on every tick of a transfer
                 // belonging to another one.
-                pace: status.phase == ArtifactPhase.downloading
-                    ? ref.watch(downloadPaceProvider)
-                    : null,
+                pace: status.phase == ArtifactPhase.paused
+                    ? null
+                    : ref.watch(downloadPaceProvider),
                 simulated: simulated,
               ),
               density: TransferDensity.dense,
-              semanticsLabel: context.l10n.downloadProgressLabel(suffix),
-              caption: context.l10n.downloadProgressLabel(suffix),
+              semanticsLabel: barLabel,
+              caption: verifying ? null : barLabel,
+              showChip: !verifying,
               // The status row above already reads "Downloading 1.42 GB of
               // 3.30 GB · simulated"; the card does not say it twice.
               showBytes: false,
@@ -448,16 +459,6 @@ class _ModelCard extends ConsumerWidget {
               entry: entry,
               margin: const EdgeInsetsDirectional.only(top: 14),
             ),
-          if (status.phase == ArtifactPhase.verifying) ...[
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                const CupertinoActivityIndicator(),
-                const SizedBox(width: 10),
-                Text(context.l10n.verifyingFilesStatus(suffix)),
-              ],
-            ),
-          ],
           if (status.phase == ArtifactPhase.failed) ...[
             const SizedBox(height: 10),
             Text(
@@ -599,7 +600,9 @@ class _ModelCard extends ConsumerWidget {
       ],
       ArtifactPhase.paused ||
       ArtifactPhase.failed => [const SizedBox(height: 14), download, cancel],
-      ArtifactPhase.verifying => const [],
+      // A hash is not pausable, but it is a multi-gigabyte phase now and
+      // first run lets the user abandon it; so does this card.
+      ArtifactPhase.verifying => [const SizedBox(height: 14), cancel],
       ArtifactPhase.installed => [
         const SizedBox(height: 14),
         GolemButton.destructive(
