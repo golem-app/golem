@@ -207,7 +207,7 @@ class SettingsScreen extends ConsumerWidget {
                 SettingsNavRow(
                   key: const Key('about-row'),
                   label: l10n.settingsAboutGolem,
-                  value: appVersion,
+                  value: aboutVersionLabel(),
                   onTap: () => _showAbout(context, ref),
                 ),
               ],

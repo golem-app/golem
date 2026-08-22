@@ -38,10 +38,12 @@ runs `dev`'s real inference and real downloader. Prefer `flutter build
 --flavor <name>`; if you must use a bare `xcodebuild`, run the matching
 `flutter build ... --flavor qa` immediately before it.
 
-> **Physical iPhone caution:** never install the `production`
-> (`app.golem`) flavor on the physical iPhone — that identifier belongs
-> to the native app there (and its imported model). The `qa` and `dev`
-> flavors are fine to deploy. Simulator use is unrestricted.
+> **Physical devices:** build and install through `tool/device_install.sh`
+> (repo root), never by hand. It refuses to install anything but a freshly
+> built, correctly signed bundle whose id matches the flavor, clears the
+> stale Swift module cache an SDK bump leaves behind, and stamps the commit
+> into Settings ▸ About so a tester can see which build is in hand. A bare
+> `xcodebuild` once installed a morning-old binary for QA.
 
 ## Deterministic where it matters
 
@@ -728,12 +730,14 @@ a provisioned phone only if you intend to re-provision. To replace the binary
 and keep `Documents/`, build and install without uninstalling:
 
 ```sh
-flutter build ios --release --flavor qa            # or: build apk --flavor qa
-xcrun devicectl device install app --device <UUID> \
-  build/ios/iphoneos/Runner.app                    # Android: adb install -r
+tool/device_install.sh ios qa <devicectl-UUID>       # from the repo root
+tool/device_install.sh android qa <adb-serial>
+tool/device_install.sh ios production <UUID> --dart-define=GOLEM_INFERENCE_BACKEND=auto
 ```
 
-`devicectl device install app` and `adb install -r` both upgrade in place.
+The script upgrades in place (`devicectl device install app` / `adb install
+-r`), and prints the commit it stamped into the build; Settings ▸ About shows
+the same stamp on the phone.
 
 Provisioning is therefore a separate, deliberate step, and the offline path is
 the default: an unprovisioned artifact fails fast and names the directory to
