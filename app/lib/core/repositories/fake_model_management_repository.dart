@@ -135,13 +135,23 @@ final class FakeModelManagementRepository implements ModelManagementRepository {
         ),
       );
     }
-    yield await _persist(
-      _state.withArtifact(
-        artifactKey,
-        ArtifactStatus(phase: ArtifactPhase.verifying, downloadedBytes: bytes),
-      ),
-    );
-    await Future<void>.delayed(stepDelay * 2);
+    // Verification as the real repository reports it: one phase after every
+    // byte has arrived, with its own counter climbing to the total.
+    const verifySteps = 4;
+    for (var step = 0; step <= verifySteps; step++) {
+      if (step > 0) await Future<void>.delayed(stepDelay);
+      if (_stopRequested.contains(artifactKey)) return;
+      yield await _persist(
+        _state.withArtifact(
+          artifactKey,
+          ArtifactStatus(
+            phase: ArtifactPhase.verifying,
+            downloadedBytes: bytes,
+            verifiedBytes: entry.totalBytes * step ~/ verifySteps,
+          ),
+        ),
+      );
+    }
     if (_stopRequested.contains(artifactKey)) return;
     yield await _persist(
       _state.withArtifact(

@@ -28,6 +28,7 @@ void main() {
     WidgetTester tester, {
     required TransferDensity density,
     ArtifactPhase phase = ArtifactPhase.downloading,
+    int verifiedBytes = 0,
     DownloadPaceSnapshot? pace,
     bool simulated = false,
     bool showBytes = true,
@@ -45,6 +46,7 @@ void main() {
                   status: ArtifactStatus(
                     phase: phase,
                     downloadedBytes: 1000000000,
+                    verifiedBytes: verifiedBytes,
                   ),
                   localizations: AppLocalizations.of(context),
                   pace: pace,
@@ -165,21 +167,19 @@ void main() {
     expect(find.text('3.00 GB left'), findsOneWidget);
   });
 
-  testWidgets('a verification fills the bar rather than emptying it', (
-    tester,
-  ) async {
-    // The repository counts verified bytes per file, so a fraction derived
-    // from them would collapse a finished download's bar to one file's worth.
+  testWidgets('a verification paints the hashed fraction', (tester) async {
     await pump(
       tester,
       density: TransferDensity.dense,
       phase: ArtifactPhase.verifying,
+      verifiedBytes: 3000000000,
     );
     expect(
       tester
           .widget<FractionallySizedBox>(find.byType(FractionallySizedBox))
           .widthFactor,
-      1.0,
+      0.75,
     );
+    expect(find.text('Verifying'), findsOneWidget);
   });
 }

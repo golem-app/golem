@@ -60,6 +60,18 @@ ModelState _phase(String key, ArtifactPhase phase, int bytes) => ModelState(
   artifacts: {key: ArtifactStatus(phase: phase, downloadedBytes: bytes)},
 );
 
+/// Every byte has arrived; [hashed] of the pinned total are verified.
+ModelState _verifying(String key, int hashed) => ModelState(
+  simulated: true,
+  artifacts: {
+    key: ArtifactStatus(
+      phase: ArtifactPhase.verifying,
+      downloadedBytes: 3583086498,
+      verifiedBytes: hashed,
+    ),
+  },
+);
+
 void main() {
   const key = 'gemma4-mlx';
 
@@ -141,34 +153,33 @@ void main() {
       },
     );
 
-    test('per-file verifying flips do not restart the warm-up', () async {
+    test('verification opens a fresh window over hashed bytes', () async {
       container.listen(downloadPaceProvider, (_, _) {});
       await startDownload();
       await tick(Duration.zero, _downloading(key, 0));
       await tick(const Duration(seconds: 1), _downloading(key, 44000000));
       expect(container.read(downloadPaceProvider), isNotNull);
-      // A finished file verifies, then the next file starts transferring.
-      await tick(
-        const Duration(seconds: 1),
-        _phase(key, ArtifactPhase.verifying, 44000000),
-      );
+      // Every byte has arrived; the hash starts with its own counter, and
+      // the network window is not averaged into it.
+      await tick(const Duration(seconds: 1), _verifying(key, 0));
       expect(container.read(downloadPaceProvider), isNull);
-      await tick(const Duration(seconds: 1), _downloading(key, 88000000));
-      expect(
-        container.read(downloadPaceProvider),
-        isNotNull,
-        reason: 'the window survives the file boundary',
-      );
+      await tick(const Duration(seconds: 1), _verifying(key, 150000000));
+      final snapshot = container.read(downloadPaceProvider);
+      expect(snapshot, isNotNull);
+      expect(snapshot!.phase, ArtifactPhase.verifying);
+      expect(snapshot.mbPerSecond, closeTo(150.0, 0.001));
+      expect(snapshot.eta, isNotNull, reason: 'the catalog knows the size');
     });
 
-    test('verification and completion clear the snapshot', () async {
+    test('completion clears the snapshot', () async {
       container.listen(downloadPaceProvider, (_, _) {});
       await startDownload();
-      await tick(Duration.zero, _downloading(key, 0));
-      await tick(const Duration(seconds: 1), _downloading(key, 44000000));
+      await tick(Duration.zero, _verifying(key, 0));
+      await tick(const Duration(seconds: 1), _verifying(key, 150000000));
+      expect(container.read(downloadPaceProvider), isNotNull);
       await tick(
         const Duration(seconds: 1),
-        _phase(key, ArtifactPhase.verifying, 88000000),
+        _phase(key, ArtifactPhase.installed, 3583086498),
       );
       expect(container.read(downloadPaceProvider), isNull);
     });
@@ -215,14 +226,14 @@ void main() {
       expect(container.read(downloadNoteVisibleProvider(key)), isTrue);
     });
 
-    test('a dismissal survives per-file verifying flips', () async {
+    test('a dismissal survives a verify-then-refetch flip', () async {
       container.listen(downloadNoteVisibleProvider(key), (_, _) {});
       await startDownload();
       await tick(Duration.zero, _downloading(key, 0));
       container.read(downloadNoteDismissalProvider.notifier).dismiss(key);
 
-      // Multi-file artifact: each finished file verifies before the next
-      // file re-enters downloading. Same attempt — the note stays away.
+      // A verification that rejects a sideloaded file re-fetches it and
+      // re-enters downloading. Same attempt — the note stays away.
       for (var i = 1; i <= 3; i++) {
         await tick(
           const Duration(seconds: 1),
@@ -235,7 +246,7 @@ void main() {
         expect(
           container.read(downloadNoteVisibleProvider(key)),
           isFalse,
-          reason: 'file boundary $i is not a new attempt',
+          reason: 're-fetch $i is not a new attempt',
         );
       }
     });
@@ -248,7 +259,7 @@ void main() {
         await tick(Duration.zero, _downloading(key, 5000000));
         expect(container.read(downloadNoteFiguresProvider)[key], 5000000);
 
-        // Progress ticks and file-boundary verify flips leave the figure alone.
+        // Progress ticks and a verify-then-refetch flip leave the figure alone.
         await tick(const Duration(seconds: 1), _downloading(key, 44000000));
         await tick(
           const Duration(seconds: 1),

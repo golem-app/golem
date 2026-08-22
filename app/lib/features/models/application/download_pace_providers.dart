@@ -12,11 +12,12 @@ part 'download_pace_providers.g.dart';
 @Riverpod(keepAlive: true, retry: noRetry)
 DateTime Function() paceClock(Ref ref) => DateTime.now;
 
-/// Live rate/ETA for the single in-flight download, derived by sampling
-/// [ModelController]'s byte counts against the injected clock. `null` until
-/// the trailing window can quote an honest figure, and again the moment the
-/// transfer leaves the `downloading` phase — surfaces render nothing rather
-/// than a stale or fabricated number.
+/// Live rate/ETA for the single in-flight artifact, derived by sampling
+/// [ModelController]'s byte counts against the injected clock — transferred
+/// bytes while downloading, hashed bytes while verifying, each phase its own
+/// window. `null` until the trailing window can quote an honest figure, and
+/// again the moment the artifact leaves both phases — surfaces render nothing
+/// rather than a stale or fabricated number.
 ///
 /// KeepAlive: the estimator's sample window lives in notifier fields, and the
 /// model stream must stay observed across screens the way the controller
@@ -26,6 +27,7 @@ DateTime Function() paceClock(Ref ref) => DateTime.now;
 class DownloadPace extends _$DownloadPace {
   final _estimator = DownloadPaceEstimator();
   String? _artifactKey;
+  ArtifactPhase? _phase;
   DateTime? _origin;
 
   @override
@@ -37,33 +39,36 @@ class DownloadPace extends _$DownloadPace {
   }
 
   void _onModel(ModelState? model) {
-    final downloading = model?.artifacts.entries
-        .where((entry) => entry.value.phase == ArtifactPhase.downloading)
+    final inFlight = model?.artifacts.entries
+        .where(
+          (entry) =>
+              entry.value.phase == ArtifactPhase.downloading ||
+              entry.value.phase == ArtifactPhase.verifying,
+        )
         .firstOrNull;
-    if (downloading == null) {
-      // A multi-file artifact verifies each finished file before the next
-      // one starts transferring. Hold the window through those flips — no
-      // surface renders the chip while verifying, and resetting here would
-      // blank and re-warm the readout at every file boundary. Any other
-      // phase ends the attempt.
-      final verifying =
-          _artifactKey != null &&
-          model?.statusOf(_artifactKey!).phase == ArtifactPhase.verifying;
-      if (!verifying) {
-        _artifactKey = null;
-        _origin = null;
-        _estimator.reset();
-      }
+    if (inFlight == null) {
+      _artifactKey = null;
+      _phase = null;
+      _origin = null;
+      _estimator.reset();
       state = null;
       return;
     }
+    final status = inFlight.value;
     final now = ref.read(paceClockProvider)();
-    if (downloading.key != _artifactKey) {
-      _artifactKey = downloading.key;
+    // A new artifact or a new phase is a new window: a hash runs at a
+    // different rate than the network, and averaging across the edge would
+    // quote one as the other.
+    if (inFlight.key != _artifactKey || status.phase != _phase) {
+      _artifactKey = inFlight.key;
+      _phase = status.phase;
       _origin = now;
       _estimator.reset();
     }
-    _estimator.add(now.difference(_origin!), downloading.value.downloadedBytes);
+    final progressed = status.phase == ArtifactPhase.verifying
+        ? status.verifiedBytes
+        : status.downloadedBytes;
+    _estimator.add(now.difference(_origin!), progressed);
     final rate = _estimator.mbPerSecond;
     if (rate == null) {
       state = null;
@@ -71,15 +76,14 @@ class DownloadPace extends _$DownloadPace {
     }
     final entry = ref
         .read(effectiveModelCatalogProvider)
-        .where((entry) => entry.key == downloading.key)
+        .where((entry) => entry.key == inFlight.key)
         .firstOrNull;
-    final remaining = entry == null
-        ? null
-        : entry.totalBytes - downloading.value.downloadedBytes;
+    final remaining = entry == null ? null : entry.totalBytes - progressed;
     state = DownloadPaceSnapshot(
-      artifactKey: downloading.key,
+      artifactKey: inFlight.key,
       mbPerSecond: rate,
       eta: remaining == null ? null : _estimator.eta(remaining),
+      phase: status.phase,
     );
   }
 }

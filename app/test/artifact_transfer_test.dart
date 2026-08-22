@@ -75,18 +75,19 @@ void main() {
       },
     );
 
-    test('a verification is complete, not partway', () {
-      // `real_model_management_repository` publishes `verifying` with the
-      // bytes verified *so far*, one file at a time. Reading a fraction off
-      // that would walk a finished download's bar backwards.
+    test('a verification reads its own counter, not the download', () {
+      // The transfer is complete; the bar now belongs to the hash.
       final transfer = project(
         const ArtifactStatus(
           phase: ArtifactPhase.verifying,
-          downloadedBytes: 400000000,
+          downloadedBytes: 4000000000,
+          verifiedBytes: 1000000000,
         ),
       );
-      expect(transfer.fraction, 1.0);
-      expect(transfer.percent, 100);
+      expect(transfer.fraction, 0.25);
+      expect(transfer.percent, 25);
+      expect(transfer.transferred, '1.00 GB');
+      expect(transfer.remaining, '3.00 GB');
     });
 
     test('a sizeless entry reads zero instead of dividing by it', () {
@@ -186,12 +187,43 @@ void main() {
       expect(failed.remainder, 'Stopped at 25%');
     });
 
-    test('verification and completion carry neither chip nor remainder', () {
-      for (final phase in [ArtifactPhase.verifying, ArtifactPhase.installed]) {
-        final transfer = project(ArtifactStatus(phase: phase));
-        expect(transfer.chip, isNull, reason: '$phase');
-        expect(transfer.remainder, isNull, reason: '$phase');
-      }
+    test('a verification names its phase and quotes an ETA, never a rate', () {
+      const status = ArtifactStatus(phase: ArtifactPhase.verifying);
+      final bare = project(status);
+      expect(bare.chip, 'Verifying');
+      expect(bare.chipIsLive, isTrue);
+      expect(bare.remainder, isNull, reason: 'no window yet');
+
+      final timed = project(
+        status,
+        pace: const DownloadPaceSnapshot(
+          artifactKey: 'test-gguf',
+          mbPerSecond: 150.0,
+          eta: Duration(seconds: 90),
+          phase: ArtifactPhase.verifying,
+        ),
+      );
+      expect(timed.chip, 'Verifying', reason: 'a hash rate is not MB/s');
+      expect(timed.remainder, 'About 2 minutes left');
+
+      // A window measured on the network is not borrowed across the edge.
+      final stale = project(
+        status,
+        pace: const DownloadPaceSnapshot(
+          artifactKey: 'test-gguf',
+          mbPerSecond: 44.0,
+          eta: Duration(seconds: 54),
+        ),
+      );
+      expect(stale.remainder, isNull);
+    });
+
+    test('completion carries neither chip nor remainder', () {
+      final transfer = project(
+        const ArtifactStatus(phase: ArtifactPhase.installed),
+      );
+      expect(transfer.chip, isNull);
+      expect(transfer.remainder, isNull);
     });
   });
 
