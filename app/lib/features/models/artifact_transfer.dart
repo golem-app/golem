@@ -105,6 +105,7 @@ final class ArtifactTransferPresentation {
     required this.remaining,
     required this.chipIsLive,
     this.chip,
+    this.chipSlot,
     this.remainder,
     this.affordance,
   });
@@ -131,6 +132,11 @@ final class ArtifactTransferPresentation {
   /// Whether [chip] reports a running transfer, which is the difference
   /// between an accent chip and a quiet one.
   final bool chipIsLive;
+
+  /// A value at least as wide as anything [chip] will show, so the pill keeps
+  /// one width while its figure ticks — "9.8 MB/s" becoming "10.2 MB/s" used
+  /// to nudge the unit. Null for a chip that names a state.
+  final String? chipSlot;
 
   /// The trailing figure under the bar: time left while downloading, amount
   /// left while paused, where it stopped when it failed.
@@ -183,6 +189,9 @@ ArtifactTransferPresentation artifactTransfer({
     total: gigabytes(entry.totalBytes),
     remaining: gigabytes(entry.totalBytes - progressed),
     chip: _chip(status.phase, snapshot, suffix, localizations),
+    chipSlot: status.phase == ArtifactPhase.downloading && snapshot != null
+        ? localizations.rateMbs('999.9')
+        : null,
     chipIsLive:
         status.phase == ArtifactPhase.downloading ||
         status.phase == ArtifactPhase.verifying,

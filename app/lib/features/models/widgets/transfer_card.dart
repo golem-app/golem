@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../core/theme/golem_theme.dart';
 import '../../../core/widgets/labeled_progress.dart';
+import '../../../core/widgets/text_measure.dart';
 import '../../../l10n/l10n.dart';
 import '../artifact_transfer.dart';
 
@@ -56,12 +57,18 @@ class TransferCard extends StatelessWidget {
     final prominent = density == TransferDensity.prominent;
     final chip = transfer.chip == null
         ? null
-        : _PaceChip(label: transfer.chip!, live: transfer.chipIsLive);
+        : _PaceChip(
+            label: transfer.chip!,
+            live: transfer.chipIsLive,
+            slot: transfer.chipSlot,
+          );
     return LabeledProgress(
       semanticsLabel: semanticsLabel,
       fraction: transfer.fraction,
       percent: transfer.percent,
       caption: prominent ? '${transfer.percent}%' : caption,
+      // The hero reserves "100%" so the sign never moves as digits come.
+      captionSlot: prominent ? '100%' : null,
       captionStyle: prominent
           ? GolemText.hero.copyWith(
               fontFeatures: const [FontFeature.tabularFigures()],
@@ -91,32 +98,45 @@ class TransferCard extends StatelessWidget {
 /// The rate or state chip riding the caption line: accent while bytes are
 /// moving, quiet once they have stopped.
 class _PaceChip extends StatelessWidget {
-  const _PaceChip({required this.label, required this.live});
+  const _PaceChip({required this.label, required this.live, this.slot});
 
   final String label;
   final bool live;
 
+  /// See [ArtifactTransferPresentation.chipSlot].
+  final String? slot;
+
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-    decoration: BoxDecoration(
-      color: CupertinoDynamicColor.resolve(
-        live ? GolemTheme.accentSoft : GolemTheme.fillQuiet,
-        context,
+  Widget build(BuildContext context) {
+    final style = GolemText.captionStrong.copyWith(
+      // The rate ticks; tabular digits keep every digit one width, and the
+      // slot keeps the pill one width when the digit count changes.
+      fontFeatures: const [FontFeature.tabularFigures()],
+      color: live
+          ? CupertinoDynamicColor.resolve(GolemTheme.accentIcon, context)
+          : CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      decoration: BoxDecoration(
+        color: CupertinoDynamicColor.resolve(
+          live ? GolemTheme.accentSoft : GolemTheme.fillQuiet,
+          context,
+        ),
+        borderRadius: BorderRadius.circular(GolemRadius.pill),
       ),
-      borderRadius: BorderRadius.circular(GolemRadius.pill),
-    ),
-    child: Text(
-      label,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: GolemText.captionStrong.copyWith(
-        // The rate ticks; tabular digits keep the pill one width.
-        fontFeatures: const [FontFeature.tabularFigures()],
-        color: live
-            ? CupertinoDynamicColor.resolve(GolemTheme.accentIcon, context)
-            : CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minWidth: slot == null ? 0 : textWidth(context, slot!, style),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.end,
+          style: style,
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

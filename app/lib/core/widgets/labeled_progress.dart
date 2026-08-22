@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../../l10n/l10n.dart';
 import '../theme/golem_theme.dart';
 import 'progress_track.dart';
+import 'text_measure.dart';
 
 /// A determinate bar that reads as one thing.
 ///
@@ -24,6 +25,7 @@ class LabeledProgress extends StatelessWidget {
     this.caption,
     this.captionStyle,
     this.trailing,
+    this.captionSlot,
     this.captionYields = true,
     this.showPercent = true,
     this.announcePercent = true,
@@ -51,6 +53,11 @@ class LabeledProgress extends StatelessWidget {
   /// A chip or badge riding the caption line, right of the caption and left of
   /// the percentage.
   final Widget? trailing;
+
+  /// A value at least as wide as any [caption] this bar will paint, reserved
+  /// and right-aligned so the caption's last glyph — the "%" of a hero
+  /// percentage — never moves as the digits before it come and go.
+  final String? captionSlot;
 
   /// Which of the caption and [trailing] gives way on a short line. A row
   /// inside a list wraps its caption and keeps the chip whole; a card led by a
@@ -98,11 +105,19 @@ class LabeledProgress extends StatelessWidget {
     final hasHeader = caption != null || trailing != null || showPercent;
     final captionWidget = caption == null
         ? const SizedBox.shrink()
-        : Text(
-            caption!,
-            style: captionText,
-            maxLines: captionYields ? null : 1,
-            softWrap: captionYields,
+        : ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: captionSlot == null
+                  ? 0
+                  : textWidth(context, captionSlot!, captionText),
+            ),
+            child: Text(
+              caption!,
+              style: captionText,
+              maxLines: captionYields ? null : 1,
+              softWrap: captionYields,
+              textAlign: captionSlot == null ? null : TextAlign.end,
+            ),
           );
     final bar = ExcludeSemantics(
       child: Column(
@@ -150,7 +165,6 @@ class LabeledProgress extends StatelessWidget {
       // first-run body sits under an IntrinsicHeight, which cannot ask one
       // for a height.
       const tabular = [FontFeature.tabularFigures()];
-      final base = DefaultTextStyle.of(context).style;
       final leadingStyle = GolemText.footnote.copyWith(
         fontFeatures: tabular,
         color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
@@ -159,14 +173,7 @@ class LabeledProgress extends StatelessWidget {
         fontFeatures: tabular,
       );
       int needs(String text, TextStyle style) {
-        final painter = TextPainter(
-          text: TextSpan(text: text, style: base.merge(style)),
-          textDirection: Directionality.of(context),
-          textScaler: MediaQuery.textScalerOf(context),
-          maxLines: 1,
-        )..layout();
-        final width = painter.width.ceil();
-        painter.dispose();
+        final width = textWidth(context, text, style).ceil();
         return width < 1 ? 1 : width;
       }
 
