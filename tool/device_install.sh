@@ -26,7 +26,7 @@ started=$(date +%s)
 
 fresh() { # fail unless $1 exists and was written after this run began
   [ -e "$1" ] || { echo "missing artifact: $1" >&2; exit 1; }
-  [ "$(stat -f %m "$1")" -ge "$started" ] || { echo "stale artifact (older than this run): $1" >&2; exit 1; }
+  [ "$(/usr/bin/stat -f %m "$1")" -ge "$started" ] || { echo "stale artifact (older than this run): $1" >&2; exit 1; }
 }
 
 case "$platform" in
