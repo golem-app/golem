@@ -355,6 +355,11 @@ class _ModelCard extends ConsumerWidget {
     final controller = ref.read(modelControllerProvider.notifier);
     final suffix = simulated ? ' · ${context.l10n.simulated}' : '';
     final statusLabel = _statusLabel(context, suffix);
+    // The bar names its own phase: "Download" over a hash read as a download
+    // regressing from 100 % to 27 %.
+    final barLabel = status.phase == ArtifactPhase.verifying
+        ? context.l10n.verifyingStatus(suffix)
+        : context.l10n.downloadProgressLabel(suffix);
     final chats = ref.watch(chatControllerProvider).value?.conversations;
     // Attribution comes from the shared helper, not a local fallback: the
     // picker quotes the same numbers, and a different default had one surface
@@ -422,8 +427,8 @@ class _ModelCard extends ConsumerWidget {
                 simulated: simulated,
               ),
               density: TransferDensity.dense,
-              semanticsLabel: context.l10n.downloadProgressLabel(suffix),
-              caption: context.l10n.downloadProgressLabel(suffix),
+              semanticsLabel: barLabel,
+              caption: barLabel,
               // The status row above already reads "Downloading 1.42 GB of
               // 3.30 GB · simulated"; the card does not say it twice.
               showBytes: false,

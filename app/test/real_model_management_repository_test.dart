@@ -564,12 +564,43 @@ void main() {
       phases.toList().indexOf(ArtifactPhase.verifying),
       lessThan(phases.toList().lastIndexOf(ArtifactPhase.downloading)),
     );
+    // Inside the first verify pass the counter never steps back: the first
+    // forgery's bytes stay counted while the second is hashed.
+    final firstPass = states
+        .map((state) => state.statusOf('test-mlx'))
+        .skipWhile((status) => status.phase != ArtifactPhase.verifying)
+        .takeWhile((status) => status.phase == ArtifactPhase.verifying)
+        .map((status) => status.verifiedBytes)
+        .toList();
+    expect(firstPass.length, greaterThan(2));
+    for (var i = 1; i < firstPass.length; i++) {
+      expect(firstPass[i], greaterThanOrEqualTo(firstPass[i - 1]));
+    }
+    expect(firstPass.last, greaterThan(_contentOne.length));
     expect(
       File(
         '${temp.path}/documents/models/test-mlx/.golem-verified.json',
       ).existsSync(),
       isTrue,
     );
+  });
+
+  test('a read fault keeps the file and is not a hash mismatch', () async {
+    // Right-length, unreadable: the device's fault, not the bytes'. Deleting
+    // the file and blaming the publisher would cost a re-download.
+    final file = File('${temp.path}/documents/models/test-mlx/$_fileTwo');
+    file.parent.createSync(recursive: true);
+    file.writeAsStringSync(_contentTwo);
+    await Process.run('chmod', ['000', file.path]);
+    addTearDown(() => Process.run('chmod', ['644', file.path]));
+    final repo = repository();
+    await repo.load();
+    await expectLater(
+      repo.download('test-mlx').toList(),
+      throwsA(isA<FileSystemException>()),
+    );
+    expect(file.existsSync(), isTrue);
+    expect(downloader.requestedUrls, [anything]);
   });
 
   test('the verified fast path needs the receipt, not just sizes', () async {

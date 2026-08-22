@@ -628,12 +628,19 @@ final class ArtifactStatus {
   /// a stale percentage.
   final int downloadedBytes;
 
-  /// Bytes whose SHA-256 has been proven in the current
-  /// [ArtifactPhase.verifying] pass — the determinate reading of a phase that
-  /// used to be a spinner (#143). In-memory like [failure]: a verify phase
-  /// never survives a relaunch (reconciliation re-derives it from the
-  /// receipt), so the store would only ever hold a stale count.
+  /// Bytes the current [ArtifactPhase.verifying] pass has hashed — the
+  /// receipted files plus every file read so far, whether it passed — the
+  /// determinate reading of a phase that used to be a spinner (#143). Never
+  /// decreases within a pass. In-memory like [failure]: a verify phase never
+  /// survives a relaunch (reconciliation re-derives it from the receipt), so
+  /// the store would only ever hold a stale count.
   final int verifiedBytes;
+
+  /// The counter this phase is measured by: hashed bytes while verifying,
+  /// transferred bytes otherwise. The one rule every bar, percentage and
+  /// pace window reads, so none of them can disagree on which it is.
+  int get progressBytes =>
+      phase == ArtifactPhase.verifying ? verifiedBytes : downloadedBytes;
 
   /// Internal diagnostic — never rendered, and never written to disk. It
   /// quotes whatever failed, which for a transfer means a platform message or

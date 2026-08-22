@@ -160,9 +160,7 @@ ArtifactTransferPresentation artifactTransfer({
   bool loadsHere = true,
   String? transferringKey,
 }) {
-  final progressed = status.phase == ArtifactPhase.verifying
-      ? status.verifiedBytes
-      : status.downloadedBytes;
+  final progressed = status.progressBytes;
   final fraction = entry.totalBytes <= 0
       ? 0.0
       : (progressed / entry.totalBytes).clamp(0.0, 1.0).toDouble();

@@ -85,7 +85,11 @@ class ModelSetupBanner extends ConsumerWidget {
             // the only thing carrying how far along it is, so it paints no
             // caption of its own.
             LabeledProgress(
-              semanticsLabel: context.l10n.download,
+              // The bar names its own phase: "Download" over a hash read as
+              // a download regressing from 100 % to 27 %.
+              semanticsLabel: status.phase == ArtifactPhase.verifying
+                  ? context.l10n.verifyingStatus('')
+                  : context.l10n.download,
               fraction: transfer.fraction,
               percent: transfer.percent,
               showPercent: false,

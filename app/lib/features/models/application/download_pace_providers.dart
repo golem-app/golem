@@ -65,9 +65,7 @@ class DownloadPace extends _$DownloadPace {
       _origin = now;
       _estimator.reset();
     }
-    final progressed = status.phase == ArtifactPhase.verifying
-        ? status.verifiedBytes
-        : status.downloadedBytes;
+    final progressed = status.progressBytes;
     _estimator.add(now.difference(_origin!), progressed);
     final rate = _estimator.mbPerSecond;
     if (rate == null) {

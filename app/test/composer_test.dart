@@ -391,9 +391,11 @@ void main() {
       expect(find.text('Think'), findsOneWidget, reason: '$width @ $textScale');
       final pill = tester.getRect(find.byKey(const Key('reasoning-toggle')));
       final send = tester.getRect(find.byKey(const Key('send-button')));
+      // The 8 of layout; the 2 the send hit box adds around its circle is
+      // tap slop, not part of the rect.
       expect(
         send.left - pill.right,
-        greaterThanOrEqualTo(12),
+        greaterThanOrEqualTo(8),
         reason: '$width @ $textScale',
       );
       await tester.pumpWidget(const SizedBox.shrink());

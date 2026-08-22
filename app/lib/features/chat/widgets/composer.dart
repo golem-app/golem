@@ -376,7 +376,7 @@ class _ComposerState extends ConsumerState<Composer> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 10),
                         _PowerButton(
                           buttonKey: const Key('reasoning-toggle'),
                           semanticLabel: reasoningEnabled
@@ -447,8 +447,10 @@ class _ComposerState extends ConsumerState<Composer> {
                   // A gap the cluster cannot claim: the chip's cap let a long
                   // model name fill the row until the Think pill touched
                   // send (#143). Only the chip shrinks; the pill keeps its
-                  // label.
-                  const SizedBox(width: GolemSpace.s3),
+                  // label. 8 here and before the chip, 10 between the pills:
+                  // send and attach each carry 2pt of hit box, so every
+                  // visible gap is 10.
+                  const SizedBox(width: GolemSpace.s2),
                   // Only send depends on the live text, so it listens to the
                   // controller alone instead of rebuilding the whole composer
                   // on every keystroke.
@@ -557,9 +559,11 @@ class _ComposerState extends ConsumerState<Composer> {
     await showModelPickerSheet(context, conversationId: conversationId);
   }
 
+  // The same 40pt as send: the two circles bracket the row, and at 34pt the
+  // attach button read as the smaller sibling.
   Widget _circle(BuildContext context, {required Widget child}) => Container(
-    width: 34,
-    height: 34,
+    width: 40,
+    height: 40,
     decoration: BoxDecoration(
       color: CupertinoDynamicColor.resolve(GolemTheme.field, context),
       shape: BoxShape.circle,

@@ -541,9 +541,16 @@ class _ReasoningPeek extends StatelessWidget {
 
   static const _lines = 3;
 
+  /// More than three lines at any text scale; the rest of a long chain of
+  /// thought is never laid out for a peek that clips it anyway.
+  static const _tailLength = 600;
+
   @override
   Widget build(BuildContext context) {
     final style = GolemText.footnote;
+    final tail = text.length > _tailLength
+        ? text.substring(text.length - _tailLength)
+        : text;
     final height =
         MediaQuery.textScalerOf(context).scale(style.fontSize!) *
         style.height! *
@@ -569,7 +576,7 @@ class _ReasoningPeek extends StatelessWidget {
                 start: 0,
                 end: 0,
                 child: Text(
-                  text,
+                  tail,
                   textDirection: textDirection,
                   style: style.copyWith(
                     color: CupertinoDynamicColor.resolve(

@@ -30,7 +30,7 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     required this.backupExclusion,
     this.activeArtifactKey,
     this.diskSpaceMargin = modelDownloadFreeSpaceMargin,
-    this.verifyProgressStride = 32 << 20,
+    this.verifyProgressStride = 8 << 20,
   }) : catalog = [...catalog] {
     _state = ModelState(activeArtifactKey: activeArtifactKey);
   }
@@ -50,9 +50,9 @@ final class RealModelManagementRepository implements ModelManagementRepository {
   /// Free bytes that must remain after a download completes.
   final int diskSpaceMargin;
 
-  /// Bytes hashed between two verification snapshots. 32 MiB keeps a 3.6 GB
-  /// artifact at about a hundred persisted emits — the order of the transfer's
-  /// own progress events; tests pass a few bytes to watch every step.
+  /// Bytes hashed between two verification snapshots, each an in-memory
+  /// emit; tests pass a few bytes to watch every step. See [_hashProgress]
+  /// for why 8 MiB.
   final int verifyProgressStride;
 
   late ModelState _state;
@@ -84,6 +84,10 @@ final class RealModelManagementRepository implements ModelManagementRepository {
 
   String _rootFor(ModelCatalogEntry entry) =>
       '$documentsDirectory/${entry.installDirectory}';
+
+  /// Publishes [value] without a durable write, for ticks whose only change
+  /// is a field the store never holds.
+  ModelState _emit(ModelState value) => _state = value;
 
   Future<ModelState> _persist(ModelState value) async {
     _state = value;
@@ -320,6 +324,11 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     // exactly once (#143); a size-matching unreceipted file counts here the
     // way reconciliation already counts it.
     var onDisk = verifiedBytes + presentUnverifiedBytes;
+    // Bytes the verify counter has already walked through this pass: the
+    // receipted files plus every file hashed so far, passed or failed. A
+    // failed file keeps its bytes in the count — dropping them stepped the
+    // bar back mid-phase and reset the ETA window.
+    var counted = verifiedBytes;
     ArtifactStatus downloading(int received) => ArtifactStatus(
       phase: ArtifactPhase.downloading,
       downloadedBytes: onDisk + received,
@@ -327,7 +336,7 @@ final class RealModelManagementRepository implements ModelManagementRepository {
     ArtifactStatus verifying(int hashed) => ArtifactStatus(
       phase: ArtifactPhase.verifying,
       downloadedBytes: onDisk,
-      verifiedBytes: verifiedBytes + hashed,
+      verifiedBytes: counted + hashed,
     );
 
     yield await _persist(_state.withArtifact(artifactKey, downloading(0)));
@@ -448,6 +457,7 @@ final class RealModelManagementRepository implements ModelManagementRepository {
       // emit instead of after a multi-gigabyte read — and never after
       // _discard has already emptied the directory.
       if (_repinned(entry) || _stopRequested.contains(artifactKey)) return;
+      counted = verifiedBytes;
       yield await _persist(_state.withArtifact(artifactKey, verifying(0)));
       final refetch = <ModelArtifactFile>[];
       for (final spec in pending) {
@@ -459,14 +469,20 @@ final class RealModelManagementRepository implements ModelManagementRepository {
             if (step.digest case final digest?) {
               actual = digest.toString();
             } else {
-              yield await _persist(
+              // In memory only: verifiedBytes is not serialized, so a
+              // durable write here would fsync the same bytes every stride.
+              yield _emit(
                 _state.withArtifact(artifactKey, verifying(step.hashed)),
               );
             }
           }
         } on FileSystemException {
-          // The file vanished under the hash — a cancel racing the read, or
-          // an external deletion. Unproven either way.
+          // A file that vanished under the hash — a cancel racing the read,
+          // or an external deletion — is unproven and fetched again below.
+          // Any other read fault is the device's, not the bytes': the file
+          // stays, and the attempt fails the way every thrown fault does
+          // rather than as a hash mismatch.
+          if (await file.exists()) rethrow;
         }
         if (_stopRequested.contains(artifactKey)) return;
 
@@ -476,6 +492,7 @@ final class RealModelManagementRepository implements ModelManagementRepository {
             await file.delete();
           }
           onDisk -= spec.bytes;
+          counted += spec.bytes;
           if (fetched.contains(spec)) {
             yield await _persist(
               _state.withArtifact(
@@ -498,6 +515,7 @@ final class RealModelManagementRepository implements ModelManagementRepository {
         }
         await _recordVerified(entry, spec, actual);
         verifiedBytes += spec.bytes;
+        counted += spec.bytes;
       }
       pending
         ..clear()
@@ -560,7 +578,9 @@ final class RealModelManagementRepository implements ModelManagementRepository {
 
   /// Hashes [file] in chunks, reporting the running byte count every
   /// [verifyProgressStride] bytes and the digest last. A digest rather than a
-  /// verdict so an unhashed file is receipted by content.
+  /// verdict so an unhashed file is receipted by content. The stride is the
+  /// pace estimator's only sample of a hash; past its 4 s window between
+  /// samples the ETA never appears, so 8 MiB keeps it alive down to 2 MB/s.
   Stream<({int hashed, Digest? digest})> _hashProgress(File file) async* {
     final sink = _DigestCatch();
     final input = sha256.startChunkedConversion(sink);

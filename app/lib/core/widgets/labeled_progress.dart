@@ -188,7 +188,9 @@ class LabeledProgress extends StatelessWidget {
             const Expanded(child: SizedBox.shrink()),
           if (detail case final detail?)
             Flexible(
-              flex: needs(detail, detailTextStyle),
+              // The gap is part of what this child needs, or the figure is
+              // short by exactly that much on the widths where it just fits.
+              flex: needs(detail, detailTextStyle) + 8,
               child: Padding(
                 padding: const EdgeInsetsDirectional.only(start: 8),
                 child: Text(
