@@ -17,7 +17,6 @@ import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_repository_resolver.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
-import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/settings/appearance_screen.dart';
 import 'package:golem_flutter/features/settings/models_screen.dart';
@@ -606,45 +605,6 @@ void main() {
       isNull,
       reason: 'reset flushes',
     );
-  }, variant: iosChrome);
-
-  testWidgets('reasoning opened by streaming latches when it settles', (
-    tester,
-  ) async {
-    setViewport(tester);
-    final container = buildContainer();
-    addTearDown(container.dispose);
-    ChatMessage message({required bool streaming}) => ChatMessage.text(
-      id: 'a1',
-      role: MessageRole.assistant,
-      text: 'The answer.',
-      reasoning: 'a private mid-read thought',
-      createdAt: DateTime.utc(2026, 8, 2),
-      isStreaming: streaming,
-    );
-    Widget pump(ChatMessage m) => UncontrolledProviderScope(
-      container: container,
-      child: wrapApp(
-        child: CupertinoPageScaffold(
-          child: MessageBubble(
-            message: m,
-            canRegenerate: false,
-            idle: false,
-            stoppedTokens: null,
-          ),
-        ),
-      ),
-    );
-    await tester.pumpWidget(pump(message(streaming: true)));
-    await tester.pump();
-    final reasoning = find.text('a private mid-read thought');
-    expect(reasoning, findsOneWidget, reason: 'streaming shows live');
-
-    // The run settles with the reader mid-thought: the card must stay
-    // open, not snap shut with the default expand preference off.
-    await tester.pumpWidget(pump(message(streaming: false)));
-    await tester.pumpAndSettle();
-    expect(reasoning, findsOneWidget);
   }, variant: iosChrome);
 
   testWidgets('the root model row names the chat\'s model, not the boot one', (

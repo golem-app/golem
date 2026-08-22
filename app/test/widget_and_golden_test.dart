@@ -392,6 +392,43 @@ void main() {
       );
     }, variant: bothChromes);
 
+    testWidgets('live reasoning peek ${brightness.name} golden', (
+      tester,
+    ) async {
+      if (chromeSuffix().isNotEmpty) return;
+      // A streaming bubble blinks its caret forever: one frame, no settle.
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        settle: false,
+        child: Column(
+          children: [
+            MessageBubble(
+              message: ChatMessage.text(
+                id: 'assistant-live',
+                role: MessageRole.assistant,
+                text: '',
+                createdAt: DateTime.utc(2026, 8, 22),
+                reasoning:
+                    'The user wants a short answer. I should check the units '
+                    'first, then the arithmetic, then phrase it in one line. '
+                    'Units: metres and seconds, so the result is in m/s. '
+                    'Arithmetic: 120 over 8 is 15. One line it is.',
+                isStreaming: true,
+              ),
+              canRegenerate: false,
+              idle: false,
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+      await expectLater(
+        find.byType(MessageBubble),
+        matchesGoldenFile('goldens/reasoning-live-peek-${brightness.name}.png'),
+      );
+    }, variant: bothChromes);
+
     testWidgets('populated reasoning ${brightness.name} golden', (
       tester,
     ) async {

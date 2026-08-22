@@ -92,16 +92,16 @@ class MessageBubble extends ConsumerWidget {
                 text: message.reasoning!,
                 streaming: message.isStreaming && message.text.isEmpty,
                 live: message.isStreaming,
-                // Streaming reasoning is always live; settled cards follow the
-                // appearance preference. A card opened by streaming latches
-                // open when the run settles (see _ReasoningCardState).
+                // Collapsed unless the appearance preference opens it, live
+                // or settled: a card that opened itself mid-stream scrolled
+                // the transcript by a paragraph per token (#143). A live card
+                // shows a peek of its newest lines instead.
                 initiallyExpanded:
-                    message.isStreaming ||
-                    (ref
-                            .watch(preferencesControllerProvider)
-                            .value
-                            ?.expandReasoning ??
-                        false),
+                    ref
+                        .watch(preferencesControllerProvider)
+                        .value
+                        ?.expandReasoning ??
+                    false,
               ),
             // Images sit above the text, the order a vision prompt uses.
             for (final image in message.images)
@@ -430,107 +430,161 @@ class _ReasoningCardState extends State<_ReasoningCard> {
   bool get _expanded => _userToggle ?? widget.initiallyExpanded;
 
   @override
-  void didUpdateWidget(covariant _ReasoningCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // A card the stream opened stays open when the run settles — the reader
-    // may be mid-thought. Latching only on the live→settled edge keeps
-    // preference toggles reactive for every other card.
-    if (oldWidget.live && !widget.live && _userToggle == null) {
-      _userToggle = true;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    // Its own node, or the whole card — header, thoughts, and the answer
-    // below it — collapses into the bubble's long-press node as one
-    // unreadable run.
-    container: true,
-    child: Container(
-      key: const Key('reasoning-card'),
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: CupertinoDynamicColor.resolve(
-          GolemTheme.reasoningSurface,
-          context,
-        ),
-        borderRadius: BorderRadius.circular(GolemRadius.notice),
-        border: Border.all(
+  Widget build(BuildContext context) {
+    final direction = contentTextDirection(
+      widget.text,
+      fallback: Directionality.of(context),
+    );
+    return Semantics(
+      // Its own node, or the whole card — header, thoughts, and the answer
+      // below it — collapses into the bubble's long-press node as one
+      // unreadable run.
+      container: true,
+      child: Container(
+        key: const Key('reasoning-card'),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
           color: CupertinoDynamicColor.resolve(
-            GolemTheme.reasoningBorder,
+            GolemTheme.reasoningSurface,
             context,
           ),
+          borderRadius: BorderRadius.circular(GolemRadius.notice),
+          border: Border.all(
+            color: CupertinoDynamicColor.resolve(
+              GolemTheme.reasoningBorder,
+              context,
+            ),
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // The disclosure is the row, not the chevron: labelling the glyph
-          // alone left the control itself nameless, and its state readable
-          // only as whichever arrow happened to be drawn.
-          Semantics(
-            key: const Key('reasoning-card-header'),
-            container: true,
-            button: true,
-            label: widget.streaming
-                ? context.l10n.reasoningLive
-                : context.l10n.reasoning,
-            value: _expanded ? context.l10n.expanded : context.l10n.collapsed,
-            onTap: () => setState(() => _userToggle = !_expanded),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              // The wrapper above owns the tap action; left in, this detector
-              // adds a second, nameless tappable node over the same row.
-              excludeFromSemantics: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // The disclosure is the row, not the chevron: labelling the glyph
+            // alone left the control itself nameless, and its state readable
+            // only as whichever arrow happened to be drawn.
+            Semantics(
+              key: const Key('reasoning-card-header'),
+              container: true,
+              button: true,
+              label: widget.streaming
+                  ? context.l10n.reasoningLive
+                  : context.l10n.reasoning,
+              value: _expanded ? context.l10n.expanded : context.l10n.collapsed,
               onTap: () => setState(() => _userToggle = !_expanded),
-              child: ExcludeSemantics(
-                child: Row(
-                  children: [
-                    const Icon(
-                      CupertinoIcons.lightbulb_fill,
-                      color: GolemTheme.amber,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 7),
-                    Expanded(
-                      child: Text(
-                        widget.streaming
-                            ? context.l10n.reasoningLiveBadge
-                            : context.l10n.reasoning,
-                        style: GolemText.footnoteStrong,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                // The wrapper above owns the tap action; left in, this detector
+                // adds a second, nameless tappable node over the same row.
+                excludeFromSemantics: true,
+                onTap: () => setState(() => _userToggle = !_expanded),
+                child: ExcludeSemantics(
+                  child: Row(
+                    children: [
+                      const Icon(
+                        CupertinoIcons.lightbulb_fill,
+                        color: GolemTheme.amber,
+                        size: 16,
                       ),
-                    ),
-                    Icon(
-                      _expanded
-                          ? CupertinoIcons.chevron_up
-                          : CupertinoIcons.chevron_down,
-                      size: 14,
-                      color: CupertinoDynamicColor.resolve(
-                        GolemTheme.mutedInk,
-                        context,
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          widget.streaming
+                              ? context.l10n.reasoningLiveBadge
+                              : context.l10n.reasoning,
+                          style: GolemText.footnoteStrong,
+                        ),
                       ),
-                    ),
-                  ],
+                      Icon(
+                        _expanded
+                            ? CupertinoIcons.chevron_up
+                            : CupertinoIcons.chevron_down,
+                        size: 14,
+                        color: CupertinoDynamicColor.resolve(
+                          GolemTheme.mutedInk,
+                          context,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          if (_expanded) ...[
-            const SizedBox(height: 8),
-            Text(
-              widget.text,
-              textDirection: contentTextDirection(
+            if (_expanded) ...[
+              const SizedBox(height: 8),
+              Text(
                 widget.text,
-                fallback: Directionality.of(context),
+                textDirection: direction,
+                style: GolemText.footnote,
               ),
-              style: GolemText.footnote,
-            ),
+            ] else if (widget.live) ...[
+              const SizedBox(height: 8),
+              _ReasoningPeek(text: widget.text, textDirection: direction),
+            ],
           ],
-        ],
+        ),
       ),
-    ),
-  );
+    );
+  }
+}
+
+/// The newest three lines of a live card's thoughts, muted under a top fade,
+/// so a collapsed card still shows the model thinking. Bottom-anchored: a new
+/// line pushes the oldest one up and out, and the card never grows. Nothing
+/// here is announced — the header already says the reasoning is live, and a
+/// peek that re-read itself on every token would talk over the answer.
+class _ReasoningPeek extends StatelessWidget {
+  const _ReasoningPeek({required this.text, required this.textDirection});
+
+  final String text;
+  final TextDirection textDirection;
+
+  static const _lines = 3;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = GolemText.footnote;
+    final height =
+        MediaQuery.textScalerOf(context).scale(style.fontSize!) *
+        style.height! *
+        _lines;
+    return ExcludeSemantics(
+      child: ShaderMask(
+        shaderCallback: (bounds) => const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0x00FFFFFF), Color(0xFFFFFFFF)],
+          stops: [0.0, 0.35],
+        ).createShader(bounds),
+        blendMode: BlendMode.dstIn,
+        child: SizedBox(
+          key: const Key('reasoning-peek'),
+          height: height,
+          width: double.infinity,
+          child: Stack(
+            clipBehavior: Clip.hardEdge,
+            children: [
+              PositionedDirectional(
+                bottom: 0,
+                start: 0,
+                end: 0,
+                child: Text(
+                  text,
+                  textDirection: textDirection,
+                  style: style.copyWith(
+                    color: CupertinoDynamicColor.resolve(
+                      GolemTheme.mutedInk,
+                      context,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _GeneratingPill extends StatelessWidget {
