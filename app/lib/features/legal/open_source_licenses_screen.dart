@@ -67,10 +67,14 @@ Future<List<OpenSourceLicense>> loadRegisteredLicenses({
   bool? apple,
 }) async {
   final onApple = apple ?? runningOnApplePlatform;
-  final declared = declaredLicensePackagesFor(apple: onApple);
+  final bundled = bundledLicenseDeclarationsFor(apple: onApple);
+  final declared = [
+    for (final declaration in bundled) declaration.displayName,
+    ...directRuntimeLicensePackages,
+  ];
   final wanted = declared.toSet();
   final authoredKinds = {
-    for (final declaration in bundledLicenseDeclarationsFor(apple: onApple))
+    for (final declaration in bundled)
       declaration.displayName: declaration.kind,
   };
 
@@ -78,14 +82,13 @@ Future<List<OpenSourceLicense>> loadRegisteredLicenses({
   // few dozen, so nothing undeclared is worth reassembling into a string.
   final documentsByPackage = <String, List<String>>{};
   await for (final entry in licenses ?? LicenseRegistry.licenses) {
-    if (!entry.packages.any(wanted.contains)) continue;
+    final kept = entry.packages.where(wanted.contains);
+    if (kept.isEmpty) continue;
     final text = entry.paragraphs
         .map((paragraph) => '${'  ' * paragraph.indent}${paragraph.text}')
         .join('\n\n');
-    for (final package in entry.packages) {
-      if (wanted.contains(package)) {
-        documentsByPackage.putIfAbsent(package, () => []).add(text);
-      }
+    for (final package in kept) {
+      documentsByPackage.putIfAbsent(package, () => []).add(text);
     }
   }
 
@@ -263,12 +266,15 @@ class _LicenseDisclosureState extends State<_LicenseDisclosure> {
                   ),
                   if (widget.license.kind case final kind?) ...[
                     const SizedBox(width: 8),
-                    // Flexible, not a bare Text: an SPDX expression can be as
-                    // long as `Apache-2.0 WITH Swift-exception`, which
-                    // overflows the row beside a full-width name. It wraps
-                    // rather than ellipsising — half an identifier on a legal
-                    // surface is worse than two lines.
-                    Flexible(
+                    // Bounded, not flexed: an SPDX expression can be as long
+                    // as `Apache-2.0 WITH Swift-exception`, which overflows
+                    // the row beside a full-width name. A ConstrainedBox caps
+                    // it and lets it wrap — half an identifier on a legal
+                    // surface is worse than two lines — while every pixel it
+                    // does not use still goes to the title, which sharing a
+                    // flex with the Expanded above would not do.
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 116),
                       child: Text(
                         kind,
                         textAlign: TextAlign.end,

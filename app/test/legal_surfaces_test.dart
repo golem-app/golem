@@ -87,7 +87,7 @@ void main() {
   });
 
   test('every declared license asset exists and contains text', () {
-    for (final declaration in bundledLicenseDeclarations) {
+    for (final declaration in bundledLicenseDeclarationsFor(apple: true)) {
       expect(declaration.assetPaths, isNotEmpty, reason: declaration.identity);
       for (final path in declaration.assetPaths) {
         final asset = File(path);
@@ -141,7 +141,7 @@ void main() {
       'stb_image',
       'miniaudio',
     ]);
-    for (final declaration in bundledLicenseDeclarations) {
+    for (final declaration in bundledLicenseDeclarationsFor(apple: true)) {
       expect(
         declared,
         contains(declaration.displayName),
@@ -151,7 +151,8 @@ void main() {
     expect(
       declared,
       hasLength(
-        bundledLicenseDeclarations.length + directRuntimeLicensePackages.length,
+        bundledLicenseDeclarationsFor(apple: true).length +
+            directRuntimeLicensePackages.length,
       ),
     );
   });
@@ -160,10 +161,23 @@ void main() {
     // The gate is held to the build system rather than restated beside it: if
     // the carrier ever builds for another OS, this fails and the licenses
     // decision has to be revisited (#144).
-    final hook = File('../packages/inferno/hook/build.dart').readAsStringSync();
+    // Matched on the condition's parts rather than its exact spelling, so a
+    // reformat or a renamed local does not fail while a dropped half does.
+    final hook = File(
+      '../packages/inferno/hook/build.dart',
+    ).readAsStringSync().replaceAll(RegExp(r'\s+'), ' ');
+    final carrierGate = RegExp(
+      r'if \([^)]*OS\.iOS[^)]*OS\.macOS[^{]*Architecture\.arm64[^{]*\) \{',
+    ).firstMatch(hook);
+
     expect(
-      hook,
-      contains('config.targetOS == OS.iOS || config.targetOS == OS.macOS'),
+      carrierGate,
+      isNotNull,
+      reason:
+          'The MLX carrier is no longer gated on Apple *and* arm64. The '
+          'licenses screen mirrors that condition in runningOnApplePlatform; '
+          'both have to move together or a build discloses a graph it does '
+          'not link.',
     );
 
     final apple = declaredLicensePackagesFor(apple: true);
@@ -185,7 +199,7 @@ void main() {
   test('each declaration states the license its own asset carries', () {
     // Restores and generalizes the Swift-exception guard: text-sniffing reads
     // every one of these as a bare family, and six of them are not.
-    for (final declaration in bundledLicenseDeclarations) {
+    for (final declaration in bundledLicenseDeclarationsFor(apple: true)) {
       final text = declaration.assetPaths
           .map((path) => File(path).readAsStringSync())
           .join('\n\n');
@@ -196,14 +210,28 @@ void main() {
         declaration.kind.contains('WITH Swift-exception'),
         reason: reason,
       );
-      if (declaration.kind.startsWith('Apache-2.0')) {
-        expect(text, contains('Apache License'), reason: reason);
-        expect(text, contains('Version 2.0'), reason: reason);
+
+      // Every operand of the expression is checked, and an expression this
+      // does not recognize fails rather than passing silently — otherwise a
+      // swapped or invented kind sails through every branch.
+      for (final operand in declaration.kind.split(' OR ')) {
+        switch (operand) {
+          case 'MIT' || 'MIT-0':
+            expect(
+              text,
+              contains('Permission is hereby granted'),
+              reason: reason,
+            );
+          case 'Unlicense':
+            expect(text, contains('public domain'), reason: reason);
+          case final apache when apache.startsWith('Apache-2.0'):
+            expect(text, contains('Apache License'), reason: reason);
+            expect(text, contains('Version 2.0'), reason: reason);
+          default:
+            fail('$reason declares an unrecognized kind: $operand');
+        }
       }
-      if (declaration.kind == 'MIT') {
-        expect(text, contains('Permission is hereby granted'), reason: reason);
-      }
-      if (declaration.kind.contains('Unlicense')) {
+      if (declaration.kind.contains(' OR ')) {
         expect(text, contains('ALTERNATIVE'), reason: reason);
       }
     }
@@ -217,7 +245,7 @@ void main() {
       expect(declaredLicensePackagesFor(apple: true), isNot(contains(name)));
     }
     expect(
-      bundledLicenseDeclarations.map((entry) => entry.identity),
+      bundledLicenseDeclarationsFor(apple: true).map((entry) => entry.identity),
       isNot(contains('gemma-4-e2b')),
     );
     expect(
@@ -262,6 +290,25 @@ void main() {
         'llama.cpp',
         'go_router',
       ]);
+    });
+
+    test('defaults to the process registry and this platform', () async {
+      // The only coverage of both `??` arms: every other test injects them,
+      // so a mis-wired default would otherwise reach a device unnoticed.
+      addTearDown(LicenseRegistry.reset);
+      LicenseRegistry.reset();
+      registerGolemLicenses(apple: false);
+
+      final licenses = await loadRegisteredLicenses();
+
+      expect(
+        licenses.map((license) => license.title),
+        llamaLicenseDeclarations.map((entry) => entry.displayName),
+        reason:
+            'The suite runs on an arm64 Mac, so the default gate is Apple '
+            'and the registry holds only what registerGolemLicenses added.',
+      );
+      expect(licenses.first.kind, 'MIT');
     });
 
     test('states the authored kind and withholds a contested one', () async {
@@ -385,6 +432,30 @@ void main() {
       findsOneWidget,
     );
   }, variant: iosChrome);
+
+  testWidgets('the longest kind and name share a row without overflowing', (
+    tester,
+  ) async {
+    // The widest pair the list can produce: an SPDX expression with a runtime
+    // exception beside the longest declared package name. An overflowing
+    // RenderFlex throws, so takeException is the assertion.
+    await pumpWithRepositories(
+      tester,
+      child: OpenSourceLicensesScreen(
+        loadLicenses: () async => [
+          OpenSourceLicense(
+            packages: const ['background_downloader'],
+            text: 'Apache License',
+            kind: 'Apache-2.0 WITH Swift-exception',
+          ),
+        ],
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Apache-2.0 WITH Swift-exception'), findsOneWidget);
+    expect(find.text('background_downloader'), findsOneWidget);
+  }, variant: bothChromes);
 
   testWidgets('a license load failure retries', (tester) async {
     var attempts = 0;

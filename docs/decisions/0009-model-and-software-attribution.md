@@ -15,14 +15,14 @@ still need a durable account of each model's author, license, and exact source.
 Community model repositories do not always carry reliable license metadata.
 In particular, the pinned `mlx-community/gemma-4-e2b-it-4bit` snapshot reports
 the legacy `gemma` identifier, while Google's Gemma 4 model card and current
-license publish Gemma 4 under Apache 2.0. The official upstream model license
+license publish Gemma 4 under Apache-2.0. The official upstream model license
 controls; repository metadata is supporting evidence, not the authority.
 
 ## Decision
 
 Golem exposes two direct Settings destinations:
 
-- **Model attribution** identifies the official author and Apache 2.0 license
+- **Model attribution** identifies the official author and Apache-2.0 license
   for Gemma 4 E2B and Qwen 3.5, and lists every immutable Hugging Face source
   and revision in the pinned catalog, including conversion and projector
   repositories.
@@ -39,9 +39,11 @@ declarations this record audits, so a pin change moves the screen with it.
 dependency is disclosed deliberately rather than by accident.
 
 The Swift half is disclosed only where it exists. `hook/build.dart` builds the
-MLX carrier for `OS.iOS` and `OS.macOS` alone; an APK links `libinferno.so`
-and nothing from that graph, so naming those sixteen packages on Android would
-describe software that is not in the binary. The gate reads `dart:io`'s
+MLX carrier for `OS.iOS` and `OS.macOS` **and** `Architecture.arm64` — MLX
+Swift is Apple-silicon-only — so an APK, an Intel Mac and an x64 simulator
+slice all link `libinferno.so` and nothing from that graph. Naming those
+sixteen packages there would describe software that is not in the binary, and
+`runningOnApplePlatform` mirrors both halves of that condition. The gate reads `dart:io`'s
 `Platform`, never `defaultTargetPlatform` — the golden harness overrides that
 through `TargetPlatformVariant`, so an Android golden runs on a macOS host and
 would answer the wrong question — and it is injected, so tests drive both arms.
@@ -71,7 +73,7 @@ Golem discloses software it chose, not software Flutter compiled.
 Model licenses are not on that screen. Golem downloads weights from Hugging
 Face after explicit consent and does not redistribute them, so no bundled
 notice obligation attaches; **Model attribution** is their home, naming the
-license and linking the canonical text upstream. The bundled Apache 2.0
+license and linking the canonical text upstream. The bundled Apache-2.0
 snapshot that once backed an offline copy is gone with them.
 
 The native manifest mirrors every identity and revision in
@@ -82,10 +84,10 @@ Inferno shim, and stb_image and miniaudio in libmtmd. Video/subprocess, curl,
 server, tools, examples, and tests are disabled by the package CMake options
 and are not declared as shipped dependencies.
 
-Gemma 4 E2B is attributed to Google DeepMind under Apache 2.0. The audit covers
+Gemma 4 E2B is attributed to Google DeepMind under Apache-2.0. The audit covers
 the official model card plus the pinned MLX, GGUF, and projector snapshots in
 the catalog. Qwen 3.5 2B and 4B are attributed to Alibaba Cloud/Qwen under
-Apache 2.0; the audit likewise covers the pinned MLX, GGUF, and projector
+Apache-2.0; the audit likewise covers the pinned MLX, GGUF, and projector
 snapshots. The license is named offline; its full text lives upstream, where
 the model card publishes it.
 
@@ -118,6 +120,15 @@ nor certifies those repositories.
 - A new direct dependency in `app/pubspec.yaml` fails `legal_surfaces_test`
   until it is added to `directRuntimeLicensePackages`. That is the point: the
   screen is a decision, not a sweep.
+- An allowlist can under-disclose where the old sweep could not, and one case
+  stays uncovered: a declared pub package whose `NOTICES` key stops matching
+  its pubspec name is skipped silently, and the entry count shrinks with no
+  failure. The two known divergences (`inferno`, `flutter_localizations`) were
+  found by reading a built bundle by hand. No test can close this — the
+  framework's test bindings register no `NOTICES` collector at all
+  (`TestWidgetsFlutterBinding.initLicenses`), so the pub half is observable
+  only in a real app run. Re-read the rendered list on both platforms when
+  changing a dependency.
 - This record documents engineering evidence and distribution handling; it is
   not legal advice.
 

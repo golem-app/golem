@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -520,12 +522,20 @@ void main() {
     // checked here — `TestWidgetsFlutterBinding.initLicenses` registers no
     // NOTICES collector, so under a test binding the registry holds only what
     // `registerGolemLicenses` added.
-    expect(
-      (await loadRegisteredLicenses()).map((license) => license.title),
-      bundledLicenseDeclarationsFor(
-        apple: runningOnApplePlatform,
-      ).map((declaration) => declaration.displayName),
-    );
+    final resolved = (await loadRegisteredLicenses())
+        .map((license) => license.title)
+        .toList();
+
+    // Both sides must not derive from the same getter, or the assertion holds
+    // however the gate is wired. `Platform` here, the getter in the loader.
+    expect(resolved.first, 'llama.cpp');
+    expect(resolved, contains('miniaudio'));
+    if (Platform.isIOS || Platform.isMacOS) {
+      expect(resolved, contains('mlx-swift'));
+    } else {
+      expect(resolved, isNot(contains('mlx-swift')));
+      expect(resolved, hasLength(llamaLicenseDeclarations.length));
+    }
     await _pageBack(tester);
     await tester.pumpAndSettle();
 

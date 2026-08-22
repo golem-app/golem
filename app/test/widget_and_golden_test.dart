@@ -56,10 +56,13 @@ Future<List<OpenSourceLicense>> _goldenLicenses() async => [
     text: 'MIT License\n\nCopyright the ggml authors',
     kind: 'MIT',
   ),
+  // Not a Swift package: this fixture feeds the android golden too, and an
+  // APK links no MLX carrier. `background_downloader` is the longest declared
+  // name, so the row still records the widest title the list can produce.
   OpenSourceLicense(
-    packages: const ['swift-syntax'],
+    packages: const ['background_downloader'],
     text: 'Apache License\n\nVersion 2.0, January 2004',
-    kind: 'Apache-2.0 WITH Swift-exception',
+    kind: 'Apache-2.0',
   ),
   OpenSourceLicense(
     packages: const ['path_provider'],

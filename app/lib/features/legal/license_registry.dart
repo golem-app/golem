@@ -30,11 +30,23 @@ final class BundledLicenseDeclaration {
   final List<String> assetPaths;
 }
 
-/// True when this build can link the MLX engine at all. `dart:io`'s [Platform]
-/// is the host truth; `defaultTargetPlatform` is not — the golden harness
-/// overrides it through `TargetPlatformVariant`, so an Android golden runs on
-/// a macOS host and would answer the wrong question.
-bool get runningOnApplePlatform => Platform.isIOS || Platform.isMacOS;
+/// True when this build can link the MLX engine at all. It mirrors both halves
+/// of the carrier's build condition in `hook/build.dart`: Apple **and** arm64.
+/// MLX Swift is Apple-silicon-only, so an Intel Mac or an x64 simulator slice
+/// links no carrier and must disclose no Swift graph.
+///
+/// `dart:io`'s [Platform] is the host truth; `defaultTargetPlatform` is not —
+/// the golden harness overrides it through `TargetPlatformVariant`, so an
+/// Android golden runs on a macOS host and would answer the wrong question.
+bool get runningOnApplePlatform =>
+    (Platform.isIOS || Platform.isMacOS) && _isAppleSilicon;
+
+/// Dart exposes no target-architecture constant, so this reads the ABI token
+/// [Platform.version] ends with — `on "macos_arm64"`. Rosetta reports the
+/// emulated architecture, which is the right answer here: the x64 slice is
+/// what was linked, and it carries no MLX carrier.
+bool get _isAppleSilicon =>
+    RegExp(r'on "\w+_arm64"').hasMatch(Platform.version);
 
 const swiftPackageLicenseDeclarations = <BundledLicenseDeclaration>[
   BundledLicenseDeclaration(
@@ -193,27 +205,23 @@ const llamaLicenseDeclarations = <BundledLicenseDeclaration>[
   ),
 ];
 
-/// Every native declaration, whatever the target — what the drift tests and
+/// The declarations a build for this platform actually links, in reading
+/// order. llama.cpp is compiled for every target; the Swift graph exists only
+/// where `hook/build.dart` builds the MLX carrier, which is Apple-silicon-only
+/// — an APK carries `libinferno.so` and nothing from that graph, so disclosing
+/// it elsewhere would name software that is not there (#144).
+///
+/// `apple: true` is also the full inventory, which is what the drift tests and
 /// the asset guards iterate. Model weights are deliberately absent: they are
-/// downloaded from Hugging Face after consent rather than redistributed, so
-/// no bundled-notice obligation attaches to them, and the Model attribution
+/// downloaded from Hugging Face after consent rather than redistributed, so no
+/// bundled-notice obligation attaches to them, and the Model attribution
 /// screen names their license and links the canonical text (ADR 0009).
-const bundledLicenseDeclarations = <BundledLicenseDeclaration>[
-  ...llamaLicenseDeclarations,
-  ...swiftPackageLicenseDeclarations,
-];
-
-/// The declarations a build for this platform actually links. llama.cpp is
-/// compiled for every target; the Swift graph exists only where
-/// `hook/build.dart` builds the MLX carrier, which is Apple-only — an APK
-/// carries `libinferno.so` and nothing from that graph, so disclosing it off
-/// Apple would name software that is not there (#144).
 List<BundledLicenseDeclaration> bundledLicenseDeclarationsFor({
   required bool apple,
-}) => [
+}) => List.unmodifiable([
   ...llamaLicenseDeclarations,
   if (apple) ...swiftPackageLicenseDeclarations,
-];
+]);
 
 /// Adds only the licenses Flutter cannot discover from pub packages. The
 /// callback remains lazy: bundled text is loaded only if the user opens the
