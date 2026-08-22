@@ -274,8 +274,14 @@ class ChatController extends _$ChatController {
   }
 
   Future<void> toggleReasoning() async {
+    if (_value.generation != GenerationPhase.idle) return;
+    // A fresh session has no conversation to carry the flag yet; the toggle
+    // materializes one the way send() does, instead of silently doing
+    // nothing on the screen first run lands on.
+    if (_value.active == null) await newChat();
+    if (!ref.mounted) return;
     final active = _value.active;
-    if (active == null || _value.generation != GenerationPhase.idle) return;
+    if (active == null) return;
     final next = withActiveConversation(
       _value,
       active.copyWith(reasoningEnabled: !active.reasoningEnabled),
