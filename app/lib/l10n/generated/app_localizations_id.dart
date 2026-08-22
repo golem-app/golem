@@ -486,7 +486,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'Versi QA ini menampilkan seluruh katalog tetap. Unduhan dan proses model disimulasikan.';
+      'Versi ini menampilkan seluruh katalog tetap. Unduhan dan proses model disimulasikan.';
 
   @override
   String get catalogDeviceDetail =>
@@ -546,7 +546,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get downloadSimulationComplete =>
-      'Simulasi QA deterministik selesai; tidak ada bobot yang disimpan.';
+      'Simulasi deterministik selesai; tidak ada bobot yang disimpan.';
 
   @override
   String get downloadComplete =>
@@ -640,7 +640,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String simulateDownloadMessage(String modelName, String size) {
-    return '$modelName ditampilkan sebagai unduhan sebesar $size. Simulasi QA ini tidak menggunakan jaringan dan tidak menyimpan bobot model.';
+    return '$modelName ditampilkan sebagai unduhan sebesar $size. Simulasi ini tidak menggunakan jaringan dan tidak menyimpan bobot model.';
   }
 
   @override
@@ -674,8 +674,8 @@ class AppLocalizationsId extends AppLocalizations {
       'Unduh dan verifikasi model yang dipilih sebelum menggunakan Golem.';
 
   @override
-  String get qaDownloadShort =>
-      'Simulasi QA deterministik; tanpa jaringan atau bobot.';
+  String get simulatedDownloadShort =>
+      'Simulasi deterministik; tanpa jaringan atau bobot.';
 
   @override
   String get downloadBeforeSending =>
@@ -1716,6 +1716,10 @@ class AppLocalizationsId extends AppLocalizations {
   @override
   String get deviceBelowMemoryFloor =>
       'Perangkat ini memiliki memori lebih sedikit daripada kebutuhan model terkecil yang disediakan Golem, sehingga unduhan dinonaktifkan. Percakapan dan pengaturan Anda tidak terpengaruh.';
+
+  @override
+  String get deviceVirtualHardware =>
+      'Golem menjalankan modelnya di perangkat keras nyata. Simulator atau emulator tidak dapat memuatnya, jadi unduhan dinonaktifkan di sini.';
 
   @override
   String outOfMemoryAtContext(int tokens) {

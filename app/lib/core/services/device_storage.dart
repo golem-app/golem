@@ -31,6 +31,13 @@ abstract interface class AvailableMemoryProbe {
   Future<int?> availableMemoryBytes();
 }
 
+/// Whether this is a simulator or emulator rather than a phone, for the
+/// admission policy. Returns null when the platform cannot answer — "unknown"
+/// must let the device try, never refuse it.
+abstract interface class DeviceKindProbe {
+  Future<bool?> isVirtualDevice();
+}
+
 /// Total capacity of the volume containing a path, for the drawer's
 /// storage meter. Returns null when the platform cannot report it — the
 /// meter hides rather than invent a denominator.
@@ -44,7 +51,8 @@ final class DeviceStorageChannel
         BackupExclusion,
         DeviceMemoryProbe,
         AvailableMemoryProbe,
-        DiskCapacityProbe {
+        DiskCapacityProbe,
+        DeviceKindProbe {
   const DeviceStorageChannel();
 
   static const _channel = MethodChannel('app.golem/storage');
@@ -68,4 +76,8 @@ final class DeviceStorageChannel
   @override
   Future<int?> totalBytes(String path) =>
       _channel.invokeMethod<int>('totalBytes', {'path': path});
+
+  @override
+  Future<bool?> isVirtualDevice() =>
+      _channel.invokeMethod<bool>('isVirtualDevice');
 }

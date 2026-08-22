@@ -483,7 +483,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'يعرض إصدار QA هذا الكتالوج المثبّت كاملًا. تُحاكى التنزيلات وعمليات تشغيل النماذج.';
+      'يعرض هذا الإصدار الكتالوج المثبّت كاملًا. تُحاكى التنزيلات وعمليات تشغيل النماذج.';
 
   @override
   String get catalogDeviceDetail =>
@@ -542,7 +542,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get downloadSimulationComplete =>
-      'اكتملت محاكاة QA الحتمية، ولم تُحفظ أي أوزان.';
+      'اكتملت المحاكاة الحتمية، ولم تُحفظ أي أوزان.';
 
   @override
   String get downloadComplete =>
@@ -638,7 +638,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String simulateDownloadMessage(String modelName, String size) {
-    return 'يظهر $modelName كتنزيل حجمه $size. لا تستخدم محاكاة QA هذه الشبكة ولا تحفظ أوزان النموذج.';
+    return 'يظهر $modelName كتنزيل حجمه $size. لا تستخدم هذه المحاكاة الشبكة ولا تحفظ أوزان النموذج.';
   }
 
   @override
@@ -672,7 +672,7 @@ class AppLocalizationsAr extends AppLocalizations {
       'نزّل النموذج المحدد وتحقق منه قبل استخدام Golem.';
 
   @override
-  String get qaDownloadShort => 'محاكاة QA حتمية بلا شبكة أو أوزان.';
+  String get simulatedDownloadShort => 'محاكاة حتمية بلا شبكة أو أوزان.';
 
   @override
   String get downloadBeforeSending =>
@@ -1744,6 +1744,10 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get deviceBelowMemoryFloor =>
       'ذاكرة هذا الجهاز أقل مما يحتاج إليه أصغر نموذج يقدمه Golem، لذا عُطّلت التنزيلات هنا. لم تتأثر محادثاتك أو إعداداتك.';
+
+  @override
+  String get deviceVirtualHardware =>
+      'يشغّل Golem نماذجه على أجهزة حقيقية. لا يمكن للمحاكي أو المحاكي الافتراضي تحميلها، لذا عُطّلت التنزيلات هنا.';
 
   @override
   String outOfMemoryAtContext(int tokens) {

@@ -30,6 +30,14 @@ import UIKit
       result(Int(ProcessInfo.processInfo.physicalMemory))
       return
     }
+    if call.method == "isVirtualDevice" {
+      #if targetEnvironment(simulator)
+        result(true)
+      #else
+        result(false)
+      #endif
+      return
+    }
     if call.method == "availableMemoryBytes" {
       // The jetsam headroom: what this process can still allocate before
       // iOS terminates it. The increased-memory-limit entitlement raises

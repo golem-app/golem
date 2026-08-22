@@ -596,7 +596,7 @@ class _DownloadScreen extends ConsumerWidget {
             ] else if (simulated) ...[
               const SizedBox(height: GolemSpace.s2),
               Text(
-                context.l10n.qaDownloadShort,
+                context.l10n.simulatedDownloadShort,
                 textAlign: TextAlign.center,
                 style: GolemText.caption.copyWith(color: muted),
               ),

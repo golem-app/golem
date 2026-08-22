@@ -158,7 +158,7 @@ class ModelSetupBanner extends ConsumerWidget {
         ArtifactPhase.notDownloaded => context.l10n.setupDownloadPrompt,
         ArtifactPhase.downloading =>
           simulated
-              ? context.l10n.qaDownloadShort
+              ? context.l10n.simulatedDownloadShort
               : context.l10n.downloadBeforeSending,
         ArtifactPhase.paused => context.l10n.resumeProgressKept,
         ArtifactPhase.verifying => context.l10n.checkingDownloadedFiles,

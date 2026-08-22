@@ -809,7 +809,7 @@ abstract class AppLocalizations {
   /// **'Golem is open source. Nothing on this screen sends anything anywhere.'**
   String get openSourcePrivacyFootnote;
 
-  /// QA simulation honesty banner.
+  /// Simulation honesty banner.
   ///
   /// In en, this message translates to:
   /// **'SIMULATED INFERENCE · No hardware validation'**
@@ -845,7 +845,7 @@ abstract class AppLocalizations {
   /// **'{language} selected'**
   String languageSelected(String language);
 
-  /// About-sheet QA download statement.
+  /// About-sheet simulated-download statement.
   ///
   /// In en, this message translates to:
   /// **'Model downloads are a deterministic simulation of the pinned catalog; no network access exists.'**
@@ -857,7 +857,7 @@ abstract class AppLocalizations {
   /// **'Model downloads fetch the pinned artifacts from Hugging Face over HTTPS.'**
   String get modelDownloadsReal;
 
-  /// About-sheet QA inference statement.
+  /// About-sheet simulated-inference statement.
   ///
   /// In en, this message translates to:
   /// **'Inference is a deterministic UI simulation — no model weights, engine, or hardware measurement is included.'**
@@ -983,10 +983,10 @@ abstract class AppLocalizations {
   /// **'All models'**
   String get allModelsTitle;
 
-  /// QA catalog explanation.
+  /// Simulated-catalog explanation.
   ///
   /// In en, this message translates to:
-  /// **'This QA build shows the full pinned catalog. Downloads and model runs are simulated.'**
+  /// **'This build shows the full pinned catalog. Downloads and model runs are simulated.'**
   String get catalogSimulationDetail;
 
   /// Production catalog explanation.
@@ -1073,10 +1073,10 @@ abstract class AppLocalizations {
   /// **'{fileName} arrived at the wrong size. Retry the download.'**
   String downloadUnexpectedFileSize(String fileName);
 
-  /// QA model install completion.
+  /// Simulated model install completion.
   ///
   /// In en, this message translates to:
-  /// **'The deterministic QA simulation is complete; no weights were stored.'**
+  /// **'The deterministic simulation is complete; no weights were stored.'**
   String get downloadSimulationComplete;
 
   /// Production model install completion.
@@ -1193,7 +1193,7 @@ abstract class AppLocalizations {
   /// **'Golem could not save setup. Try again.'**
   String get setupSaveFailed;
 
-  /// QA model download consent title.
+  /// Simulated model download consent title.
   ///
   /// In en, this message translates to:
   /// **'Simulate this download?'**
@@ -1205,10 +1205,10 @@ abstract class AppLocalizations {
   /// **'Download this model?'**
   String get downloadModelTitle;
 
-  /// QA model download consent body.
+  /// Simulated model download consent body.
   ///
   /// In en, this message translates to:
-  /// **'{modelName} is shown as a {size} download. This QA simulation uses no network and stores no model weights.'**
+  /// **'{modelName} is shown as a {size} download. This simulation uses no network and stores no model weights.'**
   String simulateDownloadMessage(String modelName, String size);
 
   /// Production model download consent body.
@@ -1223,7 +1223,7 @@ abstract class AppLocalizations {
   /// **'Not now'**
   String get notNow;
 
-  /// Start a QA simulation.
+  /// Start a simulation.
   ///
   /// In en, this message translates to:
   /// **'Simulate'**
@@ -1253,11 +1253,11 @@ abstract class AppLocalizations {
   /// **'Download and verify the selected model before using Golem.'**
   String get setupDownloadPrompt;
 
-  /// Short QA download explanation.
+  /// Short simulated-download explanation.
   ///
   /// In en, this message translates to:
-  /// **'Deterministic QA simulation; no network or weights.'**
-  String get qaDownloadShort;
+  /// **'Deterministic simulation; no network or weights.'**
+  String get simulatedDownloadShort;
 
   /// Download gating explanation.
   ///
@@ -1469,7 +1469,7 @@ abstract class AppLocalizations {
   /// **'Golem can’t run models here'**
   String get cannotRunModelsHere;
 
-  /// QA empty-chat privacy statement.
+  /// Simulated empty-chat privacy statement.
   ///
   /// In en, this message translates to:
   /// **'This preview simulates {modelName} on this phone. Nothing you type here goes anywhere.'**
@@ -2924,6 +2924,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This device has less memory than the smallest model Golem ships needs to run, so downloads are turned off here. Your chats and settings are unaffected.'**
   String get deviceBelowMemoryFloor;
+
+  /// Simulator or emulator refusal explanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Golem runs its models on real hardware. A simulator or emulator cannot load them, so downloads are turned off here.'**
+  String get deviceVirtualHardware;
 
   /// Out-of-memory recovery with known context size.
   ///

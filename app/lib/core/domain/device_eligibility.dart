@@ -11,7 +11,14 @@ library;
 enum DeviceTier { preferred, light, unsupported }
 
 /// Why a device sits outside every supported tier; null while it is inside one.
-enum DeviceIneligibilityReason { belowMemoryFloor, missingInstructionSet }
+/// [virtualDevice] is the one member that is not a hardware shortfall: a
+/// simulator or emulator has no engine to load weights with, however much
+/// memory the host lends it.
+enum DeviceIneligibilityReason {
+  belowMemoryFloor,
+  missingInstructionSet,
+  virtualDevice,
+}
 
 /// At or above this reported physical memory the preferred model is selected;
 /// below it, the lighter one. 7 GiB rather than a literal 8 GB because
@@ -40,7 +47,11 @@ int deviceMemoryFloorBytes({required bool reportsInstalledMemory}) =>
 /// The stable device facts the policy reads. A null field is genuinely unknown
 /// — a probe the platform refused — and must never be read as a low value.
 final class DeviceCapabilities {
-  const DeviceCapabilities({this.physicalMemoryBytes, this.engineSupported});
+  const DeviceCapabilities({
+    this.physicalMemoryBytes,
+    this.engineSupported,
+    this.virtualDevice,
+  });
 
   final int? physicalMemoryBytes;
 
@@ -49,14 +60,23 @@ final class DeviceCapabilities {
   /// probe could not be reached.
   final bool? engineSupported;
 
+  /// Whether this is a simulator or emulator rather than a phone. Answered by
+  /// the platform itself — a compile-time `targetEnvironment` on Apple, the
+  /// `Build` identity on Android — so it is a fact rather than a heuristic
+  /// over the other two readings, both of which describe the host and read
+  /// perfectly healthy on a simulator.
+  final bool? virtualDevice;
+
   @override
   bool operator ==(Object other) =>
       other is DeviceCapabilities &&
       other.physicalMemoryBytes == physicalMemoryBytes &&
-      other.engineSupported == engineSupported;
+      other.engineSupported == engineSupported &&
+      other.virtualDevice == virtualDevice;
 
   @override
-  int get hashCode => Object.hash(physicalMemoryBytes, engineSupported);
+  int get hashCode =>
+      Object.hash(physicalMemoryBytes, engineSupported, virtualDevice);
 }
 
 /// A classified device: the tier, and why it was refused when it was. Carries
@@ -108,16 +128,24 @@ final class DeviceEligibility {
   int get hashCode => Object.hash(tier, reason, memoryKnown);
 }
 
-/// The whole admission policy, pure. Instruction set decides first: a CPU that
-/// cannot execute the compiled kernels is out regardless of how much memory it
-/// has. Unknown never refuses — the native load guard and the #62 preflight
-/// stay behind this, so absence of evidence costs a wasted download at worst,
-/// while a wrong refusal costs a usable device.
+/// The whole admission policy, pure. A virtual device decides first, then the
+/// instruction set: both are absolute, and the two later readings would answer
+/// about the host rather than the target on a simulator — its engine probe says
+/// available and its memory is the Mac's. Unknown never refuses — the native
+/// load guard and the #62 preflight stay behind this, so absence of evidence
+/// costs a wasted download at worst, while a wrong refusal costs a usable
+/// device.
 DeviceEligibility classifyDevice({
   required DeviceCapabilities capabilities,
   required int memoryFloorBytes,
   int preferredThresholdBytes = deviceMemoryThresholdBytes,
 }) {
+  if (capabilities.virtualDevice == true) {
+    return const DeviceEligibility(
+      tier: DeviceTier.unsupported,
+      reason: DeviceIneligibilityReason.virtualDevice,
+    );
+  }
   if (capabilities.engineSupported == false) {
     return const DeviceEligibility(
       tier: DeviceTier.unsupported,

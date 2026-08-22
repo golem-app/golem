@@ -486,7 +486,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'यह QA बिल्ड पूरा पिन किया गया कैटलॉग दिखाता है। डाउनलोड और मॉडल चलाना सिम्युलेट किया जाता है।';
+      'यह बिल्ड पूरा पिन किया गया कैटलॉग दिखाता है। डाउनलोड और मॉडल चलाना सिम्युलेट किया जाता है।';
 
   @override
   String get catalogDeviceDetail =>
@@ -546,7 +546,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get downloadSimulationComplete =>
-      'निश्चित QA सिम्युलेशन पूरा हुआ; कोई वेट स्टोर नहीं किया गया।';
+      'निश्चित सिम्युलेशन पूरा हुआ; कोई वेट स्टोर नहीं किया गया।';
 
   @override
   String get downloadComplete =>
@@ -640,7 +640,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String simulateDownloadMessage(String modelName, String size) {
-    return '$modelName को $size के डाउनलोड के रूप में दिखाया गया है। यह QA सिम्युलेशन नेटवर्क का उपयोग या मॉडल वेट स्टोर नहीं करता।';
+    return '$modelName को $size के डाउनलोड के रूप में दिखाया गया है। यह सिम्युलेशन नेटवर्क का उपयोग या मॉडल वेट स्टोर नहीं करता।';
   }
 
   @override
@@ -674,8 +674,8 @@ class AppLocalizationsHi extends AppLocalizations {
       'Golem का उपयोग करने से पहले चुना गया मॉडल डाउनलोड और सत्यापित करें।';
 
   @override
-  String get qaDownloadShort =>
-      'निश्चित QA सिम्युलेशन; कोई नेटवर्क या वेट नहीं।';
+  String get simulatedDownloadShort =>
+      'निश्चित सिम्युलेशन; कोई नेटवर्क या वेट नहीं।';
 
   @override
   String get downloadBeforeSending =>
@@ -1719,6 +1719,10 @@ class AppLocalizationsHi extends AppLocalizations {
   @override
   String get deviceBelowMemoryFloor =>
       'इस डिवाइस में Golem के सबसे छोटे मॉडल की ज़रूरत से कम मेमोरी है, इसलिए डाउनलोड बंद हैं। आपकी चैट और सेटिंग्स प्रभावित नहीं हैं।';
+
+  @override
+  String get deviceVirtualHardware =>
+      'Golem अपने मॉडल असली हार्डवेयर पर चलाता है। सिम्युलेटर या एमुलेटर उन्हें लोड नहीं कर सकता, इसलिए यहाँ डाउनलोड बंद हैं।';
 
   @override
   String outOfMemoryAtContext(int tokens) {

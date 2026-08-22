@@ -2,6 +2,7 @@ package app.golem
 
 import android.app.ActivityManager
 import android.content.Context
+import android.os.Build
 import android.os.StatFs
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -22,6 +23,10 @@ class MainActivity : FlutterActivity() {
                 val info = ActivityManager.MemoryInfo()
                 manager.getMemoryInfo(info)
                 result.success(info.totalMem)
+                return@setMethodCallHandler
+            }
+            if (call.method == "isVirtualDevice") {
+                result.success(isVirtualDevice())
                 return@setMethodCallHandler
             }
             if (call.method == "availableMemoryBytes") {
@@ -53,5 +58,34 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    // Public Build fields only: ro.kernel.qemu and ro.build.characteristics
+    // separate the two just as cleanly but are not API. Verified against the
+    // Pixel emulator (hardware "ranchu", product "sdk_gphone16k_arm64") and
+    // the OnePlus 12R (hardware "qcom", product "CPH2609EEA").
+    private fun isVirtualDevice(): Boolean =
+        Build.HARDWARE in VIRTUAL_HARDWARE ||
+            VIRTUAL_PRODUCT_PREFIXES.any { Build.PRODUCT.startsWith(it) } ||
+            Build.MODEL.startsWith("sdk_") ||
+            Build.MODEL.contains("Emulator") ||
+            Build.MODEL.contains("Android SDK built for") ||
+            Build.FINGERPRINT.startsWith("generic") ||
+            Build.FINGERPRINT.startsWith("unknown")
+
+    private companion object {
+        // goldfish and ranchu are the Android emulator's two device models;
+        // the rest are Cuttlefish, Google Compute Engine, and VirtualBox.
+        val VIRTUAL_HARDWARE = setOf(
+            "goldfish",
+            "ranchu",
+            "cutf_cvm",
+            "cutf_cvm_arm64",
+            "gce_x86",
+            "gce_x86_64",
+            "vbox86",
+            "android_x86",
+        )
+        val VIRTUAL_PRODUCT_PREFIXES = listOf("sdk", "google_sdk", "vsoc", "vbox")
     }
 }

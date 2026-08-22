@@ -483,7 +483,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'Bu QA derlemesi sabitlenmiş kataloğun tamamını gösterir. İndirmeler ve model çalıştırmaları simüle edilir.';
+      'Bu derleme sabitlenmiş kataloğun tamamını gösterir. İndirmeler ve model çalıştırmaları simüle edilir.';
 
   @override
   String get catalogDeviceDetail =>
@@ -544,7 +544,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get downloadSimulationComplete =>
-      'Belirlenimci QA simülasyonu tamamlandı; hiçbir ağırlık depolanmadı.';
+      'Belirlenimci simülasyon tamamlandı; hiçbir ağırlık depolanmadı.';
 
   @override
   String get downloadComplete =>
@@ -638,7 +638,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String simulateDownloadMessage(String modelName, String size) {
-    return '$modelName, $size boyutunda bir indirme olarak gösterilir. Bu QA simülasyonu ağı kullanmaz ve model ağırlıklarını depolamaz.';
+    return '$modelName, $size boyutunda bir indirme olarak gösterilir. Bu simülasyon ağı kullanmaz ve model ağırlıklarını depolamaz.';
   }
 
   @override
@@ -672,8 +672,8 @@ class AppLocalizationsTr extends AppLocalizations {
       'Golem’i kullanmadan önce seçilen modeli indirin ve doğrulayın.';
 
   @override
-  String get qaDownloadShort =>
-      'Belirlenimci QA simülasyonu; ağ veya ağırlık yok.';
+  String get simulatedDownloadShort =>
+      'Belirlenimci simülasyon; ağ veya ağırlık yok.';
 
   @override
   String get downloadBeforeSending =>
@@ -1718,6 +1718,10 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get deviceBelowMemoryFloor =>
       'Bu cihazda Golem’in sunduğu en küçük modelin gerektirdiğinden daha az bellek var; bu nedenle indirmeler kapatıldı. Sohbetleriniz ve ayarlarınız etkilenmez.';
+
+  @override
+  String get deviceVirtualHardware =>
+      'Golem modellerini gerçek donanımda çalıştırır. Bir simülatör veya emülatör bunları yükleyemez, bu yüzden indirmeler burada kapalıdır.';
 
   @override
   String outOfMemoryAtContext(int tokens) {
