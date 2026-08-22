@@ -311,7 +311,7 @@
   "deleteModelArtifactTitle": "هل تريد حذف {modelName} · {format}؟",
   "deleteModelStorageMessage": "يزيل {size} من هذا الجهاز. يمكن تنزيل النموذج مجددًا لاحقًا.",
   "megabytes": "{value} ميغابايت",
-  "licensesIntroduction": "بُني Golem باستخدام برمجيات مفتوحة المصدر. تتوفر هذه الإشعارات بلا اتصال وتشمل تراخيص Dart والمحرك الأصلي والنماذج المستخدمة في هذا الإصدار.",
+  "licensesIntroduction": "بُني Golem باستخدام برمجيات مفتوحة المصدر. تغطي هذه الإشعارات الحزم والمحركات الأصلية التي يشحنها هذا الإصدار، وهي متاحة بلا اتصال.",
   "licenseEntries": "{count, plural, =0{لا بنود ترخيص} =1{بند ترخيص واحد} =2{بندا ترخيص} few{{count} بنود ترخيص} many{{count} بند ترخيص} other{{count} بند ترخيص}}",
   "licensesLoadFailed": "تعذر تحميل التراخيص.",
   "licensesRetryDetail": "لا تزال الملفات المضمنة على هذا الجهاز. حاول تحميلها مجددًا.",

@@ -1105,7 +1105,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'Golemはオープンソースソフトウェアを使用しています。これらの通知はオフラインでも確認でき、このビルドが使用するDart、ネイティブエンジン、モデルのライセンスが含まれています。';
+      'Golemはオープンソースソフトウェアを使用しています。これらの通知は、このビルドに同梱されるパッケージとネイティブエンジンを対象とし、オフラインでも確認できます。';
 
   @override
   String licenseEntries(int count) {

@@ -1145,7 +1145,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'Golem ओपन-सोर्स सॉफ़्टवेयर से बना है। ये नोटिस ऑफ़लाइन उपलब्ध हैं और इस बिल्ड में उपयोग किए गए Dart, नेटिव इंजन और मॉडल लाइसेंस शामिल करते हैं।';
+      'Golem ओपन-सोर्स सॉफ़्टवेयर से बना है। ये नोटिस इस बिल्ड में शामिल पैकेज और नेटिव इंजन को कवर करते हैं और ऑफ़लाइन उपलब्ध हैं।';
 
   @override
   String licenseEntries(int count) {

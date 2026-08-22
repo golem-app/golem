@@ -26,9 +26,31 @@ Golem exposes two direct Settings destinations:
   for Gemma 4 E2B and Qwen 3.5, and lists every immutable Hugging Face source
   and revision in the pinned catalog, including conversion and projector
   repositories.
-- **Open-source licenses** renders Flutter's `LicenseRegistry` through native
-  Cupertino UI. Golem lazily registers exact license and NOTICE snapshots for
-  native dependencies and model families that Flutter cannot collect.
+- **Open-source licenses** discloses the third-party software Golem itself
+  declares, through native Cupertino UI. Golem lazily registers exact license
+  and NOTICE snapshots for the native dependencies Flutter cannot collect.
+
+That screen renders three explicit manifests and nothing else (#144), in
+reading order: llama.cpp with its vendored components, the Swift graph the MLX
+engine links, then the `dependencies:` block of `app/pubspec.yaml` — each row
+labelled with the license family its text reads as. The ordering is
+`declaredLicensePackages`, assembled from the same const declarations this
+record audits, so a pin change moves the screen with it.
+`legal_surfaces_test.dart` holds the pub half to `pubspec.yaml`, so a new
+dependency is disclosed deliberately rather than by accident.
+
+Flutter's `LicenseRegistry` carries far more: 243 entries, sweeping the
+engine's own `third_party` tree and every dev-time package in the graph, much
+of which never reaches a shipping binary. Its collector walks the package
+graph rather than the link map and offers no knob to prune what it generates,
+so those notices still ship inside the app — they are simply not rendered.
+Golem discloses software it chose, not software Flutter compiled.
+
+Model licenses are not on that screen. Golem downloads weights from Hugging
+Face after explicit consent and does not redistribute them, so no bundled
+notice obligation attaches; **Model attribution** is their home, naming the
+license and linking the canonical text upstream. The bundled Apache 2.0
+snapshot that once backed an offline copy is gone with them.
 
 The native manifest mirrors every identity and revision in
 `native/apple/Package.resolved`, plus llama.cpp at
@@ -42,7 +64,8 @@ Gemma 4 E2B is attributed to Google DeepMind under Apache 2.0. The audit covers
 the official model card plus the pinned MLX, GGUF, and projector snapshots in
 the catalog. Qwen 3.5 2B and 4B are attributed to Alibaba Cloud/Qwen under
 Apache 2.0; the audit likewise covers the pinned MLX, GGUF, and projector
-snapshots. The complete license text remains available offline.
+snapshots. The license is named offline; its full text lives upstream, where
+the model card publishes it.
 
 The audited download sources are:
 
@@ -70,6 +93,9 @@ nor certifies those repositories.
   download sources before it can ship.
 - Automated drift tests compare Swift and llama pins with the declarations and
   require every referenced asset to exist and contain text.
+- A new direct dependency in `app/pubspec.yaml` fails `legal_surfaces_test`
+  until it is added to `directRuntimeLicensePackages`. That is the point: the
+  screen is a decision, not a sweep.
 - This record documents engineering evidence and distribution handling; it is
   not legal advice.
 

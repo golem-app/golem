@@ -7,8 +7,23 @@ import '../../core/chrome/golem_tappable.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
 import '../../l10n/l10n.dart';
+import 'license_registry.dart';
 
 typedef LicenseCatalogLoader = Future<List<OpenSourceLicense>> Function();
+
+/// The SPDX identifier a license body reads as, or null when nothing matches.
+/// LICENSE files carry no SPDX header, so this matches on the clauses that
+/// distinguish the families; the full text below the row stays authoritative.
+String? licenseKind(String text) {
+  if (text.contains('Apache License') && text.contains('Version 2.0')) {
+    return 'Apache-2.0';
+  }
+  if (text.contains('Redistribution and use')) {
+    return text.contains('Neither the name') ? 'BSD-3-Clause' : 'BSD-2-Clause';
+  }
+  if (text.contains('Permission is hereby granted')) return 'MIT';
+  return null;
+}
 
 final class OpenSourceLicense {
   OpenSourceLicense({required Iterable<String> packages, required this.text})
@@ -18,8 +33,14 @@ final class OpenSourceLicense {
   final String text;
 
   String get title => packages.join(', ');
+
+  late final String? kind = licenseKind(text);
 }
 
+/// The declared manifests, in `declaredLicensePackages` order. Flutter's
+/// registry also carries the engine's own third-party tree and every dev-time
+/// package in the graph; neither is software Golem chose, so neither is
+/// rendered here (#144).
 Future<List<OpenSourceLicense>> loadRegisteredLicenses() async {
   final documentsByPackage = <String, List<String>>{};
   await for (final entry in LicenseRegistry.licenses) {
@@ -30,13 +51,19 @@ Future<List<OpenSourceLicense>> loadRegisteredLicenses() async {
       documentsByPackage.putIfAbsent(package, () => []).add(text);
     }
   }
+  final order = {
+    for (final (index, package) in declaredLicensePackages.indexed)
+      package: index,
+  };
   final licenses = [
     for (final entry in documentsByPackage.entries)
-      OpenSourceLicense(packages: [entry.key], text: entry.value.join('\n\n')),
+      if (order.containsKey(entry.key))
+        OpenSourceLicense(
+          packages: [entry.key],
+          text: entry.value.join('\n\n'),
+        ),
   ];
-  licenses.sort(
-    (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
-  );
+  licenses.sort((a, b) => order[a.title]!.compareTo(order[b.title]!));
   return List.unmodifiable(licenses);
 }
 
@@ -201,6 +228,18 @@ class _LicenseDisclosureState extends State<_LicenseDisclosure> {
                       ),
                     ),
                   ),
+                  if (widget.license.kind case final kind?) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      kind,
+                      style: GolemText.caption.copyWith(
+                        color: CupertinoDynamicColor.resolve(
+                          GolemTheme.mutedInk,
+                          context,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(width: 8),
                   Icon(
                     _expanded

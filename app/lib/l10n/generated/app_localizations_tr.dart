@@ -1145,7 +1145,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'Golem açık kaynaklı yazılımlarla geliştirilmiştir. Bu bildirimler çevrimdışı kullanılabilir ve bu derlemenin kullandığı Dart, yerel motor ve model lisanslarını içerir.';
+      'Golem açık kaynaklı yazılımlarla geliştirilmiştir. Bu bildirimler bu derlemenin içerdiği paketleri ve yerel motorları kapsar ve çevrimdışı kullanılabilir.';
 
   @override
   String licenseEntries(int count) {

@@ -1988,7 +1988,7 @@ abstract class AppLocalizations {
   /// Open-source licenses introduction.
   ///
   /// In en, this message translates to:
-  /// **'Golem is built with open-source software. These notices are available offline and include Dart, native engine, and model licenses used by this build.'**
+  /// **'Golem is built with open-source software. These notices cover the packages and native engines this build ships, and are available offline.'**
   String get licensesIntroduction;
 
   /// License entry count.

@@ -311,7 +311,7 @@
   "deleteModelArtifactTitle": "Xóa {modelName} · {format}?",
   "deleteModelStorageMessage": "Xóa {size} khỏi thiết bị. Có thể tải lại mô hình sau.",
   "megabytes": "{value} MB",
-  "licensesIntroduction": "Golem được xây dựng bằng phần mềm nguồn mở. Các thông báo này có sẵn khi ngoại tuyến và bao gồm giấy phép Dart, công cụ gốc và mô hình mà bản dựng sử dụng.",
+  "licensesIntroduction": "Golem được xây dựng bằng phần mềm nguồn mở. Các thông báo này bao gồm những gói và công cụ gốc mà bản dựng này kèm theo, và có sẵn khi ngoại tuyến.",
   "licenseEntries": "{count, plural, =1{1 mục giấy phép} other{{count} mục giấy phép}}",
   "licensesLoadFailed": "Không thể tải giấy phép.",
   "licensesRetryDetail": "Các tệp đi kèm vẫn còn trên thiết bị. Hãy thử tải lại.",

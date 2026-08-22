@@ -48,18 +48,24 @@ import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
 import 'support/in_memory_settings_repository.dart';
 
+// Opening clauses, not headers: the kind label the rows render is read from
+// the text, so a fixture without them would record a golden with no labels.
 Future<List<OpenSourceLicense>> _goldenLicenses() async => [
   OpenSourceLicense(
     packages: const ['llama.cpp'],
-    text: 'MIT License\n\nCopyright the ggml authors',
+    text:
+        'MIT License\n\nCopyright the ggml authors\n\n'
+        'Permission is hereby granted, free of charge',
   ),
   OpenSourceLicense(
-    packages: const ['mlx-swift'],
-    text: 'MIT License\n\nCopyright ml-explore',
-  ),
-  OpenSourceLicense(
-    packages: const ['Qwen 3.5 models'],
+    packages: const ['swift-nio'],
     text: 'Apache License\n\nVersion 2.0, January 2004',
+  ),
+  OpenSourceLicense(
+    packages: const ['path_provider'],
+    text:
+        'Redistribution and use in source and binary forms\n\n'
+        'Neither the name of Google Inc.',
   ),
 ];
 

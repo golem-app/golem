@@ -1158,7 +1158,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'O Golem é desenvolvido com software de código aberto. Estes avisos estão disponíveis off-line e incluem as licenças do Dart, do mecanismo nativo e dos modelos usados por esta versão.';
+      'O Golem é desenvolvido com software de código aberto. Estes avisos cobrem os pacotes e os mecanismos nativos que esta versão inclui, e estão disponíveis off-line.';
 
   @override
   String licenseEntries(int count) {
@@ -3057,7 +3057,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get licensesIntroduction =>
-      'O Golem é desenvolvido com software de código aberto. Estes avisos estão disponíveis off-line e incluem as licenças do Dart, do mecanismo nativo e dos modelos usados por esta versão.';
+      'O Golem é desenvolvido com software de código aberto. Estes avisos cobrem os pacotes e os mecanismos nativos que esta versão inclui, e estão disponíveis off-line.';
 
   @override
   String licenseEntries(int count) {

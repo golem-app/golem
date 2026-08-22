@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/app_identity.dart';
@@ -13,6 +14,19 @@ import 'package:golem_flutter/features/settings/settings_screen.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_en.dart';
 
 import 'support/harness.dart';
+
+/// The keys of `app/pubspec.yaml`'s `dependencies:` block, read as text
+/// rather than through a yaml parser the app does not otherwise need.
+Set<String> _directDependencies() {
+  final lines = File('pubspec.yaml').readAsLinesSync();
+  final start = lines.indexOf('dependencies:');
+  final end = lines.indexOf('dev_dependencies:');
+  return {
+    for (final line in lines.sublist(start + 1, end))
+      if (RegExp(r'^  ([a-z0-9_]+):').firstMatch(line) case final match?)
+        match.group(1)!,
+  };
+}
 
 void main() {
   test('every pinned Swift package has an exact bundled declaration', () {
@@ -75,17 +89,6 @@ void main() {
     }
   });
 
-  test('the model license is Apache 2.0 without a Swift exception', () {
-    final license = File(
-      'assets/licenses/model-apache-2.0-license.txt',
-    ).readAsStringSync();
-
-    expect(license, contains('Apache License'));
-    expect(license, contains('Version 2.0, January 2004'));
-    expect(license, isNot(contains('Runtime Library Exception')));
-    expect(license.trim(), endsWith('limitations under the License.'));
-  });
-
   test('pinned artifacts produce complete family attribution', () {
     final families = modelAttributionsFor(modelCatalog);
 
@@ -102,6 +105,95 @@ void main() {
           .every((source) => source.revision.length == 40),
       isTrue,
     );
+  });
+
+  test('the declared list accounts for every direct dependency', () {
+    // Neither exclusion reaches Flutter's collector: `inferno` is first-party
+    // and ships no LICENSE file (its notices are the bundled declarations),
+    // and `flutter_localizations` is an SDK package whose notice is filed
+    // under `flutter`. Both were verified against a built NOTICES bundle.
+    expect(
+      directRuntimeLicensePackages.toSet(),
+      _directDependencies()
+        ..remove('inferno')
+        ..remove('flutter_localizations'),
+    );
+    expect(
+      directRuntimeLicensePackages,
+      hasLength(directRuntimeLicensePackages.toSet().length),
+    );
+  });
+
+  test('the declared list opens on the engine and covers every manifest', () {
+    expect(declaredLicensePackages.take(4), [
+      'llama.cpp',
+      'nlohmann/json',
+      'stb_image',
+      'miniaudio',
+    ]);
+    for (final declaration in bundledLicenseDeclarations) {
+      expect(
+        declaredLicensePackages,
+        contains(declaration.displayName),
+        reason: declaration.identity,
+      );
+    }
+    expect(
+      declaredLicensePackages,
+      hasLength(bundledLicenseDeclarations.length + 15),
+    );
+  });
+
+  test('model weights are attributed, not disclosed as bundled software', () {
+    // Golem downloads weights after consent instead of redistributing them,
+    // so no bundled-notice obligation attaches; the Model attribution screen
+    // names the license and links the canonical text (ADR 0009).
+    for (final name in ['Gemma 4 E2B model', 'Qwen 3.5 models']) {
+      expect(declaredLicensePackages, isNot(contains(name)));
+    }
+    expect(
+      bundledLicenseDeclarations.map((entry) => entry.identity),
+      isNot(contains('gemma-4-e2b')),
+    );
+    expect(
+      File('assets/licenses/model-apache-2.0-license.txt').existsSync(),
+      isFalse,
+    );
+  });
+
+  test('the loader renders the declared manifests and nothing else', () async {
+    addTearDown(LicenseRegistry.reset);
+    LicenseRegistry.reset();
+    LicenseRegistry.addLicense(() async* {
+      // A transitive pub package, an engine third-party entry and a model
+      // declaration — the three kinds the screen must not render.
+      yield const LicenseEntryWithLineBreaks(['petitparser'], 'transitive');
+      yield const LicenseEntryWithLineBreaks(['skia'], 'engine');
+      yield const LicenseEntryWithLineBreaks(['Gemma 4 E2B model'], 'weights');
+      yield const LicenseEntryWithLineBreaks(['go_router'], 'direct');
+      yield const LicenseEntryWithLineBreaks(['llama.cpp'], 'bundled');
+    });
+
+    final licenses = await loadRegisteredLicenses();
+
+    expect(licenses.map((license) => license.title), [
+      'llama.cpp',
+      'go_router',
+    ]);
+  });
+
+  test('license kinds are read from the clauses that distinguish them', () {
+    expect(
+      licenseKind('Apache License\n\nVersion 2.0, January 2004'),
+      'Apache-2.0',
+    );
+    expect(
+      licenseKind('Redistribution and use ...\nNeither the name of the'),
+      'BSD-3-Clause',
+    );
+    expect(licenseKind('Redistribution and use in source'), 'BSD-2-Clause');
+    expect(licenseKind('Permission is hereby granted, free of charge'), 'MIT');
+    expect(licenseKind('All rights reserved.'), isNull);
   });
 
   testWidgets('the disclaimer is visible before setup and in Settings', (
@@ -152,24 +244,31 @@ void main() {
     expect(opened.single.path, '/google/gemma-4-E2B-it');
   }, variant: iosChrome);
 
-  testWidgets('licenses expand inline', (tester) async {
+  testWidgets('licenses expand inline beside their kind', (tester) async {
     await pumpWithRepositories(
       tester,
       child: OpenSourceLicensesScreen(
         loadLicenses: () async => [
           OpenSourceLicense(
             packages: const ['Example package'],
-            text: 'Example license body',
+            text: 'Permission is hereby granted, free of charge',
           ),
         ],
       ),
     );
 
     expect(find.text('Example package'), findsOneWidget);
-    expect(find.text('Example license body'), findsNothing);
+    expect(find.text('MIT'), findsOneWidget);
+    expect(
+      find.text('Permission is hereby granted, free of charge'),
+      findsNothing,
+    );
     await tester.tap(find.text('Example package'));
     await tester.pumpAndSettle();
-    expect(find.text('Example license body'), findsOneWidget);
+    expect(
+      find.text('Permission is hereby granted, free of charge'),
+      findsOneWidget,
+    );
   }, variant: iosChrome);
 
   testWidgets('a license load failure retries', (tester) async {
@@ -203,7 +302,7 @@ void main() {
       loadLicenses: () async => [
         OpenSourceLicense(
           packages: const ['Example package'],
-          text: 'Example license body',
+          text: 'Permission is hereby granted, free of charge',
         ),
       ],
     );

@@ -311,7 +311,7 @@
   "deleteModelArtifactTitle": "Usunąć {modelName} · {format}?",
   "deleteModelStorageMessage": "Z urządzenia zostanie usunięte {size}. Model można później pobrać ponownie.",
   "megabytes": "{value} MB",
-  "licensesIntroduction": "Golem korzysta z oprogramowania open source. Te informacje są dostępne offline i obejmują licencje Dart, natywnego silnika oraz modeli używanych w tej wersji.",
+  "licensesIntroduction": "Golem korzysta z oprogramowania open source. Te informacje obejmują pakiety i natywne silniki dołączone do tej wersji i są dostępne offline.",
   "licenseEntries": "{count, plural, one{1 pozycja licencji} few{{count} pozycje licencji} many{{count} pozycji licencji} other{{count} pozycji licencji}}",
   "licensesLoadFailed": "Nie udało się wczytać licencji.",
   "licensesRetryDetail": "Dołączone pliki nadal znajdują się na urządzeniu. Spróbuj wczytać je ponownie.",

@@ -1161,7 +1161,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'Golem korzysta z oprogramowania open source. Te informacje są dostępne offline i obejmują licencje Dart, natywnego silnika oraz modeli używanych w tej wersji.';
+      'Golem korzysta z oprogramowania open source. Te informacje obejmują pakiety i natywne silniki dołączone do tej wersji i są dostępne offline.';
 
   @override
   String licenseEntries(int count) {

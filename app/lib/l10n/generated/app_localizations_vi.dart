@@ -1146,7 +1146,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'Golem được xây dựng bằng phần mềm nguồn mở. Các thông báo này có sẵn khi ngoại tuyến và bao gồm giấy phép Dart, công cụ gốc và mô hình mà bản dựng sử dụng.';
+      'Golem được xây dựng bằng phần mềm nguồn mở. Các thông báo này bao gồm những gói và công cụ gốc mà bản dựng này kèm theo, và có sẵn khi ngoại tuyến.';
 
   @override
   String licenseEntries(int count) {

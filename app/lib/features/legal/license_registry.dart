@@ -154,25 +154,13 @@ const llamaLicenseDeclarations = <BundledLicenseDeclaration>[
   ),
 ];
 
-const modelLicenseDeclarations = <BundledLicenseDeclaration>[
-  BundledLicenseDeclaration(
-    identity: 'gemma-4-e2b',
-    displayName: 'Gemma 4 E2B model',
-    revision: 'Apache-2.0',
-    assetPaths: ['assets/licenses/model-apache-2.0-license.txt'],
-  ),
-  BundledLicenseDeclaration(
-    identity: 'qwen-3.5',
-    displayName: 'Qwen 3.5 models',
-    revision: 'Apache-2.0',
-    assetPaths: ['assets/licenses/model-apache-2.0-license.txt'],
-  ),
-];
-
+/// Software Golem ships. Model weights are deliberately absent: they are
+/// downloaded from Hugging Face after consent rather than redistributed, so
+/// no bundled-notice obligation attaches to them, and the Model attribution
+/// screen names their license and links the canonical text (ADR 0009).
 const bundledLicenseDeclarations = <BundledLicenseDeclaration>[
   ...swiftPackageLicenseDeclarations,
   ...llamaLicenseDeclarations,
-  ...modelLicenseDeclarations,
 ];
 
 /// Adds only the licenses Flutter cannot discover from pub packages. The
@@ -191,3 +179,44 @@ void registerGolemLicenses() {
     }
   });
 }
+
+/// Direct runtime dependencies of `app/pubspec.yaml`, the packages a reader
+/// looks for by name. Two manifest entries are absent on purpose, because
+/// Flutter's collector never yields them: `inferno` is first-party and ships
+/// no `LICENSE` file of its own, and `flutter_localizations` is an SDK
+/// package whose notice is attributed to `flutter`. Listing either would put
+/// a name in the order that no registry entry can fill.
+/// `legal_surfaces_test.dart` holds this list to the manifest, so a new
+/// dependency has to be placed here deliberately.
+const directRuntimeLicensePackages = <String>[
+  'flutter',
+  'intl',
+  'cupertino_icons',
+  'flutter_riverpod',
+  'riverpod_annotation',
+  'go_router',
+  'path_provider',
+  'share_plus',
+  'background_downloader',
+  'crypto',
+  'url_launcher',
+  'markdown',
+  'highlight',
+  'image_picker',
+  'file_selector',
+];
+
+/// Everything the licenses screen discloses, in reading order: the engine
+/// Golem runs, the Swift graph the MLX engine links, then the packages the
+/// app itself declares. Assembled from the three explicit manifests and
+/// nothing else — Flutter's collector also sweeps the engine's `third_party`
+/// tree and every dev-time package in the graph, and none of that is software
+/// Golem chose (#144).
+final declaredLicensePackages = List<String>.unmodifiable([
+  for (final declaration in [
+    ...llamaLicenseDeclarations,
+    ...swiftPackageLicenseDeclarations,
+  ])
+    declaration.displayName,
+  ...directRuntimeLicensePackages,
+]);
