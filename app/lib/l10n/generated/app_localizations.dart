@@ -719,12 +719,6 @@ abstract class AppLocalizations {
   /// **'Download progress'**
   String get downloadProgress;
 
-  /// Model verification status.
-  ///
-  /// In en, this message translates to:
-  /// **'Verifying files…'**
-  String get verifyingFiles;
-
   /// Keep model action.
   ///
   /// In en, this message translates to:
@@ -1100,7 +1094,7 @@ abstract class AppLocalizations {
   /// Foreground-speed note headline.
   ///
   /// In en, this message translates to:
-  /// **'Keep Golem open for full speed.'**
+  /// **'Keep Golem open'**
   String get downloadNoteTitle;
 
   /// Foreground-speed note body quoting measured background pacing.
@@ -2619,12 +2613,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Download{suffix}'**
   String downloadProgressLabel(String suffix);
-
-  /// Model verification progress.
-  ///
-  /// In en, this message translates to:
-  /// **'Verifying files{suffix}…'**
-  String verifyingFilesStatus(String suffix);
 
   /// Open model repository accessibility label.
   ///

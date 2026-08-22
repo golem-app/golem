@@ -341,10 +341,6 @@ final class _ModelRow extends StatelessWidget {
             captionStyle: GolemText.caption.copyWith(color: muted),
             fraction: choice.transfer!.fraction,
             percent: choice.transfer!.percent,
-            // Both in-flight phases count real bytes now — transferred, then
-            // hashed (#143) — so the percentage is painted and read in each.
-            showPercent: true,
-            announcePercent: true,
           ),
           if (progress.pausable) ...[
             const SizedBox(height: GolemSpace.s2),

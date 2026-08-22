@@ -317,9 +317,6 @@ class AppLocalizationsPt extends AppLocalizations {
   String get downloadProgress => 'Progresso do download';
 
   @override
-  String get verifyingFiles => 'Verificando arquivos…';
-
-  @override
   String get keep => 'Manter';
 
   @override
@@ -565,8 +562,7 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle =>
-      'Mantenha o Golem aberto para velocidade máxima.';
+  String get downloadNoteTitle => 'Mantenha o Golem aberto';
 
   @override
   String downloadNoteBody(
@@ -1554,11 +1550,6 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String downloadProgressLabel(String suffix) {
     return 'Baixando$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return 'Verificando arquivos$suffix…';
   }
 
   @override
@@ -2243,9 +2234,6 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get downloadProgress => 'Progresso do download';
 
   @override
-  String get verifyingFiles => 'Verificando arquivos…';
-
-  @override
   String get keep => 'Manter';
 
   @override
@@ -2491,8 +2479,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   }
 
   @override
-  String get downloadNoteTitle =>
-      'Mantenha o Golem aberto para velocidade máxima.';
+  String get downloadNoteTitle => 'Mantenha o Golem aberto';
 
   @override
   String downloadNoteBody(
@@ -3480,11 +3467,6 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String downloadProgressLabel(String suffix) {
     return 'Baixando$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return 'Verificando arquivos$suffix…';
   }
 
   @override

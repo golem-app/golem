@@ -314,9 +314,6 @@ class AppLocalizationsVi extends AppLocalizations {
   String get downloadProgress => 'Tiến trình tải xuống';
 
   @override
-  String get verifyingFiles => 'Đang xác minh tệp…';
-
-  @override
   String get keep => 'Giữ lại';
 
   @override
@@ -560,7 +557,7 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'Giữ Golem mở để tải với tốc độ tối đa.';
+  String get downloadNoteTitle => 'Giữ Golem mở';
 
   @override
   String downloadNoteBody(
@@ -1534,11 +1531,6 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String downloadProgressLabel(String suffix) {
     return 'Tải xuống$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return 'Đang xác minh tệp$suffix…';
   }
 
   @override

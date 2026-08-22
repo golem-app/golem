@@ -312,9 +312,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get downloadProgress => 'İndirme ilerlemesi';
 
   @override
-  String get verifyingFiles => 'Dosyalar doğrulanıyor…';
-
-  @override
   String get keep => 'Tut';
 
   @override
@@ -559,7 +556,7 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'Tam hız için Golem’i açık tutun.';
+  String get downloadNoteTitle => 'Golem’i açık tutun';
 
   @override
   String downloadNoteBody(
@@ -1533,11 +1530,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String downloadProgressLabel(String suffix) {
     return 'İndirme$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return 'Dosyalar doğrulanıyor$suffix…';
   }
 
   @override

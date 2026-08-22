@@ -312,9 +312,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get downloadProgress => 'تقدم التنزيل';
 
   @override
-  String get verifyingFiles => 'جارٍ التحقق من الملفات…';
-
-  @override
   String get keep => 'إبقاء';
 
   @override
@@ -557,7 +554,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'أبقِ Golem مفتوحًا للسرعة الكاملة.';
+  String get downloadNoteTitle => 'أبقِ Golem مفتوحًا';
 
   @override
   String downloadNoteBody(
@@ -1554,11 +1551,6 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String downloadProgressLabel(String suffix) {
     return 'التنزيل$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return 'جارٍ التحقق من الملفات$suffix…';
   }
 
   @override

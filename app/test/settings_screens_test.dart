@@ -218,11 +218,11 @@ void main() {
       find.byKey(const Key('model-download-note-gemma4-mlx')),
       findsOneWidget,
     );
-    expect(find.text('Keep Golem open for full speed.'), findsOneWidget);
+    expect(find.text('Keep Golem open'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('download-note-dismiss')));
     await tester.pump();
-    expect(find.text('Keep Golem open for full speed.'), findsNothing);
+    expect(find.text('Keep Golem open'), findsNothing);
   });
 
   testWidgets('a paused card quotes the amount left under its bar', (
@@ -248,7 +248,7 @@ void main() {
       find.byKey(const Key('model-download-note-gemma4-mlx')),
       findsOneWidget,
     );
-    expect(find.text('Keep Golem open for full speed.'), findsNothing);
+    expect(find.text('Keep Golem open'), findsNothing);
     expect(find.textContaining(' left'), findsOneWidget);
   });
 
@@ -319,7 +319,7 @@ void main() {
       ),
       child: const ModelsScreen(),
     );
-    expect(find.text('Keep Golem open for full speed.'), findsOneWidget);
+    expect(find.text('Keep Golem open'), findsOneWidget);
     final before = tester.getTopLeft(
       find.byKey(const Key('model-card-gemma4-mlx')),
     );
@@ -333,7 +333,7 @@ void main() {
     await container.read(modelControllerProvider.notifier).pause('gemma4-mlx');
     await tester.pumpAndSettle();
 
-    expect(find.text('Keep Golem open for full speed.'), findsNothing);
+    expect(find.text('Keep Golem open'), findsNothing);
     expect(
       tester.getTopLeft(find.byKey(const Key('model-card-gemma4-mlx'))),
       before,

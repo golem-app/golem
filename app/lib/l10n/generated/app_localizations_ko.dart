@@ -309,9 +309,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get downloadProgress => '다운로드 진행률';
 
   @override
-  String get verifyingFiles => '파일 확인 중…';
-
-  @override
   String get keep => '유지';
 
   @override
@@ -547,7 +544,7 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => '최고 속도를 위해 Golem을 열어 두세요.';
+  String get downloadNoteTitle => 'Golem을 열어 두세요';
 
   @override
   String downloadNoteBody(
@@ -1485,11 +1482,6 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String downloadProgressLabel(String suffix) {
     return '다운로드$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return '파일 확인 중$suffix…';
   }
 
   @override

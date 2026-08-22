@@ -315,9 +315,6 @@ class AppLocalizationsHi extends AppLocalizations {
   String get downloadProgress => 'डाउनलोड की प्रगति';
 
   @override
-  String get verifyingFiles => 'फ़ाइलें जाँची जा रही हैं…';
-
-  @override
   String get keep => 'रखें';
 
   @override
@@ -561,7 +558,7 @@ class AppLocalizationsHi extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'पूरी गति के लिए Golem को खुला रखें।';
+  String get downloadNoteTitle => 'Golem को खुला रखें';
 
   @override
   String downloadNoteBody(
@@ -1533,11 +1530,6 @@ class AppLocalizationsHi extends AppLocalizations {
   @override
   String downloadProgressLabel(String suffix) {
     return 'डाउनलोड$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return 'फ़ाइलें जाँची जा रही हैं$suffix…';
   }
 
   @override

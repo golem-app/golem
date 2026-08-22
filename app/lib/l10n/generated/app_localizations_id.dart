@@ -315,9 +315,6 @@ class AppLocalizationsId extends AppLocalizations {
   String get downloadProgress => 'Kemajuan unduhan';
 
   @override
-  String get verifyingFiles => 'Memverifikasi file…';
-
-  @override
   String get keep => 'Pertahankan';
 
   @override
@@ -561,8 +558,7 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle =>
-      'Biarkan Golem terbuka untuk kecepatan penuh.';
+  String get downloadNoteTitle => 'Biarkan Golem tetap terbuka';
 
   @override
   String downloadNoteBody(
@@ -1532,11 +1528,6 @@ class AppLocalizationsId extends AppLocalizations {
   @override
   String downloadProgressLabel(String suffix) {
     return 'Unduhan$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return 'Memverifikasi file$suffix…';
   }
 
   @override

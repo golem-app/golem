@@ -313,9 +313,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadProgress => 'Download progress';
 
   @override
-  String get verifyingFiles => 'Verifying files…';
-
-  @override
   String get keep => 'Keep';
 
   @override
@@ -558,7 +555,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'Keep Golem open for full speed.';
+  String get downloadNoteTitle => 'Keep Golem open';
 
   @override
   String downloadNoteBody(
@@ -1532,11 +1529,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String downloadProgressLabel(String suffix) {
     return 'Download$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return 'Verifying files$suffix…';
   }
 
   @override

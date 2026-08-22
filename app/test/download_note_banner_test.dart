@@ -26,12 +26,12 @@ void main() {
       model: state(ArtifactPhase.downloading),
       child: Column(children: [DownloadNoteBanner(entry: entry)]),
     );
-    expect(find.text('Keep Golem open for full speed.'), findsOneWidget);
+    expect(find.text('Keep Golem open'), findsOneWidget);
     expect(find.textContaining('slows background downloads'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('download-note-dismiss')));
     await tester.pump();
-    expect(find.text('Keep Golem open for full speed.'), findsNothing);
+    expect(find.text('Keep Golem open'), findsNothing);
   });
 
   for (final phase in [
@@ -47,7 +47,7 @@ void main() {
         model: state(phase),
         child: Column(children: [DownloadNoteBanner(entry: entry)]),
       );
-      expect(find.text('Keep Golem open for full speed.'), findsNothing);
+      expect(find.text('Keep Golem open'), findsNothing);
     });
   }
 
@@ -107,7 +107,7 @@ void main() {
       ),
       child: Column(children: [DownloadNoteBanner(entry: entry)]),
     );
-    expect(find.text('Keep Golem open for full speed.'), findsNothing);
+    expect(find.text('Keep Golem open'), findsNothing);
   });
 
   testWidgets('one dismissal hides every surface sharing the state', (
@@ -127,11 +127,11 @@ void main() {
         ],
       ),
     );
-    expect(find.text('Keep Golem open for full speed.'), findsNWidgets(2));
+    expect(find.text('Keep Golem open'), findsNWidgets(2));
 
     await tester.tap(find.byKey(const Key('download-note-dismiss')).first);
     await tester.pump();
-    expect(find.text('Keep Golem open for full speed.'), findsNothing);
+    expect(find.text('Keep Golem open'), findsNothing);
   });
 
   testWidgets('dismiss control is an accessible labeled button', (

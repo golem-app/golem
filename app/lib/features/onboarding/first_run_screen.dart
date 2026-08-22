@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_identity.dart';
 import '../../core/chrome/golem_badge.dart';
 import '../../core/chrome/golem_button.dart';
+import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_tappable.dart';
 import '../../core/domain/model_admission.dart';
@@ -602,9 +603,12 @@ class _DownloadScreen extends ConsumerWidget {
                 style: GolemText.caption.copyWith(color: muted),
               ),
             ],
+            // Compact: at footnote size the note outweighed the card it
+            // annotates, and its body wrapped to four lines at 1.3× (#143).
             DownloadNoteBanner(
               key: const Key('first-run-download-note'),
               entry: selected,
+              compact: true,
               margin: const EdgeInsetsDirectional.only(top: GolemSpace.s4),
             ),
             if (status.phase == ArtifactPhase.failed) ...[
@@ -619,18 +623,23 @@ class _DownloadScreen extends ConsumerWidget {
           const Spacer(),
         ],
       ),
+      // One control set per phase. Start chatting exists only once the model
+      // is installed — a disabled button above the transfer controls read as
+      // a broken one — and every in-flight phase is two rows tall, so the
+      // body above keeps its height from the first byte to the last hash
+      // (#143). A failure offers nothing here: the banner in the body owns
+      // Retry and Discard.
       action: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          GolemButton.filled(
-            key: const Key('first-run-start-chatting'),
-            label: context.l10n.startChatting,
-            onPressed: status.phase == ArtifactPhase.installed
-                ? () => ref.read(firstRunControllerProvider.notifier).complete()
-                : null,
-          ),
           if (selected != null)
             switch (status.phase) {
+              ArtifactPhase.installed => GolemButton.filled(
+                key: const Key('first-run-start-chatting'),
+                label: context.l10n.startChatting,
+                onPressed: () =>
+                    ref.read(firstRunControllerProvider.notifier).complete(),
+              ),
               ArtifactPhase.downloading => Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -659,6 +668,18 @@ class _DownloadScreen extends ConsumerWidget {
                   _CancelDownloadButton(entry: selected),
                 ],
               ),
+              // Nothing pauses a hash, so the top row is the height a button
+              // would take, and Cancel stays where it was a moment ago.
+              ArtifactPhase.verifying => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    key: const Key('first-run-verify-spacer'),
+                    height: GolemChrome.current.minimumTapTarget,
+                  ),
+                  _CancelDownloadButton(entry: selected),
+                ],
+              ),
               // Cancel and discard land here: without a restart affordance
               // the required-setup step would be a dead end until relaunch.
               ArtifactPhase.notDownloaded => GolemButton.tinted(
@@ -669,7 +690,7 @@ class _DownloadScreen extends ConsumerWidget {
                 onPressed: () =>
                     unawaited(_requestDownload(context, ref, selected)),
               ),
-              _ => const SizedBox(height: 44),
+              ArtifactPhase.failed => const SizedBox.shrink(),
             },
           // Below the buttons per the handoff, and outside the scroll view so
           // the reassurance is never clipped mid-sentence by a tall action
@@ -699,7 +720,8 @@ class _DownloadScreen extends ConsumerWidget {
 /// The download card from the first-download handoff: name and format line,
 /// then the live transfer block — big tabular percent, a rate/state chip, the
 /// progress track, and a bytes row with the time or amount left. Verifying
-/// and installed swap the transfer block for their own rows.
+/// keeps the block, wrapped in the one announcement that the phase changed;
+/// installed swaps it for a row of its own.
 class _DownloadModelCard extends ConsumerWidget {
   const _DownloadModelCard({
     required this.entry,
@@ -733,32 +755,7 @@ class _DownloadModelCard extends ConsumerWidget {
             '${formatModelBytes(entry.totalBytes)}',
             style: GolemText.footnote.copyWith(color: muted),
           ),
-          if (status.phase == ArtifactPhase.verifying)
-            Padding(
-              padding: const EdgeInsetsDirectional.only(top: GolemSpace.s4),
-              child: Semantics(
-                key: const Key('first-run-verification-progress'),
-                container: true,
-                liveRegion: true,
-                label: context.l10n.modelVerifying(entry.displayName),
-                value: context.l10n.checkingDownloadedFiles,
-                child: ExcludeSemantics(
-                  child: Row(
-                    children: [
-                      const CupertinoActivityIndicator(),
-                      const SizedBox(width: GolemSpace.s3),
-                      Expanded(
-                        child: Text(
-                          context.l10n.checkingDownloadedFiles,
-                          style: GolemText.footnote.copyWith(color: muted),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            )
-          else if (status.phase == ArtifactPhase.installed)
+          if (status.phase == ArtifactPhase.installed)
             Padding(
               padding: const EdgeInsetsDirectional.only(top: GolemSpace.s4),
               child: Row(
@@ -785,23 +782,41 @@ class _DownloadModelCard extends ConsumerWidget {
             )
           else ...[
             const SizedBox(height: GolemSpace.s4),
-            TransferCard(
-              key: const Key('first-run-download-track'),
-              transfer: artifactTransfer(
-                entry: entry,
-                status: status,
-                localizations: context.l10n,
-                pace: ref.watch(downloadPaceProvider),
-                simulated: simulated,
+            _liveRegion(
+              context,
+              TransferCard(
+                key: const Key('first-run-download-track'),
+                transfer: artifactTransfer(
+                  entry: entry,
+                  status: status,
+                  localizations: context.l10n,
+                  pace: ref.watch(downloadPaceProvider),
+                  simulated: simulated,
+                ),
+                density: TransferDensity.prominent,
+                semanticsLabel: context.l10n.downloadProgress,
               ),
-              density: TransferDensity.prominent,
-              semanticsLabel: context.l10n.downloadProgress,
             ),
           ],
         ],
       ),
     );
   }
+
+  /// The transfer block itself is deliberately not live — every tick of a
+  /// multi-gigabyte download would talk over the screen — so the switch to
+  /// hashing is announced here, once, by the region appearing around it.
+  Widget _liveRegion(BuildContext context, Widget child) =>
+      status.phase == ArtifactPhase.verifying
+      ? Semantics(
+          key: const Key('first-run-verification-progress'),
+          container: true,
+          liveRegion: true,
+          label: context.l10n.modelVerifying(entry.displayName),
+          value: context.l10n.checkingDownloadedFiles,
+          child: child,
+        )
+      : child;
 }
 
 /// Failed transfers keep their explanation and both ways out on one surface,

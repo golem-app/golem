@@ -78,6 +78,7 @@ class ModelSetupBanner extends ConsumerWidget {
             ),
           ),
           if (status.phase == ArtifactPhase.downloading ||
+              status.phase == ArtifactPhase.verifying ||
               status.phase == ArtifactPhase.paused) ...[
             const SizedBox(height: 10),
             // The headline and detail above say what is happening; the bar is
@@ -131,9 +132,7 @@ class ModelSetupBanner extends ConsumerWidget {
                 ref.read(modelControllerProvider.notifier).download(key),
               ),
             ),
-            ArtifactPhase.verifying => const Center(
-              child: CupertinoActivityIndicator(),
-            ),
+            ArtifactPhase.verifying ||
             ArtifactPhase.installed => const SizedBox.shrink(),
           },
         ],

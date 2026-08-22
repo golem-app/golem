@@ -220,6 +220,7 @@ void main() {
           status: const ArtifactStatus(
             phase: ArtifactPhase.verifying,
             downloadedBytes: 3583086498,
+            verifiedBytes: 1433234599,
           ),
           theme: Brightness.light,
         ),
@@ -247,7 +248,6 @@ void main() {
         ),
       ]) {
     testWidgets('required setup ${setup.name} golden', (tester) async {
-      final verifying = setup.status.phase == ArtifactPhase.verifying;
       await pumpWithRepositories(
         tester,
         brightness: setup.theme,
@@ -259,29 +259,29 @@ void main() {
         overrides: [
           // A live sampler never feeds a golden; the chip and ETA are pinned.
           downloadPaceProvider.overrideWith(
-            () => FixedDownloadPace(
-              setup.status.phase == ArtifactPhase.downloading
-                  ? const DownloadPaceSnapshot(
-                      artifactKey: 'gemma4-mlx',
-                      mbPerSecond: 44.0,
-                      eta: Duration(seconds: 54),
-                    )
-                  : null,
-            ),
+            () => FixedDownloadPace(switch (setup.status.phase) {
+              ArtifactPhase.downloading => const DownloadPaceSnapshot(
+                artifactKey: 'gemma4-mlx',
+                mbPerSecond: 44.0,
+                eta: Duration(seconds: 54),
+              ),
+              ArtifactPhase.verifying => const DownloadPaceSnapshot(
+                artifactKey: 'gemma4-mlx',
+                mbPerSecond: 180.0,
+                eta: Duration(seconds: 12),
+                phase: ArtifactPhase.verifying,
+              ),
+              _ => null,
+            }),
           ),
         ],
         child: const FirstRunScreen(initialStep: FirstRunStep.download),
-        settle: !verifying,
       );
       final context = tester.element(find.byType(FirstRunScreen));
       await tester.runAsync(
         () => precacheImage(AssetImage(AppIdentity.current.iconAsset), context),
       );
-      if (verifying) {
-        await tester.pump(const Duration(milliseconds: 300));
-      } else {
-        await tester.pumpAndSettle();
-      }
+      await tester.pumpAndSettle();
       await expectLater(
         find.byType(FirstRunScreen),
         matchesGoldenFile(

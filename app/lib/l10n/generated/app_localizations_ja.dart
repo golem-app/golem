@@ -309,9 +309,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get downloadProgress => 'ダウンロードの進行状況';
 
   @override
-  String get verifyingFiles => 'ファイルを検証中…';
-
-  @override
   String get keep => '保持';
 
   @override
@@ -546,7 +543,7 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'Golem を開いたままにすると全速でダウンロードできます。';
+  String get downloadNoteTitle => 'Golem を開いたままにしてください';
 
   @override
   String downloadNoteBody(
@@ -1480,11 +1477,6 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String downloadProgressLabel(String suffix) {
     return 'ダウンロード$suffix';
-  }
-
-  @override
-  String verifyingFilesStatus(String suffix) {
-    return 'ファイルを検証中$suffix…';
   }
 
   @override

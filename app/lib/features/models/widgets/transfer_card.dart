@@ -22,8 +22,9 @@ enum TransferDensity {
 /// metadata rows — and so does the copy. What is shared is everything the
 /// projection already decided, laid out the same way at two sizes (#131).
 ///
-/// Mounted only for the phases that have a bar. Verification and completion
-/// are not partial states, and each surface has its own row for them.
+/// Mounted for the phases that have a bar — a transfer, a pause, and since
+/// #143 a verification, which counts the bytes it has hashed. Completion is
+/// not a partial state, and each surface has its own row for it.
 class TransferCard extends StatelessWidget {
   const TransferCard({
     required this.transfer,
@@ -67,6 +68,7 @@ class TransferCard extends StatelessWidget {
             )
           : const TextStyle(fontSize: 13),
       trailing: chip,
+      captionYields: !prominent,
       // At hero size the caption *is* the percentage; printing it twice on one
       // line would be a typo, not a design.
       showPercent: !prominent,
@@ -106,7 +108,11 @@ class _PaceChip extends StatelessWidget {
     ),
     child: Text(
       label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
       style: GolemText.captionStrong.copyWith(
+        // The rate ticks; tabular digits keep the pill one width.
+        fontFeatures: const [FontFeature.tabularFigures()],
         color: live
             ? CupertinoDynamicColor.resolve(GolemTheme.accentIcon, context)
             : CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),

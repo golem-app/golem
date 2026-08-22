@@ -24,6 +24,7 @@ class LabeledProgress extends StatelessWidget {
     this.caption,
     this.captionStyle,
     this.trailing,
+    this.captionYields = true,
     this.showPercent = true,
     this.announcePercent = true,
     this.announceDetail = false,
@@ -51,14 +52,20 @@ class LabeledProgress extends StatelessWidget {
   /// the percentage.
   final Widget? trailing;
 
+  /// Which of the caption and [trailing] gives way on a short line. A row
+  /// inside a list wraps its caption and keeps the chip whole; a card led by a
+  /// hero percentage keeps that on one line — split one glyph per line, "25%"
+  /// was three lines tall and moved the whole first-run screen (#143) — and
+  /// lets the chip trim itself instead.
+  final bool captionYields;
+
   /// Whether the percentage is painted. Off where the caption already carries
   /// it, or where the surface has no room for it.
   final bool showPercent;
 
-  /// Whether the percentage is *announced*. Off where the phase makes it
-  /// meaningless — a verification is not 40% verified — and deliberately
-  /// separate from [showPercent], because the chat setup banner paints no
-  /// number and is the only thing carrying how far along the transfer is.
+  /// Whether the percentage is *announced*. Deliberately separate from
+  /// [showPercent], because the chat setup banner paints no number and is the
+  /// only thing carrying how far along the transfer is.
   final bool announcePercent;
 
   /// Whether the figures under the bar read as their own nodes.
@@ -89,6 +96,14 @@ class LabeledProgress extends StatelessWidget {
   Widget build(BuildContext context) {
     final captionText = captionStyle ?? GolemText.caption;
     final hasHeader = caption != null || trailing != null || showPercent;
+    final captionWidget = caption == null
+        ? const SizedBox.shrink()
+        : Text(
+            caption!,
+            style: captionText,
+            maxLines: captionYields ? null : 1,
+            softWrap: captionYields,
+          );
     final bar = ExcludeSemantics(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,12 +111,18 @@ class LabeledProgress extends StatelessWidget {
           if (hasHeader) ...[
             Row(
               children: [
-                Expanded(
-                  child: caption == null
-                      ? const SizedBox.shrink()
-                      : Text(caption!, style: captionText),
-                ),
-                ?trailing,
+                if (captionYields) ...[
+                  Expanded(child: captionWidget),
+                  ?trailing,
+                ] else ...[
+                  captionWidget,
+                  Expanded(
+                    child: Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: trailing ?? const SizedBox.shrink(),
+                    ),
+                  ),
+                ],
                 if (showPercent) Text('$percent%', style: captionText),
               ],
             ),
@@ -119,6 +140,12 @@ class LabeledProgress extends StatelessWidget {
 
     Widget? figures;
     if (detail != null || detailLeading != null) {
+      // One line each, tabular digits, and an ellipsis rather than a wrap:
+      // the figures tick every second, and a wrap is a height change that
+      // moved the whole first-run screen under the reader (#143). Flexible,
+      // not bare, so a long "About 14 minutes left" is measured against the
+      // row and not against infinity.
+      const tabular = [FontFeature.tabularFigures()];
       figures = Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -127,7 +154,10 @@ class LabeledProgress extends StatelessWidget {
                 ? const SizedBox.shrink()
                 : Text(
                     detailLeading!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: GolemText.footnote.copyWith(
+                      fontFeatures: tabular,
                       color: CupertinoDynamicColor.resolve(
                         GolemTheme.mutedInk,
                         context,
@@ -135,14 +165,15 @@ class LabeledProgress extends StatelessWidget {
                     ),
                   ),
           ),
-          // Flexible, not bare: in a Row a non-flexible child is measured
-          // against infinity, so a long "About 14 minutes left" would size
-          // past the card and paint an overflow stripe instead of wrapping.
           if (detail case final detail?)
             Flexible(
               child: Text(
                 detail,
-                style: detailStyle ?? GolemText.captionStrong,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: (detailStyle ?? GolemText.captionStrong).copyWith(
+                  fontFeatures: tabular,
+                ),
               ),
             ),
         ],

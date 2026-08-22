@@ -404,6 +404,7 @@ class _ModelCard extends ConsumerWidget {
             child: _Status(icon: _statusIcon(), label: statusLabel),
           ),
           if (status.phase == ArtifactPhase.downloading ||
+              status.phase == ArtifactPhase.verifying ||
               status.phase == ArtifactPhase.paused) ...[
             const SizedBox(height: 14),
             TransferCard(
@@ -412,12 +413,12 @@ class _ModelCard extends ConsumerWidget {
                 entry: entry,
                 status: status,
                 localizations: context.l10n,
-                // Only a running transfer has a pace; watching it while
-                // paused would rebuild this card on every tick of a download
+                // Only a running phase has a pace; watching it while paused
+                // would rebuild this card on every tick of a transfer
                 // belonging to another one.
-                pace: status.phase == ArtifactPhase.downloading
-                    ? ref.watch(downloadPaceProvider)
-                    : null,
+                pace: status.phase == ArtifactPhase.paused
+                    ? null
+                    : ref.watch(downloadPaceProvider),
                 simulated: simulated,
               ),
               density: TransferDensity.dense,
@@ -448,16 +449,6 @@ class _ModelCard extends ConsumerWidget {
               entry: entry,
               margin: const EdgeInsetsDirectional.only(top: 14),
             ),
-          if (status.phase == ArtifactPhase.verifying) ...[
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                const CupertinoActivityIndicator(),
-                const SizedBox(width: 10),
-                Text(context.l10n.verifyingFilesStatus(suffix)),
-              ],
-            ),
-          ],
           if (status.phase == ArtifactPhase.failed) ...[
             const SizedBox(height: 10),
             Text(
