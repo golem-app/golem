@@ -15,9 +15,12 @@ advertises them, are #27 (ADR `decisions/0007-supported-device-policy.md`).
 | unknown | light | `qwen35-2b-gguf` |
 
 An arm64 Android CPU without `FEAT_DotProd` is unsupported at any memory
-size. The floor is one nominal rule — 4 GB, the iPhone 12 — spelled per
-platform because Apple reports installed DRAM while Android reports net of
-reservations; ADR 0007 carries the derivation. Unknown never refuses.
+size, and so is a simulator or emulator — the platform answers that one about
+itself, and it is classified before either hardware reading, both of which
+describe the host on a simulator (#148). The floor is one nominal rule — 4 GB,
+the iPhone 12 — spelled per platform because Apple reports installed DRAM while
+Android reports net of reservations; ADR 0007 carries the derivation. Unknown
+never refuses.
 
 ## iOS
 

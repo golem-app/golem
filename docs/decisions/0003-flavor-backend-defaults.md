@@ -48,6 +48,17 @@ alone.
   well. A real engine fed by the download simulation would "install"
   files that do not exist and then fail on first load. Only inference
   left on the fake keeps the fake downloader.
+- Amended by #148: the flavor default has one device-shaped exception. On a
+  **simulator or emulator**, an internal identity with no engine define
+  resolves `fake` rather than `auto`, and model management follows it, so a
+  plain `flutter run` composes the simulation instead of fetching multi-gigabyte
+  weights into a container where no engine can load them. Production is
+  deliberately excluded: its composition stays a pure build-time fact, so a
+  detection that ever answered wrong on a phone could refuse a shipping build
+  but never quietly turn one into a simulation. An explicit
+  `GOLEM_INFERENCE_BACKEND` still wins everywhere, and the device
+  classification then refuses the transfer
+  (`0007-supported-device-policy.md`).
 
 Host `flutter test` runs as the `dev` flavor, but flavor policy resolves
 only in `main()`; the widget-visible backend signal

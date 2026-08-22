@@ -57,6 +57,13 @@ override to real inference carries model management to the real
 implementation with it, so a real engine is never fed by the download
 simulation.
 
+One device-shaped exception (#148): on a **simulator or emulator**, `dev`
+joins `qa` on the fakes rather than fetching weights nothing there can load,
+so a plain `flutter run` is safe on both. `production` is excluded — its
+composition stays a build-time fact — and an explicit
+`GOLEM_INFERENCE_BACKEND` still wins, in which case the device
+classification below refuses the transfer instead.
+
 Backend resolution (`lib/broker/backend_policy.dart`, decided in
 `../docs/decisions/0003-flavor-backend-defaults.md`):
 `GOLEM_INFERENCE_BACKEND` accepts `fake`, `llama`, `mlx`, and `auto`;
@@ -84,8 +91,9 @@ at launch (#27, `../docs/decisions/0007-supported-device-policy.md`): the same
 reading decides whether this device is admitted to running a model at all.
 Below the floor — nominal 4 GB, read as 4 GiB on Apple and 3 GiB on Android —
 or on an arm64 Android CPU without the dot-product extension the shipped
-kernels require, the app downloads and loads nothing and says why in a blocking
-startup surface that wraps every route. Persisted chats, preferences, and
+kernels require, or on a simulator or emulator running a real backend, the app
+downloads and loads nothing and says why in a blocking startup surface that
+wraps every route. Persisted chats, preferences, and
 files are untouched;
 memory that cannot be read classifies as supported, never as refused. The
 App Store enforces its half through `UIRequiredDeviceCapabilities`
@@ -93,8 +101,11 @@ App Store enforces its half through `UIRequiredDeviceCapabilities`
 device-catalog exclusion rule, recorded in `../docs/device_floor.md` because
 no manifest can express it. In `qa` and `dev`,
 `GOLEM_DEVICE_MEMORY_BYTES` and `GOLEM_DEVICE_ENGINE_UNSUPPORTED` are
-test-only overrides for exercising the tiers and both refusals on hardware;
-production ignores both defines.
+test-only overrides for exercising the tiers and the two hardware refusals on
+devices that cannot produce them; production ignores both defines. The
+virtual-device refusal needs no override — a `production` build, or any
+explicit engine define, produces it directly on the simulator and the
+emulator.
 
 Model **downloads** are real in the `dev` and `production` flavors:
 Settings lists the pinned catalog (`lib/broker/model_catalog.dart`,
