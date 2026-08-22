@@ -204,7 +204,7 @@
   "conversationActions": "Thao tác cuộc trò chuyện",
   "deleteNamedChatMessage": "“{title}” và mọi tin nhắn trong đó sẽ bị xóa khỏi thiết bị.",
   "chatDeleted": "Đã xóa cuộc trò chuyện",
-  "storageAmount": "{used} / {total}",
+  "storageUsedAndFree": "Đã dùng {used} · Còn trống {free}",
   "closeConversations": "Đóng danh sách trò chuyện",
   "discard": "Bỏ qua",
   "downloadNamedModel": "Tải {modelName} ({size})",

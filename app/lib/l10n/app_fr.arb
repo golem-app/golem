@@ -204,7 +204,7 @@
   "conversationActions": "Actions de la conversation",
   "deleteNamedChatMessage": "« {title} » et tous ses messages seront supprimés de cet appareil.",
   "chatDeleted": "Conversation supprimée",
-  "storageAmount": "{used} sur {total}",
+  "storageUsedAndFree": "{used} utilisés · {free} libres",
   "closeConversations": "Fermer les conversations",
   "discard": "Ignorer",
   "downloadNamedModel": "Télécharger {modelName} ({size})",

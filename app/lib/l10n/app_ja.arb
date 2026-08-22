@@ -204,7 +204,7 @@
   "conversationActions": "会話の操作",
   "deleteNamedChatMessage": "「{title}」とそのすべてのメッセージがこの端末から削除されます。",
   "chatDeleted": "チャットを削除しました",
-  "storageAmount": "{total}中{used}",
+  "storageUsedAndFree": "使用中{used} · 空き容量{free}",
   "closeConversations": "会話を閉じる",
   "discard": "破棄",
   "downloadNamedModel": "{modelName}（{size}）をダウンロード",

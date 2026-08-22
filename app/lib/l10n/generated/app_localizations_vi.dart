@@ -736,8 +736,8 @@ class AppLocalizationsVi extends AppLocalizations {
   String get chatDeleted => 'Đã xóa cuộc trò chuyện';
 
   @override
-  String storageAmount(String used, String total) {
-    return '$used / $total';
+  String storageUsedAndFree(String used, String free) {
+    return 'Đã dùng $used · Còn trống $free';
   }
 
   @override

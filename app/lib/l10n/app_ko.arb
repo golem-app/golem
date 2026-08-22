@@ -204,7 +204,7 @@
   "conversationActions": "대화 작업",
   "deleteNamedChatMessage": "“{title}” 및 모든 메시지가 이 기기에서 삭제됩니다.",
   "chatDeleted": "대화 삭제됨",
-  "storageAmount": "{total} 중 {used}",
+  "storageUsedAndFree": "{used} 사용 중 · {free} 여유",
   "closeConversations": "대화 목록 닫기",
   "discard": "버리기",
   "downloadNamedModel": "{modelName} 다운로드({size})",

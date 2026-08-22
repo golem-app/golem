@@ -204,7 +204,7 @@
   "conversationActions": "बातचीत की कार्रवाइयाँ",
   "deleteNamedChatMessage": "“{title}” और इसके सभी संदेश इस डिवाइस से हटा दिए जाएँगे।",
   "chatDeleted": "चैट मिटा दी गई",
-  "storageAmount": "{total} में से {used}",
+  "storageUsedAndFree": "{used} उपयोग में · {free} खाली",
   "closeConversations": "बातचीत बंद करें",
   "discard": "छोड़ दें",
   "downloadNamedModel": "{modelName} डाउनलोड करें ({size})",

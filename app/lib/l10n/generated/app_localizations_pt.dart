@@ -743,8 +743,8 @@ class AppLocalizationsPt extends AppLocalizations {
   String get chatDeleted => 'Conversa excluída';
 
   @override
-  String storageAmount(String used, String total) {
-    return '$used de $total';
+  String storageUsedAndFree(String used, String free) {
+    return '$used usados · $free livres';
   }
 
   @override
@@ -2660,8 +2660,8 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get chatDeleted => 'Conversa excluída';
 
   @override
-  String storageAmount(String used, String total) {
-    return '$used de $total';
+  String storageUsedAndFree(String used, String free) {
+    return '$used usados · $free livres';
   }
 
   @override

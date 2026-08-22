@@ -712,8 +712,8 @@ class AppLocalizationsKo extends AppLocalizations {
   String get chatDeleted => '대화 삭제됨';
 
   @override
-  String storageAmount(String used, String total) {
-    return '$total 중 $used';
+  String storageUsedAndFree(String used, String free) {
+    return '$used 사용 중 · $free 여유';
   }
 
   @override

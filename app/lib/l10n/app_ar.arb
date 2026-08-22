@@ -204,7 +204,7 @@
   "conversationActions": "إجراءات المحادثة",
   "deleteNamedChatMessage": "ستُزال «{title}» وكل رسائلها من هذا الجهاز.",
   "chatDeleted": "حُذفت المحادثة",
-  "storageAmount": "{used} من {total}",
+  "storageUsedAndFree": "المستخدم {used} · المتاح {free}",
   "closeConversations": "إغلاق قائمة المحادثات",
   "discard": "تجاهل",
   "downloadNamedModel": "تنزيل {modelName} ‏({size})",

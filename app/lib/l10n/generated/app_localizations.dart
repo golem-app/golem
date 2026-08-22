@@ -1348,11 +1348,11 @@ abstract class AppLocalizations {
   /// **'Chat deleted'**
   String get chatDeleted;
 
-  /// Used and total storage.
+  /// Golem's usage beside the free space left.
   ///
   /// In en, this message translates to:
-  /// **'{used} of {total}'**
-  String storageAmount(String used, String total);
+  /// **'{used} used · {free} free'**
+  String storageUsedAndFree(String used, String free);
 
   /// Dismiss conversation drawer accessibility label.
   ///

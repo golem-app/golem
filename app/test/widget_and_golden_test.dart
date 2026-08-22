@@ -9,6 +9,7 @@ import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/chrome/golem_button.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
+import 'package:golem_flutter/core/domain/byte_format.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
@@ -27,6 +28,7 @@ import 'package:golem_flutter/features/chat/widgets/message_bubble.dart';
 import 'package:golem_flutter/features/chat/widgets/recovery_banner.dart';
 import 'package:golem_flutter/features/legal/model_attribution_screen.dart';
 import 'package:golem_flutter/features/legal/open_source_licenses_screen.dart';
+import 'package:golem_flutter/features/models/application/storage_providers.dart';
 import 'package:golem_flutter/features/onboarding/application/onboarding_controller.dart';
 import 'package:golem_flutter/features/onboarding/first_run_screen.dart';
 import 'package:golem_flutter/features/settings/appearance_screen.dart';
@@ -1338,6 +1340,42 @@ void main() {
     // and too narrow to show in a golden. Its width regressing to zero is
     // exactly the failure this guards.
     expect(sizes.last.width, lessThan(sizes.first.width));
+  }, variant: iosChrome);
+
+  testWidgets('the storage meter frames Golem against free space', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      history: seedHistory(),
+      child: const ChatScreen(),
+    );
+    await tester.tap(find.byKey(const Key('open-drawer')));
+    await tester.pumpAndSettle();
+    final meter = find.byKey(const Key('storage-meter'));
+    final breakdown = ProviderScope.containerOf(
+      tester.element(meter),
+    ).read(storageBreakdownProvider).value!;
+    final used = breakdown.usedBytes;
+    final free = breakdown.freeBytes!;
+    expect(used, greaterThan(0));
+    // The two figures Settings ▸ Storage leads with, not the volume's
+    // capacity: against 256 GB a model was a sliver that read as nothing.
+    expect(
+      find.descendant(
+        of: meter,
+        matching: find.text(
+          '${gigabytes(used)} used · ${gigabytes(free)} free',
+        ),
+      ),
+      findsOneWidget,
+    );
+    final bars = find
+        .descendant(of: meter, matching: find.byType(ColoredBox))
+        .evaluate()
+        .map((element) => (element.renderObject! as RenderBox).size.width)
+        .toList();
+    expect(bars.last / bars.first, closeTo(used / (used + free), 0.01));
   }, variant: iosChrome);
 
   // The drawer's own inks, asserted against the tokens the way

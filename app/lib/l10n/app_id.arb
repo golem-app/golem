@@ -204,7 +204,7 @@
   "conversationActions": "Tindakan percakapan",
   "deleteNamedChatMessage": "“{title}” dan semua pesannya akan dihapus dari perangkat ini.",
   "chatDeleted": "Percakapan dihapus",
-  "storageAmount": "{used} dari {total}",
+  "storageUsedAndFree": "{used} terpakai · {free} kosong",
   "closeConversations": "Tutup percakapan",
   "discard": "Buang",
   "downloadNamedModel": "Unduh {modelName} ({size})",

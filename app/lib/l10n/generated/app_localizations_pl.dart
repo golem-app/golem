@@ -743,8 +743,8 @@ class AppLocalizationsPl extends AppLocalizations {
   String get chatDeleted => 'Czat usunięty';
 
   @override
-  String storageAmount(String used, String total) {
-    return '$used z $total';
+  String storageUsedAndFree(String used, String free) {
+    return 'Zajęte: $used · Wolne: $free';
   }
 
   @override

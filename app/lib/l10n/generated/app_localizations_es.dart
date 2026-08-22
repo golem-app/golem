@@ -740,8 +740,8 @@ class AppLocalizationsEs extends AppLocalizations {
   String get chatDeleted => 'Chat eliminado';
 
   @override
-  String storageAmount(String used, String total) {
-    return '$used de $total';
+  String storageUsedAndFree(String used, String free) {
+    return '$used usados · $free libres';
   }
 
   @override

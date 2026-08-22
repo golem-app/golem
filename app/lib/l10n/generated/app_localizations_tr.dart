@@ -736,8 +736,8 @@ class AppLocalizationsTr extends AppLocalizations {
   String get chatDeleted => 'Sohbet silindi';
 
   @override
-  String storageAmount(String used, String total) {
-    return '$used / $total';
+  String storageUsedAndFree(String used, String free) {
+    return '$used kullanımda · $free boş';
   }
 
   @override

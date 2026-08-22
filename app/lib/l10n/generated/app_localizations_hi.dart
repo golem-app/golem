@@ -738,8 +738,8 @@ class AppLocalizationsHi extends AppLocalizations {
   String get chatDeleted => 'चैट मिटा दी गई';
 
   @override
-  String storageAmount(String used, String total) {
-    return '$total में से $used';
+  String storageUsedAndFree(String used, String free) {
+    return '$used उपयोग में · $free खाली';
   }
 
   @override

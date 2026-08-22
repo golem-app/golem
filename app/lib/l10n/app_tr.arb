@@ -204,7 +204,7 @@
   "conversationActions": "Sohbet işlemleri",
   "deleteNamedChatMessage": "“{title}” ve tüm mesajları bu cihazdan kaldırılacak.",
   "chatDeleted": "Sohbet silindi",
-  "storageAmount": "{used} / {total}",
+  "storageUsedAndFree": "{used} kullanımda · {free} boş",
   "closeConversations": "Sohbetleri kapat",
   "discard": "Vazgeç",
   "downloadNamedModel": "{modelName} modelini indir ({size})",
