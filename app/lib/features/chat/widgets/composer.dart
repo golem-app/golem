@@ -444,6 +444,11 @@ class _ComposerState extends ConsumerState<Composer> {
                       ],
                     ),
                   ),
+                  // A gap the cluster cannot claim: the chip's cap let a long
+                  // model name fill the row until the Think pill touched
+                  // send (#143). Only the chip shrinks; the pill keeps its
+                  // label.
+                  const SizedBox(width: GolemSpace.s3),
                   // Only send depends on the live text, so it listens to the
                   // controller alone instead of rebuilding the whole composer
                   // on every keystroke.

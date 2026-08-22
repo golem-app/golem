@@ -347,6 +347,59 @@ void main() {
     expect(tester.widget<Text>(artifact).data, startsWith('GGUF · Q4_K_XL · '));
   });
 
+  testWidgets('the Think pill never touches send', (tester) async {
+    // A long model name at the chip's cap filled the row until the pill
+    // sat against send (#143): the gap is guaranteed, only the chip shrinks.
+    final source = modelCatalog.firstWhere(
+      (entry) => entry.key == 'gemma4-mlx',
+    );
+    final longName = ModelCatalogEntry(
+      key: source.key,
+      displayName: 'Gemma 4 E2B Instruct Preview Edition',
+      engine: source.engine,
+      quantization: source.quantization,
+      repository: source.repository,
+      revision: source.revision,
+      files: source.files,
+      profileKey: source.profileKey,
+    );
+    for (final (width, textScale) in [
+      (402.0, 1.0),
+      (402.0, 1.3),
+      (320.0, 1.3),
+    ]) {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, 874);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      await pumpWithRepositories(
+        tester,
+        textScale: textScale,
+        catalog: [
+          for (final entry in modelCatalog)
+            if (entry.key == source.key) longName else entry,
+        ],
+        history: markdownHistory(),
+        child: const ChatScreen(),
+      );
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(ChatScreen)),
+      );
+      await container.read(chatControllerProvider.notifier).toggleReasoning();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: '$width @ $textScale');
+      expect(find.text('Think'), findsOneWidget, reason: '$width @ $textScale');
+      final pill = tester.getRect(find.byKey(const Key('reasoning-toggle')));
+      final send = tester.getRect(find.byKey(const Key('send-button')));
+      expect(
+        send.left - pill.right,
+        greaterThanOrEqualTo(12),
+        reason: '$width @ $textScale',
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+  });
+
   testWidgets('starter chips prefill and focus the composer', (tester) async {
     await pumpWithRepositories(tester, child: const ChatScreen());
     await tester.tap(find.byKey(const Key('starter-chip-rewrite')));
