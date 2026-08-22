@@ -22,12 +22,26 @@ import 'runtime.dart';
 /// what this device is allowed to run. The device is read once here: the model
 /// the build selects and the eligibility its surfaces report come from the same
 /// classification, so they cannot disagree.
-Future<({InferenceBackendConfig config, DeviceEligibility eligibility})>
-resolveConfiguredBackend({required AppIdentity identity}) async {
+Future<
+  ({
+    InferenceBackendConfig config,
+    DeviceEligibility eligibility,
+    bool virtualDevice,
+  })
+>
+resolveConfiguredBackend({
+  required AppIdentity identity,
+  Future<bool?> Function()? isVirtualDevice,
+}) async {
   const backendDefine = String.fromEnvironment('GOLEM_INFERENCE_BACKEND');
+  // Ahead of the engine, because it can change which engine there is to probe.
+  final virtualDevice = await probeVirtualDevice(
+    isVirtualDevice ?? const DeviceStorageChannel().isVirtualDevice,
+  );
   final backendName = resolveBackendName(
     backendDefine: backendDefine,
     identity: identity,
+    virtualDevice: virtualDevice ?? false,
   );
   final platform = switch ((
     Platform.isIOS,
@@ -59,6 +73,7 @@ resolveConfiguredBackend({required AppIdentity identity}) async {
     // Test-only counterpart for the instruction-set refusal, which no device
     // here can produce: every one of them carries the extension.
     forceEngineUnsupported: overrides.forceEngineUnsupported,
+    virtualDevice: virtualDevice,
   );
   final eligibility = classifyDevice(
     capabilities: capabilities,
@@ -76,6 +91,7 @@ resolveConfiguredBackend({required AppIdentity identity}) async {
       platform: platform,
     ),
     eligibility: eligibility,
+    virtualDevice: virtualDevice ?? false,
   );
 }
 

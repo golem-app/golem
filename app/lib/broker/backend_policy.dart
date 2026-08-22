@@ -25,15 +25,38 @@ String resolvedEngineName({
 /// dart-define when there is one, else the flavor default. Resolved on its own
 /// because the capability probe has to know which engine to ask about, and the
 /// full policy needs that probe's verdict.
+///
+/// [virtualDevice] moves an internal build to the fake rather than letting it
+/// compose an engine no simulator or emulator can run (#148). It applies to
+/// `qa` and `dev` only: production's composition stays a pure build-time fact,
+/// so a detection that ever answered wrong on a phone could refuse a shipping
+/// build but never quietly simulate one. An explicit define still wins
+/// everywhere — asking for a real engine on a simulator gets the real engine,
+/// and the device classification then refuses the download.
 String resolveBackendName({
   required String backendDefine,
   required AppIdentity identity,
+  required bool virtualDevice,
 }) => backendDefine.isNotEmpty
     ? backendDefine
+    : virtualDevice && identity.internalToolsEnabled
+    ? 'fake'
     : switch (identity) {
         AppIdentity.production || AppIdentity.dev => 'auto',
         AppIdentity.qa => 'fake',
       };
+
+/// Whether this launch composes the download simulation instead of the real
+/// downloader. Simulated inference is the precondition in every case: a real
+/// engine fed by a simulated install would "install" files that do not exist
+/// (ADR 0003). Beyond that, `qa` is the deterministic-automation identity, and
+/// a virtual device is the one where a real transfer could only ever produce
+/// bytes nothing can load.
+bool useFakeModelManagement({
+  required AppIdentity identity,
+  required bool simulatedInference,
+  required bool virtualDevice,
+}) => simulatedInference && (identity == AppIdentity.qa || virtualDevice);
 
 /// Pure. `auto` is the platform engine's artifact of the device-policy model
 /// (ADR 0012); an operator-supplied `GOLEM_MODEL_PATH` is the separate,
