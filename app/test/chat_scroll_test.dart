@@ -44,8 +44,9 @@ ChatHistorySnapshot _longHistory() => ChatHistorySnapshot(
   ],
 );
 
-Future<ScrollPosition> _pumpChat(WidgetTester tester) async {
+Future<ScrollPosition> _pumpChat(WidgetTester tester, {Size? viewport}) async {
   setViewport(tester);
+  if (viewport != null) tester.view.physicalSize = viewport;
   final container = ProviderContainer(
     overrides: [
       attachmentRepositoryProvider.overrideWithValue(
@@ -90,23 +91,49 @@ Future<void> _send(WidgetTester tester, String text) async {
 }
 
 void main() {
-  testWidgets('the list follows a streaming response to its end', (
+  testWidgets('the question the reader just asked holds the top of the list', (
     tester,
   ) async {
-    final position = await _pumpChat(tester);
-    await _send(tester, 'Stream and follow');
+    // Tall enough that the whole turn fits, so the spacer never runs out and
+    // the anchor is the only thing deciding where the view sits.
+    await _pumpChat(tester, viewport: const Size(402, 2400));
+    await _send(tester, 'Stream and stay put');
+    await tester.pump(_delay);
+    final question = find.text('Stream and stay put');
+    final listTop = tester.getTopLeft(find.byKey(const Key('message-list'))).dy;
 
-    var sawGrowth = false;
     for (var i = 0; i < 40; i++) {
       await tester.pump(_delay);
-      final distance = position.maxScrollExtent - position.pixels;
-      if (position.maxScrollExtent > 0 && distance <= 1) sawGrowth = true;
-      // While following, the view must never trail the tail by a visible
-      // amount even as deltas land between frames.
-      expect(distance, lessThan(120), reason: 'tick $i trailed the tail');
+      // Following the tail would carry the question off the top of the screen
+      // within a delta or two; the spacer is what keeps it in place (#147).
+      // Following the tail would carry the question off the top of the
+      // screen within a delta or two; the spacer is what holds it there.
+      expect(
+        tester.getTopLeft(question).dy,
+        greaterThanOrEqualTo(listTop - 1),
+        reason: 'tick $i pushed the question off the top',
+      );
     }
     await tester.pumpAndSettle();
-    expect(sawGrowth, isTrue);
+    // 16pt of list padding, and nothing else, above the question.
+    expect(tester.getTopLeft(question).dy - listTop, lessThan(40));
+  });
+
+  testWidgets('an answer taller than the screen hands back to the tail', (
+    tester,
+  ) async {
+    // Short enough that this one answer outgrows the screen, which is what
+    // spends the spacer and hands the view back to the tail.
+    final position = await _pumpChat(tester, viewport: const Size(402, 420));
+    await _send(tester, 'Stream and follow');
+
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(_delay);
+    }
+    await tester.pumpAndSettle();
+    // Carried off the top rather than held at it, and the view is on the end
+    // of the scrollable again.
+    expect(find.text('Stream and follow'), findsNothing);
     expect(position.pixels, moreOrLessEquals(position.maxScrollExtent));
   });
 
@@ -133,6 +160,37 @@ void main() {
 
     await tester.tap(find.byKey(const Key('jump-to-latest')));
     await tester.pumpAndSettle();
-    expect(position.pixels, moreOrLessEquals(position.maxScrollExtent));
+    // The end of the newest answer is on screen again — the arrow returns the
+    // reader to the content, not into the blank the spacer holds below it.
+    final list = tester.getRect(find.byKey(const Key('message-list')));
+    final pill = tester.getRect(find.byKey(const Key('metrics-pill')));
+    expect(pill.bottom, lessThanOrEqualTo(list.bottom));
+    expect(pill.top, greaterThanOrEqualTo(list.top));
+  });
+
+  testWidgets('a short drag detaches just as firmly as a long one', (
+    tester,
+  ) async {
+    final position = await _pumpChat(tester);
+    await _send(tester, 'Stream then nudge the history up');
+    await tester.pump(_delay);
+    await tester.pump(_delay);
+
+    // 30pt — inside the 48pt window the jump affordance uses. Content growth
+    // used to re-attach the follow from inside that window, so every delta
+    // undid the drag and the reader could never get out (#147).
+    // 50 of drag is 30 of scroll once the touch slop is paid — inside the
+    // 48 the jump affordance uses, which is where the re-attach used to live.
+    await tester.drag(
+      find.byKey(const Key('message-list')),
+      const Offset(0, 50),
+    );
+    await tester.pump();
+    final detachedOffset = position.pixels;
+
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(_delay);
+    }
+    expect(position.pixels, moreOrLessEquals(detachedOffset, epsilon: 1));
   });
 }

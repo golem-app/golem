@@ -26,7 +26,11 @@ class ChatCanvas extends ConsumerWidget {
     required this.scrollToLatest,
     required this.onUserScroll,
     required this.onScrollMetrics,
+    required this.onScrollSettled,
     required this.showJump,
+    required this.tailSpacer,
+    this.anchorKey,
+    this.anchorId,
     this.picker = const AttachmentPicker(),
     super.key,
   });
@@ -37,7 +41,18 @@ class ChatCanvas extends ConsumerWidget {
   final VoidCallback scrollToLatest;
   final ValueChanged<ScrollDirection> onUserScroll;
   final VoidCallback onScrollMetrics;
+  final VoidCallback onScrollSettled;
   final bool showJump;
+
+  /// Height of the trailing spacer. Sized so the anchored question sits at
+  /// the top of the viewport; zero once its turn is taller than one screen,
+  /// and zero in every transcript nobody has sent into.
+  final double tailSpacer;
+
+  /// Identifies the anchored message and carries the key the screen measures
+  /// it through. Null until the reader sends something.
+  final GlobalKey? anchorKey;
+  final String? anchorId;
   final AttachmentPicker picker;
 
   @override
@@ -73,29 +88,48 @@ class ChatCanvas extends ConsumerWidget {
                       onScrollMetrics();
                       return false;
                     },
-                    child: ListView.builder(
-                      key: const Key('message-list'),
-                      controller: scroll,
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                      itemCount: active.messages.length,
-                      itemBuilder: (context, index) {
-                        final message = active.messages[index];
-                        final isLast = index == active.messages.length - 1;
-                        return MessageBubble(
-                          message: message,
-                          canRegenerate:
-                              isLast && chat.generation == GenerationPhase.idle,
-                          idle: chat.generation == GenerationPhase.idle,
-                          stoppedTokens:
-                              isLast &&
-                                  chat.generation == GenerationPhase.failed &&
-                                  message.role == MessageRole.assistant
-                              ? message.metrics?.tokenCount
-                              : null,
-                        );
+                    child: NotificationListener<ScrollEndNotification>(
+                      onNotification: (notification) {
+                        onScrollSettled();
+                        return false;
                       },
+                      child: ListView.builder(
+                        key: const Key('message-list'),
+                        controller: scroll,
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                        // One trailing item, the anchor spacer: it holds the
+                        // question the reader just asked at the top of the
+                        // viewport while its answer streams in underneath.
+                        // Present only when it has a height to contribute — a
+                        // zero-height trailing child still costs the delegate
+                        // an averaged estimate, and a transcript nobody has
+                        // sent into scrolled by that estimate on load.
+                        itemCount:
+                            active.messages.length + (tailSpacer > 0 ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == active.messages.length) {
+                            return SizedBox(height: tailSpacer);
+                          }
+                          final message = active.messages[index];
+                          final isLast = index == active.messages.length - 1;
+                          return MessageBubble(
+                            key: message.id == anchorId ? anchorKey : null,
+                            message: message,
+                            canRegenerate:
+                                isLast &&
+                                chat.generation == GenerationPhase.idle,
+                            idle: chat.generation == GenerationPhase.idle,
+                            stoppedTokens:
+                                isLast &&
+                                    chat.generation == GenerationPhase.failed &&
+                                    message.role == MessageRole.assistant
+                                ? message.metrics?.tokenCount
+                                : null,
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),
