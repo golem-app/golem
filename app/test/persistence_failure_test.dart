@@ -103,28 +103,24 @@ void main() {
     expect(File('${file.path}.corrupt').existsSync(), isTrue);
   });
 
-  test(
-    'a failing quarantine surfaces instead of claiming recovery',
-    () async {
-      final file = storeFile('settings.json');
-      file.writeAsStringSync('not json at all');
-      // A read-only parent lets the read succeed and the rename fail.
-      Process.runSync('chmod', ['555', directory.path]);
-      await expectLater(
-        FileSettingsRepository(file).load(),
-        throwsA(
-          isA<PersistenceException>().having(
-            (e) => e.kind,
-            'kind',
-            PersistenceFailureKind.read,
-          ),
+  test('a failing quarantine surfaces instead of claiming recovery', () async {
+    final file = storeFile('settings.json');
+    file.writeAsStringSync('not json at all');
+    // A read-only parent lets the read succeed and the rename fail.
+    Process.runSync('chmod', ['555', directory.path]);
+    await expectLater(
+      FileSettingsRepository(file).load(),
+      throwsA(
+        isA<PersistenceException>().having(
+          (e) => e.kind,
+          'kind',
+          PersistenceFailureKind.read,
         ),
-      );
-      _makeWritable(directory);
-      expect(file.existsSync(), isTrue);
-    },
-    skip: Platform.isWindows,
-  );
+      ),
+    );
+    _makeWritable(directory);
+    expect(file.existsSync(), isTrue);
+  }, skip: Platform.isWindows);
 
   test('a failing write surfaces as a typed write failure', () async {
     // The store's parent path is an ordinary file, so no directory can be

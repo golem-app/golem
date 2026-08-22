@@ -99,35 +99,33 @@ void main() {
     expect(find.byKey(const Key('metrics-pill')), findsNothing);
   }, variant: iosChrome);
 
-  testWidgets(
-    'settled reasoning collapses unless the preference expands it',
-    (tester) async {
-      await pumpWithRepositories(
-        tester,
-        history: seedHistory(),
-        child: const ChatScreen(),
-      );
-      final reasoningText = find.textContaining('one small delight');
-      expect(reasoningText, findsNothing, reason: 'collapsed by default');
-      await tester.tap(find.byKey(const Key('reasoning-card')));
-      await tester.pumpAndSettle();
-      expect(reasoningText, findsOneWidget, reason: 'tap still discloses');
+  testWidgets('settled reasoning collapses unless the preference expands it', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      history: seedHistory(),
+      child: const ChatScreen(),
+    );
+    final reasoningText = find.textContaining('one small delight');
+    expect(reasoningText, findsNothing, reason: 'collapsed by default');
+    await tester.tap(find.byKey(const Key('reasoning-card')));
+    await tester.pumpAndSettle();
+    expect(reasoningText, findsOneWidget, reason: 'tap still discloses');
 
-      // Dismantle the tree first: an identical re-pump would reuse the
-      // card's State and mask the initial-expansion behavior under test.
-      await tester.pumpWidget(const SizedBox.shrink());
-      await pumpWithRepositories(
-        tester,
-        history: seedHistory(),
-        preferences: InMemoryPreferencesRepository(
-          const AppPreferences(expandReasoning: true),
-        ),
-        child: const ChatScreen(),
-      );
-      expect(reasoningText, findsOneWidget);
-    },
-    variant: iosChrome,
-  );
+    // Dismantle the tree first: an identical re-pump would reuse the
+    // card's State and mask the initial-expansion behavior under test.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await pumpWithRepositories(
+      tester,
+      history: seedHistory(),
+      preferences: InMemoryPreferencesRepository(
+        const AppPreferences(expandReasoning: true),
+      ),
+      child: const ChatScreen(),
+    );
+    expect(reasoningText, findsOneWidget);
+  }, variant: iosChrome);
 
   testWidgets('appearance commits theme, and toggles persist', (tester) async {
     final preferences = InMemoryPreferencesRepository();
@@ -649,47 +647,45 @@ void main() {
     expect(reasoning, findsOneWidget);
   }, variant: iosChrome);
 
-  testWidgets(
-    'the root model row names the chat\'s model, not the boot one',
-    (tester) async {
-      // The visible half of the one-derivation rule (#129). The row used to
-      // resolve from residency alone, so with nothing loaded yet it named the
-      // build's boot artifact while chat, the picker and the Models screen all
-      // named the conversation's choice.
-      await pumpWithRepositories(
-        tester,
-        backend: const InferenceBackendConfig(
-          kind: InferenceBackendKind.mlx,
-          profileKey: 'gemma4',
-          artifactKey: 'gemma4-mlx',
-          modelPath: '/models/gemma',
-          modelPathFromCatalog: true,
-        ),
-        model: const ModelState(
-          artifacts: {
-            'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
-            'qwen35-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
-          },
-        ),
-        history: ChatHistorySnapshot(
-          activeId: 'chat',
-          conversations: [
-            ChatConversation(
-              id: 'chat',
-              title: 'Switched',
-              updatedAt: DateTime.utc(2026, 8, 18),
-              messages: const [],
-              modelKey: 'qwen35-mlx',
-            ),
-          ],
-        ),
-        child: const SettingsScreen(identity: AppIdentity.dev),
-      );
-      expect(find.text('Qwen 3.5 4B'), findsOneWidget);
-      expect(find.text('Gemma 4 E2B'), findsNothing);
-    },
-    variant: iosChrome,
-  );
+  testWidgets('the root model row names the chat\'s model, not the boot one', (
+    tester,
+  ) async {
+    // The visible half of the one-derivation rule (#129). The row used to
+    // resolve from residency alone, so with nothing loaded yet it named the
+    // build's boot artifact while chat, the picker and the Models screen all
+    // named the conversation's choice.
+    await pumpWithRepositories(
+      tester,
+      backend: const InferenceBackendConfig(
+        kind: InferenceBackendKind.mlx,
+        profileKey: 'gemma4',
+        artifactKey: 'gemma4-mlx',
+        modelPath: '/models/gemma',
+        modelPathFromCatalog: true,
+      ),
+      model: const ModelState(
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+          'qwen35-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+        },
+      ),
+      history: ChatHistorySnapshot(
+        activeId: 'chat',
+        conversations: [
+          ChatConversation(
+            id: 'chat',
+            title: 'Switched',
+            updatedAt: DateTime.utc(2026, 8, 18),
+            messages: const [],
+            modelKey: 'qwen35-mlx',
+          ),
+        ],
+      ),
+      child: const SettingsScreen(identity: AppIdentity.dev),
+    );
+    expect(find.text('Qwen 3.5 4B'), findsOneWidget);
+    expect(find.text('Gemma 4 E2B'), findsNothing);
+  }, variant: iosChrome);
 
   testWidgets('the root reflects the active style and advanced rows', (
     tester,

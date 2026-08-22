@@ -1,10 +1,14 @@
 # Dependency blockers
 
-After #74 every direct and transitive package in the workspace sits at the
-newest version that resolves against the pinned Flutter 3.44.9 / Dart 3.12.2
-toolchain — `flutter pub outdated` reports `Current == Upgradable ==
-Resolvable` for every row. What remains is the gap to `Latest`, and each of
-those gaps has a cause recorded here.
+After #74 every direct and transitive package in the workspace sat at the
+newest version that resolved against the then-pinned Flutter 3.44.9 / Dart
+3.12.2 toolchain — `flutter pub outdated` reported `Current == Upgradable ==
+Resolvable` for every row. #143 moved the pin to Flutter 3.47.1 / Dart 3.13.1
+with `pub get` alone: the lockfile moved only where the SDK forced it (`intl`,
+`meta`, `matcher`, the `test` trio, `vector_math`), so the two chains below are
+now partly clear and the rows need re-deriving before the next reviewed
+`pub upgrade`. What remains is the gap to `Latest`, and each of those gaps has
+a cause recorded here.
 
 The version columns below are a snapshot, not a source of truth — `pubspec.lock`
 is. Nothing checks them, so re-derive from the lockfile and from pub.dev before

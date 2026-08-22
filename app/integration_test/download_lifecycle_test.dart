@@ -119,51 +119,43 @@ void main() {
         await state.delete(recursive: true);
       });
 
-      test(
-        'a fresh repository converges on what the platform holds',
-        () async {
-          final first = build();
-          await first.load();
-          await first.download(entry.key).drain<void>();
+      test('a fresh repository converges on what the platform holds', () async {
+        final first = build();
+        await first.load();
+        await first.download(entry.key).drain<void>();
 
-          // A second repository over the same device is the app having forgotten
-          // everything while the platform did not.
-          final relaunched = build();
-          final converged = await relaunched.load();
-          final status = converged.statusOf(entry.key);
-          expect(
-            status.phase,
-            anyOf(ArtifactPhase.installed, ArtifactPhase.notDownloaded),
-            reason: 'failure: ${status.failure}',
-          );
-        },
-        timeout: const Timeout(Duration(minutes: 8)),
-      );
+        // A second repository over the same device is the app having forgotten
+        // everything while the platform did not.
+        final relaunched = build();
+        final converged = await relaunched.load();
+        final status = converged.statusOf(entry.key);
+        expect(
+          status.phase,
+          anyOf(ArtifactPhase.installed, ArtifactPhase.notDownloaded),
+          reason: 'failure: ${status.failure}',
+        );
+      }, timeout: const Timeout(Duration(minutes: 8)));
 
-      test(
-        'a completed artifact is adopted, never re-fetched',
-        () async {
-          final repository = build();
-          await repository.load();
-          final states = await repository
-              .download(entry.key)
-              .timeout(const Duration(minutes: 6))
-              .toList();
-          expect(
-            states.last.statusOf(entry.key).phase,
-            ArtifactPhase.installed,
-            reason: 'failure: ${states.last.statusOf(entry.key).failure}',
-          );
+      test('a completed artifact is adopted, never re-fetched', () async {
+        final repository = build();
+        await repository.load();
+        final states = await repository
+            .download(entry.key)
+            .timeout(const Duration(minutes: 6))
+            .toList();
+        expect(
+          states.last.statusOf(entry.key).phase,
+          ArtifactPhase.installed,
+          reason: 'failure: ${states.last.statusOf(entry.key).failure}',
+        );
 
-          // Skip-if-valid across a relaunch: the receipt and the sizes carry it,
-          // and nothing is enqueued a second time.
-          final relaunched = build();
-          await relaunched.load();
-          final again = await relaunched.download(entry.key).toList();
-          expect(again.last.statusOf(entry.key).phase, ArtifactPhase.installed);
-        },
-        timeout: const Timeout(Duration(minutes: 10)),
-      );
+        // Skip-if-valid across a relaunch: the receipt and the sizes carry it,
+        // and nothing is enqueued a second time.
+        final relaunched = build();
+        await relaunched.load();
+        final again = await relaunched.download(entry.key).toList();
+        expect(again.last.statusOf(entry.key).phase, ArtifactPhase.installed);
+      }, timeout: const Timeout(Duration(minutes: 10)));
 
       test(
         'a pause the user asked for is reported as theirs, not the platform is',

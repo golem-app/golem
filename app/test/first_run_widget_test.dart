@@ -643,81 +643,76 @@ void main() {
     },
   );
 
-  testWidgets(
-    'first run survives large text, RTL, and platform tap targets',
-    (tester) async {
-      await pumpWithRepositories(
-        tester,
-        eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
-        model: const ModelState(simulated: true),
-        child: const Directionality(
-          textDirection: TextDirection.rtl,
-          child: MediaQuery(
-            data: MediaQueryData(textScaler: TextScaler.linear(1.6)),
-            child: FirstRunScreen(),
+  testWidgets('first run survives large text, RTL, and platform tap targets', (
+    tester,
+  ) async {
+    await pumpWithRepositories(
+      tester,
+      eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+      model: const ModelState(simulated: true),
+      child: const Directionality(
+        textDirection: TextDirection.rtl,
+        child: MediaQuery(
+          data: MediaQueryData(textScaler: TextScaler.linear(1.6)),
+          child: FirstRunScreen(),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('first-run-get-started')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('first-run-choose-model')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    final guideline =
+        debugDefaultTargetPlatformOverride == TargetPlatform.android
+        ? androidTapTargetGuideline
+        : iOSTapTargetGuideline;
+    await expectLater(tester, meetsGuideline(guideline));
+  }, variant: bothChromes);
+
+  testWidgets('blocking setup survives large text and announces progress', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await pumpWithRepositories(
+      tester,
+      textScale: 1.6,
+      eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+      model: const ModelState(
+        simulated: true,
+        artifacts: {
+          'gemma4-mlx': ArtifactStatus(
+            phase: ArtifactPhase.downloading,
+            downloadedBytes: 900000000,
           ),
-        ),
-      );
-      expect(tester.takeException(), isNull);
-      await tester.tap(find.byKey(const Key('first-run-get-started')));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      await tester.tap(find.byKey(const Key('first-run-choose-model')));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
+        },
+      ),
+      child: const FirstRunScreen(initialStep: FirstRunStep.download),
+    );
 
-      final guideline =
-          debugDefaultTargetPlatformOverride == TargetPlatform.android
-          ? androidTapTargetGuideline
-          : iOSTapTargetGuideline;
-      await expectLater(tester, meetsGuideline(guideline));
-    },
-    variant: bothChromes,
-  );
-
-  testWidgets(
-    'blocking setup survives large text and announces progress',
-    (tester) async {
-      final semantics = tester.ensureSemantics();
-      await pumpWithRepositories(
-        tester,
-        textScale: 1.6,
-        eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
-        model: const ModelState(
-          simulated: true,
-          artifacts: {
-            'gemma4-mlx': ArtifactStatus(
-              phase: ArtifactPhase.downloading,
-              downloadedBytes: 900000000,
+    expect(tester.takeException(), isNull);
+    final progress = find.byWidgetPredicate(
+      (widget) =>
+          widget is Semantics && widget.properties.label == 'Download progress',
+    );
+    expect(progress, findsOneWidget);
+    expect(tester.getSemantics(progress).value, isNotEmpty);
+    expect(
+      tester
+          .widget<CupertinoButton>(
+            find.descendant(
+              of: find.byKey(const Key('first-run-start-chatting')),
+              matching: find.byType(CupertinoButton),
             ),
-          },
-        ),
-        child: const FirstRunScreen(initialStep: FirstRunStep.download),
-      );
-
-      expect(tester.takeException(), isNull);
-      final progress = find.byWidgetPredicate(
-        (widget) =>
-            widget is Semantics &&
-            widget.properties.label == 'Download progress',
-      );
-      expect(progress, findsOneWidget);
-      expect(tester.getSemantics(progress).value, isNotEmpty);
-      expect(
-        tester
-            .widget<CupertinoButton>(
-              find.descendant(
-                of: find.byKey(const Key('first-run-start-chatting')),
-                matching: find.byType(CupertinoButton),
-              ),
-            )
-            .onPressed,
-        isNull,
-      );
-      semantics.dispose();
-    },
-    variant: bothChromes,
-  );
+          )
+          .onPressed,
+      isNull,
+    );
+    semantics.dispose();
+  }, variant: bothChromes);
 
   testWidgets(
     'verification uses honest indeterminate progress with accessible status',

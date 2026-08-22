@@ -162,11 +162,9 @@ Future<_CurlResult> _curlWindow(String url, String? range, int window) async {
   // Exit 28 is the expected --max-time cut; the write-out still reports.
   final parts = (result.stdout as String).trim().split(RegExp(r'\s+'));
   if (parts.length < 4) {
-    throw ProcessException(
-      'curl',
-      ['<write-out>'],
-      'unparseable write-out: "${result.stdout}" (exit ${result.exitCode})',
-    );
+    throw ProcessException('curl', [
+      '<write-out>',
+    ], 'unparseable write-out: "${result.stdout}" (exit ${result.exitCode})');
   }
   return _CurlResult(
     parts[0],

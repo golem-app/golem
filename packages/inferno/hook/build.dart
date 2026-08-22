@@ -148,28 +148,24 @@ Future<File> _buildMlxCarrier(
     sharedOutput.resolve('mlx-build-$sdk-$architecture/'),
   );
   await derivedData.create(recursive: true);
-  await _run(
-    'xcodebuild',
-    [
-      'build',
-      '-quiet',
-      '-scheme',
-      'InfernoMLXCarrier',
-      '-configuration',
-      'Release',
-      '-destination',
-      destination,
-      '-derivedDataPath',
-      derivedData.path,
-      '-skipPackagePluginValidation',
-      '-skipMacroValidation',
-      'CODE_SIGNING_ALLOWED=NO',
-      'BUILD_LIBRARY_FOR_DISTRIBUTION=NO',
-      'ARCHS=$architecture',
-      'ONLY_ACTIVE_ARCH=YES',
-    ],
-    workingDirectory: Directory.fromUri(packageRoot.resolve('native/apple/')),
-  );
+  await _run('xcodebuild', [
+    'build',
+    '-quiet',
+    '-scheme',
+    'InfernoMLXCarrier',
+    '-configuration',
+    'Release',
+    '-destination',
+    destination,
+    '-derivedDataPath',
+    derivedData.path,
+    '-skipPackagePluginValidation',
+    '-skipMacroValidation',
+    'CODE_SIGNING_ALLOWED=NO',
+    'BUILD_LIBRARY_FOR_DISTRIBUTION=NO',
+    'ARCHS=$architecture',
+    'ONLY_ACTIVE_ARCH=YES',
+  ], workingDirectory: Directory.fromUri(packageRoot.resolve('native/apple/')));
 
   final configurationDirectory = sdk == 'macosx' ? 'Release' : 'Release-$sdk';
   final products = Directory(

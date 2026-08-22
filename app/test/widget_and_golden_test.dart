@@ -493,55 +493,53 @@ void main() {
   }
 
   for (final brightness in Brightness.values) {
-    testWidgets(
-      'model picker on a real backend ${brightness.name} golden',
-      (tester) async {
-        // The states only a real engine can produce (#79): the recommendation
-        // and its device-tier reason, an installed artifact of the *other*
-        // engine explaining why it cannot be chosen, the count of what is not
-        // listed, and — with Advanced on — the exact artifact behind each name.
-        // Geometry is chrome-independent here, so iOS records it.
-        await pumpWithRepositories(
-          tester,
-          brightness: brightness,
-          history: markdownHistory(),
-          // Resolved by the real policy, not hand-built: a literal config
-          // leaves artifactFromDevicePolicy false, and the device-tier
-          // sentence this golden exists to record would quietly degrade to
-          // the generic fallback without a test noticing.
-          backend: resolveBackendPolicy(
-            backendName: 'auto',
-            profileDefine: '',
-            artifactDefine: '',
-            modelPathDefine: '',
-            tier: DeviceTier.preferred,
-          ),
-          eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
-          preferences: InMemoryPreferencesRepository(
-            const AppPreferences(advancedMode: true),
-          ),
-          model: const ModelState(
-            artifacts: {
-              'gemma4-gguf': ArtifactStatus(phase: ArtifactPhase.installed),
-              'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
-              'qwen35-2b-gguf': ArtifactStatus(
-                phase: ArtifactPhase.paused,
-                downloadedBytes: 620000000,
-              ),
-            },
-            activeArtifactKey: 'gemma4-gguf',
-          ),
-          child: const ChatScreen(),
-        );
-        await tester.tap(find.byKey(const Key('composer-model-chip')));
-        await tester.pumpAndSettle();
-        await expectLater(
-          find.byKey(const Key('model-picker-sheet')),
-          matchesGoldenFile('goldens/model-picker-real-${brightness.name}.png'),
-        );
-      },
-      variant: iosChrome,
-    );
+    testWidgets('model picker on a real backend ${brightness.name} golden', (
+      tester,
+    ) async {
+      // The states only a real engine can produce (#79): the recommendation
+      // and its device-tier reason, an installed artifact of the *other*
+      // engine explaining why it cannot be chosen, the count of what is not
+      // listed, and — with Advanced on — the exact artifact behind each name.
+      // Geometry is chrome-independent here, so iOS records it.
+      await pumpWithRepositories(
+        tester,
+        brightness: brightness,
+        history: markdownHistory(),
+        // Resolved by the real policy, not hand-built: a literal config
+        // leaves artifactFromDevicePolicy false, and the device-tier
+        // sentence this golden exists to record would quietly degrade to
+        // the generic fallback without a test noticing.
+        backend: resolveBackendPolicy(
+          backendName: 'auto',
+          profileDefine: '',
+          artifactDefine: '',
+          modelPathDefine: '',
+          tier: DeviceTier.preferred,
+        ),
+        eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+        preferences: InMemoryPreferencesRepository(
+          const AppPreferences(advancedMode: true),
+        ),
+        model: const ModelState(
+          artifacts: {
+            'gemma4-gguf': ArtifactStatus(phase: ArtifactPhase.installed),
+            'gemma4-mlx': ArtifactStatus(phase: ArtifactPhase.installed),
+            'qwen35-2b-gguf': ArtifactStatus(
+              phase: ArtifactPhase.paused,
+              downloadedBytes: 620000000,
+            ),
+          },
+          activeArtifactKey: 'gemma4-gguf',
+        ),
+        child: const ChatScreen(),
+      );
+      await tester.tap(find.byKey(const Key('composer-model-chip')));
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byKey(const Key('model-picker-sheet')),
+        matchesGoldenFile('goldens/model-picker-real-${brightness.name}.png'),
+      );
+    }, variant: iosChrome);
   }
 
   for (final brightness in Brightness.values) {
@@ -1532,36 +1530,34 @@ void main() {
     }
   }, variant: iosChrome);
 
-  testWidgets(
-    'an empty failed assistant message renders no ghost bubble',
-    (tester) async {
-      Widget wrap(ChatMessage message) => ProviderScope(
-        child: wrapApp(
-          child: MessageBubble(
-            message: message,
-            canRegenerate: false,
-            idle: false,
-          ),
+  testWidgets('an empty failed assistant message renders no ghost bubble', (
+    tester,
+  ) async {
+    Widget wrap(ChatMessage message) => ProviderScope(
+      child: wrapApp(
+        child: MessageBubble(
+          message: message,
+          canRegenerate: false,
+          idle: false,
         ),
-      );
-      final ghost = ChatMessage.text(
-        id: 'assistant-ghost',
-        role: MessageRole.assistant,
-        text: '',
-        createdAt: DateTime.utc(2026, 8, 5),
-      );
-      // A failure can strand an assistant message with no text, reasoning, or
-      // metrics; it must vanish instead of painting an empty bubble shell.
-      await tester.pumpWidget(wrap(ghost));
-      expect(find.byKey(const Key('message-assistant-ghost')), findsNothing);
+      ),
+    );
+    final ghost = ChatMessage.text(
+      id: 'assistant-ghost',
+      role: MessageRole.assistant,
+      text: '',
+      createdAt: DateTime.utc(2026, 8, 5),
+    );
+    // A failure can strand an assistant message with no text, reasoning, or
+    // metrics; it must vanish instead of painting an empty bubble shell.
+    await tester.pumpWidget(wrap(ghost));
+    expect(find.byKey(const Key('message-assistant-ghost')), findsNothing);
 
-      // While streaming, the same empty message is the typing indicator
-      // (the blinking caret) and must stay visible.
-      await tester.pumpWidget(wrap(ghost.copyWith(isStreaming: true)));
-      expect(find.byKey(const Key('message-assistant-ghost')), findsOneWidget);
-    },
-    variant: iosChrome,
-  );
+    // While streaming, the same empty message is the typing indicator
+    // (the blinking caret) and must stay visible.
+    await tester.pumpWidget(wrap(ghost.copyWith(isStreaming: true)));
+    expect(find.byKey(const Key('message-assistant-ghost')), findsOneWidget);
+  }, variant: iosChrome);
 
   testWidgets('the toggle is withheld mid-answer on an unloaded phase', (
     tester,

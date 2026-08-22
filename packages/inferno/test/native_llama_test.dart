@@ -11,75 +11,71 @@ void main() {
       ? 'Set INFERNO_TOY_GGUF using tool/fetch_toy_model.dart.'
       : false;
 
-  test(
-    'disposing mid-generation ends the stream once and stays quiet',
-    () async {
-      // #124: the app tore the isolate down while the engine's worker thread was
-      // still calling the token trampoline, which aborts the process with
-      // "Callback invoked after it has been deleted". dispose() must join that
-      // worker before the callback port closes — mock backends cannot show this,
-      // so this suite is where it belongs.
-      final inferno = Inferno.native();
-      await inferno.load(
-        engine: InfernoEngineKind.llamaCpp,
-        modelPath: modelPath!,
-      );
+  test('disposing mid-generation ends the stream once and stays quiet', () async {
+    // #124: the app tore the isolate down while the engine's worker thread was
+    // still calling the token trampoline, which aborts the process with
+    // "Callback invoked after it has been deleted". dispose() must join that
+    // worker before the callback port closes — mock backends cannot show this,
+    // so this suite is where it belongs.
+    final inferno = Inferno.native();
+    await inferno.load(
+      engine: InfernoEngineKind.llamaCpp,
+      modelPath: modelPath!,
+    );
 
-      // One flag, not a list: cancelOnError defaults to false, so an
-      // error-terminated stream delivers onError *and* onDone. Counting both
-      // would read as "a late event arrived after dispose" — the abort
-      // signature — when the stream simply ended the other way.
-      var terminated = 0;
-      final firstDelta = Completer<void>();
-      final closed = Completer<void>();
-      final subscription = inferno
-          .generate(
-            const InfernoGenerationRequest(
-              // Long enough that dispose lands mid-stream rather than after it.
-              prompt: 'Count slowly',
-              sampling: InfernoSamplingParameters(
-                maxTokens: 512,
-                temperature: 0.2,
-                topP: 0.9,
-                seed: 7,
-              ),
+    // One flag, not a list: cancelOnError defaults to false, so an
+    // error-terminated stream delivers onError *and* onDone. Counting both
+    // would read as "a late event arrived after dispose" — the abort
+    // signature — when the stream simply ended the other way.
+    var terminated = 0;
+    final firstDelta = Completer<void>();
+    final closed = Completer<void>();
+    final subscription = inferno
+        .generate(
+          const InfernoGenerationRequest(
+            // Long enough that dispose lands mid-stream rather than after it.
+            prompt: 'Count slowly',
+            sampling: InfernoSamplingParameters(
+              maxTokens: 512,
+              temperature: 0.2,
+              topP: 0.9,
+              seed: 7,
             ),
-          )
-          .listen(
-            (event) {
-              if (event is InfernoTextDelta && !firstDelta.isCompleted) {
-                firstDelta.complete();
-              }
-            },
-            onError: (Object _) {
+          ),
+        )
+        .listen(
+          (event) {
+            if (event is InfernoTextDelta && !firstDelta.isCompleted) {
+              firstDelta.complete();
+            }
+          },
+          onError: (Object _) {
+            terminated++;
+            if (!closed.isCompleted) closed.complete();
+          },
+          onDone: () {
+            if (!closed.isCompleted) {
               terminated++;
-              if (!closed.isCompleted) closed.complete();
-            },
-            onDone: () {
-              if (!closed.isCompleted) {
-                terminated++;
-                closed.complete();
-              }
-            },
-          );
-      addTearDown(subscription.cancel);
+              closed.complete();
+            }
+          },
+        );
+    addTearDown(subscription.cancel);
 
-      await firstDelta.future;
-      // Without this the test would pass vacuously whenever the toy model
-      // outruns the teardown: the point is to dispose *under* a live worker.
-      expect(terminated, 0, reason: 'generation must still be running');
-      await inferno.dispose();
-      await closed.future;
+    await firstDelta.future;
+    // Without this the test would pass vacuously whenever the toy model
+    // outruns the teardown: the point is to dispose *under* a live worker.
+    expect(terminated, 0, reason: 'generation must still be running');
+    await inferno.dispose();
+    await closed.future;
 
-      expect(terminated, 1, reason: 'the stream ends exactly once');
-      // Nothing may arrive after dispose returned: the worker has joined and
-      // the callback port is closed. A late event here is the abort in slow
-      // motion.
-      await Future<void>.delayed(const Duration(seconds: 2));
-      expect(terminated, 1);
-    },
-    skip: skipReason,
-  );
+    expect(terminated, 1, reason: 'the stream ends exactly once');
+    // Nothing may arrive after dispose returned: the worker has joined and
+    // the callback port is closed. A late event here is the abort in slow
+    // motion.
+    await Future<void>.delayed(const Duration(seconds: 2));
+    expect(terminated, 1);
+  }, skip: skipReason);
 
   test('toy GGUF loads, streams, reports metrics, and unloads', () async {
     final inferno = Inferno.native();
@@ -310,55 +306,51 @@ void main() {
     await inferno.unload();
   }, skip: skipReason);
 
-  test(
-    'a context budget below prompt plus max tokens fails clearly',
-    () async {
-      final inferno = Inferno.native();
-      await inferno.load(
-        engine: InfernoEngineKind.llamaCpp,
-        modelPath: modelPath!,
-      );
-      await expectLater(
-        inferno
-            .generate(
-              const InfernoGenerationRequest(
-                prompt: 'Hello',
-                sampling: InfernoSamplingParameters(
-                  maxTokens: 16,
-                  contextLength: 8,
-                  seed: 7,
-                ),
-              ),
-            )
-            .toList(),
-        throwsA(
-          isA<InfernoException>()
-              .having(
-                (error) => error.code,
-                'code',
-                InfernoErrorCode.contextExhausted,
-              )
-              .having(
-                (error) => error.message,
-                'message',
-                contains('context budget'),
-              ),
-        ),
-      );
-      // The runtime must stay usable after the rejected request.
-      final events = await inferno
+  test('a context budget below prompt plus max tokens fails clearly', () async {
+    final inferno = Inferno.native();
+    await inferno.load(
+      engine: InfernoEngineKind.llamaCpp,
+      modelPath: modelPath!,
+    );
+    await expectLater(
+      inferno
           .generate(
             const InfernoGenerationRequest(
               prompt: 'Hello',
-              sampling: InfernoSamplingParameters(maxTokens: 4, seed: 7),
+              sampling: InfernoSamplingParameters(
+                maxTokens: 16,
+                contextLength: 8,
+                seed: 7,
+              ),
             ),
           )
-          .toList();
-      expect(events.last, isA<InfernoGenerationCompleted>());
-      await inferno.unload();
-    },
-    skip: skipReason,
-  );
+          .toList(),
+      throwsA(
+        isA<InfernoException>()
+            .having(
+              (error) => error.code,
+              'code',
+              InfernoErrorCode.contextExhausted,
+            )
+            .having(
+              (error) => error.message,
+              'message',
+              contains('context budget'),
+            ),
+      ),
+    );
+    // The runtime must stay usable after the rejected request.
+    final events = await inferno
+        .generate(
+          const InfernoGenerationRequest(
+            prompt: 'Hello',
+            sampling: InfernoSamplingParameters(maxTokens: 4, seed: 7),
+          ),
+        )
+        .toList();
+    expect(events.last, isA<InfernoGenerationCompleted>());
+    await inferno.unload();
+  }, skip: skipReason);
 
   test('damaged GGUF variants fail as catchable Dart errors', () async {
     final fixtureDirectory = File(modelPath!).parent.path;
