@@ -1110,7 +1110,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'Golem은 오픈 소스 소프트웨어로 제작되었습니다. 이 고지는 이 빌드에 포함된 패키지와 네이티브 엔진을 다루며 오프라인에서 볼 수 있습니다.';
+      'Golem은 오픈 소스 소프트웨어로 제작되었습니다. 이 고지는 Golem이 포함하는 네이티브 엔진과 직접 의존하는 패키지를 밝히며 오프라인에서 볼 수 있습니다.';
 
   @override
   String licenseEntries(int count) {

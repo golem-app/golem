@@ -1159,7 +1159,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'بُني Golem باستخدام برمجيات مفتوحة المصدر. تغطي هذه الإشعارات الحزم والمحركات الأصلية التي يشحنها هذا الإصدار، وهي متاحة بلا اتصال.';
+      'بُني Golem باستخدام برمجيات مفتوحة المصدر. تذكر هذه الإشعارات المحركات الأصلية التي يشحنها Golem والحزم التي يعتمد عليها مباشرة، وهي متاحة بلا اتصال.';
 
   @override
   String licenseEntries(int count) {

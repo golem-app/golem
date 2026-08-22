@@ -622,7 +622,7 @@
   "@deleteModelStorageMessage": {"description": "Delete model storage confirmation body.", "placeholders": {"size": {"type": "String"}}},
   "megabytes": "{value} MB",
   "@megabytes": {"description": "Megabyte value.", "placeholders": {"value": {"type": "int"}}},
-  "licensesIntroduction": "Golem is built with open-source software. These notices cover the packages and native engines this build ships, and are available offline.",
+  "licensesIntroduction": "Golem is built with open-source software. These notices name the native engines Golem ships and the packages it depends on directly, and are available offline.",
   "@licensesIntroduction": {"description": "Open-source licenses introduction."},
   "licenseEntries": "{count, plural, =1{1 license entry} other{{count} license entries}}",
   "@licenseEntries": {"description": "License entry count.", "placeholders": {"count": {"type": "int"}}},

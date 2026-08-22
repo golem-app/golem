@@ -21,6 +21,14 @@ Set<String> _directDependencies() {
   final lines = File('pubspec.yaml').readAsLinesSync();
   final start = lines.indexOf('dependencies:');
   final end = lines.indexOf('dev_dependencies:');
+  // Without this, a restructured pubspec silently parses the wrong block —
+  // `environment:`'s own keys match the same indent — and the guard reports a
+  // bogus dependency set instead of naming the parse.
+  expect(
+    start >= 0 && end > start,
+    isTrue,
+    reason: 'pubspec.yaml has no dependencies: block before dev_dependencies:',
+  );
   return {
     for (final line in lines.sublist(start + 1, end))
       if (RegExp(r'^  ([a-z0-9_]+):').firstMatch(line) case final match?)
@@ -94,7 +102,7 @@ void main() {
 
     expect(families.map((family) => family.title), ['Gemma 4 E2B', 'Qwen 3.5']);
     expect(
-      families.every((family) => family.licenseName == 'Apache 2.0'),
+      families.every((family) => family.licenseName == 'Apache-2.0'),
       isTrue,
     );
     expect(families.first.sources, hasLength(3));
@@ -125,7 +133,9 @@ void main() {
   });
 
   test('the declared list opens on the engine and covers every manifest', () {
-    expect(declaredLicensePackages.take(4), [
+    final declared = declaredLicensePackagesFor(apple: true);
+
+    expect(declared.take(4), [
       'llama.cpp',
       'nlohmann/json',
       'stb_image',
@@ -133,15 +143,70 @@ void main() {
     ]);
     for (final declaration in bundledLicenseDeclarations) {
       expect(
-        declaredLicensePackages,
+        declared,
         contains(declaration.displayName),
         reason: declaration.identity,
       );
     }
     expect(
-      declaredLicensePackages,
-      hasLength(bundledLicenseDeclarations.length + 15),
+      declared,
+      hasLength(
+        bundledLicenseDeclarations.length + directRuntimeLicensePackages.length,
+      ),
     );
+  });
+
+  test('the Swift graph is disclosed only where the MLX carrier is built', () {
+    // The gate is held to the build system rather than restated beside it: if
+    // the carrier ever builds for another OS, this fails and the licenses
+    // decision has to be revisited (#144).
+    final hook = File('../packages/inferno/hook/build.dart').readAsStringSync();
+    expect(
+      hook,
+      contains('config.targetOS == OS.iOS || config.targetOS == OS.macOS'),
+    );
+
+    final apple = declaredLicensePackagesFor(apple: true);
+    final portable = declaredLicensePackagesFor(apple: false);
+    for (final declaration in swiftPackageLicenseDeclarations) {
+      expect(apple, contains(declaration.displayName));
+      expect(
+        portable,
+        isNot(contains(declaration.displayName)),
+        reason: declaration.identity,
+      );
+    }
+    for (final declaration in llamaLicenseDeclarations) {
+      expect(portable, contains(declaration.displayName));
+    }
+    expect(portable, containsAll(directRuntimeLicensePackages));
+  });
+
+  test('each declaration states the license its own asset carries', () {
+    // Restores and generalizes the Swift-exception guard: text-sniffing reads
+    // every one of these as a bare family, and six of them are not.
+    for (final declaration in bundledLicenseDeclarations) {
+      final text = declaration.assetPaths
+          .map((path) => File(path).readAsStringSync())
+          .join('\n\n');
+      final reason = declaration.identity;
+
+      expect(
+        text.contains('Runtime Library Exception'),
+        declaration.kind.contains('WITH Swift-exception'),
+        reason: reason,
+      );
+      if (declaration.kind.startsWith('Apache-2.0')) {
+        expect(text, contains('Apache License'), reason: reason);
+        expect(text, contains('Version 2.0'), reason: reason);
+      }
+      if (declaration.kind == 'MIT') {
+        expect(text, contains('Permission is hereby granted'), reason: reason);
+      }
+      if (declaration.kind.contains('Unlicense')) {
+        expect(text, contains('ALTERNATIVE'), reason: reason);
+      }
+    }
   });
 
   test('model weights are attributed, not disclosed as bundled software', () {
@@ -149,7 +214,7 @@ void main() {
     // so no bundled-notice obligation attaches; the Model attribution screen
     // names the license and links the canonical text (ADR 0009).
     for (final name in ['Gemma 4 E2B model', 'Qwen 3.5 models']) {
-      expect(declaredLicensePackages, isNot(contains(name)));
+      expect(declaredLicensePackagesFor(apple: true), isNot(contains(name)));
     }
     expect(
       bundledLicenseDeclarations.map((entry) => entry.identity),
@@ -161,25 +226,74 @@ void main() {
     );
   });
 
-  test('the loader renders the declared manifests and nothing else', () async {
-    addTearDown(LicenseRegistry.reset);
-    LicenseRegistry.reset();
-    LicenseRegistry.addLicense(() async* {
-      // A transitive pub package, an engine third-party entry and a model
-      // declaration — the three kinds the screen must not render.
+  group('the loader', () {
+    // A transitive pub package, an engine third-party entry, a model
+    // declaration and an Apple-only package — everything the screen must not
+    // render off Apple. Injected, so the process-wide registry is untouched.
+    Stream<LicenseEntry> registry() async* {
       yield const LicenseEntryWithLineBreaks(['petitparser'], 'transitive');
       yield const LicenseEntryWithLineBreaks(['skia'], 'engine');
       yield const LicenseEntryWithLineBreaks(['Gemma 4 E2B model'], 'weights');
+      yield const LicenseEntryWithLineBreaks(['mlx-swift'], 'apple only');
       yield const LicenseEntryWithLineBreaks(['go_router'], 'direct');
       yield const LicenseEntryWithLineBreaks(['llama.cpp'], 'bundled');
+    }
+
+    test('renders the declared manifests and nothing else', () async {
+      final licenses = await loadRegisteredLicenses(
+        licenses: registry(),
+        apple: true,
+      );
+
+      expect(licenses.map((license) => license.title), [
+        'llama.cpp',
+        'mlx-swift',
+        'go_router',
+      ]);
     });
 
-    final licenses = await loadRegisteredLicenses();
+    test('drops the Swift graph off Apple', () async {
+      final licenses = await loadRegisteredLicenses(
+        licenses: registry(),
+        apple: false,
+      );
 
-    expect(licenses.map((license) => license.title), [
-      'llama.cpp',
-      'go_router',
-    ]);
+      expect(licenses.map((license) => license.title), [
+        'llama.cpp',
+        'go_router',
+      ]);
+    });
+
+    test('states the authored kind and withholds a contested one', () async {
+      Stream<LicenseEntry> mixed() async* {
+        // `stb_image` sniffs as bare MIT and is actually dual-licensed;
+        // `flutter` files several documents that do not agree.
+        yield const LicenseEntryWithLineBreaks([
+          'stb_image',
+        ], 'Permission is hereby granted');
+        yield const LicenseEntryWithLineBreaks([
+          'flutter',
+        ], 'Redistribution and use ... Neither the name');
+        yield const LicenseEntryWithLineBreaks([
+          'flutter',
+        ], 'Permission is hereby granted');
+        yield const LicenseEntryWithLineBreaks([
+          'go_router',
+        ], 'Redistribution and use ... Neither the name');
+      }
+
+      final byTitle = {
+        for (final license in await loadRegisteredLicenses(
+          licenses: mixed(),
+          apple: false,
+        ))
+          license.title: license.kind,
+      };
+
+      expect(byTitle['stb_image'], 'MIT OR Unlicense');
+      expect(byTitle['flutter'], isNull);
+      expect(byTitle['go_router'], 'BSD-3-Clause');
+    });
   });
 
   test('license kinds are read from the clauses that distinguish them', () {
@@ -252,6 +366,7 @@ void main() {
           OpenSourceLicense(
             packages: const ['Example package'],
             text: 'Permission is hereby granted, free of charge',
+            kind: 'MIT',
           ),
         ],
       ),
@@ -303,6 +418,7 @@ void main() {
         OpenSourceLicense(
           packages: const ['Example package'],
           text: 'Permission is hereby granted, free of charge',
+          kind: 'MIT',
         ),
       ],
     );

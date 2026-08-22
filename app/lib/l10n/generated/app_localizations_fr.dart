@@ -1159,7 +1159,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'Golem est conçu avec des logiciels open source. Ces avis couvrent les paquets et les moteurs natifs livrés dans cette version, et restent consultables hors ligne.';
+      'Golem est conçu avec des logiciels open source. Ces avis nomment les moteurs natifs livrés avec Golem ainsi que les paquets dont il dépend directement, et restent consultables hors ligne.';
 
   @override
   String licenseEntries(int count) {

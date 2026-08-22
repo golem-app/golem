@@ -311,7 +311,7 @@
   "deleteModelArtifactTitle": "Supprimer {modelName} · {format}\u202f?",
   "deleteModelStorageMessage": "Supprime {size} de cet appareil. Le modèle pourra être téléchargé de nouveau plus tard.",
   "megabytes": "{value} Mo",
-  "licensesIntroduction": "Golem est conçu avec des logiciels open source. Ces avis couvrent les paquets et les moteurs natifs livrés dans cette version, et restent consultables hors ligne.",
+  "licensesIntroduction": "Golem est conçu avec des logiciels open source. Ces avis nomment les moteurs natifs livrés avec Golem ainsi que les paquets dont il dépend directement, et restent consultables hors ligne.",
   "licenseEntries": "{count, plural, one{{count} entrée de licence} many{{count} d’entrées de licence} other{{count} entrées de licence}}",
   "licensesLoadFailed": "Impossible de charger les licences.",
   "licensesRetryDetail": "Les fichiers intégrés sont toujours sur cet appareil. Réessayez de les charger.",

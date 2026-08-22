@@ -32,12 +32,34 @@ Golem exposes two direct Settings destinations:
 
 That screen renders three explicit manifests and nothing else (#144), in
 reading order: llama.cpp with its vendored components, the Swift graph the MLX
-engine links, then the `dependencies:` block of `app/pubspec.yaml` — each row
-labelled with the license family its text reads as. The ordering is
-`declaredLicensePackages`, assembled from the same const declarations this
-record audits, so a pin change moves the screen with it.
+engine links, then the `dependencies:` block of `app/pubspec.yaml`. The
+ordering is `declaredLicensePackagesFor`, assembled from the same const
+declarations this record audits, so a pin change moves the screen with it.
 `legal_surfaces_test.dart` holds the pub half to `pubspec.yaml`, so a new
 dependency is disclosed deliberately rather than by accident.
+
+The Swift half is disclosed only where it exists. `hook/build.dart` builds the
+MLX carrier for `OS.iOS` and `OS.macOS` alone; an APK links `libinferno.so`
+and nothing from that graph, so naming those sixteen packages on Android would
+describe software that is not in the binary. The gate reads `dart:io`'s
+`Platform`, never `defaultTargetPlatform` — the golden harness overrides that
+through `TargetPlatformVariant`, so an Android golden runs on a macOS host and
+would answer the wrong question — and it is injected, so tests drive both arms.
+A drift test reads the build hook itself and fails if the carrier stops being
+Apple-gated, which keeps the guarantee checked against the build system rather
+than restated next to it. The license *text assets* still ship on every
+platform: Flutter's pubspec has per-flavor asset keys but no per-platform one.
+That is a deliberate wart, roughly 160 KB of unreferenced text in the APK, not
+a disclosure problem.
+
+Each row states its license kind. For the bundled declarations that kind is
+authored on the declaration, because these are known at pin time and reading
+them back out of the text gets them wrong: `miniaudio` is `Unlicense OR MIT-0`,
+`stb_image` is `MIT OR Unlicense`, and six Swift packages carry
+`Apache-2.0 WITH Swift-exception`. Only the pub half is classified from text,
+and a package whose documents disagree — `flutter` files ten, mixing BSD-3 with
+an MIT shader notice and a font license — renders no label rather than a
+confident wrong one.
 
 Flutter's `LicenseRegistry` carries far more: 243 entries, sweeping the
 engine's own `third_party` tree and every dev-time package in the graph, much

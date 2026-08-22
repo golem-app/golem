@@ -311,7 +311,7 @@
   "deleteModelArtifactTitle": "Excluir {modelName} · {format}?",
   "deleteModelStorageMessage": "Remove {size} deste dispositivo. O modelo poderá ser baixado novamente depois.",
   "megabytes": "{value} MB",
-  "licensesIntroduction": "O Golem é desenvolvido com software de código aberto. Estes avisos cobrem os pacotes e os mecanismos nativos que esta versão inclui, e estão disponíveis off-line.",
+  "licensesIntroduction": "O Golem é desenvolvido com software de código aberto. Estes avisos citam os mecanismos nativos que o Golem inclui e os pacotes dos quais depende diretamente, e estão disponíveis off-line.",
   "licenseEntries": "{count, plural, one{1 item de licença} many{{count} itens de licença} other{{count} itens de licença}}",
   "licensesLoadFailed": "Não foi possível carregar as licenças.",
   "licensesRetryDetail": "Os arquivos incluídos ainda estão neste dispositivo. Tente carregá-los novamente.",

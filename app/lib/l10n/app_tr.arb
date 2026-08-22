@@ -311,7 +311,7 @@
   "deleteModelArtifactTitle": "{modelName} · {format} silinsin mi?",
   "deleteModelStorageMessage": "Bu cihazdan {size} kaldırır. Model daha sonra yeniden indirilebilir.",
   "megabytes": "{value} MB",
-  "licensesIntroduction": "Golem açık kaynaklı yazılımlarla geliştirilmiştir. Bu bildirimler bu derlemenin içerdiği paketleri ve yerel motorları kapsar ve çevrimdışı kullanılabilir.",
+  "licensesIntroduction": "Golem açık kaynaklı yazılımlarla geliştirilmiştir. Bu bildirimler Golem’in içerdiği yerel motorları ve doğrudan bağımlı olduğu paketleri belirtir; çevrimdışı kullanılabilir.",
   "licenseEntries": "{count, plural, one{{count} lisans girdisi} other{{count} lisans girdisi}}",
   "licensesLoadFailed": "Lisanslar yüklenemedi.",
   "licensesRetryDetail": "Paketlenmiş dosyalar hâlâ bu cihazda. Yeniden yüklemeyi deneyin.",

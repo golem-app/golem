@@ -1145,7 +1145,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'Golem ओपन-सोर्स सॉफ़्टवेयर से बना है। ये नोटिस इस बिल्ड में शामिल पैकेज और नेटिव इंजन को कवर करते हैं और ऑफ़लाइन उपलब्ध हैं।';
+      'Golem ओपन-सोर्स सॉफ़्टवेयर से बना है। ये नोटिस Golem के साथ आने वाले नेटिव इंजन और उन पैकेज के नाम देते हैं जिन पर यह सीधे निर्भर है, और ऑफ़लाइन उपलब्ध हैं।';
 
   @override
   String licenseEntries(int count) {
