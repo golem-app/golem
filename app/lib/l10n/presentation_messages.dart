@@ -21,6 +21,7 @@ String deviceRefusalMessage(
   DeviceIneligibilityReason.missingInstructionSet =>
     l10n.deviceMissingInstructionSet,
   DeviceIneligibilityReason.belowMemoryFloor => l10n.deviceBelowMemoryFloor,
+  DeviceIneligibilityReason.virtualDevice => l10n.deviceVirtualHardware,
   null => l10n.modelsUnavailableGeneric,
 };
 

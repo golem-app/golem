@@ -473,7 +473,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'このQAビルドでは固定カタログ全体を表示します。ダウンロードとモデル実行はシミュレーションです。';
+      'このビルドでは固定カタログ全体を表示します。ダウンロードとモデル実行はシミュレーションです。';
 
   @override
   String get catalogDeviceDetail =>
@@ -531,8 +531,7 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get downloadSimulationComplete =>
-      '決定論的なQAシミュレーションが完了しました。重みは保存されていません。';
+  String get downloadSimulationComplete => '決定論的なシミュレーションが完了しました。重みは保存されていません。';
 
   @override
   String get downloadComplete => 'この端末で検証されました。Golemはネットワーク接続なしで応答できます。';
@@ -619,7 +618,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String simulateDownloadMessage(String modelName, String size) {
-    return '$modelNameは$sizeのダウンロードとして表示されています。このQAシミュレーションはネットワークを使わず、モデルの重みも保存しません。';
+    return '$modelNameは$sizeのダウンロードとして表示されています。このシミュレーションはネットワークを使わず、モデルの重みも保存しません。';
   }
 
   @override
@@ -652,7 +651,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get setupDownloadPrompt => 'Golemを使用する前に、選択したモデルをダウンロードして検証してください。';
 
   @override
-  String get qaDownloadShort => '決定論的なQAシミュレーション。ネットワークも重みも使用しません。';
+  String get simulatedDownloadShort => '決定論的なシミュレーション。ネットワークも重みも使用しません。';
 
   @override
   String get downloadBeforeSending => 'メッセージを送信するには、モデルのダウンロードと検証を完了する必要があります。';
@@ -1662,6 +1661,10 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get deviceBelowMemoryFloor =>
       'この端末のメモリは、Golemが提供する最小モデルの要件を満たさないため、ダウンロードは無効です。チャットや設定には影響しません。';
+
+  @override
+  String get deviceVirtualHardware =>
+      'Golemはモデルを実機で実行します。シミュレーターやエミュレーターでは読み込めないため、ここではダウンロードを無効にしています。';
 
   @override
   String outOfMemoryAtContext(int tokens) {

@@ -68,4 +68,10 @@ final class DeviceStorageChannel
   @override
   Future<int?> totalBytes(String path) =>
       _channel.invokeMethod<int>('totalBytes', {'path': path});
+
+  /// Whether this is a simulator or emulator rather than a phone, for the
+  /// admission policy. Null when the platform cannot answer — "unknown" must
+  /// let the device try, never refuse it.
+  Future<bool?> isVirtualDevice() =>
+      _channel.invokeMethod<bool>('isVirtualDevice');
 }

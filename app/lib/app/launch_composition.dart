@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../broker/backend_policy.dart';
 import '../broker/configured_inference_repository.dart';
 import '../broker/model_catalog.dart';
 import '../broker/model_profile.dart';
@@ -174,18 +175,22 @@ _composeRequired({
   // the backend signal provider, so they can never disagree. qa — which is
   // also where flavorless builds land — wires all fakes so goldens, journeys,
   // and CI stay deterministic and offline; production and dev wire the real
-  // ones. Explicit dart-defines override the flavor default, and an override
-  // to real inference drags model management along with it: a real engine fed
-  // by a download simulation would "install" files that do not exist.
-  final (config: backendConfig, :eligibility) = await resolveConfiguredBackend(
-    identity: identity,
-  );
+  // ones, except on a simulator or emulator, where an internal build joins qa
+  // on the fakes rather than fetching weights nothing there can load (#148).
+  // Explicit dart-defines override the flavor default, and an override to real
+  // inference drags model management along with it: a real engine fed by a
+  // download simulation would "install" files that do not exist.
+  final (config: backendConfig, :eligibility, :virtualDevice) =
+      await resolveConfiguredBackend(identity: identity);
   final support = await getApplicationSupportDirectory();
   final documents = await getApplicationDocumentsDirectory();
   final temporary = await getTemporaryDirectory();
   final stateFile = File('${support.path}/flutter-model-v2.json');
-  final useFakeModels =
-      identity == AppIdentity.qa && backendConfig.simulatedInference;
+  final useFakeModels = useFakeModelManagement(
+    identity: identity,
+    simulatedInference: backendConfig.simulatedInference,
+    virtualDevice: virtualDevice,
+  );
   // Preferences load before the repositories so persisted custom repositories
   // (Advanced mode) are in the fake downloader's catalog from the first frame.
   // The provider catalog stays the pinned list; the UI derives pinned + custom.

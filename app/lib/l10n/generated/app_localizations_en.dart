@@ -483,7 +483,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'This QA build shows the full pinned catalog. Downloads and model runs are simulated.';
+      'This build shows the full pinned catalog. Downloads and model runs are simulated.';
 
   @override
   String get catalogDeviceDetail =>
@@ -543,7 +543,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get downloadSimulationComplete =>
-      'The deterministic QA simulation is complete; no weights were stored.';
+      'The deterministic simulation is complete; no weights were stored.';
 
   @override
   String get downloadComplete =>
@@ -637,7 +637,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String simulateDownloadMessage(String modelName, String size) {
-    return '$modelName is shown as a $size download. This QA simulation uses no network and stores no model weights.';
+    return '$modelName is shown as a $size download. This simulation uses no network and stores no model weights.';
   }
 
   @override
@@ -671,8 +671,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Download and verify the selected model before using Golem.';
 
   @override
-  String get qaDownloadShort =>
-      'Deterministic QA simulation; no network or weights.';
+  String get simulatedDownloadShort =>
+      'Deterministic simulation; no network or weights.';
 
   @override
   String get downloadBeforeSending =>
@@ -1718,6 +1718,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get deviceBelowMemoryFloor =>
       'This device has less memory than the smallest model Golem ships needs to run, so downloads are turned off here. Your chats and settings are unaffected.';
+
+  @override
+  String get deviceVirtualHardware =>
+      'Golem runs its models on real hardware. A simulator or emulator cannot load them, so downloads are turned off here.';
 
   @override
   String outOfMemoryAtContext(int tokens) {

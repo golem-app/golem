@@ -21,8 +21,15 @@ InferenceBackendConfig _resolve({
   AppIdentity identity = AppIdentity.production,
   DeviceTier tier = DeviceTier.preferred,
   HostPlatform platform = HostPlatform.other,
+  bool virtualDevice = false,
 }) => resolveBackendPolicy(
-  backendName: resolveBackendName(backendDefine: backend, identity: identity),
+  backendName: resolveBackendName(
+    backendDefine: backend,
+    identity: identity,
+    virtualDevice: virtualDevice,
+    artifactDefine: artifact,
+    modelPathDefine: modelPath,
+  ),
   profileDefine: profile,
   artifactDefine: artifact,
   modelPathDefine: modelPath,
@@ -36,6 +43,7 @@ Future<DeviceCapabilities> _capabilities({
   String backendName = 'auto',
   int memoryOverride = 0,
   bool forceEngineUnsupported = false,
+  bool? virtualDevice,
   Future<int?> Function()? probe,
   Future<bool?> Function(String)? engineProbe,
 }) => probeDeviceCapabilities(
@@ -43,6 +51,7 @@ Future<DeviceCapabilities> _capabilities({
   physicalMemoryBytes: probe ?? () async => 8 * _gib,
   memoryOverrideBytes: memoryOverride,
   forceEngineUnsupported: forceEngineUnsupported,
+  virtualDevice: virtualDevice,
   engineProbe: engineProbe ?? (name) async => true,
 );
 
@@ -381,5 +390,218 @@ void main() {
     addTearDown(container.dispose);
     expect(container.read(inferenceBackendProvider).simulatedInference, isTrue);
     expect(AppIdentity.current, AppIdentity.dev);
+  });
+
+  group('a virtual device (#148)', () {
+    test('moves an internal build to the fake, and production not at all', () {
+      for (final identity in [AppIdentity.qa, AppIdentity.dev]) {
+        expect(
+          resolveBackendName(
+            backendDefine: '',
+            identity: identity,
+            virtualDevice: true,
+            artifactDefine: '',
+            modelPathDefine: '',
+          ),
+          'fake',
+        );
+      }
+      // Production's composition stays a build-time fact: a detection that
+      // ever answered wrong on a phone may refuse a shipping build, but must
+      // never turn one into a simulation.
+      expect(
+        resolveBackendName(
+          backendDefine: '',
+          identity: AppIdentity.production,
+          virtualDevice: true,
+          artifactDefine: '',
+          modelPathDefine: '',
+        ),
+        'auto',
+      );
+    });
+
+    test('an explicit engine still wins, so the refusal stays reachable', () {
+      expect(
+        resolveBackendName(
+          backendDefine: 'mlx',
+          identity: AppIdentity.dev,
+          virtualDevice: true,
+          artifactDefine: '',
+          modelPathDefine: '',
+        ),
+        'mlx',
+      );
+      expect(
+        _resolve(
+          backend: 'mlx',
+          identity: AppIdentity.dev,
+          virtualDevice: true,
+        ).simulatedInference,
+        isFalse,
+      );
+    });
+
+    test('a physical device resolves exactly what it resolved before', () {
+      expect(
+        resolveBackendName(
+          backendDefine: '',
+          identity: AppIdentity.dev,
+          virtualDevice: false,
+          artifactDefine: '',
+          modelPathDefine: '',
+        ),
+        'auto',
+      );
+      expect(
+        resolveBackendName(
+          backendDefine: '',
+          identity: AppIdentity.qa,
+          virtualDevice: false,
+          artifactDefine: '',
+          modelPathDefine: '',
+        ),
+        'fake',
+      );
+    });
+
+    test(
+      'a real engine there is classified out, not quietly simulated',
+      () async {
+        // The reading that reaches the classifier, on the path an explicit
+        // engine define takes: healthy memory, an available engine, and still
+        // refused.
+        final capabilities = await _capabilities(
+          backendName: 'mlx',
+          virtualDevice: true,
+        );
+        expect(capabilities.virtualDevice, isTrue);
+        expect(
+          classifyDevice(
+            capabilities: capabilities,
+            memoryFloorBytes: deviceMemoryFloorBytes(
+              reportsInstalledMemory: true,
+            ),
+          ).refusal,
+          DeviceIneligibilityReason.virtualDevice,
+        );
+      },
+    );
+
+    test('the fake path still reads nothing about the device', () async {
+      expect(
+        (await _capabilities(
+          backendName: 'fake',
+          virtualDevice: true,
+        )).virtualDevice,
+        isNull,
+      );
+    });
+
+    test('a probe that will not answer never refuses', () async {
+      expect(
+        await probeVirtualDevice(() async => throw StateError('no')),
+        isNull,
+      );
+      expect(await probeVirtualDevice(() async => null), isNull);
+    });
+
+    test('an internal build composes the simulation end to end', () async {
+      final resolved = await resolveConfiguredBackend(
+        identity: AppIdentity.dev,
+        isVirtualDevice: () async => true,
+      );
+      expect(resolved.virtualDevice, isTrue);
+      expect(resolved.config.simulatedInference, isTrue);
+      // Nothing was classified, so nothing is refused: the surfaces stay
+      // usable and label themselves simulated.
+      expect(resolved.eligibility.refusal, isNull);
+      expect(resolved.eligibility.runsModels, isTrue);
+    });
+
+    test('a build that named a model keeps the real path', () {
+      // The fake branch throws on an artifact and ignores a path, so swapping
+      // under either would turn an operator's define into a terminal
+      // misconfiguration pane or a silent simulation.
+      expect(
+        resolveBackendName(
+          backendDefine: '',
+          identity: AppIdentity.dev,
+          virtualDevice: true,
+          artifactDefine: 'qwen35-2b-mlx',
+          modelPathDefine: '',
+        ),
+        'auto',
+      );
+      expect(
+        resolveBackendName(
+          backendDefine: '',
+          identity: AppIdentity.dev,
+          virtualDevice: true,
+          artifactDefine: '',
+          modelPathDefine: 'documents:my.gguf',
+        ),
+        'auto',
+      );
+      // And the artifact still resolves rather than throwing.
+      expect(
+        _resolve(
+          identity: AppIdentity.dev,
+          virtualDevice: true,
+          artifact: 'qwen35-2b-mlx',
+          platform: HostPlatform.ios,
+        ).artifactKey,
+        'qwen35-2b-mlx',
+      );
+    });
+
+    test('model management follows inference, never leads it', () {
+      // The precondition is simulated inference in every arm: a real engine
+      // fed by a simulated install would "install" files that do not exist.
+      expect(
+        useFakeModelManagement(
+          identity: AppIdentity.dev,
+          simulatedInference: false,
+          virtualDevice: true,
+        ),
+        isFalse,
+      );
+      expect(
+        useFakeModelManagement(
+          identity: AppIdentity.dev,
+          simulatedInference: true,
+          virtualDevice: true,
+        ),
+        isTrue,
+      );
+      // Unchanged on hardware: dev keeps the real downloader even when an
+      // operator pins fake inference, and qa keeps the simulation.
+      expect(
+        useFakeModelManagement(
+          identity: AppIdentity.dev,
+          simulatedInference: true,
+          virtualDevice: false,
+        ),
+        isFalse,
+      );
+      expect(
+        useFakeModelManagement(
+          identity: AppIdentity.qa,
+          simulatedInference: true,
+          virtualDevice: false,
+        ),
+        isTrue,
+      );
+      // Production's model management is a build-time fact too: the device
+      // may not swap it, under the same gate resolveBackendName applies.
+      expect(
+        useFakeModelManagement(
+          identity: AppIdentity.production,
+          simulatedInference: true,
+          virtualDevice: true,
+        ),
+        isFalse,
+      );
+    });
   });
 }

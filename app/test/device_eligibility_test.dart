@@ -6,11 +6,13 @@ const _gib = 1024 * 1024 * 1024;
 DeviceEligibility _classify({
   int? memory,
   bool? engineSupported,
+  bool? virtualDevice,
   bool apple = false,
 }) => classifyDevice(
   capabilities: DeviceCapabilities(
     physicalMemoryBytes: memory,
     engineSupported: engineSupported,
+    virtualDevice: virtualDevice,
   ),
   memoryFloorBytes: deviceMemoryFloorBytes(reportsInstalledMemory: apple),
 );
@@ -116,6 +118,49 @@ void main() {
     });
   });
 
+  group('virtual devices', () {
+    test('a simulator or emulator refuses however healthy it reads', () {
+      // The two readings that already exist describe the host: a simulator
+      // borrows the Mac's memory and the MLX shim reports itself available
+      // there, so neither of the other branches would ever fire.
+      final refused = _classify(
+        memory: 32 * _gib,
+        engineSupported: true,
+        virtualDevice: true,
+        apple: true,
+      );
+      expect(refused.tier, DeviceTier.unsupported);
+      expect(refused.reason, DeviceIneligibilityReason.virtualDevice);
+      expect(refused.refusal, DeviceIneligibilityReason.virtualDevice);
+    });
+
+    test('it decides before the instruction set and the floor', () {
+      expect(
+        _classify(
+          memory: _gib,
+          engineSupported: false,
+          virtualDevice: true,
+        ).reason,
+        DeviceIneligibilityReason.virtualDevice,
+      );
+    });
+
+    test('unknown and false leave the other branches in charge', () {
+      expect(
+        _classify(memory: 8 * _gib, virtualDevice: null).tier,
+        DeviceTier.preferred,
+      );
+      expect(
+        _classify(memory: 8 * _gib, virtualDevice: false).tier,
+        DeviceTier.preferred,
+      );
+      expect(
+        _classify(memory: _gib, virtualDevice: null).reason,
+        DeviceIneligibilityReason.belowMemoryFloor,
+      );
+    });
+  });
+
   test('an unclassified process permits everything', () {
     const value = DeviceEligibility.unclassified();
     expect(value.runsModels, isTrue);
@@ -133,6 +178,11 @@ void main() {
     expect(
       const DeviceCapabilities(physicalMemoryBytes: 1, engineSupported: true),
       const DeviceCapabilities(physicalMemoryBytes: 1, engineSupported: true),
+    );
+    expect(
+      const DeviceCapabilities(virtualDevice: true) ==
+          const DeviceCapabilities(virtualDevice: false),
+      isFalse,
     );
   });
 }

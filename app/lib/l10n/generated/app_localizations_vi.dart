@@ -485,7 +485,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'Bản dựng QA này hiển thị toàn bộ danh mục cố định. Việc tải xuống và chạy mô hình đều được mô phỏng.';
+      'Bản dựng này hiển thị toàn bộ danh mục cố định. Việc tải xuống và chạy mô hình đều được mô phỏng.';
 
   @override
   String get catalogDeviceDetail =>
@@ -545,7 +545,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get downloadSimulationComplete =>
-      'Mô phỏng QA xác định đã hoàn tất; không có trọng số nào được lưu.';
+      'Mô phỏng xác định đã hoàn tất; không có trọng số nào được lưu.';
 
   @override
   String get downloadComplete =>
@@ -638,7 +638,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String simulateDownloadMessage(String modelName, String size) {
-    return '$modelName được hiển thị dưới dạng tệp tải xuống $size. Mô phỏng QA này không dùng mạng và không lưu trọng số mô hình.';
+    return '$modelName được hiển thị dưới dạng tệp tải xuống $size. Mô phỏng này không dùng mạng và không lưu trọng số mô hình.';
   }
 
   @override
@@ -672,8 +672,8 @@ class AppLocalizationsVi extends AppLocalizations {
       'Hãy tải xuống và xác minh mô hình đã chọn trước khi dùng Golem.';
 
   @override
-  String get qaDownloadShort =>
-      'Mô phỏng QA xác định; không có mạng hay trọng số.';
+  String get simulatedDownloadShort =>
+      'Mô phỏng xác định; không có mạng hay trọng số.';
 
   @override
   String get downloadBeforeSending =>
@@ -1720,6 +1720,10 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get deviceBelowMemoryFloor =>
       'Thiết bị có ít bộ nhớ hơn mức mô hình nhỏ nhất của Golem cần, vì vậy tính năng tải xuống bị tắt. Các cuộc trò chuyện và cài đặt không bị ảnh hưởng.';
+
+  @override
+  String get deviceVirtualHardware =>
+      'Golem chạy các mô hình của mình trên phần cứng thật. Trình mô phỏng hoặc giả lập không thể tải chúng, nên tính năng tải xuống bị tắt ở đây.';
 
   @override
   String outOfMemoryAtContext(int tokens) {

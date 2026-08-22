@@ -30,6 +30,20 @@ Plus one non-memory refusal: an **arm64 Android CPU without `FEAT_DotProd`**
 is unsupported at any memory size, because the shipped kernels are compiled
 for it (`../device_floor.md`) and no amount of free memory changes that.
 
+Since #148 there is a third, which is not a hardware shortfall at all: a
+**simulator or emulator** is unsupported however healthy it reads. It is
+classified first, ahead of the instruction set, because the other two readings
+answer about the host rather than the target — a simulator borrows the Mac's
+memory and the MLX shim reports itself available there, so neither of the later
+branches would ever fire and the refusal would be worded as a lie. The fact is
+answered by the platform itself rather than inferred: `targetEnvironment(simulator)`
+is a compile-time constant on Apple, and Android reads the public `Build`
+identity (`HARDWARE` `ranchu`/`goldfish` and their Cuttlefish, GCE and VirtualBox
+siblings, `sdk`-prefixed products, generic fingerprints). Reaching the refusal
+at all takes a real backend on a virtual device: internal identities compose the
+fake there instead (ADR 0003), so this is what `production` and an explicit
+`GOLEM_INFERENCE_BACKEND` get.
+
 ## The floor is nominal, so it is spelled per platform
 
 The floor is **nominal 4 GB — the iPhone 12**, the oldest device this project
@@ -56,11 +70,16 @@ decision, so an optimistic admission still fails safely and loudly.
 
 ## One read, one classification
 
-`resolveConfiguredBackend()` reads the device once — memory over the storage
-channel, engine support over Inferno's device probe — classifies it, and
-hands the tier to `resolveBackendPolicy` while publishing the verdict on
+`resolveConfiguredBackend()` reads the device once — device kind over the
+storage channel, then memory over the same channel and engine support over
+Inferno's device probe — classifies it, and hands the tier to
+`resolveBackendPolicy` while publishing the verdict on
 `deviceEligibilityProvider`. The model a build selects and the eligibility its
 surfaces report therefore come from the same reading and cannot disagree.
+
+Device kind is read first and on its own, because it decides which engine there
+is left to probe: an internal build on a virtual device composes the fake, and
+the fake path reads nothing about the device at all.
 
 The engine half is answered by `Inferno.probeDevice()`, which reads a native
 free function and creates no engine. The shim reports `available` from the
@@ -107,8 +126,14 @@ on supported hardware or a later compatible release.
 
 ## Testing what no device here can be
 
-Both team devices report over 8 GB and both carry the dot-product extension,
-so neither refusal is reachable on hardware without help.
+The virtual-device refusal is the one that needs no help: the iPhone 17
+simulator and the Android emulator produce it directly, with a `production`
+build or an explicit `GOLEM_INFERENCE_BACKEND`. It also closes the other two
+there, since it classifies first and the fake path reads nothing at all — the
+two overrides below reach the floor and the instruction set on hardware, which
+is the only place they were ever needed. The other two are harder —
+both team devices report over 8 GB and both carry the dot-product extension,
+so neither is reachable on hardware without help.
 `GOLEM_DEVICE_MEMORY_BYTES` already existed for the model-tier branch and now
 also reaches the floor; `GOLEM_DEVICE_ENGINE_UNSUPPORTED` is its
 instruction-set counterpart. Both are test-only, both are dart-defines, and

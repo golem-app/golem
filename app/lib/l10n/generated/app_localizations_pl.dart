@@ -485,7 +485,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'Ta wersja QA pokazuje pełny przypięty katalog. Pobieranie i uruchamianie modeli są symulowane.';
+      'Ta wersja pokazuje pełny przypięty katalog. Pobieranie i uruchamianie modeli są symulowane.';
 
   @override
   String get catalogDeviceDetail =>
@@ -546,7 +546,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get downloadSimulationComplete =>
-      'Deterministyczna symulacja QA została ukończona. Nie zapisano wag modelu.';
+      'Deterministyczna symulacja została ukończona. Nie zapisano wag modelu.';
 
   @override
   String get downloadComplete =>
@@ -643,7 +643,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String simulateDownloadMessage(String modelName, String size) {
-    return 'Model $modelName jest pokazany jako plik do pobrania o rozmiarze $size. Ta symulacja QA nie korzysta z sieci ani nie zapisuje wag modelu.';
+    return 'Model $modelName jest pokazany jako plik do pobrania o rozmiarze $size. Ta symulacja nie korzysta z sieci ani nie zapisuje wag modelu.';
   }
 
   @override
@@ -677,8 +677,8 @@ class AppLocalizationsPl extends AppLocalizations {
       'Pobierz i zweryfikuj wybrany model przed użyciem Golema.';
 
   @override
-  String get qaDownloadShort =>
-      'Deterministyczna symulacja QA bez sieci i wag modelu.';
+  String get simulatedDownloadShort =>
+      'Deterministyczna symulacja bez sieci i wag modelu.';
 
   @override
   String get downloadBeforeSending =>
@@ -1745,6 +1745,10 @@ class AppLocalizationsPl extends AppLocalizations {
   @override
   String get deviceBelowMemoryFloor =>
       'To urządzenie ma mniej pamięci, niż wymaga najmniejszy model oferowany przez Golem, dlatego pobieranie modeli jest wyłączone. Nie wpływa to na czaty ani ustawienia.';
+
+  @override
+  String get deviceVirtualHardware =>
+      'Golem uruchamia swoje modele na prawdziwym sprzęcie. Symulator ani emulator nie może ich wczytać, dlatego pobieranie jest tutaj wyłączone.';
 
   @override
   String outOfMemoryAtContext(int tokens) {

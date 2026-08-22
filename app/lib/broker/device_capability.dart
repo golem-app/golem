@@ -2,6 +2,14 @@ import 'package:inferno/inferno.dart';
 
 import '../core/domain/device_eligibility.dart';
 
+/// Whether this launch is running on a simulator or emulator. Read on its own,
+/// and first, because it decides which engine the rest of the composition even
+/// resolves (#148): an internal build on a virtual device composes the fake,
+/// so there is no engine left to probe. Unknown is permitting, like every other
+/// reading here.
+Future<bool?> probeVirtualDevice(Future<bool?> Function() isVirtualDevice) =>
+    _guarded(isVirtualDevice);
+
 /// The launch-time capability read: what this device *is*, taken once before
 /// anything is downloaded or loaded. Both readings degrade to unknown — a
 /// platform or an engine that will not answer must never fail the launch, and
@@ -12,13 +20,23 @@ import '../core/domain/device_eligibility.dart';
 /// no floor, and a qa build must not depend on a platform channel or on native
 /// assets its composition never links. [engineProbe] is the seam that keeps
 /// this testable from outside the broker, where Inferno cannot be imported.
+///
+/// [virtualDevice] is already known by the time this runs — [probeVirtualDevice]
+/// answered it before the engine was resolved — so it is carried in rather than
+/// read again, keeping one launch to one reading of each fact.
 Future<DeviceCapabilities> probeDeviceCapabilities({
   required String backendName,
   required Future<int?> Function() physicalMemoryBytes,
   int memoryOverrideBytes = 0,
   bool forceEngineUnsupported = false,
+  bool? virtualDevice,
   Future<bool?> Function(String backendName)? engineProbe,
 }) async {
+  // The fake reads nothing about the device, [virtualDevice] included, and that
+  // discard is load-bearing rather than incidental: an internal build on a
+  // simulator composes the fake *because* it is virtual, so carrying the fact
+  // past here would classify that build unsupported and refuse the simulation
+  // it was just given.
   if (backendName == 'fake') return const DeviceCapabilities();
   final readings = await Future.wait([
     memoryOverrideBytes > 0
@@ -33,6 +51,7 @@ Future<DeviceCapabilities> probeDeviceCapabilities({
   return DeviceCapabilities(
     physicalMemoryBytes: readings[0] as int?,
     engineSupported: readings[1] as bool?,
+    virtualDevice: virtualDevice,
   );
 }
 

@@ -487,7 +487,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'Esta versión de QA muestra todo el catálogo fijado. Las descargas y ejecuciones de modelos son simuladas.';
+      'Esta versión muestra todo el catálogo fijado. Las descargas y ejecuciones de modelos son simuladas.';
 
   @override
   String get catalogDeviceDetail =>
@@ -547,7 +547,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get downloadSimulationComplete =>
-      'La simulación determinista de QA terminó; no se guardaron pesos.';
+      'La simulación determinista terminó; no se guardaron pesos.';
 
   @override
   String get downloadComplete =>
@@ -642,7 +642,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String simulateDownloadMessage(String modelName, String size) {
-    return '$modelName aparece como una descarga de $size. Esta simulación de QA no usa la red ni guarda pesos de modelos.';
+    return '$modelName aparece como una descarga de $size. Esta simulación no usa la red ni guarda pesos de modelos.';
   }
 
   @override
@@ -676,8 +676,8 @@ class AppLocalizationsEs extends AppLocalizations {
       'Descarga y verifica el modelo seleccionado antes de usar Golem.';
 
   @override
-  String get qaDownloadShort =>
-      'Simulación determinista de QA; sin red ni pesos.';
+  String get simulatedDownloadShort =>
+      'Simulación determinista; sin red ni pesos.';
 
   @override
   String get downloadBeforeSending =>
@@ -1735,6 +1735,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get deviceBelowMemoryFloor =>
       'Este dispositivo tiene menos memoria de la que necesita el modelo más pequeño de Golem, por lo que las descargas están desactivadas. Tus chats y configuración no se ven afectados.';
+
+  @override
+  String get deviceVirtualHardware =>
+      'Golem ejecuta sus modelos en hardware real. Un simulador o emulador no puede cargarlos, así que las descargas están desactivadas aquí.';
 
   @override
   String outOfMemoryAtContext(int tokens) {

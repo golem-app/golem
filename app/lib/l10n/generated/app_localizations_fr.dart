@@ -488,7 +488,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'Cette version QA affiche tout le catalogue épinglé. Les téléchargements et l’exécution des modèles sont simulés.';
+      'Cette version affiche tout le catalogue épinglé. Les téléchargements et l’exécution des modèles sont simulés.';
 
   @override
   String get catalogDeviceDetail =>
@@ -549,7 +549,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get downloadSimulationComplete =>
-      'La simulation QA déterministe est terminée ; aucun poids n’a été stocké.';
+      'La simulation déterministe est terminée ; aucun poids n’a été stocké.';
 
   @override
   String get downloadComplete =>
@@ -644,7 +644,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String simulateDownloadMessage(String modelName, String size) {
-    return '$modelName est présenté comme un téléchargement de $size. Cette simulation QA n’utilise pas le réseau et ne stocke aucun poids de modèle.';
+    return '$modelName est présenté comme un téléchargement de $size. Cette simulation n’utilise pas le réseau et ne stocke aucun poids de modèle.';
   }
 
   @override
@@ -678,8 +678,8 @@ class AppLocalizationsFr extends AppLocalizations {
       'Téléchargez et vérifiez le modèle sélectionné avant d’utiliser Golem.';
 
   @override
-  String get qaDownloadShort =>
-      'Simulation QA déterministe ; aucun réseau ni poids.';
+  String get simulatedDownloadShort =>
+      'Simulation déterministe ; aucun réseau ni poids.';
 
   @override
   String get downloadBeforeSending =>
@@ -1738,6 +1738,10 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get deviceBelowMemoryFloor =>
       'Cet appareil possède moins de mémoire que le minimum requis par le plus petit modèle fourni par Golem ; les téléchargements sont donc désactivés. Vos conversations et réglages ne sont pas affectés.';
+
+  @override
+  String get deviceVirtualHardware =>
+      'Golem exécute ses modèles sur du matériel réel. Un simulateur ou un émulateur ne peut pas les charger, les téléchargements sont donc désactivés ici.';
 
   @override
   String outOfMemoryAtContext(int tokens) {

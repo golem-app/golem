@@ -1765,6 +1765,30 @@ void main() {
       expect(find.byKey(const Key('runtime-toggle-button')), findsNothing);
     }, variant: iosChrome);
 
+    testWidgets('a simulator or emulator says which refusal this is (#148)', (
+      tester,
+    ) async {
+      // Same withheld affordances, different sentence: a device that reads
+      // 32 GB and passes the engine probe must not be told it is short of
+      // memory or missing an instruction set.
+      await pumpWithRepositories(
+        tester,
+        backend: backend,
+        eligibility: const DeviceEligibility(
+          tier: DeviceTier.unsupported,
+          reason: DeviceIneligibilityReason.virtualDevice,
+        ),
+        child: const ModelsScreen(),
+      );
+      expect(find.byKey(const Key('model-download-gemma4-gguf')), findsNothing);
+      final refusal = find.byKey(const Key('model-device-refusal-gemma4-gguf'));
+      expect(refusal, findsOneWidget);
+      expect(
+        tester.widget<Text>(refusal).data,
+        contains('simulator or emulator'),
+      );
+    }, variant: iosChrome);
+
     testWidgets('the banner offers no recovery it cannot deliver', (
       tester,
     ) async {

@@ -473,7 +473,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      '이 QA 빌드는 고정된 전체 카탈로그를 표시합니다. 다운로드와 모델 실행은 시뮬레이션됩니다.';
+      '이 빌드는 고정된 전체 카탈로그를 표시합니다. 다운로드와 모델 실행은 시뮬레이션됩니다.';
 
   @override
   String get catalogDeviceDetail =>
@@ -532,7 +532,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get downloadSimulationComplete =>
-      '결정론적 QA 시뮬레이션이 완료되었으며 가중치는 저장되지 않았습니다.';
+      '결정론적 시뮬레이션이 완료되었으며 가중치는 저장되지 않았습니다.';
 
   @override
   String get downloadComplete =>
@@ -620,7 +620,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String simulateDownloadMessage(String modelName, String size) {
-    return '$modelName은(는) $size 다운로드로 표시됩니다. 이 QA 시뮬레이션은 네트워크를 사용하거나 모델 가중치를 저장하지 않습니다.';
+    return '$modelName은(는) $size 다운로드로 표시됩니다. 이 시뮬레이션은 네트워크를 사용하거나 모델 가중치를 저장하지 않습니다.';
   }
 
   @override
@@ -653,7 +653,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get setupDownloadPrompt => 'Golem을 사용하기 전에 선택한 모델을 다운로드하고 검증하세요.';
 
   @override
-  String get qaDownloadShort => '결정론적 QA 시뮬레이션. 네트워크 및 가중치 없음.';
+  String get simulatedDownloadShort => '결정론적 시뮬레이션. 네트워크 및 가중치 없음.';
 
   @override
   String get downloadBeforeSending => '메시지를 보내려면 모델 다운로드와 확인이 완료되어야 합니다.';
@@ -1669,6 +1669,10 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get deviceBelowMemoryFloor =>
       '이 기기의 메모리가 Golem의 가장 작은 모델이 요구하는 수준보다 적어 다운로드가 꺼졌습니다. 대화와 설정에는 영향이 없습니다.';
+
+  @override
+  String get deviceVirtualHardware =>
+      'Golem은 실제 기기에서 모델을 실행합니다. 시뮬레이터나 에뮬레이터는 모델을 불러올 수 없으므로 여기서는 다운로드가 꺼져 있습니다.';
 
   @override
   String outOfMemoryAtContext(int tokens) {

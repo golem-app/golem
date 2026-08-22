@@ -53,6 +53,11 @@ class MainFlutterWindow: NSWindow {
       result(Int(ProcessInfo.processInfo.physicalMemory))
       return
     }
+    // macOS has no simulator: this build always runs on the metal it names.
+    if call.method == "isVirtualDevice" {
+      result(false)
+      return
+    }
     guard
       let arguments = call.arguments as? [String: Any],
       let path = arguments["path"] as? String

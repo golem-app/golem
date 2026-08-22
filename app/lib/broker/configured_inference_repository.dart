@@ -22,13 +22,41 @@ import 'runtime.dart';
 /// what this device is allowed to run. The device is read once here: the model
 /// the build selects and the eligibility its surfaces report come from the same
 /// classification, so they cannot disagree.
-Future<({InferenceBackendConfig config, DeviceEligibility eligibility})>
-resolveConfiguredBackend({required AppIdentity identity}) async {
+Future<
+  ({
+    InferenceBackendConfig config,
+    DeviceEligibility eligibility,
+    bool virtualDevice,
+  })
+>
+resolveConfiguredBackend({
+  required AppIdentity identity,
+  Future<bool?> Function()? isVirtualDevice,
+}) async {
   const backendDefine = String.fromEnvironment('GOLEM_INFERENCE_BACKEND');
-  final backendName = resolveBackendName(
+  const artifactDefine = String.fromEnvironment('GOLEM_MODEL_ARTIFACT');
+  const modelPathDefine = String.fromEnvironment('GOLEM_MODEL_PATH');
+  String resolveName({required bool virtualDevice}) => resolveBackendName(
     backendDefine: backendDefine,
     identity: identity,
+    virtualDevice: virtualDevice,
+    artifactDefine: artifactDefine,
+    modelPathDefine: modelPathDefine,
   );
+  // The flavor answer first. A build that lands on the fake without asking
+  // cannot have that changed by the device, and must not pay a platform
+  // channel to hear it: the whole fake path reads nothing about the device by
+  // design, which is what keeps qa launches offline and hardware-independent.
+  final flavorBackend = resolveName(virtualDevice: false);
+  // Ahead of the engine, because it can change which engine there is to probe.
+  final virtualDevice = flavorBackend == 'fake'
+      ? null
+      : await probeVirtualDevice(
+          isVirtualDevice ?? const DeviceStorageChannel().isVirtualDevice,
+        );
+  final backendName = virtualDevice == true
+      ? resolveName(virtualDevice: true)
+      : flavorBackend;
   final platform = switch ((
     Platform.isIOS,
     Platform.isAndroid,
@@ -59,6 +87,7 @@ resolveConfiguredBackend({required AppIdentity identity}) async {
     // Test-only counterpart for the instruction-set refusal, which no device
     // here can produce: every one of them carries the extension.
     forceEngineUnsupported: overrides.forceEngineUnsupported,
+    virtualDevice: virtualDevice,
   );
   final eligibility = classifyDevice(
     capabilities: capabilities,
@@ -70,12 +99,13 @@ resolveConfiguredBackend({required AppIdentity identity}) async {
     config: resolveBackendPolicy(
       backendName: backendName,
       profileDefine: const String.fromEnvironment('GOLEM_MODEL_PROFILE'),
-      artifactDefine: const String.fromEnvironment('GOLEM_MODEL_ARTIFACT'),
-      modelPathDefine: const String.fromEnvironment('GOLEM_MODEL_PATH'),
+      artifactDefine: artifactDefine,
+      modelPathDefine: modelPathDefine,
       tier: eligibility.tier,
       platform: platform,
     ),
     eligibility: eligibility,
+    virtualDevice: virtualDevice ?? false,
   );
 }
 
