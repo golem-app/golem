@@ -142,37 +142,60 @@ class LabeledProgress extends StatelessWidget {
     if (detail != null || detailLeading != null) {
       // One line each, tabular digits, and an ellipsis rather than a wrap:
       // the figures tick every second, and a wrap is a height change that
-      // moved the whole first-run screen under the reader (#143). Flexible,
-      // not bare, so a long "About 14 minutes left" is measured against the
-      // row and not against infinity.
+      // moved the whole first-run screen under the reader (#143). Each
+      // figure's flex is the width it needs, so both stay whole whenever the
+      // row has room for both and trim in proportion when it does not —
+      // split half and half, Android's wider face cut "About 2 minutes
+      // left" short while the row still had room. No LayoutBuilder: the
+      // first-run body sits under an IntrinsicHeight, which cannot ask one
+      // for a height.
       const tabular = [FontFeature.tabularFigures()];
+      final base = DefaultTextStyle.of(context).style;
+      final leadingStyle = GolemText.footnote.copyWith(
+        fontFeatures: tabular,
+        color: CupertinoDynamicColor.resolve(GolemTheme.mutedInk, context),
+      );
+      final detailTextStyle = (detailStyle ?? GolemText.captionStrong).copyWith(
+        fontFeatures: tabular,
+      );
+      int needs(String text, TextStyle style) {
+        final painter = TextPainter(
+          text: TextSpan(text: text, style: base.merge(style)),
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+          maxLines: 1,
+        )..layout();
+        final width = painter.width.ceil();
+        painter.dispose();
+        return width < 1 ? 1 : width;
+      }
+
       figures = Row(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            child: detailLeading == null
-                ? const SizedBox.shrink()
-                : Text(
-                    detailLeading!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GolemText.footnote.copyWith(
-                      fontFeatures: tabular,
-                      color: CupertinoDynamicColor.resolve(
-                        GolemTheme.mutedInk,
-                        context,
-                      ),
-                    ),
-                  ),
-          ),
-          if (detail case final detail?)
+          if (detailLeading case final leading?)
             Flexible(
+              flex: needs(leading, leadingStyle),
               child: Text(
-                detail,
+                leading,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: (detailStyle ?? GolemText.captionStrong).copyWith(
-                  fontFeatures: tabular,
+                style: leadingStyle,
+              ),
+            )
+          else
+            const Expanded(child: SizedBox.shrink()),
+          if (detail case final detail?)
+            Flexible(
+              flex: needs(detail, detailTextStyle),
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(start: 8),
+                child: Text(
+                  detail,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: detailTextStyle,
                 ),
               ),
             ),
