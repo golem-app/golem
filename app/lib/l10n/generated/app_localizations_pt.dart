@@ -562,28 +562,8 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'Mantenha o Golem aberto';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return 'Sair não tem problema — o $platform reduz downloads em segundo plano para cerca de $rate, então isso levaria $backgroundDuration em vez de $foregroundDuration.';
-  }
-
-  @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'cerca de $count minutos',
-      one: 'cerca de 1 minuto',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote =>
+      'Mantenha o Golem aberto — os downloads são mais rápidos em primeiro plano.';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -629,9 +609,6 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get privacyFootnote =>
       'O modelo fica armazenado neste dispositivo. Nada do que você digita é enviado.';
-
-  @override
-  String get dismissNote => 'Fechar';
 
   @override
   String get chatsStayAvailable => 'As conversas continuam disponíveis.';
@@ -2479,28 +2456,8 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   }
 
   @override
-  String get downloadNoteTitle => 'Mantenha o Golem aberto';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return 'Sair não tem problema — o $platform reduz downloads em segundo plano para cerca de $rate, então isso levaria $backgroundDuration em vez de $foregroundDuration.';
-  }
-
-  @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'cerca de $count minutos',
-      one: 'cerca de 1 minuto',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote =>
+      'Mantenha o Golem aberto — os downloads são mais rápidos em primeiro plano.';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -2546,9 +2503,6 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String get privacyFootnote =>
       'O modelo fica armazenado neste dispositivo. Nada do que você digita é enviado.';
-
-  @override
-  String get dismissNote => 'Fechar';
 
   @override
   String get chatsStayAvailable => 'As conversas continuam disponíveis.';

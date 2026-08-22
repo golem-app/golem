@@ -98,7 +98,6 @@ class ModelSetupBanner extends ConsumerWidget {
           DownloadNoteBanner(
             key: const Key('chat-download-note'),
             entry: entry,
-            compact: true,
             margin: const EdgeInsetsDirectional.only(top: 10),
           ),
           const SizedBox(height: 10),

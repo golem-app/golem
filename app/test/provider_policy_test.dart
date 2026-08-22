@@ -56,8 +56,6 @@ final _allProviders = <String, ProviderOrFamily>{
   'paceClock': paceClockProvider,
   'downloadPace': downloadPaceProvider,
   'customRepositoryController': customRepositoryControllerProvider,
-  'downloadNoteDismissal': downloadNoteDismissalProvider,
-  'downloadNoteFigures': downloadNoteFiguresProvider,
   'downloadNoteVisible': downloadNoteVisibleProvider,
   'searchQuery': searchQueryProvider,
   'chatSearchResults': chatSearchResultsProvider,

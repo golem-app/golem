@@ -543,27 +543,7 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'Golem を開いたままにしてください';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return '離れてもかまいません。$platform はバックグラウンドのダウンロードを約 $rate まで下げるため、所要時間は$foregroundDurationではなく$backgroundDurationになります。';
-  }
-
-  @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '約$count分',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote => 'Golem を開いたままにしてください。バックグラウンドではダウンロードが遅くなります。';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -606,9 +586,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get privacyFootnote => 'モデルはこの端末に保存されます。入力した内容が送信されることはありません。';
-
-  @override
-  String get dismissNote => '閉じる';
 
   @override
   String get chatsStayAvailable => 'チャットは引き続き利用できます。';

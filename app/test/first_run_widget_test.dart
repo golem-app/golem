@@ -317,13 +317,11 @@ void main() {
     expect(find.byKey(const Key('first-run-pause-download')), findsOneWidget);
     expect(find.byKey(const Key('first-run-cancel-download')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('download-note-dismiss')));
-    await tester.pump();
-    expect(find.text('Keep Golem open'), findsNothing);
+    expect(find.textContaining('Keep Golem open'), findsOneWidget);
     expect(
-      find.byKey(const Key('first-run-cancel-download')),
-      findsOneWidget,
-      reason: 'dismissing the note leaves the transfer controls alone',
+      find.byKey(const Key('download-note-dismiss')),
+      findsNothing,
+      reason: 'the note is advice, not a banner to wave away',
     );
   });
 
@@ -373,7 +371,7 @@ void main() {
       findsOneWidget,
       reason: 'the banner widget mounts but renders nothing while failed',
     );
-    expect(find.text('Keep Golem open'), findsNothing);
+    expect(find.textContaining('Keep Golem open'), findsNothing);
   });
 
   testWidgets(
@@ -531,16 +529,9 @@ void main() {
     );
     expect(find.byKey(const Key('model-setup-banner')), findsOneWidget);
     expect(find.byKey(const Key('chat-download-note')), findsOneWidget);
-    expect(find.text('Keep Golem open'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('download-note-dismiss')));
-    await tester.pump();
-    expect(find.text('Keep Golem open'), findsNothing);
-    expect(
-      find.byKey(const Key('model-setup-pause')),
-      findsOneWidget,
-      reason: 'dismissing the note keeps the banner controls',
-    );
+    expect(find.textContaining('Keep Golem open'), findsOneWidget);
+    expect(find.byKey(const Key('download-note-dismiss')), findsNothing);
+    expect(find.byKey(const Key('model-setup-pause')), findsOneWidget);
   });
 
   testWidgets('deferred setup is persistent and gates only sending', (
@@ -772,13 +763,6 @@ void main() {
         child: const FirstRunScreen(initialStep: FirstRunStep.download),
       );
       expect(find.byKey(const Key('first-run-start-chatting')), findsNothing);
-      // The note is the one thing that legitimately leaves — it belongs to a
-      // running download — so every phase is measured without it.
-      final dismiss = find.byKey(const Key('download-note-dismiss'));
-      if (dismiss.evaluate().isNotEmpty) {
-        await tester.tap(dismiss);
-        await tester.pumpAndSettle();
-      }
       if (status.phase == ArtifactPhase.verifying) {
         expect(
           tester
@@ -817,8 +801,11 @@ void main() {
         verifiedBytes: 900000000,
       ),
     );
-    expect(paused, downloading);
-    expect(verifying, downloading);
+    // The note belongs to a running download, so the card sits higher while
+    // downloading; the action slot — where Cancel lands — is one height in
+    // every phase, and the two note-free phases match exactly.
+    expect(verifying, paused);
+    expect(downloading.$2, paused.$2);
   }, variant: bothChromes);
 
   testWidgets(

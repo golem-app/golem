@@ -1,9 +1,7 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
-import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/models/widgets/download_note_banner.dart';
 
 import 'support/harness.dart';
@@ -18,21 +16,24 @@ void main() {
     },
   );
 
-  testWidgets('shows only while downloading and dismisses on tap', (
-    tester,
-  ) async {
-    await pumpWithRepositories(
-      tester,
-      model: state(ArtifactPhase.downloading),
-      child: Column(children: [DownloadNoteBanner(entry: entry)]),
-    );
-    expect(find.text('Keep Golem open'), findsOneWidget);
-    expect(find.textContaining('slows background downloads'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('download-note-dismiss')));
-    await tester.pump();
-    expect(find.text('Keep Golem open'), findsNothing);
-  });
+  testWidgets(
+    'a running download shows one line of advice, nothing to wave away',
+    (tester) async {
+      await pumpWithRepositories(
+        tester,
+        model: state(ArtifactPhase.downloading),
+        child: Column(children: [DownloadNoteBanner(entry: entry)]),
+      );
+      expect(
+        find.text('Keep Golem open — downloads are fastest in the foreground.'),
+        findsOneWidget,
+      );
+      // Advice, not a warning: no figures to read, no control to dismiss.
+      expect(find.textContaining('MB/s'), findsNothing);
+      expect(find.byType(CupertinoButton), findsNothing);
+      expect(find.byKey(const Key('download-note-dismiss')), findsNothing);
+    },
+  );
 
   for (final phase in [
     ArtifactPhase.notDownloaded,
@@ -47,128 +48,24 @@ void main() {
         model: state(phase),
         child: Column(children: [DownloadNoteBanner(entry: entry)]),
       );
-      expect(find.text('Keep Golem open'), findsNothing);
+      expect(find.textContaining('Keep Golem open'), findsNothing);
+      expect(tester.getSize(find.byType(DownloadNoteBanner)), Size.zero);
     });
   }
 
-  testWidgets('the note copy holds still while bytes advance', (tester) async {
-    final container = buildContainer(
-      models: StaticModels(state(ArtifactPhase.downloading)),
-    );
-    addTearDown(container.dispose);
-    await container.read(modelControllerProvider.future);
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: wrapApp(
-          brightness: Brightness.light,
-          child: Column(children: [DownloadNoteBanner(entry: entry)]),
-        ),
-      ),
-    );
-    await tester.pump();
-    final before = tester.widget<Text>(find.textContaining('MB/s')).data;
-
-    // A later progress tick must not rewrite the frozen comparison.
-    container.read(modelControllerProvider.notifier).state = AsyncData(
-      ModelState(
-        simulated: true,
-        artifacts: {
-          entry.key: ArtifactStatus(
-            phase: ArtifactPhase.downloading,
-            downloadedBytes: 2500000000,
-          ),
-        },
-      ),
-    );
-    await tester.pump();
-    expect(
-      tester.widget<Text>(find.textContaining('MB/s')).data,
-      before,
-      reason: 'the note figures are per attempt, not per tick',
-    );
-  });
-
-  testWidgets('the note stands down when leaving would cost no extra time', (
-    tester,
-  ) async {
+  testWidgets('the margin applies only while visible', (tester) async {
     await pumpWithRepositories(
       tester,
-      model: ModelState(
-        simulated: true,
-        artifacts: {
-          entry.key: ArtifactStatus(
-            phase: ArtifactPhase.downloading,
-            // ~50 MB left: background and foreground both round to "about
-            // 1 minute", so the comparison would contradict itself.
-            downloadedBytes: entry.totalBytes - 50000000,
-          ),
-        },
-      ),
-      child: Column(children: [DownloadNoteBanner(entry: entry)]),
-    );
-    expect(find.text('Keep Golem open'), findsNothing);
-  });
-
-  testWidgets('one dismissal hides every surface sharing the state', (
-    tester,
-  ) async {
-    await pumpWithRepositories(
-      tester,
-      model: state(ArtifactPhase.downloading),
+      model: state(ArtifactPhase.paused),
       child: Column(
         children: [
-          DownloadNoteBanner(entry: entry, key: const Key('surface-a')),
           DownloadNoteBanner(
             entry: entry,
-            compact: true,
-            key: const Key('surface-b'),
+            margin: const EdgeInsetsDirectional.only(top: 14),
           ),
         ],
       ),
     );
-    expect(find.text('Keep Golem open'), findsNWidgets(2));
-
-    await tester.tap(find.byKey(const Key('download-note-dismiss')).first);
-    await tester.pump();
-    expect(find.text('Keep Golem open'), findsNothing);
-  });
-
-  testWidgets('dismiss control is an accessible labeled button', (
-    tester,
-  ) async {
-    final handle = tester.ensureSemantics();
-    await pumpWithRepositories(
-      tester,
-      model: state(ArtifactPhase.downloading),
-      child: Column(children: [DownloadNoteBanner(entry: entry)]),
-    );
-    expect(
-      tester.getSemantics(find.byKey(const Key('download-note-dismiss'))),
-      matchesSemantics(
-        label: 'Dismiss',
-        isButton: true,
-        hasTapAction: true,
-        hasFocusAction: true,
-        isFocusable: true,
-      ),
-    );
-    handle.dispose();
-  });
-
-  testWidgets('Arabic keeps the MB/s figure intact under RTL', (tester) async {
-    await pumpWithRepositories(
-      tester,
-      locale: const Locale('ar'),
-      model: state(ArtifactPhase.downloading),
-      child: Column(children: [DownloadNoteBanner(entry: entry)]),
-    );
-    final body = tester
-        .widgetList<Text>(find.textContaining('MB/s'))
-        .single
-        .data!;
-    // Widget tests run as TargetPlatform.android, so the Android pacing shows.
-    expect(body, contains('\u20661.2 MB/s\u2069'));
-    expect(tester.takeException(), isNull);
+    expect(tester.getSize(find.byType(DownloadNoteBanner)), Size.zero);
   });
 }

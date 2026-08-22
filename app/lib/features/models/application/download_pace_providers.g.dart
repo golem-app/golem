@@ -129,7 +129,7 @@ final class DownloadPaceProvider
   }
 }
 
-String _$downloadPaceHash() => r'83b767baae38ba54cc1e35443cd76c4d57eaf554';
+String _$downloadPaceHash() => r'd8b76d122a5520e03649171f9ec8beab414291ab';
 
 /// Live rate/ETA for the single in-flight artifact, derived by sampling
 /// [ModelController]'s byte counts against the injected clock — transferred

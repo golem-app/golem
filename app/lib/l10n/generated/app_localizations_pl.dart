@@ -558,30 +558,8 @@ class AppLocalizationsPl extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'Zostaw Golema otwartego';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return 'Można wyjść — $platform zwalnia pobieranie w tle do około $rate, więc zajęłoby to $backgroundDuration zamiast $foregroundDuration.';
-  }
-
-  @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'około $count minuty',
-      many: 'około $count minut',
-      few: 'około $count minut',
-      one: 'około 1 minuty',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote =>
+      'Nie zamykaj Golema — pobieranie jest najszybsze na pierwszym planie.';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -629,9 +607,6 @@ class AppLocalizationsPl extends AppLocalizations {
   @override
   String get privacyFootnote =>
       'Model jest przechowywany na tym urządzeniu. Nic, co wpisujesz, nie jest wysyłane.';
-
-  @override
-  String get dismissNote => 'Zamknij';
 
   @override
   String get chatsStayAvailable => 'Czaty pozostają dostępne.';

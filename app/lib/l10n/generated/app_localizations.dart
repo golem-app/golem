@@ -1091,28 +1091,11 @@ abstract class AppLocalizations {
   /// **'{downloaded} of {total}'**
   String downloadAmount(String downloaded, String total);
 
-  /// Foreground-speed note headline.
+  /// One-line foreground-speed note under a running download.
   ///
   /// In en, this message translates to:
-  /// **'Keep Golem open'**
-  String get downloadNoteTitle;
-
-  /// Foreground-speed note body quoting measured background pacing.
-  ///
-  /// In en, this message translates to:
-  /// **'Leaving is fine — {platform} slows background downloads to about {rate}, so this would take {backgroundDuration} instead of {foregroundDuration}.'**
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  );
-
-  /// Approximate duration in minutes.
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{about 1 minute} other{about {count} minutes}}'**
-  String aboutMinutes(int count);
+  /// **'Keep Golem open — downloads are fastest in the foreground.'**
+  String get downloadNote;
 
   /// Approximate time left on a running download.
   ///
@@ -1167,12 +1150,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The model is stored on this device. Nothing you type is uploaded.'**
   String get privacyFootnote;
-
-  /// Dismiss the foreground-speed note.
-  ///
-  /// In en, this message translates to:
-  /// **'Dismiss'**
-  String get dismissNote;
 
   /// Unsupported-device onboarding headline.
   ///

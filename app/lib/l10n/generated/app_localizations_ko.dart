@@ -544,27 +544,7 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'Golem을 열어 두세요';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return '나가도 괜찮습니다. $platform에서는 백그라운드 다운로드 속도가 약 $rate로 제한되어, $foregroundDuration 대신 $backgroundDuration 정도 걸립니다.';
-  }
-
-  @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '약 $count분',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote => 'Golem을 열어 두세요 — 앱이 화면에 있을 때 다운로드가 가장 빠릅니다.';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -607,9 +587,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get privacyFootnote => '모델은 이 기기에 저장됩니다. 입력한 내용은 업로드되지 않습니다.';
-
-  @override
-  String get dismissNote => '닫기';
 
   @override
   String get chatsStayAvailable => '대화는 계속 사용할 수 있습니다.';

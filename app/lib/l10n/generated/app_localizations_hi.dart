@@ -558,28 +558,8 @@ class AppLocalizationsHi extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'Golem को खुला रखें';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return 'बाहर जाना ठीक है — $platform बैकग्राउंड डाउनलोड को लगभग $rate तक धीमा कर देता है, इसलिए इसमें $foregroundDuration की जगह $backgroundDuration लगेंगे।';
-  }
-
-  @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'लगभग $count मिनट',
-      one: 'लगभग 1 मिनट',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote =>
+      'Golem को खुला रखें — ऐप सामने रहने पर डाउनलोड सबसे तेज़ होता है।';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -625,9 +605,6 @@ class AppLocalizationsHi extends AppLocalizations {
   @override
   String get privacyFootnote =>
       'मॉडल इसी डिवाइस पर रहता है। आप जो लिखते हैं वह कहीं अपलोड नहीं होता।';
-
-  @override
-  String get dismissNote => 'बंद करें';
 
   @override
   String get chatsStayAvailable => 'चैट उपलब्ध रहती हैं।';

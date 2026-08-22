@@ -556,28 +556,8 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'Golem’i açık tutun';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return 'Çıkmak sorun değil — $platform arka plan indirmelerini yaklaşık $rate hızına düşürür; bu durumda işlem $foregroundDuration yerine $backgroundDuration sürer.';
-  }
-
-  @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'yaklaşık $count dakika',
-      one: 'yaklaşık 1 dakika',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote =>
+      'Golem’i açık tutun — indirmeler uygulama öndeyken en hızlıdır.';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -623,9 +603,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get privacyFootnote =>
       'Model bu cihazda saklanır. Yazdıklarınız hiçbir yere yüklenmez.';
-
-  @override
-  String get dismissNote => 'Kapat';
 
   @override
   String get chatsStayAvailable => 'Sohbetler kullanılabilir kalır.';

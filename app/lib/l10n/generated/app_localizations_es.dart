@@ -559,28 +559,8 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'Mantén Golem abierto';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return 'Puedes salir — $platform reduce las descargas en segundo plano a unos $rate, así que tardaría $backgroundDuration en lugar de $foregroundDuration.';
-  }
-
-  @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'alrededor de $count minutos',
-      one: 'alrededor de 1 minuto',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote =>
+      'Mantén Golem abierto: las descargas son más rápidas en primer plano.';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -626,9 +606,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get privacyFootnote =>
       'El modelo se guarda en este dispositivo. Nada de lo que escribes se sube.';
-
-  @override
-  String get dismissNote => 'Cerrar';
 
   @override
   String get chatsStayAvailable => 'Los chats siguen disponibles.';

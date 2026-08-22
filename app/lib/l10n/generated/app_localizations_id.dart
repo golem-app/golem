@@ -558,27 +558,8 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'Biarkan Golem tetap terbuka';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return 'Keluar tidak masalah — $platform memperlambat unduhan latar belakang menjadi sekitar $rate, jadi prosesnya akan memakan $backgroundDuration, bukan $foregroundDuration.';
-  }
-
-  @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'sekitar $count menit',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote =>
+      'Biarkan Golem tetap terbuka — unduhan paling cepat saat aplikasi di depan.';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -623,9 +604,6 @@ class AppLocalizationsId extends AppLocalizations {
   @override
   String get privacyFootnote =>
       'Model disimpan di perangkat ini. Tidak ada yang Anda ketik yang diunggah.';
-
-  @override
-  String get dismissNote => 'Tutup';
 
   @override
   String get chatsStayAvailable => 'Percakapan tetap tersedia.';

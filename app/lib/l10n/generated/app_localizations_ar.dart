@@ -554,31 +554,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get downloadNoteTitle => 'أبقِ Golem مفتوحًا';
-
-  @override
-  String downloadNoteBody(
-    String platform,
-    String rate,
-    String backgroundDuration,
-    String foregroundDuration,
-  ) {
-    return 'لا بأس بالمغادرة — يبطئ $platform التنزيلات في الخلفية إلى نحو $rate، لذا سيستغرق الأمر $backgroundDuration بدلًا من $foregroundDuration.';
-  }
-
-  @override
-  String aboutMinutes(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'نحو $count دقيقة',
-      many: 'نحو $count دقيقة',
-      few: 'نحو $count دقائق',
-      two: 'نحو دقيقتين',
-      one: 'نحو دقيقة واحدة',
-    );
-    return '$_temp0';
-  }
+  String get downloadNote =>
+      'أبقِ Golem مفتوحًا — يكون التنزيل أسرع عندما يكون التطبيق في المقدمة.';
 
   @override
   String etaAboutMinutesLeft(int count) {
@@ -627,9 +604,6 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get privacyFootnote =>
       'يُخزَّن النموذج على هذا الجهاز. لا يُرفَع أي شيء تكتبه.';
-
-  @override
-  String get dismissNote => 'إغلاق';
 
   @override
   String get chatsStayAvailable => 'تبقى المحادثات متاحة.';

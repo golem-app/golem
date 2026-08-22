@@ -602,12 +602,9 @@ class _DownloadScreen extends ConsumerWidget {
                 style: GolemText.caption.copyWith(color: muted),
               ),
             ],
-            // Compact: at footnote size the note outweighed the card it
-            // annotates, and its body wrapped to four lines at 1.3× (#143).
             DownloadNoteBanner(
               key: const Key('first-run-download-note'),
               entry: selected,
-              compact: true,
               margin: const EdgeInsetsDirectional.only(top: GolemSpace.s4),
             ),
             if (status.phase == ArtifactPhase.failed) ...[

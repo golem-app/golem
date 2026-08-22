@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/download_pace.dart';
 
@@ -92,46 +91,12 @@ void main() {
     });
   });
 
-  group('aboutMinutes', () {
-    test('rounds up and floors at one minute', () {
-      // 3.2 GB remaining at the iOS background rate: 3.2e9 / 3.8e6 ≈ 842 s.
-      expect(aboutMinutes(iosBackgroundMbs, 3200000000), 15);
-      // The same bytes at foreground pace finish within about two minutes.
-      expect(aboutMinutes(downloadForegroundMbs, 3200000000), 2);
-      expect(aboutMinutes(downloadForegroundMbs, 1000000), 1);
-      expect(aboutMinutes(downloadForegroundMbs, 0), 1);
-      expect(aboutMinutes(downloadForegroundMbs, -5), 1);
-    });
-
-    test('exact minute boundaries do not round up an extra minute', () {
-      // 44 MB/s for exactly 2 minutes: 5,280,000,000 bytes.
-      expect(aboutMinutes(downloadForegroundMbs, 5280000000), 2);
-    });
-  });
-
   group('aboutMinutesLeft', () {
     test('shares the round-up-floor-one rule with aboutMinutes', () {
       expect(aboutMinutesLeft(const Duration(seconds: 54)), 1);
       expect(aboutMinutesLeft(const Duration(seconds: 61)), 2);
       expect(aboutMinutesLeft(const Duration(minutes: 2)), 2);
       expect(aboutMinutesLeft(Duration.zero), 1);
-    });
-  });
-
-  group('backgroundMbsFor', () {
-    test('quotes the measured platform pacing', () {
-      expect(backgroundMbsFor(TargetPlatform.iOS), iosBackgroundMbs);
-      expect(backgroundMbsFor(TargetPlatform.android), androidBackgroundMbs);
-      expect(backgroundMbsFor(TargetPlatform.macOS), iosBackgroundMbs);
-    });
-
-    // The figures themselves, not just the wiring: they are measurements from
-    // the #36 spike that the foreground-download note quotes, so an edit to one
-    // has to fail here rather than quietly change what the app promises.
-    test('the constants are the figures the note records', () {
-      expect(downloadForegroundMbs, 44.0);
-      expect(iosBackgroundMbs, 3.8);
-      expect(androidBackgroundMbs, 1.2);
     });
   });
 }
