@@ -379,6 +379,8 @@ itself a button, so a download inside it cannot swallow the tap),
 `search-field`, `search-cancel`, `search-results`, `search-result-<id>`,
 `search-empty`, `rename-sheet`, `rename-field`, `rename-counter`,
 `confirm-delete`, `open-settings`,
+`model-attribution-row`, `open-source-licenses-row`, `licenses-list`,
+`license-<name>` plus `license-text-<name>`,
 `settings-{model,style,system-prompt,appearance,privacy,storage}-row`,
 `advanced-mode-switch`, `about-row`, `about-sheet`,
 `models-tab-{all,installed}`, `model-card-<key>`, `model-status-<key>`,
@@ -544,7 +546,7 @@ They cover splash, empty/populated chat, reasoning, the markdown
 transcript, search, the composer sheets, the sectioned conversation
 drawer, rename overlay, every settings surface (root, models, response
 style, appearance, privacy, storage, system prompt, model attribution, and
-open-source licenses — with iOS-only
+the declared open-source licenses list, with its kind labels — with iOS-only
 Advanced variants for the root, custom repository, and sampling states),
 Benchmark, and both unsupported-device surfaces (chat and models, iOS-only
 in light and dark). The model picker records twice: the simulated catalog

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +11,8 @@ import 'package:golem_flutter/features/benchmark/application/benchmark_providers
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/widgets/attach_sheet.dart';
+import 'package:golem_flutter/features/legal/license_registry.dart';
+import 'package:golem_flutter/features/legal/open_source_licenses_screen.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/onboarding/first_run_gate.dart';
 import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
@@ -512,6 +516,26 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('llama.cpp'), findsOneWidget);
+    // The bundled half, resolved from the real asset bundle on a real device:
+    // every declaration's text loads, they arrive in reading order, and the
+    // Apple gate matches the platform actually running. The pub half cannot be
+    // checked here — `TestWidgetsFlutterBinding.initLicenses` registers no
+    // NOTICES collector, so under a test binding the registry holds only what
+    // `registerGolemLicenses` added.
+    final resolved = (await loadRegisteredLicenses())
+        .map((license) => license.title)
+        .toList();
+
+    // Both sides must not derive from the same getter, or the assertion holds
+    // however the gate is wired. `Platform` here, the getter in the loader.
+    expect(resolved.first, 'llama.cpp');
+    expect(resolved, contains('miniaudio'));
+    if (Platform.isIOS || Platform.isMacOS) {
+      expect(resolved, contains('mlx-swift'));
+    } else {
+      expect(resolved, isNot(contains('mlx-swift')));
+      expect(resolved, hasLength(llamaLicenseDeclarations.length));
+    }
     await _pageBack(tester);
     await tester.pumpAndSettle();
 

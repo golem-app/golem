@@ -15,20 +15,66 @@ still need a durable account of each model's author, license, and exact source.
 Community model repositories do not always carry reliable license metadata.
 In particular, the pinned `mlx-community/gemma-4-e2b-it-4bit` snapshot reports
 the legacy `gemma` identifier, while Google's Gemma 4 model card and current
-license publish Gemma 4 under Apache 2.0. The official upstream model license
+license publish Gemma 4 under Apache-2.0. The official upstream model license
 controls; repository metadata is supporting evidence, not the authority.
 
 ## Decision
 
 Golem exposes two direct Settings destinations:
 
-- **Model attribution** identifies the official author and Apache 2.0 license
+- **Model attribution** identifies the official author and Apache-2.0 license
   for Gemma 4 E2B and Qwen 3.5, and lists every immutable Hugging Face source
   and revision in the pinned catalog, including conversion and projector
   repositories.
-- **Open-source licenses** renders Flutter's `LicenseRegistry` through native
-  Cupertino UI. Golem lazily registers exact license and NOTICE snapshots for
-  native dependencies and model families that Flutter cannot collect.
+- **Open-source licenses** discloses the third-party software Golem itself
+  declares, through native Cupertino UI. Golem lazily registers exact license
+  and NOTICE snapshots for the native dependencies Flutter cannot collect.
+
+That screen renders three explicit manifests and nothing else (#144), in
+reading order: llama.cpp with its vendored components, the Swift graph the MLX
+engine links, then the `dependencies:` block of `app/pubspec.yaml`. The
+ordering is `declaredLicensePackagesFor`, assembled from the same const
+declarations this record audits, so a pin change moves the screen with it.
+`legal_surfaces_test.dart` holds the pub half to `pubspec.yaml`, so a new
+dependency is disclosed deliberately rather than by accident.
+
+The Swift half is disclosed only where it exists. `hook/build.dart` builds the
+MLX carrier for `OS.iOS` and `OS.macOS` **and** `Architecture.arm64` — MLX
+Swift is Apple-silicon-only — so an APK, an Intel Mac and an x64 simulator
+slice all link `libinferno.so` and nothing from that graph. Naming those
+sixteen packages there would describe software that is not in the binary, and
+`runningOnApplePlatform` mirrors both halves of that condition. The gate reads `dart:io`'s
+`Platform`, never `defaultTargetPlatform` — the golden harness overrides that
+through `TargetPlatformVariant`, so an Android golden runs on a macOS host and
+would answer the wrong question — and it is injected, so tests drive both arms.
+A drift test reads the build hook itself and fails if the carrier stops being
+Apple-gated, which keeps the guarantee checked against the build system rather
+than restated next to it. The license *text assets* still ship on every
+platform: Flutter's pubspec has per-flavor asset keys but no per-platform one.
+That is a deliberate wart, roughly 160 KB of unreferenced text in the APK, not
+a disclosure problem.
+
+Each row states its license kind. For the bundled declarations that kind is
+authored on the declaration, because these are known at pin time and reading
+them back out of the text gets them wrong: `miniaudio` is `Unlicense OR MIT-0`,
+`stb_image` is `MIT OR Unlicense`, and six Swift packages carry
+`Apache-2.0 WITH Swift-exception`. Only the pub half is classified from text,
+and a package whose documents disagree — `flutter` files ten, mixing BSD-3 with
+an MIT shader notice and a font license — renders no label rather than a
+confident wrong one.
+
+Flutter's `LicenseRegistry` carries far more: 243 entries, sweeping the
+engine's own `third_party` tree and every dev-time package in the graph, much
+of which never reaches a shipping binary. Its collector walks the package
+graph rather than the link map and offers no knob to prune what it generates,
+so those notices still ship inside the app — they are simply not rendered.
+Golem discloses software it chose, not software Flutter compiled.
+
+Model licenses are not on that screen. Golem downloads weights from Hugging
+Face after explicit consent and does not redistribute them, so no bundled
+notice obligation attaches; **Model attribution** is their home, naming the
+license and linking the canonical text upstream. The bundled Apache-2.0
+snapshot that once backed an offline copy is gone with them.
 
 The native manifest mirrors every identity and revision in
 `native/apple/Package.resolved`, plus llama.cpp at
@@ -38,11 +84,12 @@ Inferno shim, and stb_image and miniaudio in libmtmd. Video/subprocess, curl,
 server, tools, examples, and tests are disabled by the package CMake options
 and are not declared as shipped dependencies.
 
-Gemma 4 E2B is attributed to Google DeepMind under Apache 2.0. The audit covers
+Gemma 4 E2B is attributed to Google DeepMind under Apache-2.0. The audit covers
 the official model card plus the pinned MLX, GGUF, and projector snapshots in
 the catalog. Qwen 3.5 2B and 4B are attributed to Alibaba Cloud/Qwen under
-Apache 2.0; the audit likewise covers the pinned MLX, GGUF, and projector
-snapshots. The complete license text remains available offline.
+Apache-2.0; the audit likewise covers the pinned MLX, GGUF, and projector
+snapshots. The license is named offline; its full text lives upstream, where
+the model card publishes it.
 
 The audited download sources are:
 
@@ -70,6 +117,18 @@ nor certifies those repositories.
   download sources before it can ship.
 - Automated drift tests compare Swift and llama pins with the declarations and
   require every referenced asset to exist and contain text.
+- A new direct dependency in `app/pubspec.yaml` fails `legal_surfaces_test`
+  until it is added to `directRuntimeLicensePackages`. That is the point: the
+  screen is a decision, not a sweep.
+- An allowlist can under-disclose where the old sweep could not, and one case
+  stays uncovered: a declared pub package whose `NOTICES` key stops matching
+  its pubspec name is skipped silently, and the entry count shrinks with no
+  failure. The two known divergences (`inferno`, `flutter_localizations`) were
+  found by reading a built bundle by hand. No test can close this — the
+  framework's test bindings register no `NOTICES` collector at all
+  (`TestWidgetsFlutterBinding.initLicenses`), so the pub half is observable
+  only in a real app run. Re-read the rendered list on both platforms when
+  changing a dependency.
 - This record documents engineering evidence and distribution handling; it is
   not legal advice.
 

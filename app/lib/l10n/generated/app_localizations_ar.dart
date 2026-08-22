@@ -1159,7 +1159,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'بُني Golem باستخدام برمجيات مفتوحة المصدر. تتوفر هذه الإشعارات بلا اتصال وتشمل تراخيص Dart والمحرك الأصلي والنماذج المستخدمة في هذا الإصدار.';
+      'بُني Golem باستخدام برمجيات مفتوحة المصدر. تذكر هذه الإشعارات المحركات الأصلية التي يشحنها Golem والحزم التي يعتمد عليها مباشرة، وهي متاحة بلا اتصال.';
 
   @override
   String licenseEntries(int count) {

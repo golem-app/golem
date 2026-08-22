@@ -311,7 +311,7 @@
   "deleteModelArtifactTitle": "Hapus {modelName} · {format}?",
   "deleteModelStorageMessage": "Menghapus {size} dari perangkat ini. Model dapat diunduh lagi nanti.",
   "megabytes": "{value} MB",
-  "licensesIntroduction": "Golem dibuat dengan perangkat lunak sumber terbuka. Pemberitahuan ini tersedia tanpa koneksi dan mencakup lisensi Dart, mesin natif, serta model yang digunakan versi ini.",
+  "licensesIntroduction": "Golem dibuat dengan perangkat lunak sumber terbuka. Pemberitahuan ini menyebutkan mesin natif yang disertakan Golem dan paket yang menjadi dependensi langsungnya, serta tersedia tanpa koneksi.",
   "licenseEntries": "{count, plural, other{{count} entri lisensi}}",
   "licensesLoadFailed": "Lisensi tidak dapat dimuat.",
   "licensesRetryDetail": "File yang disertakan masih berada di perangkat ini. Coba muat lagi.",

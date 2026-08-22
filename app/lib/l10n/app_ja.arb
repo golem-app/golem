@@ -311,7 +311,7 @@
   "deleteModelArtifactTitle": "{modelName} · {format}を削除しますか？",
   "deleteModelStorageMessage": "この端末から{size}を削除します。モデルは後でもう一度ダウンロードできます。",
   "megabytes": "{value} MB",
-  "licensesIntroduction": "Golemはオープンソースソフトウェアを使用しています。これらの通知はオフラインでも確認でき、このビルドが使用するDart、ネイティブエンジン、モデルのライセンスが含まれています。",
+  "licensesIntroduction": "Golemはオープンソースソフトウェアを使用しています。これらの通知には、Golemが同梱するネイティブエンジンと直接依存するパッケージが記載され、オフラインでも確認できます。",
   "licenseEntries": "{count, plural, other{ライセンス項目{count}件}}",
   "licensesLoadFailed": "ライセンスを読み込めませんでした。",
   "licensesRetryDetail": "同梱ファイルはこの端末に残っています。もう一度読み込んでください。",

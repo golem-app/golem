@@ -7,37 +7,100 @@ import '../../core/chrome/golem_tappable.dart';
 import '../../core/theme/golem_theme.dart';
 import '../../core/widgets/section_header.dart';
 import '../../l10n/l10n.dart';
+import 'license_registry.dart';
 
 typedef LicenseCatalogLoader = Future<List<OpenSourceLicense>> Function();
 
+/// The SPDX identifier a license body reads as, or null when nothing matches.
+/// Pub packages arrive as text through `NOTICES` with no SPDX header, so this
+/// matches on the clauses that distinguish the families. It is deliberately
+/// *not* used for the bundled declarations, which author their `kind`: this
+/// cannot see a dual license or a runtime exception, and guessing one on a
+/// legal surface is worse than saying nothing.
+String? licenseKind(String text) {
+  if (text.contains('Apache License') && text.contains('Version 2.0')) {
+    return 'Apache-2.0';
+  }
+  if (text.contains('Redistribution and use')) {
+    return text.contains('Neither the name') ? 'BSD-3-Clause' : 'BSD-2-Clause';
+  }
+  if (text.contains('Permission is hereby granted')) return 'MIT';
+  return null;
+}
+
+/// The kind for a package Flutter collected, or null unless every document
+/// filed under it reads the same way. A name can carry several — the built
+/// `NOTICES` files ten under `flutter` alone, mixing BSD-3 with an MIT shader
+/// notice and a font license — and picking the first match would put a
+/// confident wrong label on a row whose text says otherwise.
+String? _collectedKind(List<String> documents) {
+  final kinds = documents.map(licenseKind).toSet();
+  return kinds.length == 1 ? kinds.single : null;
+}
+
 final class OpenSourceLicense {
-  OpenSourceLicense({required Iterable<String> packages, required this.text})
-    : packages = List.unmodifiable(packages);
+  OpenSourceLicense({
+    required Iterable<String> packages,
+    required this.text,
+    this.kind,
+  }) : packages = List.unmodifiable(packages);
 
   final List<String> packages;
   final String text;
 
+  /// The SPDX expression shown beside the title, or null when it is not known
+  /// well enough to state.
+  final String? kind;
+
   String get title => packages.join(', ');
 }
 
-Future<List<OpenSourceLicense>> loadRegisteredLicenses() async {
+/// The declared manifests for this platform, in reading order. Flutter's
+/// registry also carries the engine's own third-party tree and every dev-time
+/// package in the graph; neither is software Golem chose, so neither is
+/// rendered here (#144).
+///
+/// [licenses] and [apple] exist so tests drive both platform arms against a
+/// stream they own, rather than mutating the process-wide [LicenseRegistry].
+Future<List<OpenSourceLicense>> loadRegisteredLicenses({
+  Stream<LicenseEntry>? licenses,
+  bool? apple,
+}) async {
+  final onApple = apple ?? runningOnApplePlatform;
+  final bundled = bundledLicenseDeclarationsFor(apple: onApple);
+  final declared = [
+    for (final declaration in bundled) declaration.displayName,
+    ...directRuntimeLicensePackages,
+  ];
+  final wanted = declared.toSet();
+  final authoredKinds = {
+    for (final declaration in bundled)
+      declaration.displayName: declaration.kind,
+  };
+
+  // Filter before joining: the bundle holds ~1650 entries and this keeps a
+  // few dozen, so nothing undeclared is worth reassembling into a string.
   final documentsByPackage = <String, List<String>>{};
-  await for (final entry in LicenseRegistry.licenses) {
+  await for (final entry in licenses ?? LicenseRegistry.licenses) {
+    final kept = entry.packages.where(wanted.contains);
+    if (kept.isEmpty) continue;
     final text = entry.paragraphs
         .map((paragraph) => '${'  ' * paragraph.indent}${paragraph.text}')
         .join('\n\n');
-    for (final package in entry.packages) {
+    for (final package in kept) {
       documentsByPackage.putIfAbsent(package, () => []).add(text);
     }
   }
-  final licenses = [
-    for (final entry in documentsByPackage.entries)
-      OpenSourceLicense(packages: [entry.key], text: entry.value.join('\n\n')),
-  ];
-  licenses.sort(
-    (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
-  );
-  return List.unmodifiable(licenses);
+
+  return List.unmodifiable([
+    for (final package in declared)
+      if (documentsByPackage[package] case final documents?)
+        OpenSourceLicense(
+          packages: [package],
+          text: documents.join('\n\n'),
+          kind: authoredKinds[package] ?? _collectedKind(documents),
+        ),
+  ]);
 }
 
 class OpenSourceLicensesScreen extends StatefulWidget {
@@ -201,6 +264,29 @@ class _LicenseDisclosureState extends State<_LicenseDisclosure> {
                       ),
                     ),
                   ),
+                  if (widget.license.kind case final kind?) ...[
+                    const SizedBox(width: 8),
+                    // Bounded, not flexed: an SPDX expression can be as long
+                    // as `Apache-2.0 WITH Swift-exception`, which overflows
+                    // the row beside a full-width name. A ConstrainedBox caps
+                    // it and lets it wrap — half an identifier on a legal
+                    // surface is worse than two lines — while every pixel it
+                    // does not use still goes to the title, which sharing a
+                    // flex with the Expanded above would not do.
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 116),
+                      child: Text(
+                        kind,
+                        textAlign: TextAlign.end,
+                        style: GolemText.caption.copyWith(
+                          color: CupertinoDynamicColor.resolve(
+                            GolemTheme.mutedInk,
+                            context,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(width: 8),
                   Icon(
                     _expanded

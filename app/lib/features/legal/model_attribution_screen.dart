@@ -83,7 +83,7 @@ List<ModelFamilyAttribution> modelAttributionsFor(
     ModelFamilyAttribution(
       title: 'Gemma 4 E2B',
       author: 'Google DeepMind',
-      licenseName: 'Apache 2.0',
+      licenseName: 'Apache-2.0',
       licenseUri: Uri.parse('https://ai.google.dev/gemma/apache_2'),
       modelCardUri: Uri.parse('https://huggingface.co/google/gemma-4-E2B-it'),
       sources: sourcesFor('gemma4'),
@@ -91,7 +91,7 @@ List<ModelFamilyAttribution> modelAttributionsFor(
     ModelFamilyAttribution(
       title: 'Qwen 3.5',
       author: 'Alibaba Cloud · Qwen',
-      licenseName: 'Apache 2.0',
+      licenseName: 'Apache-2.0',
       licenseUri: Uri.parse(
         'https://huggingface.co/Qwen/Qwen3.5-2B/blob/'
         '965dcc54bc9c0591873df0e9869c056a54d323d1/LICENSE',

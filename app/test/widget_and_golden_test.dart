@@ -48,18 +48,28 @@ import 'support/in_memory_chat_history_repository.dart';
 import 'support/in_memory_preferences_repository.dart';
 import 'support/in_memory_settings_repository.dart';
 
+// One bundled row with an authored kind, one carrying the Swift exception
+// (the widest label the row has to lay out), and one pub row.
 Future<List<OpenSourceLicense>> _goldenLicenses() async => [
   OpenSourceLicense(
     packages: const ['llama.cpp'],
     text: 'MIT License\n\nCopyright the ggml authors',
+    kind: 'MIT',
   ),
+  // Not a Swift package: this fixture feeds the android golden too, and an
+  // APK links no MLX carrier. `background_downloader` is the longest declared
+  // name, so the row still records the widest title the list can produce.
   OpenSourceLicense(
-    packages: const ['mlx-swift'],
-    text: 'MIT License\n\nCopyright ml-explore',
-  ),
-  OpenSourceLicense(
-    packages: const ['Qwen 3.5 models'],
+    packages: const ['background_downloader'],
     text: 'Apache License\n\nVersion 2.0, January 2004',
+    kind: 'Apache-2.0',
+  ),
+  OpenSourceLicense(
+    packages: const ['path_provider'],
+    text:
+        'Redistribution and use in source and binary forms\n\n'
+        'Neither the name of Google Inc.',
+    kind: 'BSD-3-Clause',
   ),
 ];
 

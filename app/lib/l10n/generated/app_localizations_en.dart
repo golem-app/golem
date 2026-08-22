@@ -1143,7 +1143,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'Golem is built with open-source software. These notices are available offline and include Dart, native engine, and model licenses used by this build.';
+      'Golem is built with open-source software. These notices name the native engines Golem ships and the packages it depends on directly, and are available offline.';
 
   @override
   String licenseEntries(int count) {
