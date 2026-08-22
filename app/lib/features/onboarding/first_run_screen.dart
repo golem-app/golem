@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_identity.dart';
 import '../../core/chrome/golem_badge.dart';
 import '../../core/chrome/golem_button.dart';
-import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_tappable.dart';
 import '../../core/domain/model_admission.dart';
@@ -595,7 +594,7 @@ class _DownloadScreen extends ConsumerWidget {
                 style: GolemText.footnote.copyWith(color: muted),
               ),
             ] else if (simulated) ...[
-              const SizedBox(height: GolemSpace.s3),
+              const SizedBox(height: GolemSpace.s2),
               Text(
                 context.l10n.qaDownloadShort,
                 textAlign: TextAlign.center,
@@ -664,14 +663,22 @@ class _DownloadScreen extends ConsumerWidget {
                   _CancelDownloadButton(entry: selected),
                 ],
               ),
-              // Nothing pauses a hash, so the top row is the height a button
-              // would take, and Cancel stays where it was a moment ago.
+              // Nothing pauses a hash, so the top row is the Pause button
+              // itself, invisible and inert, keeping exactly its height —
+              // Cancel stays where it was a moment ago.
               ArtifactPhase.verifying => Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  SizedBox(
+                  Visibility(
                     key: const Key('first-run-verify-spacer'),
-                    height: GolemChrome.current.minimumTapTarget,
+                    visible: false,
+                    maintainSize: true,
+                    maintainAnimation: true,
+                    maintainState: true,
+                    child: GolemButton.plain(
+                      label: context.l10n.pauseDownload,
+                      onPressed: null,
+                    ),
                   ),
                   _CancelDownloadButton(entry: selected),
                 ],
@@ -983,30 +990,29 @@ class _FirstRunScaffold extends StatelessWidget {
   final Widget action;
 
   @override
+  // The body's minimum height is its own viewport, measured after the action
+  // column has taken its rows: a guessed "column minus 108" left the body
+  // 88pt taller than the space it had, so every first-run step scrolled
+  // through blank space whether its content fit or not (#143 QA).
   Widget build(BuildContext context) => CupertinoPageScaffold(
     child: SafeArea(
-      child: LayoutBuilder(
-        builder: (context, constraints) => Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(22, 8, 22, 12),
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(22, 8, 22, 12),
+        child: Column(
+          children: [
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, viewport) => SingleChildScrollView(
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: (constraints.maxHeight - 108).clamp(
-                        0,
-                        double.infinity,
-                      ),
-                    ),
+                    constraints: BoxConstraints(minHeight: viewport.maxHeight),
                     child: IntrinsicHeight(child: body),
                   ),
                 ),
               ),
-              const SizedBox(height: GolemSpace.s3),
-              action,
-            ],
-          ),
+            ),
+            const SizedBox(height: GolemSpace.s3),
+            action,
+          ],
         ),
       ),
     ),

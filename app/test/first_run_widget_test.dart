@@ -2,7 +2,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:golem_flutter/core/chrome/golem_chrome.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/download_pace.dart';
@@ -744,6 +743,57 @@ void main() {
     expect([track, note, cancel].map(tester.getRect).toList(), before);
   });
 
+  testWidgets('the download step fits the phone without scrolling', (
+    tester,
+  ) async {
+    // 402×874 at default text: the note's last line sat under the fold on a
+    // production phone (#143 QA), hidden by a scroll nobody expects there.
+    setViewport(tester);
+    for (final simulated in [false, true]) {
+      await pumpWithRepositories(
+        tester,
+        eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+        model: ModelState(
+          simulated: simulated,
+          artifacts: const {
+            'gemma4-mlx': ArtifactStatus(
+              phase: ArtifactPhase.downloading,
+              downloadedBytes: 900000000,
+            ),
+          },
+        ),
+        overrides: [
+          downloadPaceProvider.overrideWith(
+            () => FixedDownloadPace(
+              const DownloadPaceSnapshot(
+                artifactKey: 'gemma4-mlx',
+                mbPerSecond: 44.0,
+                eta: Duration(minutes: 14),
+              ),
+            ),
+          ),
+        ],
+        child: const FirstRunScreen(initialStep: FirstRunStep.download),
+      );
+      final position = tester
+          .state<ScrollableState>(
+            find.descendant(
+              of: find.byType(FirstRunScreen),
+              matching: find.byType(Scrollable),
+            ),
+          )
+          .position;
+      expect(position.maxScrollExtent, 0, reason: 'simulated: $simulated');
+      expect(
+        tester.getRect(find.byKey(const Key('first-run-download-note'))).bottom,
+        lessThanOrEqualTo(tester.getRect(find.byType(Scrollable)).bottom),
+        reason: 'simulated: $simulated',
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    }
+  }, variant: iosChrome);
+
   testWidgets('the action slot is one height in every in-flight phase', (
     tester,
   ) async {
@@ -765,11 +815,10 @@ void main() {
       expect(find.byKey(const Key('first-run-start-chatting')), findsNothing);
       if (status.phase == ArtifactPhase.verifying) {
         expect(
-          tester
-              .getSize(find.byKey(const Key('first-run-verify-spacer')))
-              .height,
-          GolemChrome.current.minimumTapTarget,
+          find.byKey(const Key('first-run-verify-spacer')),
+          findsOneWidget,
         );
+        expect(find.byKey(const Key('first-run-pause-download')), findsNothing);
       }
       final measured = (
         tester.getRect(find.byKey(const Key('first-run-download-track'))),
