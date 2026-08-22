@@ -32,6 +32,11 @@ Future<DeviceCapabilities> probeDeviceCapabilities({
   bool? virtualDevice,
   Future<bool?> Function(String backendName)? engineProbe,
 }) async {
+  // The fake reads nothing about the device, [virtualDevice] included, and that
+  // discard is load-bearing rather than incidental: an internal build on a
+  // simulator composes the fake *because* it is virtual, so carrying the fact
+  // past here would classify that build unsupported and refuse the simulation
+  // it was just given.
   if (backendName == 'fake') return const DeviceCapabilities();
   final readings = await Future.wait([
     memoryOverrideBytes > 0

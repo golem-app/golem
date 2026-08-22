@@ -34,15 +34,29 @@ resolveConfiguredBackend({
   Future<bool?> Function()? isVirtualDevice,
 }) async {
   const backendDefine = String.fromEnvironment('GOLEM_INFERENCE_BACKEND');
-  // Ahead of the engine, because it can change which engine there is to probe.
-  final virtualDevice = await probeVirtualDevice(
-    isVirtualDevice ?? const DeviceStorageChannel().isVirtualDevice,
-  );
-  final backendName = resolveBackendName(
+  const artifactDefine = String.fromEnvironment('GOLEM_MODEL_ARTIFACT');
+  const modelPathDefine = String.fromEnvironment('GOLEM_MODEL_PATH');
+  String resolveName({required bool virtualDevice}) => resolveBackendName(
     backendDefine: backendDefine,
     identity: identity,
-    virtualDevice: virtualDevice ?? false,
+    virtualDevice: virtualDevice,
+    artifactDefine: artifactDefine,
+    modelPathDefine: modelPathDefine,
   );
+  // The flavor answer first. A build that lands on the fake without asking
+  // cannot have that changed by the device, and must not pay a platform
+  // channel to hear it: the whole fake path reads nothing about the device by
+  // design, which is what keeps qa launches offline and hardware-independent.
+  final flavorBackend = resolveName(virtualDevice: false);
+  // Ahead of the engine, because it can change which engine there is to probe.
+  final virtualDevice = flavorBackend == 'fake'
+      ? null
+      : await probeVirtualDevice(
+          isVirtualDevice ?? const DeviceStorageChannel().isVirtualDevice,
+        );
+  final backendName = virtualDevice == true
+      ? resolveName(virtualDevice: true)
+      : flavorBackend;
   final platform = switch ((
     Platform.isIOS,
     Platform.isAndroid,
@@ -85,8 +99,8 @@ resolveConfiguredBackend({
     config: resolveBackendPolicy(
       backendName: backendName,
       profileDefine: const String.fromEnvironment('GOLEM_MODEL_PROFILE'),
-      artifactDefine: const String.fromEnvironment('GOLEM_MODEL_ARTIFACT'),
-      modelPathDefine: const String.fromEnvironment('GOLEM_MODEL_PATH'),
+      artifactDefine: artifactDefine,
+      modelPathDefine: modelPathDefine,
       tier: eligibility.tier,
       platform: platform,
     ),

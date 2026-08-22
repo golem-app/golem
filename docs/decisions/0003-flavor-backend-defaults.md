@@ -58,7 +58,15 @@ alone.
   but never quietly turn one into a simulation. An explicit
   `GOLEM_INFERENCE_BACKEND` still wins everywhere, and the device
   classification then refuses the transfer
-  (`0007-supported-device-policy.md`).
+  (`0007-supported-device-policy.md`) — including on `qa`, which is therefore
+  untouched on a virtual device only while it names no engine. So does an
+  artifact or a path define: the fake branch throws on the first and ignores
+  the second, so a build that named any model configuration keeps the real
+  path rather than being swapped under. A container that already holds real
+  weights when the swap begins stops being managed — the fake repository has
+  never heard of them, so the storage meter omits them and no row offers a
+  delete. That costs a stale simulator container, which is why the exception
+  stops at the two internal identities.
 
 Host `flutter test` runs as the `dev` flavor, but flavor policy resolves
 only in `main()`; the widget-visible backend signal

@@ -59,10 +59,13 @@ simulation.
 
 One device-shaped exception (#148): on a **simulator or emulator**, `dev`
 joins `qa` on the fakes rather than fetching weights nothing there can load,
-so a plain `flutter run` is safe on both. `production` is excluded — its
-composition stays a build-time fact — and an explicit
-`GOLEM_INFERENCE_BACKEND` still wins, in which case the device
-classification below refuses the transfer instead.
+so a plain `flutter run` is safe on both. It applies only to a build that
+named no model configuration: `production` is excluded — its composition stays
+a build-time fact — and any of `GOLEM_INFERENCE_BACKEND`,
+`GOLEM_MODEL_ARTIFACT`, or `GOLEM_MODEL_PATH` keeps the real path, in which
+case the device classification below refuses the transfer instead. That last
+part includes `qa`: `--flavor qa --dart-define=GOLEM_INFERENCE_BACKEND=auto`
+is refused on a simulator rather than offered a download it could not use.
 
 Backend resolution (`lib/broker/backend_policy.dart`, decided in
 `../docs/decisions/0003-flavor-backend-defaults.md`):
@@ -105,7 +108,7 @@ test-only overrides for exercising the tiers and the two hardware refusals on
 devices that cannot produce them; production ignores both defines. The
 virtual-device refusal needs no override — a `production` build, or any
 explicit engine define, produces it directly on the simulator and the
-emulator.
+emulator, where it also preempts the other two.
 
 Model **downloads** are real in the `dev` and `production` flavors:
 Settings lists the pinned catalog (`lib/broker/model_catalog.dart`,

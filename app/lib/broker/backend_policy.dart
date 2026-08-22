@@ -27,36 +27,68 @@ String resolvedEngineName({
 /// full policy needs that probe's verdict.
 ///
 /// [virtualDevice] moves an internal build to the fake rather than letting it
-/// compose an engine no simulator or emulator can run (#148). It applies to
-/// `qa` and `dev` only: production's composition stays a pure build-time fact,
-/// so a detection that ever answered wrong on a phone could refuse a shipping
-/// build but never quietly simulate one. An explicit define still wins
-/// everywhere — asking for a real engine on a simulator gets the real engine,
-/// and the device classification then refuses the download.
+/// compose an engine no simulator or emulator can run (#148), but only through
+/// [virtualDeviceComposesFake] — a build that named any model configuration is
+/// asking for the real path and keeps it.
 String resolveBackendName({
   required String backendDefine,
   required AppIdentity identity,
   required bool virtualDevice,
+  required String artifactDefine,
+  required String modelPathDefine,
 }) => backendDefine.isNotEmpty
     ? backendDefine
-    : virtualDevice && identity.internalToolsEnabled
+    : virtualDeviceComposesFake(
+        identity: identity,
+        virtualDevice: virtualDevice,
+        artifactDefine: artifactDefine,
+        modelPathDefine: modelPathDefine,
+      )
     ? 'fake'
     : switch (identity) {
         AppIdentity.production || AppIdentity.dev => 'auto',
         AppIdentity.qa => 'fake',
       };
 
+/// Whether a virtual device may swap this build's composition for the fake.
+///
+/// Only `qa` and `dev`: production's composition stays a pure build-time fact,
+/// so a device reading that ever answered wrong on a phone can refuse a
+/// shipping build but never quietly simulate one.
+///
+/// And only a build that named no model configuration at all. An artifact or a
+/// path define is an operator asking for the real path just as much as an
+/// engine define is, and the fake branch of [resolveBackendPolicy] cannot honour
+/// either — it throws on an artifact and ignores a path. Swapping under them
+/// would turn `--dart-define=GOLEM_MODEL_ARTIFACT=…` into a terminal
+/// misconfiguration pane and a sideload into a silent simulation.
+bool virtualDeviceComposesFake({
+  required AppIdentity identity,
+  required bool virtualDevice,
+  required String artifactDefine,
+  required String modelPathDefine,
+}) =>
+    virtualDevice &&
+    identity.internalToolsEnabled &&
+    artifactDefine.isEmpty &&
+    modelPathDefine.isEmpty;
+
 /// Whether this launch composes the download simulation instead of the real
 /// downloader. Simulated inference is the precondition in every case: a real
 /// engine fed by a simulated install would "install" files that do not exist
 /// (ADR 0003). Beyond that, `qa` is the deterministic-automation identity, and
 /// a virtual device is the one where a real transfer could only ever produce
-/// bytes nothing can load.
+/// bytes nothing can load — under the same identity gate as
+/// [virtualDeviceComposesFake], so production's model management stays a
+/// build-time fact too.
 bool useFakeModelManagement({
   required AppIdentity identity,
   required bool simulatedInference,
   required bool virtualDevice,
-}) => simulatedInference && (identity == AppIdentity.qa || virtualDevice);
+}) =>
+    simulatedInference &&
+    (identity == AppIdentity.qa ||
+        (virtualDevice && identity.internalToolsEnabled));
 
 /// Pure. `auto` is the platform engine's artifact of the device-policy model
 /// (ADR 0012); an operator-supplied `GOLEM_MODEL_PATH` is the separate,

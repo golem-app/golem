@@ -27,6 +27,8 @@ InferenceBackendConfig _resolve({
     backendDefine: backend,
     identity: identity,
     virtualDevice: virtualDevice,
+    artifactDefine: artifact,
+    modelPathDefine: modelPath,
   ),
   profileDefine: profile,
   artifactDefine: artifact,
@@ -398,6 +400,8 @@ void main() {
             backendDefine: '',
             identity: identity,
             virtualDevice: true,
+            artifactDefine: '',
+            modelPathDefine: '',
           ),
           'fake',
         );
@@ -410,6 +414,8 @@ void main() {
           backendDefine: '',
           identity: AppIdentity.production,
           virtualDevice: true,
+          artifactDefine: '',
+          modelPathDefine: '',
         ),
         'auto',
       );
@@ -421,6 +427,8 @@ void main() {
           backendDefine: 'mlx',
           identity: AppIdentity.dev,
           virtualDevice: true,
+          artifactDefine: '',
+          modelPathDefine: '',
         ),
         'mlx',
       );
@@ -440,6 +448,8 @@ void main() {
           backendDefine: '',
           identity: AppIdentity.dev,
           virtualDevice: false,
+          artifactDefine: '',
+          modelPathDefine: '',
         ),
         'auto',
       );
@@ -448,6 +458,8 @@ void main() {
           backendDefine: '',
           identity: AppIdentity.qa,
           virtualDevice: false,
+          artifactDefine: '',
+          modelPathDefine: '',
         ),
         'fake',
       );
@@ -507,6 +519,42 @@ void main() {
       expect(resolved.eligibility.runsModels, isTrue);
     });
 
+    test('a build that named a model keeps the real path', () {
+      // The fake branch throws on an artifact and ignores a path, so swapping
+      // under either would turn an operator's define into a terminal
+      // misconfiguration pane or a silent simulation.
+      expect(
+        resolveBackendName(
+          backendDefine: '',
+          identity: AppIdentity.dev,
+          virtualDevice: true,
+          artifactDefine: 'qwen35-2b-mlx',
+          modelPathDefine: '',
+        ),
+        'auto',
+      );
+      expect(
+        resolveBackendName(
+          backendDefine: '',
+          identity: AppIdentity.dev,
+          virtualDevice: true,
+          artifactDefine: '',
+          modelPathDefine: 'documents:my.gguf',
+        ),
+        'auto',
+      );
+      // And the artifact still resolves rather than throwing.
+      expect(
+        _resolve(
+          identity: AppIdentity.dev,
+          virtualDevice: true,
+          artifact: 'qwen35-2b-mlx',
+          platform: HostPlatform.ios,
+        ).artifactKey,
+        'qwen35-2b-mlx',
+      );
+    });
+
     test('model management follows inference, never leads it', () {
       // The precondition is simulated inference in every arm: a real engine
       // fed by a simulated install would "install" files that do not exist.
@@ -543,6 +591,16 @@ void main() {
           virtualDevice: false,
         ),
         isTrue,
+      );
+      // Production's model management is a build-time fact too: the device
+      // may not swap it, under the same gate resolveBackendName applies.
+      expect(
+        useFakeModelManagement(
+          identity: AppIdentity.production,
+          simulatedInference: true,
+          virtualDevice: true,
+        ),
+        isFalse,
       );
     });
   });

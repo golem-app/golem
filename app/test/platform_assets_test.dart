@@ -351,6 +351,37 @@ void main() {
     }
   });
 
+  test('every storage channel method is answered on every side', () {
+    // The name agreeing is not enough: a method the Dart client invokes and a
+    // native handler never names degrades silently, because every caller
+    // guards the channel and reads a refusal as "unknown". #148 added
+    // isVirtualDevice by hand in three files, and a miss there would put the
+    // multi-gigabyte fetch back on that platform's simulator with no error and
+    // no failing test.
+    final client = File(
+      'lib/core/services/device_storage.dart',
+    ).readAsStringSync();
+    final invoked = RegExp(
+      r"invokeMethod<[^>]+>\(\s*'(\w+)'",
+    ).allMatches(client).map((match) => match[1]!).toSet();
+    expect(invoked, isNotEmpty);
+    for (final handler in const [
+      'ios/Runner/AppDelegate.swift',
+      'macos/Runner/MainFlutterWindow.swift',
+      _mainActivity,
+    ]) {
+      final source = File(handler).readAsStringSync();
+      // macOS answers one method fewer on purpose: there is no jetsam
+      // ceiling to report, so the mobile load preflight has nothing to ask.
+      final exempt = handler.startsWith('macos')
+          ? const {'availableMemoryBytes'}
+          : const <String>{};
+      for (final method in invoked.difference(exempt)) {
+        expect(source, contains("\"$method\""), reason: '$handler: $method');
+      }
+    }
+  });
+
   test('no shipping surface still names the retired identity', () {
     // #116. Enumerating the files a rename touched would pass the moment the
     // string reappears somewhere nobody listed — a scheme, a second xcconfig,

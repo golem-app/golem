@@ -128,7 +128,10 @@ on supported hardware or a later compatible release.
 
 The virtual-device refusal is the one that needs no help: the iPhone 17
 simulator and the Android emulator produce it directly, with a `production`
-build or an explicit `GOLEM_INFERENCE_BACKEND`. The other two are harder —
+build or an explicit `GOLEM_INFERENCE_BACKEND`. It also closes the other two
+there, since it classifies first and the fake path reads nothing at all — the
+two overrides below reach the floor and the instruction set on hardware, which
+is the only place they were ever needed. The other two are harder —
 both team devices report over 8 GB and both carry the dot-product extension,
 so neither is reachable on hardware without help.
 `GOLEM_DEVICE_MEMORY_BYTES` already existed for the model-tier branch and now
