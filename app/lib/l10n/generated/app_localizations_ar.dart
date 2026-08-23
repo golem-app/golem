@@ -1052,7 +1052,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'يحافظ Golem على الخصوصية: لا يتطلب حسابًا ولا يرسل تحليلات، ويتوقف عن استخدام الشبكة بعد تنزيل النموذج. لا يوجد تتبع لتعطيله.';
+      'يحافظ Golem على الخصوصية: لا حساب ولا تحليلات. الدردشة لا تحتاج إلى شبكة، ولا يتصل Golem بالإنترنت إلا عندما تطلب تنزيل نموذج. لا تدخل المحادثات في نسخ الهاتف الاحتياطية؛ استخدم التصدير لنقلها. لا يوجد شيء لتعطيله.';
 
   @override
   String get onThisPhone => 'على هذا الهاتف';
@@ -1259,6 +1259,10 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get chatHistoryNotSaving =>
       'لا يُحفظ سجل المحادثات. قد تُفقد آخر تغييراتك عند إغلاق التطبيق.';
+
+  @override
+  String get chatHistoryPartlyUnreadable =>
+      'تعذّرت قراءة بعض المحادثات فوُضعت جانبًا. كل ما عداها موجود هنا.';
 
   @override
   String get saving => 'جارٍ الحفظ…';

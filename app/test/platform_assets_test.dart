@@ -177,6 +177,47 @@ void main() {
     expect(project, contains('TARGETED_DEVICE_FAMILY = 1;'));
   });
 
+  test('the iOS bundle declares what App Store Connect reads', () async {
+    // Required-reason APIs (#154): AppDelegate reads the volume's capacity for
+    // the Storage screen and the download preflight, which is the DiskSpace
+    // category under reasons 85F4.1 (shown to the user) and E174.1 (checked
+    // before writing). The manifest must be a Runner resource or the bundle
+    // ships without it and the upload is rejected.
+    final manifest = await File(
+      'ios/Runner/PrivacyInfo.xcprivacy',
+    ).readAsString();
+    expect(manifest, contains('NSPrivacyAccessedAPICategoryDiskSpace'));
+    expect(manifest, contains('<string>85F4.1</string>'));
+    expect(manifest, contains('<string>E174.1</string>'));
+    expect(manifest, contains('<key>NSPrivacyTracking</key>\n\t<false/>'));
+    final project = await File(
+      'ios/Runner.xcodeproj/project.pbxproj',
+    ).readAsString();
+    expect(project, contains('PrivacyInfo.xcprivacy in Resources'));
+    // The floor is the current major only (ADR 0016): 1.0 ships weeks before
+    // iOS 27, and the MLX carrier the default iOS build composes needs 17 at
+    // least — it is dlopen'ed at the launch probe, so anything lower would
+    // install on phones that then die at first use.
+    expect('IPHONEOS_DEPLOYMENT_TARGET = 26.0;'.allMatches(project).length, 12);
+    expect(project, isNot(contains('IPHONEOS_DEPLOYMENT_TARGET = 1')));
+
+    final plist = await File('ios/Runner/Info.plist').readAsString();
+    // HTTPS through the OS and SHA-256 integrity hashing are exempt; the key
+    // spares every TestFlight upload the export-compliance prompt (ADR 0016).
+    expect(
+      plist,
+      contains('<key>ITSAppUsesNonExemptEncryption</key>\n\t<false/>'),
+    );
+    // CFBundleName follows the flavor like CFBundleDisplayName does; the
+    // pubspec package name is not an identity (#133).
+    expect(plist, isNot(contains('golem_flutter')));
+    expect(
+      r'$(GOLEM_DISPLAY_NAME)'.allMatches(plist).length,
+      2,
+      reason: 'CFBundleDisplayName and CFBundleName both resolve the variable',
+    );
+  });
+
   test('native bundles declare every UI locale and RTL support', () async {
     final project = await File(
       'ios/Runner.xcodeproj/project.pbxproj',
@@ -271,22 +312,35 @@ void main() {
       manifest,
       contains('<uses-permission android:name="android.permission.INTERNET"/>'),
     );
+    // Nothing Golem stores leaves the phone (ADR 0016). allowBackup off is
+    // the cloud half; some manufacturers keep device-to-device transfer on
+    // regardless, so the extraction rules must exclude every domain from
+    // both paths as well.
+    expect(manifest, contains('android:allowBackup="false"'));
+    expect(manifest, isNot(contains('BackupContent')));
     expect(
       manifest,
       contains('android:dataExtractionRules="@xml/data_extraction_rules"'),
     );
-    expect(manifest, contains('android:fullBackupContent="@xml/backup_rules"'));
-    // Downloaded models are re-fetchable and must stay out of backups and
-    // device transfers on every rules surface.
-    for (final rules in [
-      'android/app/src/main/res/xml/backup_rules.xml',
+    final rules = await File(
       'android/app/src/main/res/xml/data_extraction_rules.xml',
-    ]) {
-      expect(
-        await File(rules).readAsString(),
-        contains('<exclude domain="root" path="app_flutter/models"/>'),
-        reason: rules,
-      );
+    ).readAsString();
+    for (final section in ['cloud-backup', 'device-transfer']) {
+      final body = rules.split('<$section>')[1].split('</$section>')[0];
+      for (final domain in [
+        'root',
+        'file',
+        'database',
+        'sharedpref',
+        'external',
+      ]) {
+        expect(
+          body,
+          contains('<exclude domain="$domain" path="."/>'),
+          reason: '$section/$domain',
+        );
+      }
+      expect(body, isNot(contains('<include')), reason: section);
     }
 
     final activity = await File(_mainActivity).readAsString();

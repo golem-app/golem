@@ -1040,7 +1040,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'Golem no tiene cuentas, no envía analíticas y elimina su permiso de red cuando se descarga un modelo. No hay nada que desactivar.';
+      'Golem no tiene cuentas y no envía analíticas. Chatear no necesita red: Golem solo se conecta cuando le pides que descargue un modelo. Los chats quedan fuera de las copias de seguridad del teléfono; usa Exportar para moverlos. No hay nada que desactivar.';
 
   @override
   String get onThisPhone => 'En este teléfono';
@@ -1246,6 +1246,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get chatHistoryNotSaving =>
       'El historial de chats no se está guardando. Podrías perder los cambios más recientes al cerrar la app.';
+
+  @override
+  String get chatHistoryPartlyUnreadable =>
+      'Algunos chats no se pudieron leer y se apartaron. Todo lo demás está aquí.';
 
   @override
   String get saving => 'Guardando…';

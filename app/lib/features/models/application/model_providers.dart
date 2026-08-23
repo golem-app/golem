@@ -7,6 +7,8 @@ import '../../../core/domain/model_activation.dart' as domain;
 import '../../../core/domain/model_catalog.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/repositories/contracts.dart'
+    show ModelManagementRepository, PersistenceException;
 import '../../../core/providers/retry.dart';
 import '../../preferences/application/preferences_providers.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -310,7 +312,7 @@ class ModelController extends _$ModelController {
     _busy = true;
     _engineBusy = true;
     try {
-      final value = await models.recordRuntime(RuntimePhase.loaded);
+      final value = await _recordRuntime(models, current, RuntimePhase.loaded);
       if (!ref.mounted) return;
       state = AsyncData(value);
     } on Exception {
@@ -363,14 +365,17 @@ class ModelController extends _$ModelController {
   /// (#42). Engine failures stay in memory as a failed phase.
   Future<void> toggleRuntime() async {
     if (_busy) return;
+    final current = state.value;
+    if (current == null) return;
+    // Read ahead of the guard flags and the guarded engine calls below: a
+    // container failure is a programming error to surface, not an engine
+    // fault to report (#127), and a throw between the flags and the finally
+    // would latch them.
+    final repository = ref.read(modelManagementRepositoryProvider);
+    final inference = ref.read(inferenceRepositoryProvider);
     _busy = true;
     _engineBusy = true;
     try {
-      // Read ahead of the guarded engine calls below: a container failure is
-      // a programming error to surface, not an engine fault to report (#127).
-      final repository = ref.read(modelManagementRepositoryProvider);
-      final inference = ref.read(inferenceRepositoryProvider);
-      final current = state.requireValue;
       // Ahead of both arms: after a failed unload the phase reads `failed`
       // while the weights stay mapped, so a live answer can still be streaming
       // on the engine the load arm would prepare — and a different target
@@ -390,7 +395,11 @@ class ModelController extends _$ModelController {
           return;
         }
         if (!ref.mounted) return;
-        final value = await repository.recordRuntime(RuntimePhase.unloaded);
+        final value = await _recordRuntime(
+          repository,
+          current,
+          RuntimePhase.unloaded,
+        );
         if (!ref.mounted) return;
         state = AsyncData(value);
       } else {
@@ -404,7 +413,9 @@ class ModelController extends _$ModelController {
         // by an earlier build can always be corrected.
         final refusal = ref.read(deviceRefusalProvider);
         if (refusal != null) {
-          final value = await repository.recordRuntime(
+          final value = await _recordRuntime(
+            repository,
+            current,
             RuntimePhase.failed,
             failure: RuntimeFailureKind.deviceRefused,
           );
@@ -415,7 +426,9 @@ class ModelController extends _$ModelController {
         final target = _engineTargetKey();
         if (!_engineMayHoldWeights(current)) {
           // Refuse with a persisted failed phase; the engine is never touched.
-          final value = await repository.recordRuntime(
+          final value = await _recordRuntime(
+            repository,
+            current,
             RuntimePhase.failed,
             failure: RuntimeFailureKind.notInstalled,
           );
@@ -436,13 +449,59 @@ class ModelController extends _$ModelController {
           return;
         }
         if (!ref.mounted) return;
-        final value = await repository.recordRuntime(RuntimePhase.loaded);
+        final value = await _recordRuntime(
+          repository,
+          current,
+          RuntimePhase.loaded,
+        );
         if (!ref.mounted) return;
         state = AsyncData(value);
       }
+    } catch (_) {
+      // Anything that still escapes is a programming error and stays loud —
+      // but the row must reflect the engine, not the arm that threw: left on
+      // `loading` the Models screen withholds the toggle until a relaunch,
+      // and a fictional `failed` after a successful prepare re-offers "Load"
+      // for weights already mapped (#126). Residency is the truth, and the
+      // latest state is the base — reconciliation may have moved it.
+      if (ref.mounted) {
+        final latest = state.value ?? current;
+        state = AsyncData(
+          latest.copyWith(
+            runtime: inference.residency.value.loaded
+                ? RuntimePhase.loaded
+                : RuntimePhase.unloaded,
+            clearFailure: true,
+          ),
+        );
+      }
+      rethrow;
     } finally {
       _busy = false;
       _engineBusy = false;
+    }
+  }
+
+  /// The persisted phase is bookkeeping the engine never waits for: a store
+  /// the process cannot write keeps the phase the engine actually has in
+  /// memory, and reflectEngineLoaded reconciles the file at the next launch.
+  /// A loaded engine reported as anything else would offer "Load" for weights
+  /// already mapped (#126). The fallback builds on the latest published state,
+  /// not the caller's snapshot: reconciliation runs outside the busy guard and
+  /// may have refreshed artifact rows during the engine call.
+  Future<ModelState> _recordRuntime(
+    ModelManagementRepository repository,
+    ModelState current,
+    RuntimePhase phase, {
+    RuntimeFailureKind? failure,
+  }) async {
+    try {
+      return await repository.recordRuntime(phase, failure: failure);
+    } on PersistenceException {
+      final latest = state.value ?? current;
+      return failure == null
+          ? latest.copyWith(runtime: phase, clearFailure: true)
+          : latest.copyWith(runtime: phase, failure: failure);
     }
   }
 
@@ -477,7 +536,14 @@ class ModelController extends _$ModelController {
       if (!loaded && !inference.residency.value.loaded) return;
       await inference.unload();
       if (!ref.mounted || !loaded) return;
-      final value = await models.recordRuntime(RuntimePhase.unloaded);
+      // Through the tolerant write: the engine is empty now, and a store that
+      // cannot say so must not leave the row — and the next send — believing
+      // weights are resident.
+      final value = await _recordRuntime(
+        models,
+        current,
+        RuntimePhase.unloaded,
+      );
       if (!ref.mounted) return;
       state = AsyncData(value);
     } catch (_) {

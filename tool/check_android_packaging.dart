@@ -65,9 +65,11 @@ const _defaultArtifacts = [
 /// at its toolchain baseline and is reported without being enforced.
 const _sixtyFourBitAbis = {'arm64-v8a', 'x86_64'};
 
-/// What the shipped bundle carries. `armeabi-v7a` and `x86_64` still build for
-/// emulators and local checks; the store artifact is arm64 only
-/// (docs/decisions/0010-android-native-packaging.md).
+/// What every Android build carries: `defaultConfig.ndk.abiFilters` is
+/// arm64-only for all flavors, so no emulator or local build produces another
+/// ABI either; the Inferno hook still knows how to cross-compile the rest and
+/// nothing packages them (docs/decisions/0010-android-native-packaging.md,
+/// docs/device_floor.md).
 const _shippedAbis = {'arm64-v8a'};
 
 const _pageSize = 16384;

@@ -4,7 +4,10 @@ Status: decided on `feat/27-device-floor-admission` (issue #27)
 
 The classification and refusal thresholds remain current. ADR 0012 supersedes
 the refusal's former access to chats and Settings: the explanation now blocks
-the app shell because no supported model can satisfy startup.
+the app shell because no supported model can satisfy startup. It also made the
+engine platform-owned, so the tier table below names the artifact per platform.
+The iOS install floor that follows from that engine is recorded in
+[ADR 0016](0016-release-bundle-declarations.md).
 
 Everything before this decision governed the *moment of load*: the
 device-model policy picks a lighter model below 7 GiB (#19), the preflight
@@ -21,10 +24,13 @@ model affordance consults before it offers anything.
 
 | Reported physical memory | Tier | Model |
 | --- | --- | --- |
-| ≥ 7 GiB | preferred | `gemma4-gguf` (3.18 GB) |
-| ≥ floor, < 7 GiB | light | `qwen35-2b-gguf` (1.58 GB) |
+| ≥ 7 GiB | preferred | Gemma 4 E2B — `gemma4-mlx` on iOS (3.58 GB), `gemma4-gguf` elsewhere (3.18 GB) |
+| ≥ floor, < 7 GiB | light | Qwen 3.5 2B — `qwen35-2b-mlx` on iOS (1.75 GB), `qwen35-2b-gguf` elsewhere (1.58 GB) |
 | < floor | **unsupported** | none |
-| unknown | light | `qwen35-2b-gguf` |
+| unknown | light | Qwen 3.5 2B, as above |
+
+The engine half of each key is the platform's composition under ADR 0012 (MLX
+on iOS, llama.cpp/GGUF on Android and macOS); the tier only picks the family.
 
 Plus one non-memory refusal: an **arm64 Android CPU without `FEAT_DotProd`**
 is unsupported at any memory size, because the shipped kernels are compiled

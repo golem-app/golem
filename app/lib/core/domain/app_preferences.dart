@@ -7,6 +7,7 @@ import 'dart:convert';
 
 import 'equality.dart';
 import 'model_catalog.dart';
+import 'models.dart' show enumByName, enumByNameOrNull;
 import 'model_profile_spec.dart';
 import 'resolved_repository.dart';
 
@@ -163,7 +164,9 @@ final class CustomModelSpec {
     }
     return CustomModelSpec(
       repository: json['repository'] as String,
-      engine: ModelEngine.values.byName(json['engine'] as String),
+      engine:
+          enumByNameOrNull(ModelEngine.values, json['engine']) ??
+          (throw FormatException('Unknown model engine: ${json['engine']}')),
       revision: json['revision'] as String? ?? 'main',
       profile: profile,
       resolved: resolved,
@@ -364,8 +367,10 @@ final class AppPreferences {
     final rawStyles = json['responseStyles'];
     final rawCustom = json['customModels'];
     return AppPreferences(
-      theme: ThemeSetting.values.byName(
-        json['theme'] as String? ?? ThemeSetting.system.name,
+      theme: enumByName(
+        ThemeSetting.values,
+        json['theme'],
+        orElse: ThemeSetting.system,
       ),
       language: AppLanguage.fromCode(json['language']),
       textScale: (json['textScale'] as num?)?.toDouble() ?? 1.0,
@@ -380,18 +385,30 @@ final class AppPreferences {
       responseStyles: {
         if (rawStyles is Map)
           for (final entry in rawStyles.entries)
-            entry.key as String: ResponseStyle.values.byName(
-              entry.value as String,
+            entry.key as String: ?enumByNameOrNull(
+              ResponseStyle.values,
+              entry.value,
             ),
       },
       customModels: [
         if (rawCustom is List)
           for (final item in rawCustom)
             if (item is Map)
-              CustomModelSpec.fromJson(Map<String, Object?>.from(item)),
+              ..._customModelEntry(Map<String, Object?>.from(item)),
       ],
     );
   }
 
   String encode() => const JsonEncoder.withIndent('  ').convert(toJson());
+}
+
+/// One custom entry that will not parse costs that entry, not the file. Broad
+/// on purpose: a missing `repository` is a TypeError from the cast, an
+/// unknown engine a FormatException, and both are bad data, not bugs.
+List<CustomModelSpec> _customModelEntry(Map<String, Object?> json) {
+  try {
+    return [CustomModelSpec.fromJson(json)];
+  } catch (_) {
+    return const [];
+  }
 }

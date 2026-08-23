@@ -11,8 +11,8 @@ abstract interface class CacheProbe {
 }
 
 /// Sums and clears the contents of one directory. The directory itself is
-/// preserved; unreadable entries are skipped rather than failing the whole
-/// measurement.
+/// preserved; an unreadable entry is skipped, but a walk that fails outright
+/// throws — the breakdown reads that as unknown, and unknown is not zero.
 ///
 /// Partial model transfers are excluded from both. Android stages a small
 /// file's partial data in the cache directory — the very directory this
@@ -28,18 +28,16 @@ final class DirectoryCacheProbe implements CacheProbe {
     final directory = Directory(path);
     if (!await directory.exists()) return 0;
     var total = 0;
-    try {
-      await for (final entry in directory.list(
-        recursive: true,
-        followLinks: false,
-      )) {
-        if (entry is File && !isPartialTransferFile(entry)) {
-          try {
-            total += await entry.length();
-          } catch (_) {}
-        }
+    await for (final entry in directory.list(
+      recursive: true,
+      followLinks: false,
+    )) {
+      if (entry is File && !isPartialTransferFile(entry)) {
+        try {
+          total += await entry.length();
+        } catch (_) {}
       }
-    } catch (_) {}
+    }
     return total;
   }
 

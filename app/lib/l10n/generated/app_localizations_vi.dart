@@ -1020,7 +1020,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'Golem không có tài khoản, không gửi dữ liệu phân tích và bỏ quyền mạng sau khi tải mô hình. Không có gì cần từ chối.';
+      'Golem không có tài khoản và không gửi dữ liệu phân tích. Trò chuyện không cần mạng — Golem chỉ lên mạng khi bạn yêu cầu tải mô hình. Các cuộc trò chuyện không nằm trong bản sao lưu của điện thoại; hãy dùng Xuất để chuyển chúng. Không có gì cần từ chối.';
 
   @override
   String get onThisPhone => 'Trên điện thoại này';
@@ -1224,6 +1224,10 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get chatHistoryNotSaving =>
       'Lịch sử trò chuyện không được lưu. Các thay đổi mới nhất có thể bị mất khi bạn đóng ứng dụng.';
+
+  @override
+  String get chatHistoryPartlyUnreadable =>
+      'Một số cuộc trò chuyện không đọc được và đã được để riêng. Mọi thứ khác vẫn ở đây.';
 
   @override
   String get saving => 'Đang lưu…';

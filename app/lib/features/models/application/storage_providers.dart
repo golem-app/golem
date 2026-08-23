@@ -23,10 +23,9 @@ part 'storage_providers.g.dart';
 // flutter_riverpod (3.3.2) a widget-watched derivation over an async
 // controller trips Flutter's element-update invariant when a provider scope is
 // swapped mid-test, the class of bug fixed upstream in 3.4.0 ("markNeedsBuild
-// ... inside Widget lifecycle"). The pin cannot move on this SDK —
-// flutter_test's test_api caps analyzer below the ^13 the newer generator
-// needs, and the family is exact-pinned end to end (docs/notes/dependencies.md).
-// Revisit on the SDK bump (#38).
+// ... inside Widget lifecycle"). The family is exact-pinned end to end and
+// moves only as one reviewed `pub upgrade` (docs/notes/dependencies.md);
+// revisit when it does.
 //
 // All of it kept out of the doc comment, as in chat_providers.dart:
 // riverpod_generator copies those into three places in the .g.dart.
@@ -42,8 +41,8 @@ Future<StorageBreakdown> storageBreakdown(Ref ref) async {
   final history = ref.watch(chatHistoryRepositoryProvider);
   // Read straight, no tolerance for an absent seam (#127): launchOverrides
   // wires all five, so a missing one is a wiring mistake that should say so
-  // rather than render as a plausible partial breakdown. The service's fields
-  // stay nullable — a probe that *fails* still degrades to null.
+  // rather than render as a plausible partial breakdown. A probe that *fails*
+  // is a different matter and degrades to null inside the service.
   final attachments = ref.watch(attachmentRepositoryProvider);
   final cache = ref.watch(cacheProbeProvider);
   final free = ref.watch(diskFreeSpaceProbeProvider);

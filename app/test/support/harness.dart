@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
@@ -151,6 +152,7 @@ LaunchDependencies launchDependenciesWith({
   SettingsRepository? settings,
   PreferencesRepository? preferences,
   AttachmentRepository? attachments,
+  CacheProbe? cache,
   CustomRepositoryResolver? resolver,
   ChatHistoryRepository? chatHistory,
   ModelManagementRepository? models,
@@ -175,7 +177,7 @@ LaunchDependencies launchDependenciesWith({
     settingsRepository: settings ?? InMemorySettingsRepository(),
     preferencesRepository: preferences ?? InMemoryPreferencesRepository(),
     attachmentRepository: attachments ?? InMemoryAttachmentRepository(),
-    cacheProbe: FakeCacheProbe(),
+    cacheProbe: cache ?? FakeCacheProbe(),
     diskFreeSpaceProbe: const FakeDiskSpace(),
     inferenceRepository:
         inference ??
@@ -208,6 +210,7 @@ ProviderContainer buildContainer({
   SettingsRepository? settings,
   PreferencesRepository? preferences,
   AttachmentRepository? attachments,
+  CacheProbe? cache,
   CustomRepositoryResolver? resolver,
   ChatHistoryRepository? chatHistory,
   ModelManagementRepository? models,
@@ -225,6 +228,7 @@ ProviderContainer buildContainer({
         settings: settings,
         preferences: preferences,
         attachments: attachments,
+        cache: cache,
         resolver: resolver,
         chatHistory: chatHistory,
         models: models,
@@ -260,6 +264,7 @@ Future<void> pumpWithRepositories(
   SettingsRepository? settings,
   PreferencesRepository? preferences,
   AttachmentRepository? attachments,
+  CacheProbe? cache,
   CustomRepositoryResolver? resolver,
   ChatHistoryRepository? chatHistory,
   ModelManagementRepository? models,
@@ -277,6 +282,7 @@ Future<void> pumpWithRepositories(
     settings: settings,
     preferences: preferences,
     attachments: attachments,
+    cache: cache,
     resolver: resolver,
     chatHistory: chatHistory,
     models: models,
@@ -363,7 +369,7 @@ Future<void> pumpSearchScreen(
     ),
   );
   await tester.pumpAndSettle();
-  router.push('/search');
+  unawaited(router.push('/search'));
   await tester.pumpAndSettle();
 }
 

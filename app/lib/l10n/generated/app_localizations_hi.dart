@@ -1032,7 +1032,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'Golem में कोई खाता नहीं है, यह एनालिटिक्स नहीं भेजता और मॉडल डाउनलोड होने के बाद नेटवर्क अनुमति हटा देता है। बंद करने के लिए कुछ नहीं है।';
+      'Golem में कोई खाता नहीं है और यह एनालिटिक्स नहीं भेजता। चैट के लिए नेटवर्क की ज़रूरत नहीं — Golem तभी ऑनलाइन जाता है जब आप मॉडल डाउनलोड करने को कहें। चैट फ़ोन के बैकअप में नहीं जातीं; उन्हें ले जाने के लिए निर्यात का उपयोग करें। बंद करने के लिए कुछ नहीं है।';
 
   @override
   String get onThisPhone => 'इस फ़ोन पर';
@@ -1236,6 +1236,10 @@ class AppLocalizationsHi extends AppLocalizations {
   @override
   String get chatHistoryNotSaving =>
       'चैट इतिहास सहेजा नहीं जा रहा है। ऐप बंद करने पर आपके नए बदलाव खो सकते हैं।';
+
+  @override
+  String get chatHistoryPartlyUnreadable =>
+      'कुछ चैट पढ़ी नहीं जा सकीं और उन्हें अलग रख दिया गया। बाकी सब यहाँ है।';
 
   @override
   String get saving => 'सहेजा जा रहा है…';

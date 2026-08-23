@@ -160,6 +160,37 @@ Future<LaunchDependencies> composeLaunch({
   return dependencies;
 }
 
+/// The bound on one backup-exclusion call at launch. Generous for a flag
+/// write, and small beside the 8 s [launchDeadline] it would otherwise eat.
+const backupExclusionDeadline = Duration(seconds: 2);
+
+/// Nothing Golem stores leaves the phone, platform backups included (ADR
+/// 0016): chats, attachments and preferences in application support, model
+/// weights under documents. The flag on a directory covers its contents, so
+/// marking the two roots covers every store at once — and every launch, since
+/// the attribute lives on the directory the OS may recreate. Best effort and
+/// bounded: a channel that refuses *or hangs* must not take the launch down
+/// with it, the same rule the downloader start below follows. Android is
+/// skipped — the manifest keeps every store out statically.
+Future<void> keepOutOfBackups(
+  BackupExclusion exclusion,
+  Iterable<Directory> directories, {
+  Duration deadline = backupExclusionDeadline,
+}) async {
+  if (Platform.isAndroid) return;
+  await Future.wait([
+    for (final directory in directories)
+      Future<void>(() async {
+        final call = exclusion.exclude(directory.path);
+        try {
+          await call.timeout(deadline);
+        } on TimeoutException {
+          call.ignore();
+        } catch (_) {}
+      }),
+  ]);
+}
+
 Future<
   ({LaunchDependencies dependencies, BackgroundArtifactDownloader? downloader})
 >
@@ -185,6 +216,7 @@ _composeRequired({
   final support = await getApplicationSupportDirectory();
   final documents = await getApplicationDocumentsDirectory();
   final temporary = await getTemporaryDirectory();
+  await keepOutOfBackups(const DeviceStorageChannel(), [support, documents]);
   final stateFile = File('${support.path}/flutter-model-v2.json');
   final useFakeModels = useFakeModelManagement(
     identity: identity,

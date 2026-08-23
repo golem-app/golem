@@ -16,9 +16,12 @@ import 'package:golem_flutter/core/domain/resolved_repository.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
 import 'package:golem_flutter/core/repositories/contracts.dart';
 import 'package:golem_flutter/core/repositories/fake_repository_resolver.dart';
+import 'package:golem_flutter/core/services/cache_probe.dart';
+import 'package:golem_flutter/core/widgets/settings_rows.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
 import 'package:golem_flutter/features/settings/appearance_screen.dart';
+import 'package:golem_flutter/features/settings/storage_screen.dart';
 import 'package:golem_flutter/features/settings/models_screen.dart';
 import 'package:golem_flutter/features/settings/privacy_screen.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';
@@ -74,6 +77,17 @@ void main() {
       line.split(':')[1].trim().split('+').first,
       appVersion,
       reason: 'core/app_version.dart is hand-owned; bump both together',
+    );
+    // tool/device_install.sh stamps the commit so a tester can tell which
+    // build is in hand; a trailing + marks an uncommitted tree.
+    expect(aboutVersionLabel(version: '1.0.0', stamp: ''), '1.0.0');
+    expect(
+      aboutVersionLabel(version: '1.0.0', stamp: 'f722edc'),
+      '1.0.0 · f722edc',
+    );
+    expect(
+      aboutVersionLabel(version: '1.0.0', stamp: 'f722edc+'),
+      '1.0.0 · f722edc+',
     );
   });
 
@@ -195,6 +209,24 @@ void main() {
     expect(history.snapshot.conversations, isEmpty);
     expect(find.byKey(const Key('golem-toast')), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 1600));
+  }, variant: iosChrome);
+
+  testWidgets('a cache the probe cannot measure can still be cleared', (
+    tester,
+  ) async {
+    // Unknown is not zero (#154): a failed probe used to print 0 MB and, on
+    // that zero, disable the one action that would have freed the space.
+    await pumpWithRepositories(
+      tester,
+      cache: _ThrowingCacheProbe(),
+      child: const StorageScreen(),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('0 MB'), findsNothing);
+    expect(
+      tester.widget<SettingsNavRow>(find.byKey(const Key('clear-cache'))).onTap,
+      isNotNull,
+    );
   }, variant: iosChrome);
 
   testWidgets('a running download shows the dismissible note in its card', (
@@ -1035,4 +1067,11 @@ final class _PausableModels implements ModelManagementRepository {
 
   @override
   Future<ModelState> addModel(ModelCatalogEntry entry) async => _state;
+}
+
+final class _ThrowingCacheProbe implements CacheProbe {
+  @override
+  Future<int> sizeBytes() async => throw StateError('probe down');
+  @override
+  Future<void> clear() async {}
 }

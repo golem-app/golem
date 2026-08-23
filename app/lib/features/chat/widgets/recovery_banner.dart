@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -193,9 +195,11 @@ class _DownloadActiveModelButton extends ConsumerWidget {
             );
             if (!approved || !context.mounted) return;
           }
-          ref.read(modelControllerProvider.notifier).download(artifactKey);
+          unawaited(
+            ref.read(modelControllerProvider.notifier).download(artifactKey),
+          );
           // Progress, pause, and cancel live on the model card.
-          context.push('/settings/models');
+          unawaited(context.push('/settings/models'));
         },
         child: Text(
           context.l10n.downloadNamedModel(

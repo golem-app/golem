@@ -7,12 +7,15 @@ advertises them, are #27 (ADR `decisions/0007-supported-device-policy.md`).
 
 ## The supported tiers
 
-| Reported physical memory | Tier | Model |
+| Reported physical memory | Tier | Model (iOS / Android + macOS) |
 | --- | --- | --- |
-| ≥ 7 GiB | preferred | `gemma4-gguf` |
-| ≥ floor, < 7 GiB | light | `qwen35-2b-gguf` |
+| ≥ 7 GiB | preferred | Gemma 4 E2B — `gemma4-mlx` / `gemma4-gguf` |
+| ≥ floor, < 7 GiB | light | Qwen 3.5 2B — `qwen35-2b-mlx` / `qwen35-2b-gguf` |
 | < floor (Apple 4 GiB / Android 3 GiB) | unsupported | none |
-| unknown | light | `qwen35-2b-gguf` |
+| unknown | light | Qwen 3.5 2B |
+
+The engine is the platform's build-time composition (ADR 0012: MLX on iOS,
+llama.cpp/GGUF on Android and macOS); the tier chooses the family only.
 
 An arm64 Android CPU without `FEAT_DotProd` is unsupported at any memory
 size, and so is a simulator or emulator — the platform answers that one about
@@ -24,21 +27,31 @@ never refuses.
 
 ## iOS
 
-- **Install floor: iOS 15.0** (`IPHONEOS_DEPLOYMENT_TARGET`, all Runner
-  configurations). 15.0 is the minimum for
-  `com.apple.developer.kernel.increased-memory-limit`, which the app
-  ships (added with #62) so multi-gigabyte weights plus an 8192-token KV
-  cache fit under the jetsam ceiling on supported devices.
+- **Install floor: iOS 26.0** (`IPHONEOS_DEPLOYMENT_TARGET`, all twelve Runner
+  configurations) — the current major only, with iOS 27 weeks away. The
+  technical minimum is lower but not by much: the MLX carrier needs 17 and
+  is `dlopen`ed by the first native call (the launch probe), so anything
+  below it would start and die before its first frame rather than be refused
+  by the store. Every phone at or above the memory floor runs 26.
+  `com.apple.developer.kernel.increased-memory-limit` (added with #62, so
+  multi-gigabyte weights plus an 8192-token KV cache fit under the jetsam
+  ceiling) needs only 15.0 and holds. Decided in
+  [ADR 0016](decisions/0016-release-bundle-declarations.md).
 - **Store gate: A12.** `UIRequiredDeviceCapabilities` names `arm64` and
   `iphone-ipad-minimum-performance-a12`, so the App Store offers the app only
   to iPhone XS/XR and later. It is the closest mechanism iOS has to the
   memory floor — every A12-or-later iPhone has at least 3 GB — but it is not
   the floor: the 3 GB parts it admits are classified unsupported in the app.
   The key needs a deployment target of iOS 14 or later, and Apple permits
-  only expanding device requirements in an update.
+  only expanding device requirements in an update. With the install floor
+  at iOS 26 the A12 entry is redundant — no A12 phone runs 26 — but a
+  capability removed is a requirement contracted, so it stays.
 - **MLX engine floor: iOS 17** (the `InfernoMLXCarrier` SwiftPM platform
-  declaration). Shipping builds compose llama.cpp-Metal (ADR 0002), so
-  this floor only binds when MLX is enabled by dart-define.
+  declaration, `packages/inferno/native/apple/Package.swift`). Shipping iOS
+  builds compose MLX (ADR 0012), so this is the lowest the install floor
+  could honestly be; the install floor sits above it by choice. The
+  llama.cpp-Metal shim, reachable by dart-define, carries a lower floor of
+  its own that never decides anything.
 
 ## Android
 

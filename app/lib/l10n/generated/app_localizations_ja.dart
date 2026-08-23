@@ -983,7 +983,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'Golemにはアカウントがなく、解析データも送信しません。モデルのダウンロード後はネットワーク権限も破棄します。オプトアウトするものはありません。';
+      'Golemにはアカウントがなく、解析データも送信しません。チャットにネットワークは不要で、Golemがオンラインになるのはモデルの取得を求めたときだけです。チャットは端末のバックアップに含まれません。移行にはエクスポートを使ってください。オプトアウトするものはありません。';
 
   @override
   String get onThisPhone => 'この端末上';
@@ -1180,6 +1180,10 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get chatHistoryNotSaving =>
       'チャット履歴が保存されていません。アプリを閉じると最新の変更が失われる可能性があります。';
+
+  @override
+  String get chatHistoryPartlyUnreadable =>
+      '一部のチャットを読み込めなかったため、脇に退避しました。それ以外はすべてここにあります。';
 
   @override
   String get saving => '保存中…';

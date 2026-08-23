@@ -72,10 +72,17 @@ class ChatController extends _$ChatController {
     bridge.bindSessionState(() => state.value);
     final persistence = _persistence();
     final snapshot = await persistence.load();
-    await persistence.retainReferenced(snapshot.conversations);
+    // A recovered load keeps every attachment on disk until the notice is
+    // dismissed: what it could not read may still reference them, and the
+    // `.corrupt` copy beside the store is worth nothing if the pictures it
+    // names are gone. Saves run as usual; only the collection waits.
+    if (!snapshot.recovered) {
+      await persistence.retainReferenced(snapshot.conversations);
+    }
     final hydrated = ChatState(
       conversations: snapshot.conversations,
       activeId: snapshot.activeId,
+      historyRecovered: snapshot.recovered,
     );
     // Recorded, not published: the breakdown reads the store's bytes off disk,
     // so hydration changes no figure it reports.
@@ -140,7 +147,9 @@ class ChatController extends _$ChatController {
     if (!saveHistory) {
       // With history off, attachment bytes follow the live session instead of
       // a durable snapshot. No history write or retry is permitted here.
-      await persistence.retainReferenced(value.conversations);
+      if (!value.historyRecovered) {
+        await persistence.retainReferenced(value.conversations);
+      }
       _invalidateStorage(value, force: forceStorage);
       if (ref.mounted && epoch == _persistenceEpoch) {
         _setPersistencePhase(ChatPersistencePhase.idle);
@@ -161,7 +170,9 @@ class ChatController extends _$ChatController {
     // newer durable snapshot still references.
     if (epoch != _persistenceEpoch) return;
     if (ref.mounted) _setPersistencePhase(ChatPersistencePhase.idle);
-    await persistence.retainReferenced(snapshot.conversations);
+    if (!value.historyRecovered) {
+      await persistence.retainReferenced(snapshot.conversations);
+    }
     // Last, so the probes read the bytes this attempt wrote and the ones its
     // attachment collection freed. A failed write above returns without
     // recording the volume, which is what lets a later Retry republish.
@@ -180,6 +191,15 @@ class ChatController extends _$ChatController {
   Future<void> persistCurrent() async {
     if (!state.hasValue) return;
     await _persist(_value, forceStorage: true);
+  }
+
+  /// Dismisses the read-side notice; nothing to retry, the loss already
+  /// happened and the `.corrupt` copy is beside the store for inspection.
+  /// Attachment collection resumes with the next save.
+  void acknowledgeRecovery() {
+    final current = state.value;
+    if (current == null || !current.historyRecovered) return;
+    state = AsyncData(current.copyWith(historyRecovered: false));
   }
 
   /// User-triggered recovery for the standing persistence notice. The latest

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -189,7 +190,7 @@ void main() {
           'GOLEM_CELL install $key from=$source '
           'bytes=${before.downloadedBytes} total=${entry.totalBytes}',
         );
-        models.download(key);
+        unawaited(models.download(key));
         var verifying = false;
         await pumpUntil(tester, '$key to install', () {
           final status = providers

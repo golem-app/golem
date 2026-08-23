@@ -206,6 +206,63 @@ void main() {
     );
   });
 
+  test(
+    'one unreadable conversation costs that conversation, not the store',
+    () {
+      final good = ChatConversation(
+        id: 'good',
+        title: 'Kept',
+        updatedAt: DateTime.utc(2026, 8, 1),
+        messages: const [],
+      ).toJson();
+      final snapshot = ChatHistorySnapshot.fromJson({
+        'schemaVersion': ChatHistorySnapshot.schemaVersion,
+        'activeConversationId': 'bad',
+        'conversations': [
+          good,
+          {...good, 'id': 'bad', 'messages': 'not a list'},
+        ],
+      });
+      expect(snapshot.conversations.map((c) => c.id), ['good']);
+      expect(snapshot.activeId, 'good');
+      expect(snapshot.recovered, isTrue);
+      // Nothing lost, nothing reported — and the flag is a fact about the load,
+      // never about the history, so a round trip does not carry it.
+      final clean = ChatHistorySnapshot.fromJson(
+        jsonDecode(snapshot.encode()) as Map<String, Object?>,
+      );
+      expect(clean.recovered, isFalse);
+
+      // The enum leaves every store reads fall to their defaults rather than
+      // throwing an ArgumentError the quarantine would turn into a lost file.
+      expect(
+        ArtifactStatus.fromJson({'phase': 'teleporting'}).phase,
+        ArtifactPhase.notDownloaded,
+      );
+      expect(
+        ModelState.fromJson({
+          'schemaVersion': ModelState.schemaVersion,
+          'artifacts': <String, Object?>{},
+          'runtime': 'dreaming',
+        }).runtime,
+        RuntimePhase.unloaded,
+      );
+      final preferences = AppPreferences.fromJson({
+        'schemaVersion': AppPreferences.schemaVersion,
+        'theme': 'sepia',
+        'responseStyles': {'gemma4': 'verbose', 'qwen35': 'precise'},
+        'customModels': [
+          {'repository': 'x/y', 'engine': 'tpu'},
+          {'engine': 'mlx'},
+          {'repository': 'x/z', 'engine': 'mlx'},
+        ],
+      });
+      expect(preferences.theme, ThemeSetting.system);
+      expect(preferences.responseStyles, {'qwen35': ResponseStyle.precise});
+      expect(preferences.customModels.map((m) => m.repository), ['x/z']);
+    },
+  );
+
   test('reasoning is excluded from future prompt context', () {
     final conversation = ChatConversation(
       id: 'chat',

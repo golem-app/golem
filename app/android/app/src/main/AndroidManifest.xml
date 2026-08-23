@@ -7,12 +7,16 @@
          never gains read access to the gallery. -->
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <!-- Nothing Golem stores leaves the phone (ADR 0016): allowBackup off
+         keeps every store out of Google backup, and because some
+         manufacturers' devices still run device-to-device transfer with it
+         off, the extraction rules exclude every domain from that path too. -->
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:supportsRtl="true"
-        android:fullBackupContent="@xml/backup_rules"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules">
         <activity
             android:name=".MainActivity"

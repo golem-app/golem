@@ -1020,7 +1020,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'Golem hesap tutmaz, analiz verisi göndermez ve model indirildikten sonra ağ iznini kaldırır. Devre dışı bırakılacak hiçbir şey yoktur.';
+      'Golem hesap tutmaz ve analiz verisi göndermez. Sohbet için ağ gerekmez; Golem yalnızca bir model indirmesini istediğinizde çevrimiçi olur. Sohbetler telefon yedeklerine girmez; taşımak için Dışa Aktar’ı kullanın. Devre dışı bırakılacak hiçbir şey yoktur.';
 
   @override
   String get onThisPhone => 'Bu telefonda';
@@ -1223,6 +1223,10 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get chatHistoryNotSaving =>
       'Sohbet geçmişi kaydedilmiyor. Uygulamayı kapattığınızda son değişiklikleriniz kaybolabilir.';
+
+  @override
+  String get chatHistoryPartlyUnreadable =>
+      'Bazı sohbetler okunamadı ve bir kenara ayrıldı. Diğer her şey burada.';
 
   @override
   String get saving => 'Kaydediliyor…';

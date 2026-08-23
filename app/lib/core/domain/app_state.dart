@@ -107,6 +107,7 @@ final class ChatState {
     this.generation = GenerationPhase.idle,
     this.failure,
     this.persistencePhase = ChatPersistencePhase.idle,
+    this.historyRecovered = false,
     this.hasUnsavedAssistant = false,
   });
 
@@ -115,6 +116,13 @@ final class ChatState {
   final GenerationPhase generation;
   final ChatFailure? failure;
   final ChatPersistencePhase persistencePhase;
+
+  /// The read-side notice: hydration set aside something it could not read.
+  /// Orthogonal to [persistencePhase], which is the write side and moves on
+  /// every save; this clears only when the user dismisses it, and while it
+  /// stands no attachment is collected — the `.corrupt` copy beside the
+  /// store still names them.
+  final bool historyRecovered;
 
   final bool hasUnsavedAssistant;
 
@@ -133,6 +141,7 @@ final class ChatState {
     ChatFailure? failure,
     bool clearFailure = false,
     ChatPersistencePhase? persistencePhase,
+    bool? historyRecovered,
     bool? hasUnsavedAssistant,
   }) => ChatState(
     conversations: conversations ?? _conversations,
@@ -140,6 +149,7 @@ final class ChatState {
     generation: generation ?? this.generation,
     failure: clearFailure ? null : failure ?? this.failure,
     persistencePhase: persistencePhase ?? this.persistencePhase,
+    historyRecovered: historyRecovered ?? this.historyRecovered,
     hasUnsavedAssistant: hasUnsavedAssistant ?? this.hasUnsavedAssistant,
   );
 }

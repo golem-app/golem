@@ -1018,7 +1018,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'Golem tidak memiliki akun, tidak mengirim analitik, dan melepaskan izin jaringan setelah model diunduh. Tidak ada yang perlu dinonaktifkan.';
+      'Golem tidak memiliki akun dan tidak mengirim analitik. Mengobrol tidak memerlukan jaringan — Golem hanya online saat Anda memintanya mengunduh model. Chat tidak masuk ke cadangan ponsel; gunakan Ekspor untuk memindahkannya. Tidak ada yang perlu dinonaktifkan.';
 
   @override
   String get onThisPhone => 'Di ponsel ini';
@@ -1222,6 +1222,10 @@ class AppLocalizationsId extends AppLocalizations {
   @override
   String get chatHistoryNotSaving =>
       'Riwayat percakapan tidak disimpan. Perubahan terbaru Anda dapat hilang saat aplikasi ditutup.';
+
+  @override
+  String get chatHistoryPartlyUnreadable =>
+      'Beberapa chat tidak dapat dibaca dan disisihkan. Semua yang lain ada di sini.';
 
   @override
   String get saving => 'Menyimpan…';

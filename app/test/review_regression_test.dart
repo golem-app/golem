@@ -72,8 +72,23 @@ void main() {
     await file.writeAsString('{"schemaVersion": 99, "conversations": ');
     final snapshot = await FileChatHistoryRepository(file).load();
     expect(snapshot.conversations, isEmpty);
+    expect(snapshot.recovered, isTrue);
     expect(File('${file.path}.corrupt').existsSync(), isTrue);
     expect(file.existsSync(), isFalse);
+
+    // A partial loss decodes, so nothing renames it away — the bytes the
+    // decoder set aside are copied beside the store before the next save
+    // replaces them with the survivors (#154).
+    await File('${file.path}.corrupt').delete();
+    const partial =
+        '{"schemaVersion": 3, "conversations": [{"id": "bad"}], '
+        '"activeConversationId": "bad"}';
+    await file.writeAsString(partial);
+    final partly = await FileChatHistoryRepository(file).load();
+    expect(partly.conversations, isEmpty);
+    expect(partly.recovered, isTrue);
+    expect(await File('${file.path}.corrupt').readAsString(), partial);
+    expect(file.existsSync(), isTrue);
   });
 
   test('concurrent chat saves serialize; the last snapshot wins', () async {

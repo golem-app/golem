@@ -1778,7 +1778,7 @@ abstract class AppLocalizations {
   /// Privacy screen summary.
   ///
   /// In en, this message translates to:
-  /// **'Golem holds no account, sends no analytics, and drops its network permission once a model is downloaded. There is nothing to opt out of.'**
+  /// **'Golem holds no account and sends no analytics. Chatting needs no network — Golem goes online only when you ask it to fetch a model. Chats stay out of phone backups; use Export to move them. There is nothing to opt out of.'**
   String get privacyStatement;
 
   /// Local data settings section.
@@ -2104,6 +2104,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Chat history isn’t saving. Your latest changes could be lost when you close the app.'**
   String get chatHistoryNotSaving;
+
+  /// Chat history read-recovery banner: some conversations were unreadable and quarantined.
+  ///
+  /// In en, this message translates to:
+  /// **'Some chats couldn’t be read and were set aside. Everything else is here.'**
+  String get chatHistoryPartlyUnreadable;
 
   /// In-progress persistence action.
   ///

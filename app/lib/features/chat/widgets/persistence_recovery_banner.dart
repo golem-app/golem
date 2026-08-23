@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,13 +13,22 @@ import '../application/chat_providers.dart';
 /// stale. This is separate from generation recovery because saving history
 /// must never modify, retry, or discard an inference turn.
 class PersistenceRecoveryBanner extends ConsumerWidget {
-  const PersistenceRecoveryBanner({required this.phase, super.key});
+  const PersistenceRecoveryBanner({
+    required this.phase,
+    this.historyRecovered = false,
+    super.key,
+  });
 
   final ChatPersistencePhase phase;
+
+  /// The read-side notice. A write failure outranks it while one stands —
+  /// that one has an action — and it returns once the write recovers.
+  final bool historyRecovered;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final retrying = phase == ChatPersistencePhase.retrying;
+    final recovered = historyRecovered && phase == ChatPersistencePhase.idle;
     List<Widget> messageChildren() => [
       const ExcludeSemantics(
         child: Icon(
@@ -30,20 +41,33 @@ class PersistenceRecoveryBanner extends ConsumerWidget {
         child: Semantics(
           liveRegion: true,
           child: Text(
-            context.l10n.chatHistoryNotSaving,
+            recovered
+                ? context.l10n.chatHistoryPartlyUnreadable
+                : context.l10n.chatHistoryNotSaving,
             style: GolemText.footnote,
           ),
         ),
       ),
     ];
 
+    // The read-side notice has nothing to retry: the loss already happened,
+    // so its only affordance is to be put away.
     Widget retryButton() => GolemTappable(
-      key: const Key('retry-chat-persistence'),
+      key: Key(recovered ? 'dismiss-chat-recovery' : 'retry-chat-persistence'),
       padding: const EdgeInsets.symmetric(horizontal: 8),
       onPressed: retrying
           ? null
-          : () => ref.read(chatControllerProvider.notifier).retryPersistence(),
-      child: retrying
+          : () {
+              final controller = ref.read(chatControllerProvider.notifier);
+              if (recovered) {
+                controller.acknowledgeRecovery();
+              } else {
+                unawaited(controller.retryPersistence());
+              }
+            },
+      child: recovered
+          ? Text(context.l10n.done)
+          : retrying
           ? Row(
               mainAxisSize: MainAxisSize.min,
               children: [

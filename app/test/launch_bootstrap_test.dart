@@ -11,6 +11,7 @@ import 'package:golem_flutter/app/bootstrap.dart';
 import 'package:golem_flutter/app/launch_composition.dart';
 import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
+import 'package:golem_flutter/core/services/device_storage.dart';
 
 import 'support/harness.dart';
 
@@ -176,6 +177,51 @@ void main() {
     );
   });
 
+  test(
+    'composition keeps both storage roots out of platform backups',
+    () async {
+      // Nothing Golem stores leaves the phone (ADR 0016): application support
+      // holds chats, attachments and preferences, documents holds the weights,
+      // and the flag on each root covers everything beneath it.
+      final root = Directory.systemTemp.createTempSync('golem-backup-');
+      addTearDown(() => root.deleteSync(recursive: true));
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      const paths = MethodChannel('plugins.flutter.io/path_provider');
+      const storage = MethodChannel('app.golem/storage');
+      final excluded = <String>[];
+      messenger.setMockMethodCallHandler(
+        paths,
+        (call) async => '${root.path}/${call.method}',
+      );
+      messenger.setMockMethodCallHandler(storage, (call) async {
+        if (call.method == 'excludeFromBackup') {
+          excluded.add((call.arguments as Map)['path'] as String);
+        }
+        return null;
+      });
+      // Best effort and bounded: a channel that never answers the flag write
+      // must not hold the launch past its own deadline.
+      await expectLater(
+        keepOutOfBackups(
+          _HangingExclusion(),
+          [root],
+          deadline: const Duration(milliseconds: 20),
+        ).timeout(const Duration(seconds: 1)),
+        completes,
+      );
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(paths, null);
+        messenger.setMockMethodCallHandler(storage, null);
+      });
+      await composeLaunch(identity: AppIdentity.qa);
+      expect(excluded, [
+        '${root.path}/getApplicationSupportDirectory',
+        '${root.path}/getApplicationDocumentsDirectory',
+      ]);
+    },
+  );
+
   group('classifyLaunchFailure', () {
     test('timeout is timedOut', () {
       expect(
@@ -204,4 +250,9 @@ void main() {
       expect(failure.retryable, isTrue);
     });
   });
+}
+
+final class _HangingExclusion implements BackupExclusion {
+  @override
+  Future<void> exclude(String path) => Completer<void>().future;
 }
