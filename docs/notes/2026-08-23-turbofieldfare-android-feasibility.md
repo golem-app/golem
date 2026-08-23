@@ -355,6 +355,50 @@ and the model, not of the runtime — so on UFS 3.1 it lands in the same
 phone whose flash sustains ≥ 2.5 GB/s at 3 MB random reads (UFS 4.x class)
 would put the mean token at ≈ 6 tok/s and a 512-token prefill near 25 s.
 
+## Levers checked, March–August 2026
+
+A second pass asked what recent work would change the terms above. One
+more measurement was taken for it: the router's actual choices over 1,552
+decode tokens of the seven prompts, logged from the decode loop.
+
+- **Expert pruning (REAP, Cerebras 2510.13999; community 30 % Gemma 4
+  checkpoints).** The routing is flat by construction: every layer uses
+  110–126 of its 128 experts; the top-32 cover 63 % of activations and 96
+  are needed for 98 %; each prompt's top-32 overlaps the global top-32 by
+  55 %. A pool that fits RAM discards a third of what the router asks for,
+  and the published checkpoints show it (World Religions 90 → 48 at 30 %).
+  Not a lever for a general assistant.
+- **Lower-bit experts.** The model quantizes unusually badly (3.3× the
+  dense 31B's KL divergence at Q8; localbench, 2026-04-14) and its smallest
+  2-bit GGUF is 9.9 GB. Does not fit; hurts.
+- **Prefetch and expert prediction** (HOBBIT 96 % next-layer; SpecPrefetch
+  2607.24787, +8 % on a Snapdragon 8 Elite). Overlap only: bounded by the
+  68 ms of compute under 235 ms of I/O — the ceiling column above.
+- **Cache policy** (FlashMoE 2601.17063): +7 % end to end on the
+  128-expert model in its own table; a Belady oracle is worth ≈ 13 points
+  of hit rate (2608.18261).
+- **Speculative decoding with streamed experts** (AcceptMoE 2608.02989,
+  DraftExpert 2607.24434): verifying a 4-token draft touches ≈ 2.7× the
+  experts; Google notes the 26B's "unique routing challenges at batch size
+  1". Raises bytes per token.
+- **Larger prefill tiles** — the one real lever, and it is the iOS port's:
+  TurboFieldfare PR #53 (open 2026-08-02) takes the chunk to 4096 tokens,
+  prefill reads 182 → 14 GB on its long prompt, outputs byte-identical. On
+  this phone that is ≈ 26 s for 512 tokens and ≈ 45 s for a 1.2k-token
+  turn, against ≈ 6 s for the dense model shipped today.
+- **Independent phone measurement of this model** (BigMoeOnEdge, stock
+  llama.cpp, 12 GB phone, UFS 4.x, 4 GB expert cache): **2.8 tok/s** at
+  top-8; 5.0 only at top-6, which changes the output. No prefill numbers.
+- **Platform**: UFS 4.1 shares 4.0's PHY and UFS 5.0 devices are 2027;
+  Android 17's memory limiter charges page cache to the app (8 GiB visible
+  on a 12 GB device) and lmkd kills on page-cache refault thrashing; `O_DIRECT`
+  silently falls back to buffered I/O without inline encryption. llama.cpp's
+  disk-streaming PR #25294 has had no maintainer review since 2026-07-04;
+  MLX has nothing merged; Apple's AFM 3 routes experts per prompt because
+  "NAND-to-DRAM bandwidth is too slow to swap weights token by token".
+
+None of it moves decode out of the 2–4 tok/s band on this class of device.
+
 ## Recommendation
 
 Do not port TurboFieldfare to Android now, in any of the three shapes.
@@ -369,6 +413,12 @@ keep the following invariants, which the spike found to be load-bearing:
    1–2 into aligned slots, with a ≥ 512-token prefill tile, and is measured
    with `tool/expert_read_probe.c` on the candidate device *before* any
    engine work.
+
+Two things the pass did surface that are worth doing, neither of them
+streaming: the Gemma 4 QAT repositories ship MTP drafters (60–100 MB) that
+llama.cpp auto-discovers — a free decode speedup on the resident models
+Golem already ships, with unchanged output; and the prefill-tile change above
+belongs in the iOS port's plan.
 
 Proposed follow-ups (drafted, not filed): an Android memory channel in
 `INFERNO_METRICS` (RSS and major faults — `peakPhysicalFootprintBytes` is
