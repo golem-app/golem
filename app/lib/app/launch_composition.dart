@@ -160,6 +160,25 @@ Future<LaunchDependencies> composeLaunch({
   return dependencies;
 }
 
+/// Nothing Golem stores leaves the phone, platform backups included (ADR
+/// 0016): chats, attachments and preferences in application support, model
+/// weights under documents. The flag on a directory covers its contents, so
+/// marking the two roots covers every store at once — and every launch, since
+/// the attribute lives on the directory the OS may recreate. Best effort: a
+/// channel that refuses must not take the launch down, and Android needs no
+/// call at all because `allowBackup` is off in the manifest.
+Future<void> keepOutOfBackups(
+  BackupExclusion exclusion,
+  Iterable<Directory> directories,
+) async {
+  for (final directory in directories) {
+    try {
+      await directory.create(recursive: true);
+      await exclusion.exclude(directory.path);
+    } catch (_) {}
+  }
+}
+
 Future<
   ({LaunchDependencies dependencies, BackgroundArtifactDownloader? downloader})
 >
@@ -185,6 +204,7 @@ _composeRequired({
   final support = await getApplicationSupportDirectory();
   final documents = await getApplicationDocumentsDirectory();
   final temporary = await getTemporaryDirectory();
+  await keepOutOfBackups(const DeviceStorageChannel(), [support, documents]);
   final stateFile = File('${support.path}/flutter-model-v2.json');
   final useFakeModels = useFakeModelManagement(
     identity: identity,

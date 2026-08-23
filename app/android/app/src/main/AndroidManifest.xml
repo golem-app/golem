@@ -7,13 +7,15 @@
          never gains read access to the gallery. -->
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <!-- Nothing Golem stores leaves the phone: allowBackup off keeps chats,
+         attachments and preferences out of Google backup and device transfer
+         alike, and model weights were never worth copying (ADR 0016). -->
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:supportsRtl="true"
-        android:fullBackupContent="@xml/backup_rules"
-        android:dataExtractionRules="@xml/data_extraction_rules">
+        android:allowBackup="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"

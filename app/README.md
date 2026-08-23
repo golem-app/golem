@@ -116,9 +116,10 @@ mirroring the Inferno manifest) and downloads artifacts from Hugging Face
 with SHA-256 verification of every file once the whole artifact has arrived,
 pause/resume, cancel, disk-space preflight, and delete. Downloads install under
 `Documents/models/<catalog-key>/` — resolvable as
-`documents:models/<catalog-key>/<file>` — and are excluded from platform
-backups (iOS/macOS `NSURLIsExcludedFromBackupKey`, Android
-`dataExtractionRules`).
+`documents:models/<catalog-key>/<file>`. They are excluded from platform
+backups like everything else the app stores (iOS/macOS
+`NSURLIsExcludedFromBackupKey` on both storage roots at launch, Android
+`allowBackup="false"`; ADR 0016).
 
 Transfers outlive the app process, so they are **reconciled** rather than
 remembered: at startup and on every return to the foreground the app asks the
@@ -144,8 +145,10 @@ llama.cpp/GGUF, which loads a pinned `mmproj` projector beside its weights
 design: `../docs/decisions/0004-image-input.md`). Attached images are copied
 into an app-owned store under application support, referenced by opaque id so
 no transcript or export can leak a source path, and collected as soon as no
-conversation mentions them. Unlike model weights they are kept in platform
-backups — a model is re-fetchable, a photo is not.
+conversation mentions them. Like every other store they stay out of platform
+backups: nothing Golem holds leaves the phone
+(`../docs/decisions/0016-release-bundle-declarations.md`), and Export every
+chat is the way to carry a history to a new device.
 
 Per-model **generation settings** (temperature, top-p, top-k, max tokens,
 context length) live in Settings ▸ Response style's Advanced sampling

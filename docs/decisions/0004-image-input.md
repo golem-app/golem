@@ -2,6 +2,11 @@
 
 Status: decided on `feat/18-image-input` (issue #18, epic #10)
 
+The backup half of "Attachments are app-owned, and not excluded from backup"
+is superseded by [ADR 0016](0016-release-bundle-declarations.md): every store,
+attachments included, now stays out of platform backups. The app-owned store,
+opaque ids and `retainOnly` collection stand as written.
+
 ## The ABI carries images outside JSON
 
 Generation requests cross the C ABI as one JSON payload. Images do not join it:

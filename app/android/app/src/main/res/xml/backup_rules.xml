@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Pre-Android-12 backup rules: downloaded model artifacts are re-fetchable
-     pinned content and must stay out of device backups. path_provider's
-     application documents directory is app_flutter/ under the app data root. -->
-<full-backup-content>
-    <exclude domain="root" path="app_flutter/models"/>
-</full-backup-content>

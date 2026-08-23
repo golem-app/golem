@@ -176,6 +176,41 @@ void main() {
     );
   });
 
+  test(
+    'composition keeps both storage roots out of platform backups',
+    () async {
+      // Nothing Golem stores leaves the phone (ADR 0016): application support
+      // holds chats, attachments and preferences, documents holds the weights,
+      // and the flag on each root covers everything beneath it.
+      final root = Directory.systemTemp.createTempSync('golem-backup-');
+      addTearDown(() => root.deleteSync(recursive: true));
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      const paths = MethodChannel('plugins.flutter.io/path_provider');
+      const storage = MethodChannel('app.golem/storage');
+      final excluded = <String>[];
+      messenger.setMockMethodCallHandler(
+        paths,
+        (call) async => '${root.path}/${call.method}',
+      );
+      messenger.setMockMethodCallHandler(storage, (call) async {
+        if (call.method == 'excludeFromBackup') {
+          excluded.add((call.arguments as Map)['path'] as String);
+        }
+        return null;
+      });
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(paths, null);
+        messenger.setMockMethodCallHandler(storage, null);
+      });
+      await composeLaunch(identity: AppIdentity.qa);
+      expect(excluded, [
+        '${root.path}/getApplicationSupportDirectory',
+        '${root.path}/getApplicationDocumentsDirectory',
+      ]);
+    },
+  );
+
   group('classifyLaunchFailure', () {
     test('timeout is timedOut', () {
       expect(

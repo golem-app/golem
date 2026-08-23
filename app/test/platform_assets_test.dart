@@ -312,23 +312,13 @@ void main() {
       manifest,
       contains('<uses-permission android:name="android.permission.INTERNET"/>'),
     );
-    expect(
-      manifest,
-      contains('android:dataExtractionRules="@xml/data_extraction_rules"'),
-    );
-    expect(manifest, contains('android:fullBackupContent="@xml/backup_rules"'));
-    // Downloaded models are re-fetchable and must stay out of backups and
-    // device transfers on every rules surface.
-    for (final rules in [
-      'android/app/src/main/res/xml/backup_rules.xml',
-      'android/app/src/main/res/xml/data_extraction_rules.xml',
-    ]) {
-      expect(
-        await File(rules).readAsString(),
-        contains('<exclude domain="root" path="app_flutter/models"/>'),
-        reason: rules,
-      );
-    }
+    // Nothing Golem stores leaves the phone (ADR 0016): chats, attachments,
+    // preferences and weights all stay out of Google backup and device
+    // transfer, which one switch states and no rules file can contradict.
+    expect(manifest, contains('android:allowBackup="false"'));
+    expect(manifest, isNot(contains('BackupContent')));
+    expect(manifest, isNot(contains('dataExtractionRules')));
+    expect(Directory('android/app/src/main/res/xml').existsSync(), isFalse);
 
     final activity = await File(_mainActivity).readAsString();
     expect(activity, contains('package app.golem\n'));

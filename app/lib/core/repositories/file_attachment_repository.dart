@@ -4,8 +4,8 @@ import '../domain/models.dart' show newId;
 import 'contracts.dart';
 
 /// Attachments on disk, one file per image, under a directory this app owns.
-/// Deliberately *not* excluded from backup, unlike model weights: a model is
-/// re-fetchable from Hugging Face, a user's photo is not.
+/// Out of platform backups with every other store (ADR 0016): a picture a
+/// user attached never leaves the phone, and Export is the migration path.
 final class FileAttachmentRepository implements AttachmentRepository {
   FileAttachmentRepository(this.directory);
 
