@@ -13,8 +13,11 @@ an open decision (§1.2, §5.1, §16.3) and makes enabling them an ADR trigger
 `strict-casts` and `strict-raw-types` are on. Measured on `main` @ `67cfb8b`
 with the #154 branch applied, both modes report nothing: every store already
 casts explicitly through a `fromJson` factory, so the modes cost no code and
-guard what is there. Generated Dart (`lib/l10n/generated/**`, `**/*.g.dart`)
-is excluded — it carries its own suppressions and is never hand-edited.
+guard what is there. Generated Dart stays analyzed: a `.g.dart` is a part of a
+hand-written library, and excluding it would hide a stale part's hard errors
+from the one analyzer gate the repository runs (review of PR #155 proved an
+excluded part with a type error analyzes clean). Its lints carry their own
+pragmas, so nothing is lost by keeping it in.
 
 Two of the five lints `packages/inferno` runs joined the app:
 

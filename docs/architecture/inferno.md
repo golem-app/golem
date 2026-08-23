@@ -19,8 +19,8 @@ ChatController -> InferenceRepository -> app/lib/broker
 `auto` is platform-owned (ADR 0012): iOS composes MLX, Android composes
 llama.cpp/GGUF, macOS keeps llama.cpp. The starred cells are reachable by
 `GOLEM_INFERENCE_BACKEND=llama|mlx` and carry no default; iOS ships the MLX
-carrier alone, which is why the iOS install floor is the carrier's iOS 17
-(ADR 0016).
+carrier alone, whose iOS 17 is the lowest the install floor could be — it is
+set to the current major instead (ADR 0016).
 
 Inferno receives a local path and has no networking. Model acquisition,
 verification UI, and catalog UI are separate concerns. The package owns one

@@ -28,16 +28,25 @@ ships encrypts data at rest or in transit on its own. Declaring it spares
 every TestFlight upload the export-compliance prompt; a future dependency
 that adds proprietary encryption reverses this decision, not the key alone.
 
-## The iOS floor is 17.0, the engine's own
+## The iOS floor is the current major: 26.0
 
-ADR 0012 made MLX the iOS engine. The MLX carrier declares iOS 17, and it is
-not linked at launch but `dlopen`ed by the first native call — the launch
-probe — so with the old 15.0 floor an iPhone on iOS 15 or 16 would install,
-launch, and die at that call with an error nothing catches. The floor is now
-the carrier's: `IPHONEOS_DEPLOYMENT_TARGET = 17.0` in every configuration.
-Every A12-or-later iPhone, the store gate from ADR 0007, runs iOS 17, so the
-two describe the same phones. Apple allows requirements to expand in an update
-and never to contract, so 17 is the value to be right about first.
+Two facts set it. The technical one: ADR 0012 made MLX the iOS engine, the
+MLX carrier declares iOS 17, and it is not linked at launch but `dlopen`ed by
+the first native call — the launch probe — so with the old 15.0 floor an
+iPhone on iOS 15 or 16 would install, launch, and die at that call with an
+error nothing catches. Seventeen is therefore the lowest honest value. The
+product one decides: 1.0 ships weeks before iOS 27, every phone that can run
+the app's memory floor (the iPhone 12 and up, ADR 0007) runs iOS 26, and a
+floor of one major means one OS to test against and no legacy path to keep
+honest. `IPHONEOS_DEPLOYMENT_TARGET = 26.0` in every configuration.
+
+What it gives up: the iPhone XS/XR/11-generation phones that stopped at iOS
+18 — all of them below or at the 4 GB memory floor anyway — and users of a
+supported phone who have not updated. Apple allows requirements to expand in
+an update and never to contract, so the floor can move to 27 later but never
+back down. `UIRequiredDeviceCapabilities` keeps its A12 entry: it is now
+redundant rather than wrong, and removing a capability is a contraction the
+store may refuse.
 
 ## Nothing Golem stores leaves the phone — backups included
 
