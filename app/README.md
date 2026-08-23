@@ -119,7 +119,7 @@ pause/resume, cancel, disk-space preflight, and delete. Downloads install under
 `documents:models/<catalog-key>/<file>`. They are excluded from platform
 backups like everything else the app stores (iOS/macOS
 `NSURLIsExcludedFromBackupKey` on both storage roots at launch, Android
-`allowBackup="false"`; ADR 0016).
+`allowBackup="false"` plus extraction rules for device transfer; ADR 0016).
 
 Transfers outlive the app process, so they are **reconciled** rather than
 remembered: at startup and on every return to the foreground the app asks the

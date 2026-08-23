@@ -56,8 +56,11 @@ The decision is the strict one. Every store is excluded:
   contents, so every store — chats, attachments, both preference files, model
   state, weights — is covered at once; the per-download exclusion of
   `models/` stays as belt and braces.
-- **Android:** `android:allowBackup="false"`. With nothing left worth copying
-  there is no rules file to keep true; both `res/xml` rule files are gone.
+- **Android:** `android:allowBackup="false"` for cloud backup, plus
+  `dataExtractionRules` excluding every domain from both `<cloud-backup>`
+  and `<device-transfer>`, because on some manufacturers' devices the switch
+  alone leaves device-to-device transfer running. The pre-12
+  `fullBackupContent` file is gone; `allowBackup` covers that regime.
 
 What this costs: a new phone does not carry chats over. Settings ▸ Privacy &
 data ▸ Export every chat is the migration path, and the Privacy screen's

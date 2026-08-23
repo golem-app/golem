@@ -312,13 +312,36 @@ void main() {
       manifest,
       contains('<uses-permission android:name="android.permission.INTERNET"/>'),
     );
-    // Nothing Golem stores leaves the phone (ADR 0016): chats, attachments,
-    // preferences and weights all stay out of Google backup and device
-    // transfer, which one switch states and no rules file can contradict.
+    // Nothing Golem stores leaves the phone (ADR 0016). allowBackup off is
+    // the cloud half; some manufacturers keep device-to-device transfer on
+    // regardless, so the extraction rules must exclude every domain from
+    // both paths as well.
     expect(manifest, contains('android:allowBackup="false"'));
     expect(manifest, isNot(contains('BackupContent')));
-    expect(manifest, isNot(contains('dataExtractionRules')));
-    expect(Directory('android/app/src/main/res/xml').existsSync(), isFalse);
+    expect(
+      manifest,
+      contains('android:dataExtractionRules="@xml/data_extraction_rules"'),
+    );
+    final rules = await File(
+      'android/app/src/main/res/xml/data_extraction_rules.xml',
+    ).readAsString();
+    for (final section in ['cloud-backup', 'device-transfer']) {
+      final body = rules.split('<$section>')[1].split('</$section>')[0];
+      for (final domain in [
+        'root',
+        'file',
+        'database',
+        'sharedpref',
+        'external',
+      ]) {
+        expect(
+          body,
+          contains('<exclude domain="$domain" path="."/>'),
+          reason: '$section/$domain',
+        );
+      }
+      expect(body, isNot(contains('<include')), reason: section);
+    }
 
     final activity = await File(_mainActivity).readAsString();
     expect(activity, contains('package app.golem\n'));

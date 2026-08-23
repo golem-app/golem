@@ -52,8 +52,8 @@ class MainActivity : FlutterActivity() {
                 } catch (error: Exception) {
                     result.error("total-bytes", error.message, null)
                 }
-                // Backup exclusion is static on Android: the manifest's
-                // allowBackup="false" already keeps every store out.
+                // Backup exclusion is static on Android: allowBackup="false"
+                // plus the extraction rules already keep every store out.
                 "excludeFromBackup" -> result.success(null)
                 else -> result.notImplemented()
             }

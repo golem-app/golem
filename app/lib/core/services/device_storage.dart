@@ -7,10 +7,10 @@ abstract interface class DiskSpaceProbe {
   Future<int?> freeBytes(String path);
 }
 
-/// Marks a directory as excluded from platform backups. Downloaded models
-/// are re-fetchable pinned content and must stay out of iCloud backups;
-/// Android handles this statically via dataExtractionRules, so its
-/// implementation is a no-op.
+/// Marks a directory as excluded from platform backups. Nothing Golem stores
+/// leaves the phone (ADR 0016): launch composition marks both storage roots.
+/// Android handles this statically in the manifest, so its implementation is
+/// a no-op.
 abstract interface class BackupExclusion {
   Future<void> exclude(String path);
 }
