@@ -78,6 +78,13 @@ void main() {
       appVersion,
       reason: 'core/app_version.dart is hand-owned; bump both together',
     );
+    // tool/device_install.sh stamps the commit so a tester can tell which
+    // build is in hand; a trailing + marks an uncommitted tree.
+    expect(aboutVersionLabel(version: '1.0.0', stamp: ''), '1.0.0');
+    expect(
+      aboutVersionLabel(version: '1.0.0', stamp: 'f722edc+'),
+      '1.0.0 · f722edc+',
+    );
   });
 
   testWidgets('the metrics toggle hides the settled chip in chat', (

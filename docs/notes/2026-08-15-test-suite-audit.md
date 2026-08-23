@@ -320,3 +320,38 @@ staging helper.
   are the only source of real-model evidence.
 - **No device work.** Nothing here touches a platform surface or a
   native-inference path. The suite was the only gate.
+
+## Re-measured 2026-08-23 (#154)
+
+Sixteen merged PRs and twenty-one test files after the baseline, on the
+toolchain the repository now pins (Flutter 3.47.1 / Dart 3.13.1; the figures
+above were taken on 3.44.8). Same instruments, same rules.
+
+| | 2026-08-15 | 2026-08-23 |
+| --- | --- | --- |
+| App tests | 949, 8 skipped | 1,297, 8 skipped, 52 s |
+| Line coverage, excluding `lib/l10n/generated/` | 87.4 % | **89.7 %** (9,895 / 11,032) |
+| Line coverage, counting the ARB tables | 59.5 % | 61.9 % (12,037 / 19,433) |
+| Test source | 24,061 LOC across 70 files | 30,895 LOC across 89 test files (+3 under `eval/`) |
+| Non-generated `lib` | 56,384 LOC | 30,895 LOC across 155 files (the earlier figure counted the locale tables) |
+| Integration tests | 15 files | 19 files, 4,469 LOC |
+| Goldens | 104 PNGs | 104 PNGs, every one referenced (`check_goldens.dart`) |
+
+`test_coverage_map.dart` was re-run once on `main` @ `67cfb8b`. Twenty-six
+files report `unique(F) = 0`, seven more than at baseline. Read the way §"Read
+its output" asks — a candidate, never a verdict — the new zeros are the
+behaviour suites #118, #140 and #143 added for surfaces the goldens already
+paint (`golem_button`, `labeled_progress`, `transfer_card`, `reasoning_card`,
+`startup_gate_controller`): the sweeps execute their lines, none of them
+asserts their semantics, and four of them are named in the mutation command.
+They stay. One file was redundant by the rule and was folded rather than
+kept: `app_version_test.dart`'s single test — the stamped About label — now
+sits beside the pubspec-version guard in `settings_screens_test.dart`, the
+About row's owner, and the file is gone. Net: 90 → 89 test files, the first
+deletion this audit has recorded.
+
+`core/services/artifact_adoption_policy.dart` — the pure decision half of
+download reconciliation, with its own unit test since #90 — was missing from
+`tool/mutation/decision_logic.xml` and is in it now, with its test appended to
+the command. The set is 25 files and 833 mutants; the run and its result are
+recorded in `2026-08-23-pre-1.0-technical-audit.md`.
