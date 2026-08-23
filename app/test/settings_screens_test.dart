@@ -82,6 +82,10 @@ void main() {
     // build is in hand; a trailing + marks an uncommitted tree.
     expect(aboutVersionLabel(version: '1.0.0', stamp: ''), '1.0.0');
     expect(
+      aboutVersionLabel(version: '1.0.0', stamp: 'f722edc'),
+      '1.0.0 · f722edc',
+    );
+    expect(
       aboutVersionLabel(version: '1.0.0', stamp: 'f722edc+'),
       '1.0.0 · f722edc+',
     );

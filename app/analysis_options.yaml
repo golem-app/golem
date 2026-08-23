@@ -2,7 +2,9 @@ include: package:flutter_lints/flutter.yaml
 
 # Written by Flutter 3.47's own migration of this file: the platform folders
 # hold generated and vendored code that no app lint should read. Generated
-# Dart carries its own suppressions and is excluded for the same reason.
+# Dart is deliberately *not* excluded: a `.g.dart` is a part of a hand-written
+# library, and excluding it would hide a stale part's hard errors from the
+# only analyzer gate this repository runs; its lints carry their own pragmas.
 analyzer:
   # Four versioned JSON stores are hand-parsed: an implicit cast out of the
   # dynamic that jsonDecode returns must be an error, not a runtime surprise
@@ -18,8 +20,6 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
-    - lib/l10n/generated/**
-    - '**/*.g.dart'
 
 linter:
   # The two of packages/inferno's five that fit a widget tree: a discarded

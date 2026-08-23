@@ -11,6 +11,7 @@ import 'package:golem_flutter/app/bootstrap.dart';
 import 'package:golem_flutter/app/launch_composition.dart';
 import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
+import 'package:golem_flutter/core/services/device_storage.dart';
 
 import 'support/harness.dart';
 
@@ -199,6 +200,16 @@ void main() {
         }
         return null;
       });
+      // Best effort and bounded: a channel that never answers the flag write
+      // must not hold the launch past its own deadline.
+      await expectLater(
+        keepOutOfBackups(
+          _HangingExclusion(),
+          [root],
+          deadline: const Duration(milliseconds: 20),
+        ).timeout(const Duration(seconds: 1)),
+        completes,
+      );
       addTearDown(() {
         messenger.setMockMethodCallHandler(paths, null);
         messenger.setMockMethodCallHandler(storage, null);
@@ -239,4 +250,9 @@ void main() {
       expect(failure.retryable, isTrue);
     });
   });
+}
+
+final class _HangingExclusion implements BackupExclusion {
+  @override
+  Future<void> exclude(String path) => Completer<void>().future;
 }
