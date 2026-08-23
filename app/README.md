@@ -297,8 +297,8 @@ once in `../docs/notes/dependencies.md`.
 The app includes the model-aware launch splash, empty chat with starter chips,
 markdown transcript with syntax-highlighted code cards, reasoning and answer
 streaming (a pulsing dot until the first token, then a live generating pill),
-stop and failure recovery
-with the ephemeral stopped-tokens caption, message actions (copy, regenerate,
+stop and failure recovery with the ephemeral stopped-tokens caption, message
+actions (copy, regenerate,
 branch-from-here, share, delete), edit-and-truncate, the sectioned edge-swipe
 conversation drawer with pinning and a storage meter that frames Golem's
 usage against the free space left (the two figures Settings ▸ Storage leads
@@ -354,8 +354,9 @@ session — an opened, switched-to, or restored conversation renders with none �
 and the anchor is measured from the question's own render box after each
 frame, never persisted. Following detaches on any upward drag and is handed
 back only when the reader themselves comes to rest at the end or taps
-`jump-to-latest`; content growth and programmatic jumps never re-attach it. Free text selection is
-deliberately absent — copy actions cover it on both chromes. Toasts are the
+`jump-to-latest`; content growth and programmatic jumps never re-attach it.
+Free text selection is deliberately absent — copy actions cover it on both
+chromes. Toasts are the
 chrome layer's `showGolemToast` (iOS pill / Android bar, no actions).
 
 The per-chat model selection persists on the conversation (`modelKey`) and a

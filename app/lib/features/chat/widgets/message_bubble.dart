@@ -652,7 +652,7 @@ class _GeneratingPill extends StatelessWidget {
 /// dot back — so an opening is held for [_grace] and shown only once it has
 /// survived. A settled message paints at once; the delay is a streaming
 /// concern and nothing else.
-final class _StreamingAnswer extends StatefulWidget {
+class _StreamingAnswer extends StatefulWidget {
   const _StreamingAnswer({required this.text, required this.streaming});
 
   final String text;
@@ -667,7 +667,7 @@ final class _StreamingAnswer extends StatefulWidget {
   State<_StreamingAnswer> createState() => _StreamingAnswerState();
 }
 
-final class _StreamingAnswerState extends State<_StreamingAnswer> {
+class _StreamingAnswerState extends State<_StreamingAnswer> {
   Timer? _timer;
   bool _survived = false;
 
@@ -738,13 +738,14 @@ class _PendingDotState extends State<_PendingDot>
     vsync: this,
     duration: const Duration(milliseconds: 900),
   )..repeat(reverse: true);
-  late final Animation<double> _pulse = CurvedAnimation(
+  late final CurvedAnimation _pulse = CurvedAnimation(
     parent: _controller,
     curve: Curves.easeInOut,
   );
 
   @override
   void dispose() {
+    _pulse.dispose();
     _controller.dispose();
     super.dispose();
   }

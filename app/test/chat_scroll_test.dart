@@ -104,8 +104,6 @@ void main() {
 
     for (var i = 0; i < 40; i++) {
       await tester.pump(_delay);
-      // Following the tail would carry the question off the top of the screen
-      // within a delta or two; the spacer is what keeps it in place (#147).
       // Following the tail would carry the question off the top of the
       // screen within a delta or two; the spacer is what holds it there.
       expect(
@@ -115,8 +113,8 @@ void main() {
       );
     }
     await tester.pumpAndSettle();
-    // 16pt of list padding, and nothing else, above the question.
-    expect(tester.getTopLeft(question).dy - listTop, lessThan(40));
+    // The list's own 16pt of top padding, and nothing else, above it.
+    expect(tester.getTopLeft(question).dy - listTop, closeTo(16, 4));
   });
 
   testWidgets('an answer taller than the screen hands back to the tail', (
@@ -129,6 +127,15 @@ void main() {
 
     for (var i = 0; i < 40; i++) {
       await tester.pump(_delay);
+      // Once the spacer is spent the view has to keep up with the tail on
+      // every delta, not only catch up when the turn settles.
+      if (find.text('Stream and follow').evaluate().isEmpty) {
+        expect(
+          position.maxScrollExtent - position.pixels,
+          lessThan(120),
+          reason: 'tick $i trailed the tail',
+        );
+      }
     }
     await tester.pumpAndSettle();
     // Carried off the top rather than held at it, and the view is on the end
@@ -168,6 +175,27 @@ void main() {
     expect(pill.top, greaterThanOrEqualTo(list.top));
   });
 
+  testWidgets('deleting a message does not anchor the transcript', (
+    tester,
+  ) async {
+    final position = await _pumpChat(tester);
+    final before = position.maxScrollExtent;
+
+    // deleteMessage shortens the list without leaving the conversation, and a
+    // plain "the count changed" test read that as a send — a transcript
+    // nobody had sent into grew a spacer up to a screen tall (#147).
+    await tester.tap(find.byKey(const Key('message-menu-a9')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('menu-message-delete')));
+    await tester.pumpAndSettle();
+
+    expect(
+      position.maxScrollExtent,
+      lessThan(before),
+      reason: 'a shorter transcript must not scroll further',
+    );
+  });
+
   testWidgets('a short drag detaches just as firmly as a long one', (
     tester,
   ) async {
@@ -176,11 +204,9 @@ void main() {
     await tester.pump(_delay);
     await tester.pump(_delay);
 
-    // 30pt — inside the 48pt window the jump affordance uses. Content growth
-    // used to re-attach the follow from inside that window, so every delta
-    // undid the drag and the reader could never get out (#147).
     // 50 of drag is 30 of scroll once the touch slop is paid — inside the
-    // 48 the jump affordance uses, which is where the re-attach used to live.
+    // 48pt window the re-attach used to live in, where content growth undid
+    // the drag on the next delta and the reader could never get out (#147).
     await tester.drag(
       find.byKey(const Key('message-list')),
       const Offset(0, 50),
