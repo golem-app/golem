@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -484,7 +486,7 @@ class _ComposerState extends ConsumerState<Composer> {
                                         .value
                                         ?.hapticsOnSend ??
                                     true) {
-                                  HapticFeedback.lightImpact();
+                                  unawaited(HapticFeedback.lightImpact());
                                 }
                                 try {
                                   await ref

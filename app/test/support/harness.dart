@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
@@ -368,7 +369,7 @@ Future<void> pumpSearchScreen(
     ),
   );
   await tester.pumpAndSettle();
-  router.push('/search');
+  unawaited(router.push('/search'));
   await tester.pumpAndSettle();
 }
 

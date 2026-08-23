@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -555,7 +557,7 @@ class _ModelCard extends ConsumerWidget {
                       );
                       if (!approved || !context.mounted) return;
                     }
-                    controller.download(entry.key);
+                    unawaited(controller.download(entry.key));
                   },
           ),
         if (!downloadable || refusalMessage != null)
