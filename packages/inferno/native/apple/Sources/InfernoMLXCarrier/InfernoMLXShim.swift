@@ -365,7 +365,12 @@ private func preparedInput(
             userInfo: [NSLocalizedDescriptionKey: "This MLX model has no image processor."]
         )
     }
+    // Image decode and preprocessing are the one long stretch of CPU work
+    // before the library's prefill, and the library polls nothing until its
+    // first token — so a cancel, or a teardown waiting on it, is honoured at
+    // every image boundary here rather than after the whole batch (#154).
     let images = try imageData.map { data -> CIImage in
+        try Task.checkCancellation()
         guard let image = CIImage(data: data), !image.extent.isEmpty else {
             throw NSError(
                 domain: "InfernoMLX",
@@ -388,7 +393,8 @@ private func preparedInput(
             )
         }
         let prepared = try images.map {
-            try processor.preprocess(image: $0, processing: nil)
+            try Task.checkCancellation()
+            return try processor.preprocess(image: $0, processing: nil)
         }
         let frames = prepared.map { $0.1 }
         let maxHeight = frames.map(\.h).max() ?? 0
@@ -460,7 +466,8 @@ private func preparedInput(
         // broader cross-engine decode boundary.
         let processing = UserInput.Processing(maxPixels: 262_144)
         let prepared = try images.map {
-            try processor.preprocess(images: [$0], processing: processing)
+            try Task.checkCancellation()
+            return try processor.preprocess(images: [$0], processing: processing)
         }
         let frames = prepared.map { $0.1 }
         processedImage = .init(
@@ -637,6 +644,11 @@ public func infernoMlxEngineLoad(
         do {
             MLX.Memory.cacheLimit = 64 * 1024 * 1024
             let adapter = try visionAdapter(at: path)
+            // The container load itself cannot be interrupted — the library
+            // polls nothing while mapping weights — so the poll before it is
+            // the last chance to honour a cancel that arrived during the
+            // adapter read, and the one after it the first chance afterwards.
+            try Task.checkCancellation()
             let modelURL = URL(fileURLWithPath: path, isDirectory: true)
             let container = if adapter == nil {
                 try await LLMModelFactory.shared.loadContainer(
@@ -655,6 +667,8 @@ public func infernoMlxEngineLoad(
             }
             engine.setContainer(container, visionAdapter: adapter)
             sink.emit(EventKind.operationCompleted)
+        } catch is CancellationError {
+            sink.fail(code: "cancelled", message: "Model loading was cancelled.")
         } catch {
             sink.fail(error: error, fallback: "incompatible_model")
         }
@@ -797,6 +811,11 @@ public func infernoMlxEngineGenerate(
                     )
                 }
 
+                // The library's prefill polls nothing until its first token;
+                // a cancel that arrived during preparation ends here, the way
+                // the llama shim's batch loop ends before its next batch.
+                try Task.checkCancellation()
+
                 var parameters = GenerateParameters(
                     maxTokens: request.maxTokens,
                     temperature: request.temperature,
@@ -918,6 +937,20 @@ public func infernoMlxEngineGenerate(
                 sink.emit(EventKind.completed, text: stopReason)
                 sink.emit(EventKind.operationCompleted)
             }
+        } catch is CancellationError {
+            // Nothing was decoded: the metrics the app reads are all zero,
+            // and the stop reason is the same one a mid-stream cancel reports.
+            sink.emitJSON(EventKind.metrics, [
+                "decodeTokensPerSecond": 0,
+                "promptTokensPerSecond": 0,
+                "generatedTokenCount": 0,
+                "elapsedSeconds": 0,
+                "promptTokenCount": 0,
+                "timeToFirstTokenSeconds": NSNull(),
+                "peakPhysicalFootprintBytes": physicalFootprintBytes(),
+            ])
+            sink.emit(EventKind.completed, text: "cancelled")
+            sink.emit(EventKind.operationCompleted)
         } catch {
             sink.fail(error: error, fallback: "generation_failed")
         }
