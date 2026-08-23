@@ -165,6 +165,8 @@
   "verifiedAmount": "{verified} dari {total} terverifikasi",
   "downloadNote": "Biarkan Golem tetap terbuka — unduhan paling cepat saat aplikasi di depan.",
   "etaAboutMinutesLeft": "{count, plural, other{Sekitar {count} menit lagi}}",
+  "etaAboutHoursLeft": "Sekitar {count} jam lagi",
+  "etaAboutHoursMinutesLeft": "Sekitar {hours} jam {minutes} menit lagi",
   "amountLeft": "Tersisa {amount}",
   "stoppedAtPercent": "Berhenti di {percent}%",
   "rateMbs": "{rate} MB/s",

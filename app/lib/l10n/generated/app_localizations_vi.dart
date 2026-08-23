@@ -576,6 +576,16 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String etaAboutHoursLeft(int count) {
+    return 'Còn khoảng $count giờ';
+  }
+
+  @override
+  String etaAboutHoursMinutesLeft(int hours, int minutes) {
+    return 'Còn khoảng $hours giờ $minutes phút';
+  }
+
+  @override
   String amountLeft(String amount) {
     return 'Còn lại $amount';
   }

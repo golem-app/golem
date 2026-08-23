@@ -165,6 +165,8 @@
   "verifiedAmount": "{verified} z {total} zweryfikowane",
   "downloadNote": "Nie zamykaj Golema — pobieranie jest najszybsze na pierwszym planie.",
   "etaAboutMinutesLeft": "{count, plural, =1{Jeszcze około 1 minuty} few{Jeszcze około {count} minut} many{Jeszcze około {count} minut} other{Jeszcze około {count} minuty}}",
+  "etaAboutHoursLeft": "Jeszcze około {count} godz.",
+  "etaAboutHoursMinutesLeft": "Jeszcze około {hours} godz. {minutes} min",
   "amountLeft": "Pozostało {amount}",
   "stoppedAtPercent": "Zatrzymano na {percent}%",
   "rateMbs": "{rate} MB/s",

@@ -576,6 +576,16 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
+  String etaAboutHoursLeft(int count) {
+    return 'Yaklaşık $count sa kaldı';
+  }
+
+  @override
+  String etaAboutHoursMinutesLeft(int hours, int minutes) {
+    return 'Yaklaşık $hours sa $minutes dk kaldı';
+  }
+
+  @override
   String amountLeft(String amount) {
     return '$amount kaldı';
   }

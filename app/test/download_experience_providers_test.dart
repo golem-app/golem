@@ -115,8 +115,58 @@ void main() {
       expect(snapshot, isNotNull);
       expect(snapshot!.artifactKey, key);
       expect(snapshot.mbPerSecond, closeTo(44.0, 0.001));
-      expect(snapshot.eta, isNotNull, reason: 'pinned catalog knows the size');
+      expect(snapshot.eta, isNull, reason: 'a rate this young is not a time');
     });
+
+    test('publishes a time left once two ticks agree on it', () async {
+      container.listen(downloadPaceProvider, (_, _) {});
+      await startDownload();
+      await tick(Duration.zero, _downloading(key, 0));
+      for (var second = 1; second <= 3; second++) {
+        await tick(
+          const Duration(seconds: 1),
+          _downloading(key, 44000000 * second),
+        );
+      }
+      expect(
+        container.read(downloadPaceProvider)!.eta,
+        isNull,
+        reason: 'the first estimate is unconfirmed',
+      );
+      await tick(const Duration(seconds: 1), _downloading(key, 176000000));
+      // 3.58 GB pinned, 176 MB in, 44 MB/s.
+      expect(
+        container.read(downloadPaceProvider)!.eta!.inSeconds,
+        closeTo(77, 2),
+      );
+    });
+
+    test(
+      'a slow first stride never reaches a surface as a time left',
+      () async {
+        // The reported defect: the opening reading of a transfer divided into
+        // the whole artifact printed "About 2173 minutes left" (#146).
+        final published = <Duration>[];
+        container.listen(downloadPaceProvider, (_, next) {
+          if (next?.eta case final eta?) published.add(eta);
+        });
+        await startDownload();
+        await tick(Duration.zero, _downloading(key, 0));
+        await tick(const Duration(seconds: 1), _downloading(key, 300000));
+        for (var second = 2; second <= 4; second++) {
+          await tick(
+            const Duration(seconds: 1),
+            _downloading(key, 300000 + 44000000 * (second - 1)),
+          );
+        }
+        expect(published, isNotEmpty, reason: 'the settled figure still lands');
+        expect(
+          published,
+          everyElement(lessThan(const Duration(minutes: 5))),
+          reason: 'nothing derived from the 0.3 MB/s opening stride',
+        );
+      },
+    );
 
     test('leaving the downloading phase clears the snapshot', () async {
       container.listen(downloadPaceProvider, (_, _) {});
@@ -167,7 +217,18 @@ void main() {
       expect(snapshot, isNotNull);
       expect(snapshot!.phase, ArtifactPhase.verifying);
       expect(snapshot.mbPerSecond, closeTo(150.0, 0.001));
-      expect(snapshot.eta, isNotNull, reason: 'the catalog knows the size');
+      expect(snapshot.eta, isNull, reason: 'the hash window is a tick old');
+      for (var second = 2; second <= 4; second++) {
+        await tick(
+          const Duration(seconds: 1),
+          _verifying(key, 150000000 * second),
+        );
+      }
+      expect(
+        container.read(downloadPaceProvider)!.eta,
+        isNotNull,
+        reason: 'the catalog knows the size',
+      );
     });
 
     test('completion clears the snapshot', () async {

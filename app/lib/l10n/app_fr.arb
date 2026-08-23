@@ -165,6 +165,8 @@
   "verifiedAmount": "{verified} sur {total} vérifiés",
   "downloadNote": "Gardez Golem ouvert — les téléchargements sont plus rapides au premier plan.",
   "etaAboutMinutesLeft": "{count, plural, =1{Environ 1 minute restante} other{Environ {count} minutes restantes}}",
+  "etaAboutHoursLeft": "{count, plural, =1{Environ 1 h restante} other{Environ {count} h restantes}}",
+  "etaAboutHoursMinutesLeft": "Environ {hours} h {minutes} min restantes",
   "amountLeft": "{amount} restants",
   "stoppedAtPercent": "Arrêté à {percent}%",
   "rateMbs": "{rate} MB/s",

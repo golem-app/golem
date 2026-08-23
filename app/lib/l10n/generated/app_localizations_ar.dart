@@ -577,6 +577,16 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String etaAboutHoursLeft(int count) {
+    return 'بقي نحو $count س';
+  }
+
+  @override
+  String etaAboutHoursMinutesLeft(int hours, int minutes) {
+    return 'بقي نحو $hours س و$minutes د';
+  }
+
+  @override
   String amountLeft(String amount) {
     return 'المتبقي $amount';
   }

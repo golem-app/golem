@@ -68,7 +68,9 @@ String _$paceClockHash() => r'3006b2ff67ca2d0bc66966a59d23d5118d1a4623';
 /// bytes while downloading, hashed bytes while verifying, each phase its own
 /// window. `null` until the trailing window can quote an honest figure, and
 /// again the moment the artifact leaves both phases — surfaces render nothing
-/// rather than a stale or fabricated number.
+/// rather than a stale or fabricated number. The time left is held back
+/// further still, until the transfer has proposed the same one twice
+/// ([DownloadEtaGate]).
 ///
 /// KeepAlive: the estimator's sample window lives in notifier fields, and the
 /// model stream must stay observed across screens the way the controller
@@ -83,7 +85,9 @@ final downloadPaceProvider = DownloadPaceProvider._();
 /// bytes while downloading, hashed bytes while verifying, each phase its own
 /// window. `null` until the trailing window can quote an honest figure, and
 /// again the moment the artifact leaves both phases — surfaces render nothing
-/// rather than a stale or fabricated number.
+/// rather than a stale or fabricated number. The time left is held back
+/// further still, until the transfer has proposed the same one twice
+/// ([DownloadEtaGate]).
 ///
 /// KeepAlive: the estimator's sample window lives in notifier fields, and the
 /// model stream must stay observed across screens the way the controller
@@ -96,7 +100,9 @@ final class DownloadPaceProvider
   /// bytes while downloading, hashed bytes while verifying, each phase its own
   /// window. `null` until the trailing window can quote an honest figure, and
   /// again the moment the artifact leaves both phases — surfaces render nothing
-  /// rather than a stale or fabricated number.
+  /// rather than a stale or fabricated number. The time left is held back
+  /// further still, until the transfer has proposed the same one twice
+  /// ([DownloadEtaGate]).
   ///
   /// KeepAlive: the estimator's sample window lives in notifier fields, and the
   /// model stream must stay observed across screens the way the controller
@@ -129,14 +135,16 @@ final class DownloadPaceProvider
   }
 }
 
-String _$downloadPaceHash() => r'd8b76d122a5520e03649171f9ec8beab414291ab';
+String _$downloadPaceHash() => r'abccdfc0ac30ece9f578de837a4693649da07101';
 
 /// Live rate/ETA for the single in-flight artifact, derived by sampling
 /// [ModelController]'s byte counts against the injected clock — transferred
 /// bytes while downloading, hashed bytes while verifying, each phase its own
 /// window. `null` until the trailing window can quote an honest figure, and
 /// again the moment the artifact leaves both phases — surfaces render nothing
-/// rather than a stale or fabricated number.
+/// rather than a stale or fabricated number. The time left is held back
+/// further still, until the transfer has proposed the same one twice
+/// ([DownloadEtaGate]).
 ///
 /// KeepAlive: the estimator's sample window lives in notifier fields, and the
 /// model stream must stay observed across screens the way the controller

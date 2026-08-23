@@ -413,6 +413,47 @@ void main() {
     expect(pl.chatCount(25), '25 czatów');
   });
 
+  test('every catalog reads a long ETA in hours', () {
+    final localizations = <String, AppLocalizations>{
+      'en': AppLocalizationsEn(),
+      'pl': AppLocalizationsPl(),
+      'ar': AppLocalizationsAr(),
+      'es': AppLocalizationsEs(),
+      'pt': AppLocalizationsPt(),
+      'pt_BR': AppLocalizationsPtBr(),
+      'ja': AppLocalizationsJa(),
+      'id': AppLocalizationsId(),
+      'hi': AppLocalizationsHi(),
+      'fr': AppLocalizationsFr(),
+      'vi': AppLocalizationsVi(),
+      'tr': AppLocalizationsTr(),
+      'ko': AppLocalizationsKo(),
+    };
+    for (final MapEntry(key: locale, value: l10n) in localizations.entries) {
+      expect(l10n.etaAboutHoursLeft(2), contains('2'), reason: locale);
+      expect(l10n.etaAboutHoursLeft(1), isNotEmpty, reason: locale);
+      final compound = l10n.etaAboutHoursMinutesLeft(1, 20);
+      expect(compound, contains('1'), reason: locale);
+      expect(compound, contains('20'), reason: locale);
+      // Above an hour every catalog abbreviates; the minutes-only form below
+      // it keeps the spelled-out unit, so the two must not read alike.
+      expect(compound, isNot(l10n.etaAboutMinutesLeft(20)), reason: locale);
+    }
+    // The three catalogs whose verb agrees with the count inflect it; the
+    // abbreviated units elsewhere do not.
+    for (final l10n in [
+      AppLocalizationsEs(),
+      AppLocalizationsPtBr(),
+      AppLocalizationsFr(),
+    ]) {
+      expect(l10n.etaAboutHoursLeft(1), isNot(l10n.etaAboutHoursLeft(2)));
+      expect(
+        l10n.etaAboutHoursMinutesLeft(1, 20),
+        isNot(l10n.etaAboutHoursMinutesLeft(2, 20)),
+      );
+    }
+  });
+
   test('every repository refusal has actionable localized copy', () {
     final en = AppLocalizationsEn();
     final translations = [

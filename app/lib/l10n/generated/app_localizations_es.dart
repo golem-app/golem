@@ -579,6 +579,28 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String etaAboutHoursLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Quedan alrededor de $count h',
+      one: 'Queda alrededor de 1 h',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String etaAboutHoursMinutesLeft(int hours, int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'Quedan alrededor de $hours h $minutes min',
+      one: 'Queda alrededor de 1 h $minutes min',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String amountLeft(String amount) {
     return 'Quedan $amount';
   }

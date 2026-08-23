@@ -243,11 +243,25 @@ String? _remainder({
 }) => switch (phase) {
   ArtifactPhase.downloading || ArtifactPhase.verifying
       when snapshot?.eta != null =>
-    localizations.etaAboutMinutesLeft(aboutMinutesLeft(snapshot!.eta!)),
+    _timeLeft(snapshot!.eta!, localizations),
   ArtifactPhase.paused => localizations.amountLeft(gigabytes(remaining)),
   ArtifactPhase.failed => localizations.stoppedAtPercent(percent),
   _ => null,
 };
+
+/// Minutes below an hour, the locale's abbreviated units above one, and
+/// nothing at all past the ceiling: a figure that large has stopped being a
+/// time left and reads as a fault (#146).
+String? _timeLeft(Duration eta, AppLocalizations localizations) =>
+    switch (aboutTimeLeft(eta)) {
+      null => null,
+      (hours: 0, :final minutes) => localizations.etaAboutMinutesLeft(minutes),
+      (:final hours, minutes: 0) => localizations.etaAboutHoursLeft(hours),
+      (:final hours, :final minutes) => localizations.etaAboutHoursMinutesLeft(
+        hours,
+        minutes,
+      ),
+    };
 
 /// What the phase permits, and why it does not.
 ///

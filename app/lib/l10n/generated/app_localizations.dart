@@ -1109,6 +1109,18 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{About 1 minute left} other{About {count} minutes left}}'**
   String etaAboutMinutesLeft(int count);
 
+  /// Approximate whole hours left on a running download, with no remaining minutes.
+  ///
+  /// In en, this message translates to:
+  /// **'About {count} h left'**
+  String etaAboutHoursLeft(int count);
+
+  /// Approximate hours and minutes left on a running download; hours is one or more and minutes one to 59.
+  ///
+  /// In en, this message translates to:
+  /// **'About {hours} h {minutes} min left'**
+  String etaAboutHoursMinutesLeft(int hours, int minutes);
+
   /// Remaining bytes on a paused download.
   ///
   /// In en, this message translates to:
