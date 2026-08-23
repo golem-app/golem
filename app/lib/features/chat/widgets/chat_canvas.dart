@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -26,7 +27,11 @@ class ChatCanvas extends ConsumerWidget {
     required this.scrollToLatest,
     required this.onUserScroll,
     required this.onScrollMetrics,
+    required this.onScrollSettled,
     required this.showJump,
+    required this.tailSpacer,
+    this.anchorKey,
+    this.anchorId,
     this.picker = const AttachmentPicker(),
     super.key,
   });
@@ -37,7 +42,19 @@ class ChatCanvas extends ConsumerWidget {
   final VoidCallback scrollToLatest;
   final ValueChanged<ScrollDirection> onUserScroll;
   final VoidCallback onScrollMetrics;
+  final VoidCallback onScrollSettled;
   final bool showJump;
+
+  /// Height of the trailing spacer. Sized so the anchored question sits at
+  /// the top of the viewport; zero once its turn is taller than one screen,
+  /// and zero in every transcript nobody has sent into. Listened to rather
+  /// than passed by value so a delta resizes the list and nothing else.
+  final ValueListenable<double> tailSpacer;
+
+  /// Identifies the anchored message and carries the key the screen measures
+  /// it through. Null until the reader sends something.
+  final GlobalKey? anchorKey;
+  final String? anchorId;
   final AttachmentPicker picker;
 
   @override
@@ -61,41 +78,71 @@ class ChatCanvas extends ConsumerWidget {
                   },
                 )
               else
+                // Depth 0 only, on all three: a code card and the reasoning
+                // peek are scrollables of their own inside these bubbles, and
+                // their notifications bubble up here. Left ungated, dragging
+                // a wide code line sideways decides the transcript's
+                // follow state.
                 NotificationListener<UserScrollNotification>(
                   onNotification: (notification) {
-                    onUserScroll(notification.direction);
+                    if (notification.depth == 0) {
+                      onUserScroll(notification.direction);
+                    }
                     return false;
                   },
                   // Content growth changes the metrics without a scroll — the
                   // only signal while detached from a streaming tail.
                   child: NotificationListener<ScrollMetricsNotification>(
                     onNotification: (notification) {
-                      onScrollMetrics();
+                      if (notification.depth == 0) onScrollMetrics();
                       return false;
                     },
-                    child: ListView.builder(
-                      key: const Key('message-list'),
-                      controller: scroll,
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                      itemCount: active.messages.length,
-                      itemBuilder: (context, index) {
-                        final message = active.messages[index];
-                        final isLast = index == active.messages.length - 1;
-                        return MessageBubble(
-                          message: message,
-                          canRegenerate:
-                              isLast && chat.generation == GenerationPhase.idle,
-                          idle: chat.generation == GenerationPhase.idle,
-                          stoppedTokens:
-                              isLast &&
-                                  chat.generation == GenerationPhase.failed &&
-                                  message.role == MessageRole.assistant
-                              ? message.metrics?.tokenCount
-                              : null,
-                        );
+                    child: NotificationListener<ScrollEndNotification>(
+                      onNotification: (notification) {
+                        if (notification.depth == 0) onScrollSettled();
+                        return false;
                       },
+                      child: ValueListenableBuilder<double>(
+                        valueListenable: tailSpacer,
+                        builder: (context, spacer, _) => ListView.builder(
+                          key: const Key('message-list'),
+                          controller: scroll,
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                          // One trailing item, the anchor spacer: it holds the
+                          // question the reader just asked at the top of the
+                          // viewport while its answer streams in underneath.
+                          // Present only when it has a height to contribute — a
+                          // zero-height trailing child still costs the delegate
+                          // an averaged estimate, and a transcript nobody has
+                          // sent into scrolled by that estimate on load.
+                          itemCount:
+                              active.messages.length + (spacer > 0 ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == active.messages.length) {
+                              return SizedBox(height: spacer);
+                            }
+                            final message = active.messages[index];
+                            final isLast = index == active.messages.length - 1;
+                            return MessageBubble(
+                              key: message.id == anchorId ? anchorKey : null,
+                              message: message,
+                              canRegenerate:
+                                  isLast &&
+                                  chat.generation == GenerationPhase.idle,
+                              idle: chat.generation == GenerationPhase.idle,
+                              stoppedTokens:
+                                  isLast &&
+                                      chat.generation ==
+                                          GenerationPhase.failed &&
+                                      message.role == MessageRole.assistant
+                                  ? message.metrics?.tokenCount
+                                  : null,
+                            );
+                          },
+                        ),
+                      ),
                     ),
                   ),
                 ),

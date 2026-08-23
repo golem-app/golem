@@ -296,8 +296,9 @@ once in `../docs/notes/dependencies.md`.
 
 The app includes the model-aware launch splash, empty chat with starter chips,
 markdown transcript with syntax-highlighted code cards, reasoning and answer
-streaming (blinking caret + live generating pill), stop and failure recovery
-with the ephemeral stopped-tokens caption, message actions (copy, regenerate,
+streaming (a pulsing dot until the first token, then a live generating pill),
+stop and failure recovery with the ephemeral stopped-tokens caption, message
+actions (copy, regenerate,
 branch-from-here, share, delete), edit-and-truncate, the sectioned edge-swipe
 conversation drawer with pinning and a storage meter that frames Golem's
 usage against the free space left (the two figures Settings ▸ Storage leads
@@ -328,8 +329,34 @@ and the five bounds on reading a stranger's server, are recorded in
 Assistant messages render a scoped markdown subset (paragraphs, emphasis,
 inline code, one-level lists, fenced code with a fixed dark card in both
 themes) through `features/chat/widgets/markdown/`; parsing is memoized per
-message so only the streaming bubble re-parses. Free text selection is
-deliberately absent — copy actions cover it on both chromes. Toasts are the
+message so only the streaming bubble re-parses. Nothing marks the tail of a
+streamed answer — no caret. A caret is a terminal's convention, and the one
+that shipped had to be dropped onto a line of its own whenever the answer
+ended in a list or a code card, which left an empty bubble holding a floating
+blue rectangle (#147). Before the first token the bubble carries one pulsing
+accent dot; after it there is nothing but the text.
+
+A streamed answer's opening is provisional for a moment. Gemma starts a turn on
+the visible channel and only then labels the run as reasoning, at which point
+the broker retracts what it already published (`AnswerResetEvent`,
+`broker/gemma4_chat_template.dart`). The bubble therefore holds a streaming
+answer's first text for 220 ms and paints it only once it has survived, so a
+retracted opening never reaches the transcript and the dot stays put through
+prompt processing and thinking alike. A settled message paints at once.
+
+The transcript holds still while an answer streams. On send, the question the
+reader just asked is anchored: a trailing spacer takes up the viewport
+remainder below the turn, which makes the end of the scrollable *be* the
+anchored position, so the one instruction "go to the end" both holds the
+question at the top and, once the turn outgrows the screen and the spacer is
+spent, follows the tail. The spacer exists only for a turn started in this
+session — an opened, switched-to, or restored conversation renders with none —
+and the anchor is measured from the question's own render box after each
+frame, never persisted. Following detaches on any upward drag and is handed
+back only when the reader themselves comes to rest at the end or taps
+`jump-to-latest`; content growth and programmatic jumps never re-attach it.
+Free text selection is deliberately absent — copy actions cover it on both
+chromes. Toasts are the
 chrome layer's `showGolemToast` (iOS pill / Android bar, no actions).
 
 The per-chat model selection persists on the conversation (`modelKey`) and a
@@ -375,7 +402,8 @@ disclosure, which reports Expanded/Collapsed as its semantic value; cards
 arrive collapsed and, while live, show a three-line `reasoning-peek` that is
 excluded from semantics),
 `composer-attach`, `composer-model-chip`,
-`starter-chip-<name>`, `generating-pill`, `stopped-caption`,
+`starter-chip-<name>`, `typing-indicator` (the pre-token dot),
+`generating-pill`, `stopped-caption`,
 `message-copy-<id>`, `message-regenerate-<id>`, `message-share-<id>`,
 `message-menu-<id>` plus `menu-message-{copy,regenerate,branch,share,delete}`,
 `code-block`/`code-copy`, `attach-sheet` plus

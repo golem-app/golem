@@ -31,7 +31,7 @@ Widget _bubble(ChatMessage message) => Column(
   ],
 );
 
-/// A streaming bubble blinks its caret forever, so these pumps never settle.
+/// A streaming bubble pulses its dot forever, so these pumps never settle.
 Future<void> _pump(
   WidgetTester tester,
   ChatMessage message, {

@@ -11,10 +11,9 @@ import 'markdown_blocks.dart';
 /// during streaming only the growing message re-parses per emission and
 /// settled bubbles rebuild from their cached blocks.
 final class GolemMarkdown extends StatefulWidget {
-  const GolemMarkdown({required this.text, this.streaming = false, super.key});
+  const GolemMarkdown({required this.text, super.key});
 
   final String text;
-  final bool streaming;
 
   @override
   State<GolemMarkdown> createState() => _GolemMarkdownState();
@@ -33,11 +32,10 @@ final class _GolemMarkdownState extends State<GolemMarkdown> {
     final children = <Widget>[];
     for (final (index, block) in _blocks.indexed) {
       if (index > 0) children.add(const SizedBox(height: 10));
-      final cursor = widget.streaming && index == _blocks.length - 1;
       children.add(switch (block) {
         ParagraphData() => _DirectedBlock(
           text: block.spans.map((span) => span.text).join(),
-          child: _Paragraph(block, cursor: cursor),
+          child: _Paragraph(block),
         ),
         ListData() => _BlockList(block),
         CodeBlockData() => Directionality(
@@ -45,15 +43,6 @@ final class _GolemMarkdownState extends State<GolemMarkdown> {
           child: MarkdownCodeBlock(code: block.code, language: block.language),
         ),
       });
-    }
-    if (widget.streaming && _blocks.lastOrNull is! ParagraphData) {
-      if (children.isNotEmpty) children.add(const SizedBox(height: 10));
-      children.add(
-        const Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: _BlinkCursor(),
-        ),
-      );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -80,24 +69,13 @@ final class _DirectedBlock extends StatelessWidget {
 }
 
 final class _Paragraph extends StatelessWidget {
-  const _Paragraph(this.data, {this.cursor = false});
+  const _Paragraph(this.data);
   final ParagraphData data;
-  final bool cursor;
 
   @override
   Widget build(BuildContext context) => Text.rich(
     TextSpan(
-      children: [
-        ...inlineSpans(context, data.spans, emphasized: data.emphasized),
-        if (cursor)
-          const WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: Padding(
-              padding: EdgeInsetsDirectional.only(start: 3),
-              child: _BlinkCursor(),
-            ),
-          ),
-      ],
+      children: inlineSpans(context, data.spans, emphasized: data.emphasized),
     ),
     style: data.emphasized ? GolemText.bodyStrong : GolemText.body,
   );
@@ -182,41 +160,3 @@ List<InlineSpan> inlineSpans(
         ),
       ),
 ];
-
-/// The streaming caret: a 9×19 accent block blinking on a hard step,
-/// exactly like the prototype's `gmBlink`.
-final class _BlinkCursor extends StatefulWidget {
-  const _BlinkCursor();
-
-  @override
-  State<_BlinkCursor> createState() => _BlinkCursorState();
-}
-
-final class _BlinkCursorState extends State<_BlinkCursor>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 1),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _controller,
-    builder: (context, child) =>
-        Opacity(opacity: _controller.value < 0.5 ? 1 : 0, child: child),
-    child: Container(
-      width: 9,
-      height: 19,
-      decoration: BoxDecoration(
-        color: CupertinoDynamicColor.resolve(GolemTheme.accent, context),
-        borderRadius: BorderRadius.circular(2),
-      ),
-    ),
-  );
-}

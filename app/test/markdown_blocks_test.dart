@@ -92,4 +92,54 @@ void main() {
     expect(blocks, hasLength(2));
     expect((blocks.first as ParagraphData).spans.single.text, 'Quoted advice.');
   });
+
+  // The reply the simulated backend streams, in one piece: a paragraph, one
+  // carrying inline code, a fenced block and a list — every shape the
+  // transcript renders, in the order a real answer produces them.
+  const answer =
+      'This is a deterministic response from Golem\u2019s simulated backend '
+      '\u2014 no model is loaded and nothing measures this device.\n\n'
+      'Use the built-in `csv` module. It streams row by row, so memory '
+      'stays flat no matter how big the file is.\n\n'
+      '```python\nimport csv\n\ndef rows(path):\n'
+      '    with open(path, newline="") as file:\n'
+      '        yield from csv.reader(file)\n```\n\n'
+      'Two things worth knowing:\n\n'
+      '- `newline=""` stops Python mangling quoted line breaks.\n'
+      '- Swap in **DictReader** if the file has a header row.';
+
+  test('a streamed prefix never re-shapes a block already on screen', () {
+    // The renderer re-parses the whole message on every emission, which is
+    // only safe if the parse of a prefix agrees with the parse of everything
+    // that follows it about the blocks before the last. Anything else moves
+    // lines the reader is in the middle of reading (#147).
+    var previous = <String>[];
+    for (var length = 1; length <= answer.length; length++) {
+      final shapes = parseMarkdownBlocks(
+        answer.substring(0, length),
+      ).map(_shape).toList();
+      final settled = previous.length - 1;
+      if (settled > 0) {
+        expect(
+          shapes.take(settled),
+          orderedEquals(previous.take(settled)),
+          reason: 'a prefix of $length characters re-shaped a settled block',
+        );
+      }
+      previous = shapes;
+    }
+    expect(previous, hasLength(5));
+  });
 }
+
+/// Everything the renderer draws from one block, flattened so two parses can
+/// be compared for sameness rather than identity.
+String _shape(MarkdownBlockData block) => switch (block) {
+  ParagraphData(:final spans, :final emphasized) =>
+    'p($emphasized)'
+        '${spans.map((s) => '${s.text}|${s.bold}${s.italic}${s.code}${s.link}').join(',')}',
+  ListData(:final items, :final ordered, :final start) =>
+    'l($ordered,$start)'
+        '${items.map((item) => item.map((s) => s.text).join()).join('||')}',
+  CodeBlockData(:final code, :final language) => 'c($language)$code',
+};

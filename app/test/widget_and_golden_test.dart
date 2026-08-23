@@ -406,7 +406,7 @@ void main() {
       tester,
     ) async {
       if (chromeSuffix().isNotEmpty) return;
-      // A streaming bubble blinks its caret forever: one frame, no settle.
+      // A streaming bubble pulses its dot forever: one frame, no settle.
       await pumpWithRepositories(
         tester,
         brightness: brightness,
@@ -1638,10 +1638,68 @@ void main() {
     await tester.pumpWidget(wrap(ghost));
     expect(find.byKey(const Key('message-assistant-ghost')), findsNothing);
 
-    // While streaming, the same empty message is the typing indicator
-    // (the blinking caret) and must stay visible.
+    // While streaming, the same empty message is the typing indicator and must
+    // stay visible — one pulsing dot where the first word will land, and no
+    // caret anywhere in the transcript (#147).
     await tester.pumpWidget(wrap(ghost.copyWith(isStreaming: true)));
     expect(find.byKey(const Key('message-assistant-ghost')), findsOneWidget);
+    expect(find.byKey(const Key('typing-indicator')), findsOneWidget);
+
+    // A token that survives its grace replaces the dot with the answer
+    // itself, and nothing else.
+    await tester.pumpWidget(
+      wrap(ghost.copyWith(isStreaming: true).withText('Everest.')),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('typing-indicator')), findsNothing);
+    expect(find.text('Everest.'), findsOneWidget);
+  }, variant: iosChrome);
+
+  testWidgets('a retracted opening never reaches the transcript', (
+    tester,
+  ) async {
+    // Gemma opens on the visible channel and only then labels the run as
+    // reasoning, so the broker retracts what it already published. The bubble
+    // must sit on that opening rather than paint it and take it back (#147).
+    Widget wrap(ChatMessage message) => ProviderScope(
+      child: wrapApp(
+        child: MessageBubble(
+          message: message,
+          canRegenerate: false,
+          idle: false,
+        ),
+      ),
+    );
+    final live = ChatMessage.text(
+      id: 'assistant-live',
+      role: MessageRole.assistant,
+      text: '',
+      createdAt: DateTime.utc(2026, 8, 22),
+      isStreaming: true,
+    );
+    const thoughts = 'Checking the units first.';
+    final dot = find.byKey(const Key('typing-indicator'));
+
+    await tester.pumpWidget(wrap(live));
+    expect(dot, findsOneWidget, reason: 'nothing to show yet');
+
+    // The provisional opening, then the retraction a token later.
+    await tester.pumpWidget(wrap(live.withText('Sure')));
+    await tester.pump(const Duration(milliseconds: 80));
+    expect(dot, findsOneWidget, reason: 'an opening is not yet an answer');
+    expect(find.text('Sure'), findsNothing);
+
+    await tester.pumpWidget(wrap(live.copyWith(reasoning: thoughts)));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(dot, findsOneWidget, reason: 'thinking is still the pending state');
+
+    // The real answer, which survives its grace and is painted.
+    await tester.pumpWidget(
+      wrap(live.copyWith(reasoning: thoughts).withText('Everest')),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(dot, findsNothing);
+    expect(find.text('Everest'), findsOneWidget);
   }, variant: iosChrome);
 
   testWidgets('the toggle is withheld mid-answer on an unloaded phase', (

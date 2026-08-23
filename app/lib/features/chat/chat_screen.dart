@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/rendering.dart' show ScrollDirection;
+import 'package:flutter/rendering.dart'
+    show RenderAbstractViewport, ScrollDirection;
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -43,6 +44,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   // animation and stop following mid-answer.
   bool _follow = true;
 
+  /// The question the reader most recently asked, held at the top of the
+  /// viewport while its answer streams in below it. Ephemeral and set only by
+  /// a send in this session: a transcript nobody has sent into — a reopened
+  /// conversation, a seeded one — carries no anchor and no spacer.
+  final GlobalKey _anchorKey = GlobalKey();
+  String? _anchorId;
+  String? _anchorConversationId;
+
+  /// The measured scroll offset that puts the anchored question's top edge at
+  /// the top of the viewport. Null until it has been measured, and the only
+  /// thing that separates holding the question still from following the tail.
+  double? _anchorOffset;
+
+  /// Height of the list's trailing spacer, chosen so that the scrollable's
+  /// own end *is* the anchored position: with the turn shorter than the
+  /// viewport the spacer makes up the difference, so `maxScrollExtent`
+  /// equals the offset that puts the question's top edge at the top of the
+  /// screen. Following the tail and holding the question still are then the
+  /// same instruction, and the switch between them needs no mode.
+  ///
+  /// A notifier rather than plain state: it changes on every delta of an
+  /// anchored turn, and a `setState` for each one rebuilt the nav bar, the
+  /// drawer and the banners to move one box at the end of a list.
+  final ValueNotifier<double> _spacer = ValueNotifier<double>(0);
+
+  /// One measurement per frame. Several deltas can queue their callbacks
+  /// against a single frame, and the later ones would then weigh a spacer
+  /// this frame's layout has not used yet against an extent that predates
+  /// it — the sum oscillates a delta at a time instead of settling.
+  bool _measureQueued = false;
+
   @override
   void initState() {
     super.initState();
@@ -54,15 +86,40 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// still appear.
   void _updateScrollState() {
     if (!_scroll.hasClients) return;
-    final distance = _scroll.position.maxScrollExtent - _scroll.offset;
-    if (distance < 48 && !_follow) _follow = true;
-    final show = distance > 240;
+    final show = _scroll.position.maxScrollExtent - _scroll.offset > 240;
     if (show != _showJump && mounted) setState(() => _showJump = show);
+  }
+
+  /// Re-attaching belongs to the reader, so it happens only once a scroll has
+  /// come to rest at the tail. Proximity alone used to do it from
+  /// [_updateScrollState], which content growth re-enters on every delta: a
+  /// drag that had travelled less than the window was undone by the next
+  /// token, which put the finger back at the tail, where the rest of the same
+  /// drag started over (#147).
+  /// Content growth and viewport changes both land here. The anchor is
+  /// re-measured from either, so a turn that settled while the reader was
+  /// away — or a keyboard that opened afterwards — cannot leave the spacer
+  /// sized for a viewport that no longer exists.
+  void _onScrollMetrics() {
+    _updateScrollState();
+    _scheduleAnchorMeasure();
+  }
+
+  void _onScrollSettled() {
+    // Coming to rest can bring an evicted anchor back into the builder's
+    // cache, which is the only chance to measure it again.
+    _scheduleAnchorMeasure();
+    if (!_scroll.hasClients || _follow) return;
+    // A hair, not a window: the reader has to actually come back to the end
+    // to hand following back. A generous window re-attached anyone whose drag
+    // had not yet cleared it, which is every drag at the moment it starts.
+    if (_followTarget() - _scroll.offset <= 8) _follow = true;
   }
 
   @override
   void dispose() {
     _composer.dispose();
+    _spacer.dispose();
     _scroll.dispose();
     _focus.dispose();
     super.dispose();
@@ -73,14 +130,124 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _animateToBottom());
   }
 
+  /// Whether this change is a turn the reader started here, rather than a
+  /// transcript arriving or shrinking: a conversation opened, switched to, or
+  /// restored on launch must render exactly as it always has, with no anchor
+  /// and no spacer, and so must one a message was just deleted from
+  /// (`deleteMessage`, `removeFailedTurn`) — both shorten the list without
+  /// leaving the conversation, which a plain "the count changed" test read as
+  /// a send. Sending into a fresh session does count, even though it
+  /// materializes the conversation as it goes.
+  static bool _startedHere(
+    ChatState? prior,
+    ChatState? next, {
+    required bool grew,
+  }) =>
+      grew &&
+      prior != null &&
+      (prior.active == null || prior.active?.id == next?.active?.id);
+
+  /// Anchors the turn the reader just started: the newest user message, which
+  /// is also the right one after a regenerate, where only an assistant draft
+  /// is appended and the question stands.
+  void _anchorTo(ChatState? state) {
+    final active = state?.active;
+    final question = active?.messages.reversed
+        .where((message) => message.role == MessageRole.user)
+        .firstOrNull;
+    if (active == null || question == null) return;
+    _anchorId = question.id;
+    _anchorConversationId = active.id;
+    _scheduleAnchorMeasure();
+  }
+
+  void _scheduleAnchorMeasure() {
+    if (_anchorId == null || _measureQueued) return;
+    _measureQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _measureQueued = false;
+      _measureAnchor();
+    });
+  }
+
+  /// Re-sizes the spacer to `anchorOffset + spacer - maxScrollExtent`, which
+  /// is the viewport remainder below the anchored turn. Both inputs are
+  /// independent of the spacer itself — the anchor offset measures what is
+  /// above it and the extent already contains the current value — so this
+  /// settles in one frame rather than chasing itself.
+  ///
+  /// A measurement is skipped, not zeroed, when the anchor has scrolled out
+  /// of the builder's cache: the turn's height has not changed, so the
+  /// standing value is still the right one.
+  void _measureAnchor() {
+    if (!mounted || _anchorId == null || !_scroll.hasClients) return;
+    final anchor = _anchorKey.currentContext?.findRenderObject();
+    if (anchor is! RenderBox || !anchor.hasSize) return;
+    final viewport = RenderAbstractViewport.maybeOf(anchor);
+    if (viewport == null) return;
+    final position = _scroll.position;
+    final reveal = viewport.getOffsetToReveal(anchor, 0).offset;
+    _anchorOffset = reveal;
+    final needed = (reveal + _spacer.value - position.maxScrollExtent).clamp(
+      0.0,
+      position.viewportDimension,
+    );
+    if ((needed - _spacer.value).abs() < 0.5) return;
+    _spacer.value = needed;
+  }
+
+  /// The anchor belongs to one conversation and one message; leaving either
+  /// takes the spacer with it, so a transcript the reader merely opened never
+  /// carries dead space at its end.
+  void _syncAnchor(ChatState? state) {
+    final active = state?.active;
+    final gone =
+        active == null ||
+        active.id != _anchorConversationId ||
+        !active.messages.any((message) => message.id == _anchorId);
+    if (!gone || _anchorId == null) return;
+    _anchorId = null;
+    _anchorConversationId = null;
+    _anchorOffset = null;
+    _spacer.value = 0;
+  }
+
+  /// Where the view belongs while it is following: the anchored offset for as
+  /// long as the spacer is still giving up room for it, and the end of the
+  /// scrollable once the turn has outgrown the screen. Taking the smaller of
+  /// the two is what lets the handover between them need no state of its own,
+  /// and it absorbs the frame in which the answer has already grown but the
+  /// spacer has not yet given the room back.
+  double _followTarget() {
+    final extent = _scroll.position.maxScrollExtent;
+    final anchor = _anchorOffset;
+    // No spacer left means the turn has outgrown the screen and there is
+    // nothing to hold the question up any more: follow the tail.
+    if (anchor == null || _spacer.value <= 0) return extent;
+    return anchor < extent ? anchor : extent;
+  }
+
   Future<void> _animateToBottom() async {
     // maxScrollExtent is a lazy-layout estimate that grows as items build, so
     // one animation can undershoot; chase the extent until the tail is really
     // reached (or the user drags away).
     for (var attempt = 0; attempt < 8; attempt++) {
       if (!_scroll.hasClients || !_follow) return;
-      final target = _scroll.position.maxScrollExtent;
-      if ((target - _scroll.offset).abs() < 1) return;
+      final target = _followTarget();
+      if ((target - _scroll.offset).abs() < 1) {
+        final anchor = _anchorOffset;
+        // Reached the end of a scrollable whose spacer has not finished
+        // growing, so the anchor is still out of reach: let the frame that
+        // resizes it land, then look again.
+        if (anchor == null || anchor <= _scroll.position.maxScrollExtent) {
+          return;
+        }
+        _measureAnchor();
+        // A frame, not a timer: a pending timer outlives a disposed tree.
+        WidgetsBinding.instance.scheduleFrame();
+        await WidgetsBinding.instance.endOfFrame;
+        continue;
+      }
       await _scroll.animateTo(
         target,
         duration: const Duration(milliseconds: 280),
@@ -94,7 +261,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _followTail() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scroll.hasClients || !_follow) return;
-      _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      _scroll.jumpTo(_followTarget());
     });
   }
 
@@ -141,19 +308,29 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final nextValue = next.hasValue ? next.requireValue : null;
       final priorLength = priorValue?.active?.messages.length ?? 0;
       final nextLength = nextValue?.active?.messages.length ?? 0;
+      _syncAnchor(nextValue);
       _announceGeneration(
         context,
         priorValue?.generation,
         nextValue?.generation,
       );
       if (nextLength != priorLength) {
+        if (_startedHere(
+          priorValue,
+          nextValue,
+          grew: nextLength > priorLength,
+        )) {
+          _anchorTo(nextValue);
+        }
         _scrollToLatest();
       } else if (!_follow) {
-        return;
+        _scheduleAnchorMeasure();
       } else if (nextValue?.generation == GenerationPhase.streaming) {
+        _scheduleAnchorMeasure();
         _followTail();
       } else if (priorValue?.generation == GenerationPhase.streaming) {
         // The last delta can extend the layout after the final jump.
+        _scheduleAnchorMeasure();
         _scrollToLatest();
       }
     });
@@ -292,8 +469,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           scroll: _scroll,
                           scrollToLatest: _scrollToLatest,
                           onUserScroll: _onUserScroll,
-                          onScrollMetrics: _updateScrollState,
+                          onScrollMetrics: _onScrollMetrics,
+                          onScrollSettled: _onScrollSettled,
                           showJump: _showJump,
+                          tailSpacer: _spacer,
+                          anchorKey: _anchorKey,
+                          anchorId: _anchorId,
                           picker: widget.picker,
                         ),
                       ),
