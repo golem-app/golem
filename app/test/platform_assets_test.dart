@@ -177,6 +177,41 @@ void main() {
     expect(project, contains('TARGETED_DEVICE_FAMILY = 1;'));
   });
 
+  test('the iOS bundle declares what App Store Connect reads', () async {
+    // Required-reason APIs (#154): AppDelegate reads the volume's capacity for
+    // the Storage screen and the download preflight, which is the DiskSpace
+    // category under reasons 85F4.1 (shown to the user) and E174.1 (checked
+    // before writing). The manifest must be a Runner resource or the bundle
+    // ships without it and the upload is rejected.
+    final manifest = await File(
+      'ios/Runner/PrivacyInfo.xcprivacy',
+    ).readAsString();
+    expect(manifest, contains('NSPrivacyAccessedAPICategoryDiskSpace'));
+    expect(manifest, contains('<string>85F4.1</string>'));
+    expect(manifest, contains('<string>E174.1</string>'));
+    expect(manifest, contains('<key>NSPrivacyTracking</key>\n\t<false/>'));
+    final project = await File(
+      'ios/Runner.xcodeproj/project.pbxproj',
+    ).readAsString();
+    expect(project, contains('PrivacyInfo.xcprivacy in Resources'));
+
+    final plist = await File('ios/Runner/Info.plist').readAsString();
+    // HTTPS through the OS and SHA-256 integrity hashing are exempt; the key
+    // spares every TestFlight upload the export-compliance prompt (ADR 0016).
+    expect(
+      plist,
+      contains('<key>ITSAppUsesNonExemptEncryption</key>\n\t<false/>'),
+    );
+    // CFBundleName follows the flavor like CFBundleDisplayName does; the
+    // pubspec package name is not an identity (#133).
+    expect(plist, isNot(contains('golem_flutter')));
+    expect(
+      r'$(GOLEM_DISPLAY_NAME)'.allMatches(plist).length,
+      2,
+      reason: 'CFBundleDisplayName and CFBundleName both resolve the variable',
+    );
+  });
+
   test('native bundles declare every UI locale and RTL support', () async {
     final project = await File(
       'ios/Runner.xcodeproj/project.pbxproj',
