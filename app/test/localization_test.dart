@@ -496,6 +496,40 @@ void main() {
     expect(ar.etaAboutHoursMinutesLeft(2, 20), contains('ساعتين'));
   });
 
+  testWidgets('a long time left stays within the row it shares', (
+    tester,
+  ) async {
+    // The figures under a transfer bar are one line each with an ellipsis, so
+    // copy that outgrows the row is truncated rather than wrapped — silently,
+    // and only in the locale that overran. The minutes form has always lived
+    // there, so the hours form (#146) is measured against it rather than
+    // against a pixel budget that would move with the type ramp. Test text
+    // renders in the placeholder face, so this is a proportional guard against
+    // a translation that balloons, not a claim about a shipped font.
+    double width(String text) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: GolemText.footnoteStrong),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      return painter.width;
+    }
+
+    for (final locale in AppLocalizations.supportedLocales) {
+      final l10n = await AppLocalizations.delegate.load(locale);
+      final minutes = width(l10n.etaAboutMinutesLeft(59));
+      for (final hours in [
+        l10n.etaAboutHoursLeft(3),
+        l10n.etaAboutHoursMinutesLeft(3, 20),
+      ]) {
+        expect(
+          width(hours),
+          lessThan(minutes * 1.6),
+          reason: '$locale: "$hours" outgrows the minutes form it replaces',
+        );
+      }
+    }
+  });
+
   test('every repository refusal has actionable localized copy', () {
     final en = AppLocalizationsEn();
     final translations = [
