@@ -42,8 +42,8 @@ Future<StorageBreakdown> storageBreakdown(Ref ref) async {
   final history = ref.watch(chatHistoryRepositoryProvider);
   // Read straight, no tolerance for an absent seam (#127): launchOverrides
   // wires all five, so a missing one is a wiring mistake that should say so
-  // rather than render as a plausible partial breakdown. The service's fields
-  // stay nullable — a probe that *fails* still degrades to null.
+  // rather than render as a plausible partial breakdown. A probe that *fails*
+  // is a different matter and degrades to null inside the service.
   final attachments = ref.watch(attachmentRepositoryProvider);
   final cache = ref.watch(cacheProbeProvider);
   final free = ref.watch(diskFreeSpaceProbeProvider);

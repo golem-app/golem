@@ -70,10 +70,16 @@ class StorageScreen extends ConsumerWidget {
                   const SizedBox(height: 24),
                   SettingsCard(
                     children: [
+                      // A cache the probe could not measure is the one case
+                      // the user most needs to clear, so only a cache known
+                      // to be empty withholds the action.
                       SettingsNavRow(
                         key: const Key('clear-cache'),
                         label: context.l10n.clearInferenceCache,
-                        value: _megabytes(context, breakdown.cacheBytes),
+                        value: switch (breakdown.cacheBytes) {
+                          final bytes? => _megabytes(context, bytes),
+                          null => null,
+                        },
                         onTap: breakdown.cacheBytes == 0
                             ? null
                             : () => _clearCache(context, ref),
@@ -119,8 +125,8 @@ class _UsageCard extends StatelessWidget {
     final segments = [
       (breakdown.modelsBytes, accent),
       (breakdown.chatsBytes, chatsColor),
-      (breakdown.attachmentsBytes, attachmentsColor),
-      (breakdown.cacheBytes, cacheColor),
+      (breakdown.attachmentsBytes ?? 0, attachmentsColor),
+      (breakdown.cacheBytes ?? 0, cacheColor),
     ].where((segment) => segment.$1 > 0).toList();
     return SettingsCard(
       children: [
@@ -184,20 +190,23 @@ class _UsageCard extends StatelessWidget {
                   ),
                   // An always-present "Images 0 MB" would be clutter on the
                   // many installs that never attach one; the bar's arithmetic
-                  // counts them either way.
-                  if (breakdown.attachmentsBytes > 0)
+                  // counts them either way. A bucket the probe could not read
+                  // is omitted the way the free label is: never a zero.
+                  if (breakdown.attachmentsBytes case final bytes?
+                      when bytes > 0)
                     _Legend(
                       color: attachmentsColor,
                       label: context.l10n.storageImagesAmount(
-                        _megabytes(context, breakdown.attachmentsBytes),
+                        _megabytes(context, bytes),
                       ),
                     ),
-                  _Legend(
-                    color: cacheColor,
-                    label: context.l10n.storageCacheAmount(
-                      _megabytes(context, breakdown.cacheBytes),
+                  if (breakdown.cacheBytes case final bytes?)
+                    _Legend(
+                      color: cacheColor,
+                      label: context.l10n.storageCacheAmount(
+                        _megabytes(context, bytes),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ],

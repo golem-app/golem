@@ -9,17 +9,23 @@ import '../services/device_storage.dart';
 /// consume it (settings storage, chat drawer), and not `core/services/`,
 /// which is the platform-adapter home. Stateless: probes are constructor
 /// dependencies, so the orchestration is unit-testable without a container.
+/// Null is a probe that failed, never an empty bucket (handbook v5.0 §10.5):
+/// a surface omits what it cannot read rather than printing a zero it would
+/// then act on.
 typedef StorageBreakdown = ({
   int modelsBytes,
   int chatsBytes,
-  int attachmentsBytes,
-  int cacheBytes,
+  int? attachmentsBytes,
+  int? cacheBytes,
   int? freeBytes,
   int? totalBytes,
 });
 
 extension StorageBreakdownTotals on StorageBreakdown {
-  int get usedBytes => modelsBytes + chatsBytes + attachmentsBytes + cacheBytes;
+  /// The buckets that were read; an unknown one contributes nothing rather
+  /// than a fictitious zero, so the figure is a floor when a probe failed.
+  int get usedBytes =>
+      modelsBytes + chatsBytes + (attachmentsBytes ?? 0) + (cacheBytes ?? 0);
 }
 
 final class StorageBreakdownService {
@@ -34,8 +40,8 @@ final class StorageBreakdownService {
 
   final ChatHistoryRepository history;
 
-  /// The optional platform probes. A probe that fails degrades to null/zero —
-  /// "unknown is not zero capacity" is their documented contract, not swallowed
+  /// The optional platform probes. A probe that fails degrades to null —
+  /// "unknown is not zero" is their documented contract, not swallowed
   /// failure. They stay nullable for direct construction in tests; the provider
   /// that builds this in the app supplies all of them (#127), so an absent seam
   /// there is a wiring mistake rather than a supported partial breakdown.
@@ -54,14 +60,18 @@ final class StorageBreakdownService {
       (sum, status) => sum + status.downloadedBytes,
     );
     final chatsBytes = await history.storedBytes();
-    var attachmentsBytes = 0;
+    int? attachmentsBytes;
     try {
-      attachmentsBytes = await attachments?.storedBytes() ?? 0;
-    } catch (_) {}
-    var cacheBytes = 0;
+      attachmentsBytes = await attachments?.storedBytes();
+    } catch (_) {
+      attachmentsBytes = null;
+    }
+    int? cacheBytes;
     try {
-      cacheBytes = await cache?.sizeBytes() ?? 0;
-    } catch (_) {}
+      cacheBytes = await cache?.sizeBytes();
+    } catch (_) {
+      cacheBytes = null;
+    }
     final path = documentsPath;
     int? freeBytes;
     try {

@@ -105,7 +105,8 @@ void main() {
         documentsPath: '/tmp/docs',
       );
       final breakdown = await service.compute(models: const ModelState());
-      expect(breakdown.cacheBytes, 0);
+      expect(breakdown.cacheBytes, isNull);
+      expect(breakdown.usedBytes, breakdown.chatsBytes);
       expect(breakdown.freeBytes, isNull);
       expect(breakdown.totalBytes, isNull);
     });
