@@ -291,6 +291,36 @@ final class _ThrowingOnSecondLoad implements ModelManagementRepository {
   Future<ModelState> addModel(ModelCatalogEntry entry) async => _installed;
 }
 
+/// Every call forwards except the runtime bookkeeping write, which fails the
+/// way a full disk does.
+final class _RefusingRuntimeWrites implements ModelManagementRepository {
+  _RefusingRuntimeWrites(this._inner);
+  final ModelManagementRepository _inner;
+
+  @override
+  Future<ModelState> load() => _inner.load();
+  @override
+  Stream<ModelState> download(String artifactKey) =>
+      _inner.download(artifactKey);
+  @override
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    RuntimeFailureKind? failure,
+  }) async => throw const PersistenceException(
+    PersistenceFailureKind.write,
+    'disk full',
+  );
+  @override
+  Future<ModelState> pause(String artifactKey) => _inner.pause(artifactKey);
+  @override
+  Future<ModelState> cancel(String artifactKey) => _inner.cancel(artifactKey);
+  @override
+  Future<ModelState> delete(String artifactKey) => _inner.delete(artifactKey);
+  @override
+  Future<ModelState> addModel(ModelCatalogEntry entry) =>
+      _inner.addModel(entry);
+}
+
 /// Records which transfer commands reach the repository, for the refusal path.
 final class _TransferRecorder implements ModelManagementRepository {
   _TransferRecorder(this._state);
@@ -1681,6 +1711,48 @@ void main() {
       RuntimePhase.unloaded,
     );
   });
+
+  test(
+    'a store that refuses the runtime write cannot strand the row',
+    () async {
+      // The persisted phase is bookkeeping: a full disk after a successful load
+      // used to throw out of the command with the row left on `loading`, where
+      // the Models screen withholds the toggle until a relaunch (#154).
+      final directory = Directory.systemTemp.createTempSync(
+        'golem-toggle-test-',
+      );
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final inference = _RecordingInferenceRepository();
+      final models = _RefusingRuntimeWrites(fakeModels(directory));
+      final container = ProviderContainer(
+        overrides: [
+          attachmentRepositoryProvider.overrideWithValue(
+            InMemoryAttachmentRepository(),
+          ),
+          inferenceRepositoryProvider.overrideWithValue(inference),
+          modelManagementRepositoryProvider.overrideWithValue(models),
+          modelCatalogEntriesProvider.overrideWithValue(_testCatalog),
+        ],
+      );
+      addTearDown(container.dispose);
+      await installActiveModel(container);
+      final controller = container.read(modelControllerProvider.notifier);
+
+      await controller.toggleRuntime();
+      expect(inference.prepares, 1);
+      expect(
+        container.read(modelControllerProvider).requireValue.runtime,
+        RuntimePhase.loaded,
+        reason: 'the engine holds the weights whatever the file says',
+      );
+      await controller.toggleRuntime();
+      expect(inference.unloads, 1);
+      expect(
+        container.read(modelControllerProvider).requireValue.runtime,
+        RuntimePhase.unloaded,
+      );
+    },
+  );
 
   test(
     'memory pressure unloads an idle engine and records the phase',

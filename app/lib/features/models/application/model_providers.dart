@@ -7,6 +7,8 @@ import '../../../core/domain/model_activation.dart' as domain;
 import '../../../core/domain/model_catalog.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/repositories/contracts.dart'
+    show ModelManagementRepository, PersistenceException;
 import '../../../core/providers/retry.dart';
 import '../../preferences/application/preferences_providers.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -363,6 +365,8 @@ class ModelController extends _$ModelController {
   /// (#42). Engine failures stay in memory as a failed phase.
   Future<void> toggleRuntime() async {
     if (_busy) return;
+    final current = state.value;
+    if (current == null) return;
     _busy = true;
     _engineBusy = true;
     try {
@@ -370,7 +374,6 @@ class ModelController extends _$ModelController {
       // a programming error to surface, not an engine fault to report (#127).
       final repository = ref.read(modelManagementRepositoryProvider);
       final inference = ref.read(inferenceRepositoryProvider);
-      final current = state.requireValue;
       // Ahead of both arms: after a failed unload the phase reads `failed`
       // while the weights stay mapped, so a live answer can still be streaming
       // on the engine the load arm would prepare — and a different target
@@ -390,7 +393,11 @@ class ModelController extends _$ModelController {
           return;
         }
         if (!ref.mounted) return;
-        final value = await repository.recordRuntime(RuntimePhase.unloaded);
+        final value = await _recordRuntime(
+          repository,
+          current,
+          RuntimePhase.unloaded,
+        );
         if (!ref.mounted) return;
         state = AsyncData(value);
       } else {
@@ -404,7 +411,9 @@ class ModelController extends _$ModelController {
         // by an earlier build can always be corrected.
         final refusal = ref.read(deviceRefusalProvider);
         if (refusal != null) {
-          final value = await repository.recordRuntime(
+          final value = await _recordRuntime(
+            repository,
+            current,
             RuntimePhase.failed,
             failure: RuntimeFailureKind.deviceRefused,
           );
@@ -415,7 +424,9 @@ class ModelController extends _$ModelController {
         final target = _engineTargetKey();
         if (!_engineMayHoldWeights(current)) {
           // Refuse with a persisted failed phase; the engine is never touched.
-          final value = await repository.recordRuntime(
+          final value = await _recordRuntime(
+            repository,
+            current,
             RuntimePhase.failed,
             failure: RuntimeFailureKind.notInstalled,
           );
@@ -436,13 +447,50 @@ class ModelController extends _$ModelController {
           return;
         }
         if (!ref.mounted) return;
-        final value = await repository.recordRuntime(RuntimePhase.loaded);
+        final value = await _recordRuntime(
+          repository,
+          current,
+          RuntimePhase.loaded,
+        );
         if (!ref.mounted) return;
         state = AsyncData(value);
       }
+    } catch (_) {
+      // Anything that still escapes is a programming error and stays loud —
+      // but the row must not stay on `loading`, where the Models screen
+      // withholds the toggle and nothing short of a relaunch brings it back.
+      if (ref.mounted && state.value?.runtime == RuntimePhase.loading) {
+        state = AsyncData(
+          current.copyWith(
+            runtime: RuntimePhase.failed,
+            failure: RuntimeFailureKind.engineLoad,
+          ),
+        );
+      }
+      rethrow;
     } finally {
       _busy = false;
       _engineBusy = false;
+    }
+  }
+
+  /// The persisted phase is bookkeeping the engine never waits for: a store
+  /// the process cannot write keeps the phase the engine actually has in
+  /// memory, and reflectEngineLoaded reconciles the file at the next launch.
+  /// A loaded engine reported as anything else would offer "Load" for weights
+  /// already mapped (#126).
+  Future<ModelState> _recordRuntime(
+    ModelManagementRepository repository,
+    ModelState current,
+    RuntimePhase phase, {
+    RuntimeFailureKind? failure,
+  }) async {
+    try {
+      return await repository.recordRuntime(phase, failure: failure);
+    } on PersistenceException {
+      return failure == null
+          ? current.copyWith(runtime: phase, clearFailure: true)
+          : current.copyWith(runtime: phase, failure: failure);
     }
   }
 
