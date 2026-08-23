@@ -133,4 +133,52 @@ void main() {
     expect(fill.right, track.right);
     expect(fill.left, greaterThan(track.left));
   });
+
+  // The contract is the track's to keep, not the caller's: of the five
+  // surfaces that once held a bar, three clamped and two did not (#123). A byte
+  // count past its total, or a division against a stale total, must stop at
+  // the groove rather than paint past it.
+  testWidgets('a value past one fills the groove and no further', (
+    tester,
+  ) async {
+    await pumpTrack(tester, 1.5);
+    // The fill's own box, not the FractionallySizedBox: the parent constrains
+    // that one to the groove whatever its factor, so it reads 200 either way.
+    expect(tester.getRect(fill).width, 200);
+  });
+
+  testWidgets('a value below zero paints an empty groove', (tester) async {
+    await pumpTrack(tester, -0.5);
+    expect(tester.takeException(), isNull);
+    expect(tester.getRect(fill).width, 0);
+  });
+
+  // 0 / 0 against a total that is not known yet. Empty, not full: a bar with
+  // no number beside it — the splash, the setup banner — would otherwise
+  // read as finished for a transfer that has moved nothing.
+  testWidgets('an undefined value paints an empty groove', (tester) async {
+    await pumpTrack(tester, double.nan);
+    expect(tester.takeException(), isNull);
+    expect(tester.getRect(fill).width, 0);
+  });
 }
+
+final fill = find.descendant(
+  of: find.byType(FractionallySizedBox),
+  matching: find.byType(ColoredBox),
+);
+
+Future<void> pumpTrack(WidgetTester tester, double value) => tester.pumpWidget(
+  CupertinoApp(
+    home: Center(
+      child: SizedBox(
+        width: 200,
+        child: ProgressTrack(
+          value: value,
+          trackColor: GolemTheme.divider,
+          fillColor: GolemTheme.accent,
+        ),
+      ),
+    ),
+  ),
+);
