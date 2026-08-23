@@ -126,7 +126,8 @@ final class ArtifactTransferPresentation {
 
   /// The state chip: a live rate while one is honest, else the phase — and
   /// nothing at all during a download whose pace window is still warming up,
-  /// because a fabricated figure is worse than none.
+  /// or whose bytes are simulated, because a fabricated figure is worse than
+  /// none.
   final String? chip;
 
   /// Whether [chip] reports a running transfer, which is the difference
@@ -188,8 +189,11 @@ ArtifactTransferPresentation artifactTransfer({
     transferred: gigabytes(progressed),
     total: gigabytes(entry.totalBytes),
     remaining: gigabytes(entry.totalBytes - progressed),
-    chip: _chip(status.phase, snapshot, suffix, localizations),
-    chipSlot: status.phase == ArtifactPhase.downloading && snapshot != null
+    chip: _chip(status.phase, snapshot, suffix, simulated, localizations),
+    chipSlot:
+        status.phase == ArtifactPhase.downloading &&
+            snapshot != null &&
+            !simulated
         ? localizations.rateMbs('999.9')
         : null,
     chipIsLive:
@@ -219,15 +223,25 @@ ArtifactTransferPresentation artifactTransfer({
 
 /// Only a transfer quotes its rate; a verification names its phase, because
 /// a hash throughput in MB/s would read as a download that slowed down.
+///
+/// A simulated download quotes none at all. The simulation walks the whole
+/// artifact in about a second, so the honest measurement of it is a physically
+/// impossible link — "2755 MB/s" on the demo build's first run — and a figure
+/// no phone could reach reads as a fault, not as a simulation. The byte line
+/// and the caption still say `· simulated`, and the phase, percentage and
+/// sizes are all real; only the throughput nobody can have is withheld. A
+/// simulated transfer never reaches an ETA either: the window has to span
+/// [DownloadPaceEstimator.etaMinimumSpan] before one is quoted, which a
+/// one-second simulation cannot do.
 String? _chip(
   ArtifactPhase phase,
   DownloadPaceSnapshot? snapshot,
   String suffix,
+  bool simulated,
   AppLocalizations localizations,
 ) => switch (phase) {
-  ArtifactPhase.downloading when snapshot != null => localizations.rateMbs(
-    snapshot.mbPerSecond.toStringAsFixed(1),
-  ),
+  ArtifactPhase.downloading when snapshot != null && !simulated =>
+    localizations.rateMbs(snapshot.mbPerSecond.toStringAsFixed(1)),
   ArtifactPhase.verifying => localizations.verifyingStatus(suffix),
   ArtifactPhase.paused => localizations.paused,
   ArtifactPhase.failed => localizations.stopped,
