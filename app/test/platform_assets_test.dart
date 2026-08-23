@@ -194,6 +194,12 @@ void main() {
       'ios/Runner.xcodeproj/project.pbxproj',
     ).readAsString();
     expect(project, contains('PrivacyInfo.xcprivacy in Resources'));
+    // The MLX carrier the default iOS build composes declares iOS 17
+    // (packages/inferno/native/apple/Package.swift) and is dlopen'ed at the
+    // launch probe, so a lower floor installs on phones that then die at
+    // first use. A12 — the store gate — runs iOS 17, so no hardware is lost.
+    expect('IPHONEOS_DEPLOYMENT_TARGET = 17.0;'.allMatches(project).length, 12);
+    expect(project, isNot(contains('IPHONEOS_DEPLOYMENT_TARGET = 15.0')));
 
     final plist = await File('ios/Runner/Info.plist').readAsString();
     // HTTPS through the OS and SHA-256 integrity hashing are exempt; the key

@@ -90,9 +90,12 @@ together as one value, eliminating the mismatched profile/path hazard.
 
 ## Device-model policy: 7 GiB, and unknown means small
 
-Devices reporting **≥ 7 GiB** physical memory default to **Gemma 4 E2B**
-(`gemma4-gguf`, 2.62 GB); below that — or when memory cannot be read —
-the lighter **Qwen 3.5 2B** (`qwen35-2b-gguf`, 1.21 GB).
+Devices reporting **≥ 7 GiB** physical memory default to **Gemma 4 E2B**;
+below that — or when memory cannot be read — the lighter **Qwen 3.5 2B**. The
+artifact is the family on the engine the platform composes (ADR 0012):
+`gemma4-mlx` (3.58 GB) / `qwen35-2b-mlx` (1.75 GB) on iOS, `gemma4-gguf`
+(3.18 GB) / `qwen35-2b-gguf` (1.58 GB) on Android and macOS. Sizes follow the
+pins in `docs/real-model-matrix.md`.
 
 - The threshold is 7 GiB rather than a literal 8 GB because Android's
   `ActivityManager.MemoryInfo.totalMem` reports net of kernel/firmware
