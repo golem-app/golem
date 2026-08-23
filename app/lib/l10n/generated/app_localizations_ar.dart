@@ -577,6 +577,34 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String etaAboutHoursLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'بقيت نحو $count ساعة',
+      many: 'بقيت نحو $count ساعة',
+      few: 'بقيت نحو $count ساعات',
+      two: 'بقيت نحو ساعتين',
+      one: 'بقيت نحو ساعة واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String etaAboutHoursMinutesLeft(int hours, int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'بقي نحو $hours ساعة و$minutes د',
+      many: 'بقي نحو $hours ساعة و$minutes د',
+      few: 'بقي نحو $hours ساعات و$minutes د',
+      two: 'بقي نحو ساعتين و$minutes د',
+      one: 'بقي نحو ساعة و$minutes د',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String amountLeft(String amount) {
     return 'المتبقي $amount';
   }

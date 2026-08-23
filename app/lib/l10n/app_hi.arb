@@ -165,6 +165,8 @@
   "verifiedAmount": "{total} में से {verified} सत्यापित",
   "downloadNote": "Golem को खुला रखें — ऐप सामने रहने पर डाउनलोड सबसे तेज़ होता है।",
   "etaAboutMinutesLeft": "{count, plural, =1{लगभग 1 मिनट बाकी} other{लगभग {count} मिनट बाकी}}",
+  "etaAboutHoursLeft": "{count, plural, =1{लगभग 1 घंटा बाकी} other{लगभग {count} घंटे बाकी}}",
+  "etaAboutHoursMinutesLeft": "{hours, plural, =1{लगभग 1 घंटा {minutes} मिनट बाकी} other{लगभग {hours} घंटे {minutes} मिनट बाकी}}",
   "amountLeft": "{amount} बाकी",
   "stoppedAtPercent": "{percent}% पर रुका",
   "rateMbs": "{rate} MB/s",

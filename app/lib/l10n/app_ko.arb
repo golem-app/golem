@@ -165,6 +165,8 @@
   "verifiedAmount": "{total} 중 {verified} 확인됨",
   "downloadNote": "Golem을 열어 두세요 — 앱이 화면에 있을 때 다운로드가 가장 빠릅니다.",
   "etaAboutMinutesLeft": "{count, plural, other{약 {count}분 남음}}",
+  "etaAboutHoursLeft": "약 {count}시간 남음",
+  "etaAboutHoursMinutesLeft": "약 {hours}시간 {minutes}분 남음",
   "amountLeft": "{amount} 남음",
   "stoppedAtPercent": "{percent}%에서 중단됨",
   "rateMbs": "{rate} MB/s",

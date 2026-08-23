@@ -582,6 +582,28 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String etaAboutHoursLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Faltam cerca de $count h',
+      one: 'Falta cerca de 1 h',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String etaAboutHoursMinutesLeft(int hours, int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'Faltam cerca de $hours h $minutes min',
+      one: 'Falta cerca de 1 h $minutes min',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String amountLeft(String amount) {
     return 'Faltam $amount';
   }
@@ -2480,6 +2502,28 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
       locale: localeName,
       other: 'Faltam cerca de $count minutos',
       one: 'Falta cerca de 1 minuto',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String etaAboutHoursLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Faltam cerca de $count h',
+      one: 'Falta cerca de 1 h',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String etaAboutHoursMinutesLeft(int hours, int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'Faltam cerca de $hours h $minutes min',
+      one: 'Falta cerca de 1 h $minutes min',
     );
     return '$_temp0';
   }

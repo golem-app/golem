@@ -140,6 +140,13 @@ final class ArtifactTransferPresentation {
 
   /// The trailing figure under the bar: time left while downloading, amount
   /// left while paused, where it stopped when it failed.
+  ///
+  /// Neither this nor [chip] measures a simulated transfer. The simulation
+  /// walks the whole artifact in about a second, so measuring it honestly
+  /// reported "2755 MB/s" on the demo build (#146) — a link no phone can reach
+  /// reads as a fault, not as a simulation, and a time left divided out of the
+  /// same compressed clock is the same fiction. The phase, the percentage, the
+  /// sizes and the `· simulated` labels are all real and all stay.
   final String? remainder;
 
   final TransferAffordance? affordance;
@@ -181,6 +188,12 @@ ArtifactTransferPresentation artifactTransfer({
   // like a real one, and all four surfaces describe one repository.
   final suffix = simulated ? ' · ${localizations.simulated}' : '';
 
+  // One decision, read twice: the pill and the width it reserves are the same
+  // question, and holding them apart let a condition land on one of them.
+  final rate = status.phase == ArtifactPhase.downloading && !simulated
+      ? snapshot?.mbPerSecond
+      : null;
+
   return ArtifactTransferPresentation(
     phase: status.phase,
     fraction: fraction,
@@ -188,10 +201,10 @@ ArtifactTransferPresentation artifactTransfer({
     transferred: gigabytes(progressed),
     total: gigabytes(entry.totalBytes),
     remaining: gigabytes(entry.totalBytes - progressed),
-    chip: _chip(status.phase, snapshot, suffix, localizations),
-    chipSlot: status.phase == ArtifactPhase.downloading && snapshot != null
-        ? localizations.rateMbs('999.9')
-        : null,
+    chip: rate == null
+        ? _stateChip(status.phase, suffix, localizations)
+        : localizations.rateMbs(rate.toStringAsFixed(1)),
+    chipSlot: rate == null ? null : localizations.rateMbs('999.9'),
     chipIsLive:
         status.phase == ArtifactPhase.downloading ||
         status.phase == ArtifactPhase.verifying,
@@ -200,6 +213,7 @@ ArtifactTransferPresentation artifactTransfer({
       snapshot: snapshot,
       percent: percent,
       remaining: entry.totalBytes - progressed,
+      simulated: simulated,
       localizations: localizations,
     ),
     affordance: _affordance(
@@ -217,17 +231,14 @@ ArtifactTransferPresentation artifactTransfer({
   );
 }
 
-/// Only a transfer quotes its rate; a verification names its phase, because
-/// a hash throughput in MB/s would read as a download that slowed down.
-String? _chip(
+/// The chip a phase names when no rate is quoted: a verification names itself
+/// rather than its throughput, because a hash rate in MB/s would read as a
+/// download that slowed down.
+String? _stateChip(
   ArtifactPhase phase,
-  DownloadPaceSnapshot? snapshot,
   String suffix,
   AppLocalizations localizations,
 ) => switch (phase) {
-  ArtifactPhase.downloading when snapshot != null => localizations.rateMbs(
-    snapshot.mbPerSecond.toStringAsFixed(1),
-  ),
   ArtifactPhase.verifying => localizations.verifyingStatus(suffix),
   ArtifactPhase.paused => localizations.paused,
   ArtifactPhase.failed => localizations.stopped,
@@ -239,15 +250,30 @@ String? _remainder({
   required DownloadPaceSnapshot? snapshot,
   required int percent,
   required int remaining,
+  required bool simulated,
   required AppLocalizations localizations,
 }) => switch (phase) {
   ArtifactPhase.downloading || ArtifactPhase.verifying
-      when snapshot?.eta != null =>
-    localizations.etaAboutMinutesLeft(aboutMinutesLeft(snapshot!.eta!)),
+      when snapshot?.eta != null && !simulated =>
+    _timeLeft(snapshot!.eta!, localizations),
   ArtifactPhase.paused => localizations.amountLeft(gigabytes(remaining)),
   ArtifactPhase.failed => localizations.stoppedAtPercent(percent),
   _ => null,
 };
+
+/// Minutes below an hour, the locale's abbreviated units above one, and
+/// nothing at all past the ceiling: a figure that large has stopped being a
+/// time left and reads as a fault (#146).
+String? _timeLeft(Duration eta, AppLocalizations localizations) =>
+    switch (aboutTimeLeft(eta)) {
+      null => null,
+      (hours: 0, :final minutes) => localizations.etaAboutMinutesLeft(minutes),
+      (:final hours, minutes: 0) => localizations.etaAboutHoursLeft(hours),
+      (:final hours, :final minutes) => localizations.etaAboutHoursMinutesLeft(
+        hours,
+        minutes,
+      ),
+    };
 
 /// What the phase permits, and why it does not.
 ///

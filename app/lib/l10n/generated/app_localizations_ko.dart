@@ -562,6 +562,16 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String etaAboutHoursLeft(int count) {
+    return '약 $count시간 남음';
+  }
+
+  @override
+  String etaAboutHoursMinutesLeft(int hours, int minutes) {
+    return '약 $hours시간 $minutes분 남음';
+  }
+
+  @override
   String amountLeft(String amount) {
     return '$amount 남음';
   }

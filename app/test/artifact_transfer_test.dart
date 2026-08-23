@@ -153,6 +153,83 @@ void main() {
       expect(transfer.remainder, 'About 1 minute left');
     });
 
+    test('an hour or more reads in hours', () {
+      String? remainderFor(Duration eta) => project(
+        const ArtifactStatus(
+          phase: ArtifactPhase.downloading,
+          downloadedBytes: 1000000000,
+        ),
+        pace: DownloadPaceSnapshot(
+          artifactKey: 'test-gguf',
+          mbPerSecond: 1.2,
+          eta: eta,
+        ),
+      ).remainder;
+
+      expect(
+        remainderFor(const Duration(minutes: 59)),
+        'About 59 minutes left',
+      );
+      expect(
+        remainderFor(const Duration(minutes: 80)),
+        'About 1 h 20 min left',
+      );
+      expect(remainderFor(const Duration(minutes: 61)), 'About 1 h 1 min left');
+      expect(remainderFor(const Duration(hours: 2)), 'About 2 h left');
+      expect(remainderFor(const Duration(hours: 1)), 'About 1 h left');
+    });
+
+    test('a figure past the ceiling is withheld, not printed', () {
+      // "About 2173 minutes left" is what a warm-up window quoted on a
+      // production phone (#146); past a day nothing is printed at all.
+      final transfer = project(
+        const ArtifactStatus(phase: ArtifactPhase.downloading),
+        pace: const DownloadPaceSnapshot(
+          artifactKey: 'test-gguf',
+          mbPerSecond: 0.03,
+          eta: Duration(minutes: 2173),
+        ),
+      );
+      expect(transfer.remainder, isNull);
+      expect(transfer.chip, '0.0 MB/s', reason: 'the rate is still honest');
+    });
+
+    test('a simulated transfer measures neither rate nor time left', () {
+      // The fake repository walks the whole artifact in about a second, so
+      // measuring it honestly reported 2755 MB/s on the demo build. The
+      // percentage, the sizes and the phase are real; the link speed and the
+      // time divided out of it are not.
+      final transfer = project(
+        const ArtifactStatus(
+          phase: ArtifactPhase.downloading,
+          downloadedBytes: 1000000000,
+        ),
+        pace: const DownloadPaceSnapshot(
+          artifactKey: 'test-gguf',
+          mbPerSecond: 2754.9,
+          eta: Duration(seconds: 90),
+        ),
+        simulated: true,
+      );
+      expect(transfer.chip, isNull);
+      expect(transfer.chipSlot, isNull, reason: 'no pill to keep one width');
+      expect(transfer.remainder, isNull);
+      expect(transfer.chipIsLive, isTrue);
+      expect(transfer.percent, 25);
+      expect(transfer.transferred, '1.00 GB');
+
+      // A phase that quotes no measurement still says where it stopped.
+      final paused = project(
+        const ArtifactStatus(
+          phase: ArtifactPhase.paused,
+          downloadedBytes: 1000000000,
+        ),
+        simulated: true,
+      );
+      expect(paused.chip, 'Paused');
+      expect(paused.remainder, '3.00 GB left');
+    });
+
     test('a snapshot for another artifact is not borrowed', () {
       final transfer = project(
         const ArtifactStatus(phase: ArtifactPhase.downloading),
@@ -205,6 +282,17 @@ void main() {
       );
       expect(timed.chip, 'Verifying', reason: 'a hash rate is not MB/s');
       expect(timed.remainder, 'About 2 minutes left');
+
+      final long = project(
+        status,
+        pace: const DownloadPaceSnapshot(
+          artifactKey: 'test-gguf',
+          mbPerSecond: 0.5,
+          eta: Duration(minutes: 95),
+          phase: ArtifactPhase.verifying,
+        ),
+      );
+      expect(long.remainder, 'About 1 h 35 min left', reason: 'one reading');
 
       // A window measured on the network is not borrowed across the edge.
       final stale = project(

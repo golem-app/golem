@@ -413,6 +413,123 @@ void main() {
     expect(pl.chatCount(25), '25 czatów');
   });
 
+  test('every catalog reads a long ETA in hours', () {
+    final localizations = <String, AppLocalizations>{
+      'en': AppLocalizationsEn(),
+      'pl': AppLocalizationsPl(),
+      'ar': AppLocalizationsAr(),
+      'es': AppLocalizationsEs(),
+      'pt': AppLocalizationsPt(),
+      'pt_BR': AppLocalizationsPtBr(),
+      'ja': AppLocalizationsJa(),
+      'id': AppLocalizationsId(),
+      'hi': AppLocalizationsHi(),
+      'fr': AppLocalizationsFr(),
+      'vi': AppLocalizationsVi(),
+      'tr': AppLocalizationsTr(),
+      'ko': AppLocalizationsKo(),
+    };
+    for (final MapEntry(key: locale, value: l10n) in localizations.entries) {
+      // The hours figure may be spelled rather than interpolated — Arabic's
+      // dual is a word, not a digit — but the minutes always come as a number.
+      expect(l10n.etaAboutHoursLeft(2), isNotEmpty, reason: locale);
+      expect(l10n.etaAboutHoursLeft(1), isNotEmpty, reason: locale);
+      final compound = l10n.etaAboutHoursMinutesLeft(3, 20);
+      expect(compound, contains('3'), reason: locale);
+      expect(compound, contains('20'), reason: locale);
+      // Above an hour every catalog abbreviates; the minutes-only form below
+      // it keeps the spelled-out unit, so the two must not read alike.
+      expect(compound, isNot(l10n.etaAboutMinutesLeft(20)), reason: locale);
+      expect(
+        l10n.etaAboutHoursMinutesLeft(1, 20),
+        isNotEmpty,
+        reason: '$locale one hour',
+      );
+    }
+    // Rendering one count against another proves nothing — the interpolated
+    // digit differs either way — so the branches are read off the catalogs.
+    // Every language whose wording changes with the count carries them.
+    for (final locale in ['es', 'pt', 'pt_BR', 'fr', 'hi', 'ar']) {
+      final catalog = _catalog('lib/l10n/app_$locale.arb');
+      expect(
+        catalog['etaAboutHoursLeft']! as String,
+        matches(RegExp(r'(=1|one)\{')),
+        reason: '$locale hours',
+      );
+    }
+    for (final locale in ['es', 'pt', 'pt_BR', 'hi', 'ar']) {
+      expect(
+        _catalog('lib/l10n/app_$locale.arb')['etaAboutHoursMinutesLeft']!
+            as String,
+        matches(RegExp(r'(=1|one)\{')),
+        reason: '$locale hours and minutes',
+      );
+    }
+    // Spanish and Brazilian Portuguese carry the verb; one hour takes the
+    // singular in both forms.
+    for (final (l10n, singular, plural) in [
+      (AppLocalizationsEs(), 'Queda ', 'Quedan '),
+      (AppLocalizationsPtBr(), 'Falta ', 'Faltam '),
+    ]) {
+      expect(l10n.etaAboutHoursLeft(1), startsWith(singular));
+      expect(l10n.etaAboutHoursLeft(2), startsWith(plural));
+      expect(l10n.etaAboutHoursMinutesLeft(1, 20), startsWith(singular));
+      expect(l10n.etaAboutHoursMinutesLeft(2, 20), startsWith(plural));
+    }
+    // French agrees with the whole quantity: a lone hour is singular, an hour
+    // and twenty minutes is not.
+    final fr = AppLocalizationsFr();
+    expect(fr.etaAboutHoursLeft(1), endsWith('restante'));
+    expect(fr.etaAboutHoursLeft(2), endsWith('restantes'));
+    expect(fr.etaAboutHoursMinutesLeft(1, 20), endsWith('restantes'));
+    // Hindi inflects the noun rather than a verb.
+    final hi = AppLocalizationsHi();
+    expect(hi.etaAboutHoursLeft(1), contains('घंटा'));
+    expect(hi.etaAboutHoursLeft(2), contains('घंटे'));
+    expect(hi.etaAboutHoursMinutesLeft(1, 20), contains('घंटा'));
+    expect(hi.etaAboutHoursMinutesLeft(2, 20), contains('घंटे'));
+    // Arabic runs one, two, and the plural branches.
+    final ar = AppLocalizationsAr();
+    expect(ar.etaAboutHoursLeft(1), contains('ساعة واحدة'));
+    expect(ar.etaAboutHoursLeft(2), contains('ساعتين'));
+    expect(ar.etaAboutHoursLeft(3), contains('ساعات'));
+    expect(ar.etaAboutHoursMinutesLeft(2, 20), contains('ساعتين'));
+  });
+
+  testWidgets('a long time left stays within the row it shares', (
+    tester,
+  ) async {
+    // The figures under a transfer bar are one line each with an ellipsis, so
+    // copy that outgrows the row is truncated rather than wrapped — silently,
+    // and only in the locale that overran. The minutes form has always lived
+    // there, so the hours form (#146) is measured against it rather than
+    // against a pixel budget that would move with the type ramp. Test text
+    // renders in the placeholder face, so this is a proportional guard against
+    // a translation that balloons, not a claim about a shipped font.
+    double width(String text) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: GolemText.footnoteStrong),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      return painter.width;
+    }
+
+    for (final locale in AppLocalizations.supportedLocales) {
+      final l10n = await AppLocalizations.delegate.load(locale);
+      final minutes = width(l10n.etaAboutMinutesLeft(59));
+      for (final hours in [
+        l10n.etaAboutHoursLeft(3),
+        l10n.etaAboutHoursMinutesLeft(3, 20),
+      ]) {
+        expect(
+          width(hours),
+          lessThan(minutes * 1.6),
+          reason: '$locale: "$hours" outgrows the minutes form it replaces',
+        );
+      }
+    }
+  });
+
   test('every repository refusal has actionable localized copy', () {
     final en = AppLocalizationsEn();
     final translations = [

@@ -577,6 +577,16 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
+  String etaAboutHoursLeft(int count) {
+    return 'Sekitar $count jam lagi';
+  }
+
+  @override
+  String etaAboutHoursMinutesLeft(int hours, int minutes) {
+    return 'Sekitar $hours jam $minutes menit lagi';
+  }
+
+  @override
   String amountLeft(String amount) {
     return 'Tersisa $amount';
   }

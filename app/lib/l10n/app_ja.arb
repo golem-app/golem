@@ -165,6 +165,8 @@
   "verifiedAmount": "{total}中{verified}を検証済み",
   "downloadNote": "Golem を開いたままにしてください。バックグラウンドではダウンロードが遅くなります。",
   "etaAboutMinutesLeft": "{count, plural, other{残り約{count}分}}",
+  "etaAboutHoursLeft": "残り約{count}時間",
+  "etaAboutHoursMinutesLeft": "残り約{hours}時間{minutes}分",
   "amountLeft": "残り {amount}",
   "stoppedAtPercent": "{percent}% で停止しました",
   "rateMbs": "{rate} MB/s",

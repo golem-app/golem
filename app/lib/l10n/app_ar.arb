@@ -165,6 +165,8 @@
   "verifiedAmount": "تم التحقق من {verified} من {total}",
   "downloadNote": "أبقِ Golem مفتوحًا — يكون التنزيل أسرع عندما يكون التطبيق في المقدمة.",
   "etaAboutMinutesLeft": "{count, plural, one{بقيت نحو دقيقة واحدة} two{بقيت نحو دقيقتين} few{بقيت نحو {count} دقائق} many{بقيت نحو {count} دقيقة} other{بقيت نحو {count} دقيقة}}",
+  "etaAboutHoursLeft": "{count, plural, one{بقيت نحو ساعة واحدة} two{بقيت نحو ساعتين} few{بقيت نحو {count} ساعات} many{بقيت نحو {count} ساعة} other{بقيت نحو {count} ساعة}}",
+  "etaAboutHoursMinutesLeft": "{hours, plural, one{بقي نحو ساعة و{minutes} د} two{بقي نحو ساعتين و{minutes} د} few{بقي نحو {hours} ساعات و{minutes} د} many{بقي نحو {hours} ساعة و{minutes} د} other{بقي نحو {hours} ساعة و{minutes} د}}",
   "amountLeft": "المتبقي {amount}",
   "stoppedAtPercent": "توقف عند {percent}%",
   "rateMbs": "{rate} MB/s",

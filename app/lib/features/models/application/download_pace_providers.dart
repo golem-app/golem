@@ -17,7 +17,9 @@ DateTime Function() paceClock(Ref ref) => DateTime.now;
 /// bytes while downloading, hashed bytes while verifying, each phase its own
 /// window. `null` until the trailing window can quote an honest figure, and
 /// again the moment the artifact leaves both phases — surfaces render nothing
-/// rather than a stale or fabricated number.
+/// rather than a stale or fabricated number. The time left is held back
+/// further still, until the transfer has proposed the same one twice
+/// ([DownloadEtaGate]).
 ///
 /// KeepAlive: the estimator's sample window lives in notifier fields, and the
 /// model stream must stay observed across screens the way the controller
@@ -26,6 +28,7 @@ DateTime Function() paceClock(Ref ref) => DateTime.now;
 @Riverpod(keepAlive: true, retry: noRetry)
 class DownloadPace extends _$DownloadPace {
   final _estimator = DownloadPaceEstimator();
+  final _etaGate = DownloadEtaGate();
   String? _artifactKey;
   ArtifactPhase? _phase;
   DateTime? _origin;
@@ -50,7 +53,7 @@ class DownloadPace extends _$DownloadPace {
       _artifactKey = null;
       _phase = null;
       _origin = null;
-      _estimator.reset();
+      _reset();
       state = null;
       return;
     }
@@ -63,12 +66,17 @@ class DownloadPace extends _$DownloadPace {
       _artifactKey = inFlight.key;
       _phase = status.phase;
       _origin = now;
-      _estimator.reset();
+      _reset();
     }
     final progressed = status.progressBytes;
     _estimator.add(now.difference(_origin!), progressed);
     final rate = _estimator.mbPerSecond;
     if (rate == null) {
+      // The snapshot goes, because a surface has no rate to show. The gate
+      // stays: the rate window can thin out for a tick — two reports 400 ms
+      // apart — while the ETA's longer window is still intact, and re-arming
+      // here would blank a settled time left for the five seconds it takes to
+      // prove itself again.
       state = null;
       return;
     }
@@ -80,8 +88,13 @@ class DownloadPace extends _$DownloadPace {
     state = DownloadPaceSnapshot(
       artifactKey: inFlight.key,
       mbPerSecond: rate,
-      eta: remaining == null ? null : _estimator.eta(remaining),
+      eta: _etaGate.admit(remaining == null ? null : _estimator.eta(remaining)),
       phase: status.phase,
     );
+  }
+
+  void _reset() {
+    _estimator.reset();
+    _etaGate.reset();
   }
 }

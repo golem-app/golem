@@ -165,6 +165,8 @@
   "verifiedAmount": "Đã xác minh {verified} / {total}",
   "downloadNote": "Giữ Golem mở — tải xuống nhanh nhất khi ứng dụng ở nền trước.",
   "etaAboutMinutesLeft": "{count, plural, other{Còn khoảng {count} phút}}",
+  "etaAboutHoursLeft": "Còn khoảng {count} giờ",
+  "etaAboutHoursMinutesLeft": "Còn khoảng {hours} giờ {minutes} phút",
   "amountLeft": "Còn lại {amount}",
   "stoppedAtPercent": "Đã dừng ở {percent}%",
   "rateMbs": "{rate} MB/s",

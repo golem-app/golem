@@ -560,6 +560,16 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String etaAboutHoursLeft(int count) {
+    return '残り約$count時間';
+  }
+
+  @override
+  String etaAboutHoursMinutesLeft(int hours, int minutes) {
+    return '残り約$hours時間$minutes分';
+  }
+
+  @override
   String amountLeft(String amount) {
     return '残り $amount';
   }

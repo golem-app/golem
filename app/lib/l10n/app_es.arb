@@ -165,6 +165,8 @@
   "verifiedAmount": "{verified} de {total} verificados",
   "downloadNote": "Mantén Golem abierto: las descargas son más rápidas en primer plano.",
   "etaAboutMinutesLeft": "{count, plural, =1{Queda alrededor de 1 minuto} other{Quedan alrededor de {count} minutos}}",
+  "etaAboutHoursLeft": "{count, plural, =1{Queda alrededor de 1 h} other{Quedan alrededor de {count} h}}",
+  "etaAboutHoursMinutesLeft": "{hours, plural, =1{Queda alrededor de 1 h {minutes} min} other{Quedan alrededor de {hours} h {minutes} min}}",
   "amountLeft": "Quedan {amount}",
   "stoppedAtPercent": "Detenida en {percent}%",
   "rateMbs": "{rate} MB/s",

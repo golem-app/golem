@@ -165,6 +165,8 @@
   "verifiedAmount": "{verified} / {total} doğrulandı",
   "downloadNote": "Golem’i açık tutun — indirmeler uygulama öndeyken en hızlıdır.",
   "etaAboutMinutesLeft": "{count, plural, =1{Yaklaşık 1 dakika kaldı} other{Yaklaşık {count} dakika kaldı}}",
+  "etaAboutHoursLeft": "Yaklaşık {count} sa kaldı",
+  "etaAboutHoursMinutesLeft": "Yaklaşık {hours} sa {minutes} dk kaldı",
   "amountLeft": "{amount} kaldı",
   "stoppedAtPercent": "%{percent} seviyesinde durdu",
   "rateMbs": "{rate} MB/s",

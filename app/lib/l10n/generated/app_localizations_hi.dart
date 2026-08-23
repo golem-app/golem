@@ -578,6 +578,28 @@ class AppLocalizationsHi extends AppLocalizations {
   }
 
   @override
+  String etaAboutHoursLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'लगभग $count घंटे बाकी',
+      one: 'लगभग 1 घंटा बाकी',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String etaAboutHoursMinutesLeft(int hours, int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'लगभग $hours घंटे $minutes मिनट बाकी',
+      one: 'लगभग 1 घंटा $minutes मिनट बाकी',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String amountLeft(String amount) {
     return '$amount बाकी';
   }

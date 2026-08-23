@@ -581,6 +581,22 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
+  String etaAboutHoursLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Environ $count h restantes',
+      one: 'Environ 1 h restante',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String etaAboutHoursMinutesLeft(int hours, int minutes) {
+    return 'Environ $hours h $minutes min restantes';
+  }
+
+  @override
   String amountLeft(String amount) {
     return '$amount restants';
   }

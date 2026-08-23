@@ -575,6 +575,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String etaAboutHoursLeft(int count) {
+    return 'About $count h left';
+  }
+
+  @override
+  String etaAboutHoursMinutesLeft(int hours, int minutes) {
+    return 'About $hours h $minutes min left';
+  }
+
+  @override
   String amountLeft(String amount) {
     return '$amount left';
   }
