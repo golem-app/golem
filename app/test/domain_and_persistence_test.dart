@@ -253,6 +253,7 @@ void main() {
         'responseStyles': {'gemma4': 'verbose', 'qwen35': 'precise'},
         'customModels': [
           {'repository': 'x/y', 'engine': 'tpu'},
+          {'engine': 'mlx'},
           {'repository': 'x/z', 'engine': 'mlx'},
         ],
       });

@@ -13,14 +13,22 @@ import '../application/chat_providers.dart';
 /// stale. This is separate from generation recovery because saving history
 /// must never modify, retry, or discard an inference turn.
 class PersistenceRecoveryBanner extends ConsumerWidget {
-  const PersistenceRecoveryBanner({required this.phase, super.key});
+  const PersistenceRecoveryBanner({
+    required this.phase,
+    this.historyRecovered = false,
+    super.key,
+  });
 
   final ChatPersistencePhase phase;
+
+  /// The read-side notice. A write failure outranks it while one stands —
+  /// that one has an action — and it returns once the write recovers.
+  final bool historyRecovered;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final retrying = phase == ChatPersistencePhase.retrying;
-    final recovered = phase == ChatPersistencePhase.recovered;
+    final recovered = historyRecovered && phase == ChatPersistencePhase.idle;
     List<Widget> messageChildren() => [
       const ExcludeSemantics(
         child: Icon(

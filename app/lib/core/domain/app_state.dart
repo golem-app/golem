@@ -94,9 +94,7 @@ final class ChatFailure {
 /// deliberately orthogonal to [ChatFailure]: retrying a history write must not
 /// modify an inference turn, and inference recovery must not hide an unsaved
 /// session.
-/// [recovered] is the read-side notice: hydration lost something unreadable
-/// and said so; it clears on dismissal or the next successful persist.
-enum ChatPersistencePhase { idle, failed, retrying, recovered }
+enum ChatPersistencePhase { idle, failed, retrying }
 
 // Deliberately identity-equal: the controller reassigns this state on every
 // streaming token, so a deep compare in updateShouldNotify would cost
@@ -109,6 +107,7 @@ final class ChatState {
     this.generation = GenerationPhase.idle,
     this.failure,
     this.persistencePhase = ChatPersistencePhase.idle,
+    this.historyRecovered = false,
     this.hasUnsavedAssistant = false,
   });
 
@@ -117,6 +116,13 @@ final class ChatState {
   final GenerationPhase generation;
   final ChatFailure? failure;
   final ChatPersistencePhase persistencePhase;
+
+  /// The read-side notice: hydration set aside something it could not read.
+  /// Orthogonal to [persistencePhase], which is the write side and moves on
+  /// every save; this clears only when the user dismisses it, and while it
+  /// stands no attachment is collected — the `.corrupt` copy beside the
+  /// store still names them.
+  final bool historyRecovered;
 
   final bool hasUnsavedAssistant;
 
@@ -135,6 +141,7 @@ final class ChatState {
     ChatFailure? failure,
     bool clearFailure = false,
     ChatPersistencePhase? persistencePhase,
+    bool? historyRecovered,
     bool? hasUnsavedAssistant,
   }) => ChatState(
     conversations: conversations ?? _conversations,
@@ -142,6 +149,7 @@ final class ChatState {
     generation: generation ?? this.generation,
     failure: clearFailure ? null : failure ?? this.failure,
     persistencePhase: persistencePhase ?? this.persistencePhase,
+    historyRecovered: historyRecovered ?? this.historyRecovered,
     hasUnsavedAssistant: hasUnsavedAssistant ?? this.hasUnsavedAssistant,
   );
 }

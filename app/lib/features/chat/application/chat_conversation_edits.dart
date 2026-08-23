@@ -32,6 +32,7 @@ ChatState withNewConversation(ChatState value, ChatConversation conversation) =>
       conversations: [conversation, ...value.conversations],
       activeId: conversation.id,
       persistencePhase: value.persistencePhase,
+      historyRecovered: value.historyRecovered,
     );
 
 /// Removing the active chat falls through to whatever is now first, which is
@@ -44,6 +45,7 @@ ChatState withoutConversation(ChatState value, String id) {
     conversations: remaining,
     activeId: value.activeId == id ? remaining.firstOrNull?.id : value.activeId,
     persistencePhase: value.persistencePhase,
+    historyRecovered: value.historyRecovered,
   );
 }
 

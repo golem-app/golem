@@ -174,8 +174,12 @@ class ChatCanvas extends ConsumerWidget {
             ],
           ),
         ),
-        if (chat.persistencePhase != ChatPersistencePhase.idle)
-          PersistenceRecoveryBanner(phase: chat.persistencePhase),
+        if (chat.persistencePhase != ChatPersistencePhase.idle ||
+            chat.historyRecovered)
+          PersistenceRecoveryBanner(
+            phase: chat.persistencePhase,
+            historyRecovered: chat.historyRecovered,
+          ),
         if (chat.failure != null)
           RecoveryBanner(failure: chat.failure!)
         // The empty state carries this copy until the first message; once a

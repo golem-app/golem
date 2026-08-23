@@ -10,11 +10,19 @@ import 'equality.dart';
 /// An enum name read off disk: a build that does not know the name — an
 /// older one reading a newer store, or a hand-edited file — gets [orElse]
 /// rather than an [ArgumentError] that throws the whole store away (#154).
-T enumByName<T extends Enum>(List<T> values, Object? raw, {required T orElse}) {
+T enumByName<T extends Enum>(
+  List<T> values,
+  Object? raw, {
+  required T orElse,
+}) => enumByNameOrNull(values, raw) ?? orElse;
+
+/// [enumByName] for a leaf with no sensible default: null means "not a name
+/// this build knows", for the caller to drop or refuse.
+T? enumByNameOrNull<T extends Enum>(List<T> values, Object? raw) {
   for (final value in values) {
     if (value.name == raw) return value;
   }
-  return orElse;
+  return null;
 }
 
 enum MessageRole { user, assistant }

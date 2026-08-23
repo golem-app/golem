@@ -23,13 +23,21 @@ class _PersistenceHost extends ConsumerWidget {
         (value) => value.value?.persistencePhase ?? ChatPersistencePhase.idle,
       ),
     );
+    final recovered = ref.watch(
+      chatControllerProvider.select(
+        (value) => value.value?.historyRecovered ?? false,
+      ),
+    );
     return CupertinoPageScaffold(
       child: SafeArea(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            if (persistence != ChatPersistencePhase.idle)
-              PersistenceRecoveryBanner(phase: persistence),
+            if (persistence != ChatPersistencePhase.idle || recovered)
+              PersistenceRecoveryBanner(
+                phase: persistence,
+                historyRecovered: recovered,
+              ),
             if (withInferenceFailure)
               const RecoveryBanner(
                 failure: ChatFailure(kind: ChatFailureKind.generic),

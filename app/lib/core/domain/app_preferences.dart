@@ -7,7 +7,7 @@ import 'dart:convert';
 
 import 'equality.dart';
 import 'model_catalog.dart';
-import 'models.dart' show enumByName;
+import 'models.dart' show enumByName, enumByNameOrNull;
 import 'model_profile_spec.dart';
 import 'resolved_repository.dart';
 
@@ -164,13 +164,9 @@ final class CustomModelSpec {
     }
     return CustomModelSpec(
       repository: json['repository'] as String,
-      // A spec whose engine this build cannot name is a FormatException so the
-      // caller drops the one entry, the way an unparsable profile is dropped.
-      engine: switch (json['engine']) {
-        final String name when ModelEngine.values.any((e) => e.name == name) =>
-          ModelEngine.values.byName(name),
-        final other => throw FormatException('Unknown model engine: $other'),
-      },
+      engine:
+          enumByNameOrNull(ModelEngine.values, json['engine']) ??
+          (throw FormatException('Unknown model engine: ${json['engine']}')),
       revision: json['revision'] as String? ?? 'main',
       profile: profile,
       resolved: resolved,
@@ -389,11 +385,10 @@ final class AppPreferences {
       responseStyles: {
         if (rawStyles is Map)
           for (final entry in rawStyles.entries)
-            if (entry.value is String &&
-                ResponseStyle.values.any((style) => style.name == entry.value))
-              entry.key as String: ResponseStyle.values.byName(
-                entry.value as String,
-              ),
+            entry.key as String: ?enumByNameOrNull(
+              ResponseStyle.values,
+              entry.value,
+            ),
       },
       customModels: [
         if (rawCustom is List)
@@ -407,11 +402,13 @@ final class AppPreferences {
   String encode() => const JsonEncoder.withIndent('  ').convert(toJson());
 }
 
-/// One custom entry that will not parse costs that entry, not the file.
+/// One custom entry that will not parse costs that entry, not the file. Broad
+/// on purpose: a missing `repository` is a TypeError from the cast, an
+/// unknown engine a FormatException, and both are bad data, not bugs.
 List<CustomModelSpec> _customModelEntry(Map<String, Object?> json) {
   try {
     return [CustomModelSpec.fromJson(json)];
-  } on FormatException {
+  } catch (_) {
     return const [];
   }
 }

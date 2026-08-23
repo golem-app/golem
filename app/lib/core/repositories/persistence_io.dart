@@ -63,6 +63,16 @@ Future<void> quarantineStore(File file, {required String what}) => _guardIo(
   message: 'Could not quarantine the corrupt $what store.',
 );
 
+/// Preserves a copy of a store that decoded with losses: the live file stays
+/// where it is and will be overwritten by the survivors on the next save, so
+/// the bytes the decoder set aside survive only here. Same `.corrupt` name
+/// and the same I/O classification as the rename.
+Future<void> preserveStoreCopy(File file, {required String what}) => _guardIo(
+  () => file.copy('${file.path}.corrupt'),
+  kind: PersistenceFailureKind.read,
+  message: 'Could not preserve the partly unreadable $what store.',
+);
+
 /// The atomic write every store uses: parent directory, `.tmp`, rename.
 Future<void> writeStore(File file, String content, {required String what}) =>
     _guardIo(
