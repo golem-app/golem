@@ -1,7 +1,11 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show clampDouble;
 
 /// Rounded determinate progress track shared by the splash and settings
 /// download rows.
+///
+/// [value] is a fraction, 0 to 1. Anything outside that range is bounded here,
+/// so no caller clamps.
 class ProgressTrack extends StatelessWidget {
   const ProgressTrack({
     required this.value,
@@ -43,8 +47,10 @@ class ProgressTrack extends StatelessWidget {
           // heightFactor is not optional: without it the fill's ColoredBox has
           // no child to size to, collapses to zero height, and the track paints
           // empty at every value.
+          // clampDouble, not num.clamp: NaN lands on the full bar instead of
+          // passing through to FractionallySizedBox's assert.
           FractionallySizedBox(
-            widthFactor: value,
+            widthFactor: clampDouble(value, 0, 1),
             heightFactor: 1,
             child: ColoredBox(
               color: CupertinoDynamicColor.resolve(fillColor, context),

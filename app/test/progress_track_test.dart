@@ -133,4 +133,64 @@ void main() {
     expect(fill.right, track.right);
     expect(fill.left, greaterThan(track.left));
   });
+
+  // The contract is the track's to keep, not the caller's: of the five
+  // surfaces that once held a bar, three clamped and two did not (#123). A byte
+  // count past its total, or a division against a stale total, must stop at
+  // the groove rather than paint past it.
+  testWidgets('a value past one fills the groove and no further', (
+    tester,
+  ) async {
+    Future<void> pumpValue(double value) => tester.pumpWidget(
+      CupertinoApp(
+        home: Center(
+          child: SizedBox(
+            width: 200,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ProgressTrack(
+                  value: value,
+                  trackColor: GolemTheme.divider,
+                  fillColor: GolemTheme.accent,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await pumpValue(1.5);
+    expect(tester.getRect(find.byType(FractionallySizedBox)).width, 200);
+    // 0 / 0 against a stale total: NaN is neither below nor above the range,
+    // and must not reach FractionallySizedBox's assert.
+    await pumpValue(double.nan);
+    expect(tester.getRect(find.byType(FractionallySizedBox)).width, 200);
+  });
+
+  testWidgets('a value below zero paints an empty groove', (tester) async {
+    await tester.pumpWidget(
+      CupertinoApp(
+        home: Center(
+          child: SizedBox(
+            width: 200,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: const [
+                ProgressTrack(
+                  value: -0.5,
+                  trackColor: GolemTheme.divider,
+                  fillColor: GolemTheme.accent,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    expect(tester.getRect(find.byType(FractionallySizedBox)).width, 0);
+  });
 }
