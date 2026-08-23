@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
+import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/chat/widgets/persistence_recovery_banner.dart';
 import 'package:golem_flutter/features/chat/widgets/recovery_banner.dart';
@@ -93,6 +94,38 @@ void main() {
     );
 
     setup.history.saves[1].succeed();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-persistence-banner')), findsNothing);
+    semantics.dispose();
+  }, variant: bothChromes);
+
+  testWidgets('a recovered load is announced once and put away', (
+    tester,
+  ) async {
+    setViewport(tester);
+    final container = buildContainer(
+      history: const ChatHistorySnapshot(conversations: [], recovered: true),
+    );
+    addTearDown(container.dispose);
+    await container.read(chatControllerProvider.future);
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: wrapApp(child: const _PersistenceHost()),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.text(
+        'Some chats couldn’t be read and were set aside. Everything else is '
+        'here.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('retry-chat-persistence')), findsNothing);
+    await tester.tap(find.byKey(const Key('dismiss-chat-recovery')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-persistence-banner')), findsNothing);
     semantics.dispose();

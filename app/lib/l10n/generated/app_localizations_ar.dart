@@ -1261,6 +1261,10 @@ class AppLocalizationsAr extends AppLocalizations {
       'لا يُحفظ سجل المحادثات. قد تُفقد آخر تغييراتك عند إغلاق التطبيق.';
 
   @override
+  String get chatHistoryPartlyUnreadable =>
+      'تعذّرت قراءة بعض المحادثات فوُضعت جانبًا. كل ما عداها موجود هنا.';
+
+  @override
   String get saving => 'جارٍ الحفظ…';
 
   @override

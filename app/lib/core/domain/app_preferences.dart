@@ -7,6 +7,7 @@ import 'dart:convert';
 
 import 'equality.dart';
 import 'model_catalog.dart';
+import 'models.dart' show enumByName;
 import 'model_profile_spec.dart';
 import 'resolved_repository.dart';
 
@@ -163,7 +164,13 @@ final class CustomModelSpec {
     }
     return CustomModelSpec(
       repository: json['repository'] as String,
-      engine: ModelEngine.values.byName(json['engine'] as String),
+      // A spec whose engine this build cannot name is a FormatException so the
+      // caller drops the one entry, the way an unparsable profile is dropped.
+      engine: switch (json['engine']) {
+        final String name when ModelEngine.values.any((e) => e.name == name) =>
+          ModelEngine.values.byName(name),
+        final other => throw FormatException('Unknown model engine: $other'),
+      },
       revision: json['revision'] as String? ?? 'main',
       profile: profile,
       resolved: resolved,
@@ -364,8 +371,10 @@ final class AppPreferences {
     final rawStyles = json['responseStyles'];
     final rawCustom = json['customModels'];
     return AppPreferences(
-      theme: ThemeSetting.values.byName(
-        json['theme'] as String? ?? ThemeSetting.system.name,
+      theme: enumByName(
+        ThemeSetting.values,
+        json['theme'],
+        orElse: ThemeSetting.system,
       ),
       language: AppLanguage.fromCode(json['language']),
       textScale: (json['textScale'] as num?)?.toDouble() ?? 1.0,
@@ -380,18 +389,29 @@ final class AppPreferences {
       responseStyles: {
         if (rawStyles is Map)
           for (final entry in rawStyles.entries)
-            entry.key as String: ResponseStyle.values.byName(
-              entry.value as String,
-            ),
+            if (entry.value is String &&
+                ResponseStyle.values.any((style) => style.name == entry.value))
+              entry.key as String: ResponseStyle.values.byName(
+                entry.value as String,
+              ),
       },
       customModels: [
         if (rawCustom is List)
           for (final item in rawCustom)
             if (item is Map)
-              CustomModelSpec.fromJson(Map<String, Object?>.from(item)),
+              ..._customModelEntry(Map<String, Object?>.from(item)),
       ],
     );
   }
 
   String encode() => const JsonEncoder.withIndent('  ').convert(toJson());
+}
+
+/// One custom entry that will not parse costs that entry, not the file.
+List<CustomModelSpec> _customModelEntry(Map<String, Object?> json) {
+  try {
+    return [CustomModelSpec.fromJson(json)];
+  } on FormatException {
+    return const [];
+  }
 }

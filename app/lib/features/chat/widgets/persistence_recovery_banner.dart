@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -18,6 +20,7 @@ class PersistenceRecoveryBanner extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final retrying = phase == ChatPersistencePhase.retrying;
+    final recovered = phase == ChatPersistencePhase.recovered;
     List<Widget> messageChildren() => [
       const ExcludeSemantics(
         child: Icon(
@@ -30,20 +33,33 @@ class PersistenceRecoveryBanner extends ConsumerWidget {
         child: Semantics(
           liveRegion: true,
           child: Text(
-            context.l10n.chatHistoryNotSaving,
+            recovered
+                ? context.l10n.chatHistoryPartlyUnreadable
+                : context.l10n.chatHistoryNotSaving,
             style: GolemText.footnote,
           ),
         ),
       ),
     ];
 
+    // The read-side notice has nothing to retry: the loss already happened,
+    // so its only affordance is to be put away.
     Widget retryButton() => GolemTappable(
-      key: const Key('retry-chat-persistence'),
+      key: Key(recovered ? 'dismiss-chat-recovery' : 'retry-chat-persistence'),
       padding: const EdgeInsets.symmetric(horizontal: 8),
       onPressed: retrying
           ? null
-          : () => ref.read(chatControllerProvider.notifier).retryPersistence(),
-      child: retrying
+          : () {
+              final controller = ref.read(chatControllerProvider.notifier);
+              if (recovered) {
+                controller.acknowledgeRecovery();
+              } else {
+                unawaited(controller.retryPersistence());
+              }
+            },
+      child: recovered
+          ? Text(context.l10n.done)
+          : retrying
           ? Row(
               mainAxisSize: MainAxisSize.min,
               children: [

@@ -1189,6 +1189,10 @@ class AppLocalizationsKo extends AppLocalizations {
       '대화 기록이 저장되지 않습니다. 앱을 닫으면 최신 변경 사항이 손실될 수 있습니다.';
 
   @override
+  String get chatHistoryPartlyUnreadable =>
+      '일부 채팅을 읽을 수 없어 따로 보관했습니다. 나머지는 모두 여기에 있습니다.';
+
+  @override
   String get saving => '저장 중…';
 
   @override

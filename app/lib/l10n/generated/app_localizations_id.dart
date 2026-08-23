@@ -1224,6 +1224,10 @@ class AppLocalizationsId extends AppLocalizations {
       'Riwayat percakapan tidak disimpan. Perubahan terbaru Anda dapat hilang saat aplikasi ditutup.';
 
   @override
+  String get chatHistoryPartlyUnreadable =>
+      'Beberapa chat tidak dapat dibaca dan disisihkan. Semua yang lain ada di sini.';
+
+  @override
   String get saving => 'Menyimpan…';
 
   @override

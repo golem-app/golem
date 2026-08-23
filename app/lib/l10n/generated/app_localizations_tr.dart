@@ -1225,6 +1225,10 @@ class AppLocalizationsTr extends AppLocalizations {
       'Sohbet geçmişi kaydedilmiyor. Uygulamayı kapattığınızda son değişiklikleriniz kaybolabilir.';
 
   @override
+  String get chatHistoryPartlyUnreadable =>
+      'Bazı sohbetler okunamadı ve bir kenara ayrıldı. Diğer her şey burada.';
+
+  @override
   String get saving => 'Kaydediliyor…';
 
   @override

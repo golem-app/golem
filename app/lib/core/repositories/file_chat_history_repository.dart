@@ -20,6 +20,11 @@ final class FileChatHistoryRepository implements ChatHistoryRepository {
       Map<String, Object?>.from(jsonDecode(raw) as Map),
     ),
     orElse: () => const ChatHistorySnapshot(conversations: []),
+    // A quarantined file is a loss the session must hear about, and the
+    // attachments it referenced must outlive the sweep that would otherwise
+    // follow an empty hydration (#154).
+    onCorrupt: () =>
+        const ChatHistorySnapshot(conversations: [], recovered: true),
   );
 
   @override

@@ -26,15 +26,17 @@ Future<T> _guardIo<T>(
 
 /// Loads a versioned store: absent → [orElse]; unreadable → typed read
 /// failure; undecodable or unparsable → quarantined to `.corrupt`, then
-/// [orElse]. The read fetches raw bytes so byte-level corruption (invalid
-/// UTF-8) lands on the corruption path — `readAsString` reports a decode
-/// failure as [FileSystemException], which would masquerade as I/O and
-/// skip the quarantine forever.
+/// [onCorrupt], which defaults to [orElse] for a store whose caller need not
+/// tell a fresh install from a lost one. The read fetches raw bytes so
+/// byte-level corruption (invalid UTF-8) lands on the corruption path —
+/// `readAsString` reports a decode failure as [FileSystemException], which
+/// would masquerade as I/O and skip the quarantine forever.
 Future<T> loadStore<T>(
   File file, {
   required String what,
   required T Function(String raw) decode,
   required T Function() orElse,
+  T Function()? onCorrupt,
 }) async {
   final bytes = await _guardIo(
     () async => await file.exists() ? file.readAsBytes() : null,
@@ -48,7 +50,7 @@ Future<T> loadStore<T>(
     // Only pure decode/parse can throw here — corruption by definition:
     // preserve the file for inspection, fall back to defaults.
     await quarantineStore(file, what: what);
-    return orElse();
+    return (onCorrupt ?? orElse)();
   }
 }
 

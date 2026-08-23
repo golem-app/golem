@@ -331,6 +331,7 @@
   "gettingReady": "Trwa przygotowywanie",
   "splashTagline": "Prywatnie, lokalnie i zawsze pod ręką.",
   "chatHistoryNotSaving": "Historia czatów nie jest zapisywana. Ostatnie zmiany mogą zostać utracone po zamknięciu aplikacji.",
+  "chatHistoryPartlyUnreadable": "Części czatów nie udało się odczytać i zostały odłożone. Cała reszta jest na miejscu.",
   "saving": "Zapisywanie…",
   "reasoningLive": "Rozumowanie na żywo",
   "expanded": "Rozwinięte",

@@ -1238,6 +1238,10 @@ class AppLocalizationsHi extends AppLocalizations {
       'चैट इतिहास सहेजा नहीं जा रहा है। ऐप बंद करने पर आपके नए बदलाव खो सकते हैं।';
 
   @override
+  String get chatHistoryPartlyUnreadable =>
+      'कुछ चैट पढ़ी नहीं जा सकीं और उन्हें अलग रख दिया गया। बाकी सब यहाँ है।';
+
+  @override
   String get saving => 'सहेजा जा रहा है…';
 
   @override

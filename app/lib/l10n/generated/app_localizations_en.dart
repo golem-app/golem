@@ -1223,6 +1223,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Chat history isn’t saving. Your latest changes could be lost when you close the app.';
 
   @override
+  String get chatHistoryPartlyUnreadable =>
+      'Some chats couldn’t be read and were set aside. Everything else is here.';
+
+  @override
   String get saving => 'Saving…';
 
   @override

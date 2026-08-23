@@ -331,6 +331,7 @@
   "gettingReady": "Preparando tudo",
   "splashTagline": "Privado, local e pronto quando você estiver.",
   "chatHistoryNotSaving": "O histórico de conversas não está sendo salvo. Suas alterações mais recentes podem ser perdidas ao fechar o app.",
+  "chatHistoryPartlyUnreadable": "Alguns chats não puderam ser lidos e foram deixados de lado. Todo o resto está aqui.",
   "saving": "Salvando…",
   "reasoningLive": "Raciocínio ao vivo",
   "expanded": "Expandido",

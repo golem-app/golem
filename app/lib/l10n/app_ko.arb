@@ -331,6 +331,7 @@
   "gettingReady": "준비 중",
   "splashTagline": "비공개, 로컬, 언제나 준비됨.",
   "chatHistoryNotSaving": "대화 기록이 저장되지 않습니다. 앱을 닫으면 최신 변경 사항이 손실될 수 있습니다.",
+  "chatHistoryPartlyUnreadable": "일부 채팅을 읽을 수 없어 따로 보관했습니다. 나머지는 모두 여기에 있습니다.",
   "saving": "저장 중…",
   "reasoningLive": "실시간 추론",
   "expanded": "펼쳐짐",

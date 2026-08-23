@@ -2105,6 +2105,12 @@ abstract class AppLocalizations {
   /// **'Chat history isn’t saving. Your latest changes could be lost when you close the app.'**
   String get chatHistoryNotSaving;
 
+  /// Chat history read-recovery banner: some conversations were unreadable and quarantined.
+  ///
+  /// In en, this message translates to:
+  /// **'Some chats couldn’t be read and were set aside. Everything else is here.'**
+  String get chatHistoryPartlyUnreadable;
+
   /// In-progress persistence action.
   ///
   /// In en, this message translates to:

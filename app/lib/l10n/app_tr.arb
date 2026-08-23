@@ -331,6 +331,7 @@
   "gettingReady": "Hazırlanıyor",
   "splashTagline": "Özel, yerel ve her zaman hazır.",
   "chatHistoryNotSaving": "Sohbet geçmişi kaydedilmiyor. Uygulamayı kapattığınızda son değişiklikleriniz kaybolabilir.",
+  "chatHistoryPartlyUnreadable": "Bazı sohbetler okunamadı ve bir kenara ayrıldı. Diğer her şey burada.",
   "saving": "Kaydediliyor…",
   "reasoningLive": "Canlı akıl yürütme",
   "expanded": "Genişletildi",

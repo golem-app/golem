@@ -331,6 +331,7 @@
   "gettingReady": "Preparando todo",
   "splashTagline": "Privado, local y listo cuando tú lo estés.",
   "chatHistoryNotSaving": "El historial de chats no se está guardando. Podrías perder los cambios más recientes al cerrar la app.",
+  "chatHistoryPartlyUnreadable": "Algunos chats no se pudieron leer y se apartaron. Todo lo demás está aquí.",
   "saving": "Guardando…",
   "reasoningLive": "Razonamiento en vivo",
   "expanded": "Expandido",

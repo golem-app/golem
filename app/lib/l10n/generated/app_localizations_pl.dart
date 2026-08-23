@@ -1243,6 +1243,10 @@ class AppLocalizationsPl extends AppLocalizations {
       'Historia czatów nie jest zapisywana. Ostatnie zmiany mogą zostać utracone po zamknięciu aplikacji.';
 
   @override
+  String get chatHistoryPartlyUnreadable =>
+      'Części czatów nie udało się odczytać i zostały odłożone. Cała reszta jest na miejscu.';
+
+  @override
   String get saving => 'Zapisywanie…';
 
   @override

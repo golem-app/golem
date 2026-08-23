@@ -1248,6 +1248,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'El historial de chats no se está guardando. Podrías perder los cambios más recientes al cerrar la app.';
 
   @override
+  String get chatHistoryPartlyUnreadable =>
+      'Algunos chats no se pudieron leer y se apartaron. Todo lo demás está aquí.';
+
+  @override
   String get saving => 'Guardando…';
 
   @override

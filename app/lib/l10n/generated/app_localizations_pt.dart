@@ -1252,6 +1252,10 @@ class AppLocalizationsPt extends AppLocalizations {
       'O histórico de conversas não está sendo salvo. Suas alterações mais recentes podem ser perdidas ao fechar o app.';
 
   @override
+  String get chatHistoryPartlyUnreadable =>
+      'Alguns chats não puderam ser lidos e foram deixados de lado. Todo o resto está aqui.';
+
+  @override
   String get saving => 'Salvando…';
 
   @override
@@ -3175,6 +3179,10 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String get chatHistoryNotSaving =>
       'O histórico de conversas não está sendo salvo. Suas alterações mais recentes podem ser perdidas ao fechar o app.';
+
+  @override
+  String get chatHistoryPartlyUnreadable =>
+      'Alguns chats não puderam ser lidos e foram deixados de lado. Todo o resto está aqui.';
 
   @override
   String get saving => 'Salvando…';

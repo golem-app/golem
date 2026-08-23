@@ -662,6 +662,8 @@
   "@splashTagline": {"description": "Splash-screen product tagline."},
   "chatHistoryNotSaving": "Chat history isn’t saving. Your latest changes could be lost when you close the app.",
   "@chatHistoryNotSaving": {"description": "Chat persistence failure banner."},
+  "chatHistoryPartlyUnreadable": "Some chats couldn’t be read and were set aside. Everything else is here.",
+  "@chatHistoryPartlyUnreadable": {"description": "Chat history read-recovery banner: some conversations were unreadable and quarantined."},
   "saving": "Saving…",
   "@saving": {"description": "In-progress persistence action."},
   "reasoningLive": "Reasoning, live",

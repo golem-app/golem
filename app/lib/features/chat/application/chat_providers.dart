@@ -72,10 +72,18 @@ class ChatController extends _$ChatController {
     bridge.bindSessionState(() => state.value);
     final persistence = _persistence();
     final snapshot = await persistence.load();
-    await persistence.retainReferenced(snapshot.conversations);
+    // A recovered load keeps every attachment on disk: what it could not read
+    // may still reference them, and the quarantined file is worth nothing if
+    // the pictures it names are gone. The next successful save sweeps as usual.
+    if (!snapshot.recovered) {
+      await persistence.retainReferenced(snapshot.conversations);
+    }
     final hydrated = ChatState(
       conversations: snapshot.conversations,
       activeId: snapshot.activeId,
+      persistencePhase: snapshot.recovered
+          ? ChatPersistencePhase.recovered
+          : ChatPersistencePhase.idle,
     );
     // Recorded, not published: the breakdown reads the store's bytes off disk,
     // so hydration changes no figure it reports.
@@ -180,6 +188,13 @@ class ChatController extends _$ChatController {
   Future<void> persistCurrent() async {
     if (!state.hasValue) return;
     await _persist(_value, forceStorage: true);
+  }
+
+  /// Dismisses the read-side notice; nothing to retry, the loss already
+  /// happened and the quarantined file is beside the store for inspection.
+  void acknowledgeRecovery() {
+    if (_value.persistencePhase != ChatPersistencePhase.recovered) return;
+    _setPersistencePhase(ChatPersistencePhase.idle);
   }
 
   /// User-triggered recovery for the standing persistence notice. The latest

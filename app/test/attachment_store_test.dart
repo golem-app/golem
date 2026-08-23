@@ -288,6 +288,28 @@ void main() {
       },
     );
 
+    test('a recovered history keeps every attachment and says so', () async {
+      // A quarantined store hydrates empty; sweeping on that would delete the
+      // pictures the unreadable file still names (#154).
+      final attachments = InMemoryAttachmentRepository();
+      final stored = await attachments.store(const [1], mimeType: 'image/png');
+      final container = containerWith(
+        attachments,
+        history: const ChatHistorySnapshot(conversations: [], recovered: true),
+      );
+      addTearDown(container.dispose);
+
+      final state = await container.read(chatControllerProvider.future);
+
+      expect(state.persistencePhase, ChatPersistencePhase.recovered);
+      expect(await attachments.read(stored.id), isNotNull);
+      container.read(chatControllerProvider.notifier).acknowledgeRecovery();
+      expect(
+        container.read(chatControllerProvider).requireValue.persistencePhase,
+        ChatPersistencePhase.idle,
+      );
+    });
+
     test('deleting every chat collects every attachment', () async {
       final attachments = InMemoryAttachmentRepository();
       final stored = await attachments.store(const [1], mimeType: 'image/png');

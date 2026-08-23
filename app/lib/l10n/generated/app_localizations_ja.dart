@@ -1182,6 +1182,10 @@ class AppLocalizationsJa extends AppLocalizations {
       'チャット履歴が保存されていません。アプリを閉じると最新の変更が失われる可能性があります。';
 
   @override
+  String get chatHistoryPartlyUnreadable =>
+      '一部のチャットを読み込めなかったため、脇に退避しました。それ以外はすべてここにあります。';
+
+  @override
   String get saving => '保存中…';
 
   @override

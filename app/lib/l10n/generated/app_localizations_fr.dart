@@ -1246,6 +1246,10 @@ class AppLocalizationsFr extends AppLocalizations {
       'L’historique des conversations n’est pas enregistré. Vos dernières modifications pourraient être perdues à la fermeture de l’application.';
 
   @override
+  String get chatHistoryPartlyUnreadable =>
+      'Certaines conversations n’ont pas pu être lues et ont été mises de côté. Tout le reste est là.';
+
+  @override
   String get saving => 'Enregistrement…';
 
   @override

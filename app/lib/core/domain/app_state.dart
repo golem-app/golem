@@ -94,7 +94,9 @@ final class ChatFailure {
 /// deliberately orthogonal to [ChatFailure]: retrying a history write must not
 /// modify an inference turn, and inference recovery must not hide an unsaved
 /// session.
-enum ChatPersistencePhase { idle, failed, retrying }
+/// [recovered] is the read-side notice: hydration lost something unreadable
+/// and said so; it clears on dismissal or the next successful persist.
+enum ChatPersistencePhase { idle, failed, retrying, recovered }
 
 // Deliberately identity-equal: the controller reassigns this state on every
 // streaming token, so a deep compare in updateShouldNotify would cost

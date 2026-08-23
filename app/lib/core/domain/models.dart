@@ -7,6 +7,16 @@ import 'dart:convert';
 
 import 'equality.dart';
 
+/// An enum name read off disk: a build that does not know the name — an
+/// older one reading a newer store, or a hand-edited file — gets [orElse]
+/// rather than an [ArgumentError] that throws the whole store away (#154).
+T enumByName<T extends Enum>(List<T> values, Object? raw, {required T orElse}) {
+  for (final value in values) {
+    if (value.name == raw) return value;
+  }
+  return orElse;
+}
+
 enum MessageRole { user, assistant }
 
 enum ArtifactPhase {
@@ -384,9 +394,18 @@ final class ChatConversation {
 }
 
 final class ChatHistorySnapshot {
-  const ChatHistorySnapshot({required this._conversations, this.activeId});
+  const ChatHistorySnapshot({
+    required this._conversations,
+    this.activeId,
+    this.recovered = false,
+  });
   final List<ChatConversation> _conversations;
   final String? activeId;
+
+  /// True when the store this came from lost something on the way in — a
+  /// conversation that would not decode, or a whole file that was
+  /// quarantined. Never serialized: it describes the load, not the history.
+  final bool recovered;
 
   /// Unmodifiable — snapshots are rebuilt, never edited in place.
   List<ChatConversation> get conversations =>
@@ -411,19 +430,32 @@ final class ChatHistorySnapshot {
     if (version != 1 && version != 2 && version != schemaVersion) {
       throw const FormatException('Unsupported chat history schema');
     }
-    final conversations = (json['conversations']! as List)
-        .map(
-          (item) => ChatConversation.fromJson(
+    // One conversation that will not decode costs that conversation, not
+    // the store: the rest hydrate and the loss is reported (#154). The
+    // quarantine above this level is for a file that is not a store at all.
+    final conversations = <ChatConversation>[];
+    var dropped = 0;
+    for (final item in json['conversations']! as List) {
+      try {
+        conversations.add(
+          ChatConversation.fromJson(
             Map<String, Object?>.from(item as Map),
             migrateGeneratedPlaceholder: version != schemaVersion,
           ),
-        )
-        .toList();
+        );
+      } catch (_) {
+        dropped++;
+      }
+    }
     final requested = json['activeConversationId'] as String?;
     final active = conversations.any((item) => item.id == requested)
         ? requested
         : conversations.firstOrNull?.id;
-    return ChatHistorySnapshot(conversations: conversations, activeId: active);
+    return ChatHistorySnapshot(
+      conversations: conversations,
+      activeId: active,
+      recovered: dropped > 0,
+    );
   }
 
   String encode() => const JsonEncoder.withIndent('  ').convert(toJson());
@@ -673,8 +705,12 @@ final class ArtifactStatus {
   };
 
   factory ArtifactStatus.fromJson(Map<String, Object?> json) => ArtifactStatus(
-    phase: ArtifactPhase.values.byName(
-      json['phase'] as String? ?? 'notDownloaded',
+    // An unknown phase reads as nothing downloaded; reconciliation re-derives
+    // the truth from the files on disk either way.
+    phase: enumByName(
+      ArtifactPhase.values,
+      json['phase'],
+      orElse: ArtifactPhase.notDownloaded,
     ),
     downloadedBytes: json['downloadedBytes'] as int? ?? 0,
     failureReason: json['failureReason'] is Map
@@ -811,8 +847,10 @@ final class ModelState {
     );
     return ModelState(
       artifacts: artifacts,
-      runtime: RuntimePhase.values.byName(
-        json['runtime'] as String? ?? 'unloaded',
+      runtime: enumByName(
+        RuntimePhase.values,
+        json['runtime'],
+        orElse: RuntimePhase.unloaded,
       ),
       // Tolerant on purpose: a schema-2 store holds an English sentence here,
       // and an unrecognized name from any build is a value this one cannot act

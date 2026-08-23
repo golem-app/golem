@@ -1226,6 +1226,10 @@ class AppLocalizationsVi extends AppLocalizations {
       'Lịch sử trò chuyện không được lưu. Các thay đổi mới nhất có thể bị mất khi bạn đóng ứng dụng.';
 
   @override
+  String get chatHistoryPartlyUnreadable =>
+      'Một số cuộc trò chuyện không đọc được và đã được để riêng. Mọi thứ khác vẫn ở đây.';
+
+  @override
   String get saving => 'Đang lưu…';
 
   @override
