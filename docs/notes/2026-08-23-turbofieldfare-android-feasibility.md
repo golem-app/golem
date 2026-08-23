@@ -52,8 +52,8 @@ throughput at expert granularity, predicted decode is
 tok/s ≤ 1 / (B / R + t_compute)
 ```
 
-with `t_compute` anchored on what the same CPU does for a dense Gemma 4 (see
-Finding 4). *Feasible for a premium tier* was defined as predicted decode
+with `t_compute` measured on the same CPU with every expert resident (Method
+S3b, Finding 3). *Feasible for a premium tier* was defined as predicted decode
 ≥ 3 tok/s **and** a 512-token prefill ≤ 60 s on the OnePlus 12R; anything
 else is *not feasible on current Android hardware*.
 
@@ -125,7 +125,15 @@ else is *not feasible on current Android hardware*.
    process's `/proc/<pid>/io` and major-fault count. Two variants: upstream's
    loader as pinned, and a scratchpad build that honors an environment
    variable to skip `MAP_POPULATE` / `MADV_WILLNEED` (demand paging only).
-4. **S4 — OpenCL** was conditional on the rule clearing and was not run.
+4. **S3b — the compute term, measured.** A copy of the Q4_0 GGUF with only
+   the first 16 of 128 experts per layer (the `ffn_*_exps` tensors, the
+   router weight, and `expert_count` sliced with `gguf-py`; 3.34 GB) keeps
+   the attention, the shared expert, and 8-of-N routing of the true shape,
+   so its per-token compute is the real model's while its output is
+   meaningless. It fits the page cache with 8 GB to spare, which is the only
+   reason it was allowed near the phone. `llama-bench -p 512 -n 64 -t 5
+   -C 0xF8 --cpu-strict 1 -r 2`.
+5. **S4 — OpenCL** was conditional on the rule clearing and was not run.
 
 ## Findings
 
@@ -235,34 +243,38 @@ tok/s, against 81.9 / 27.3 with mmap), and the pinned ggml with five pinned
 big cores decodes Gemma 4 E2B at **27 tok/s**, where the app's shim with
 default threading has measured 8–13.
 
+With every expert resident (S3b), the 26B-A4B's own per-token compute on the
+same five cores is **14.76 ± 0.22 tok/s decode (67.7 ms per token) and
+35.85 ± 0.22 tok/s prefill** — 3.10 GiB mapped, the phone untroubled. That is
+the ceiling any streaming design on this CPU sits under, and it is the
+`t_compute` the rule uses.
+
 ### 4. The rule applied
 
-`t_compute` is estimated from Finding 3's dense measurement: 27.3 tok/s for
-≈ 2 GB of weight traffic per token is ≈ 50–55 GB/s of effective bandwidth,
-so the 26B-A4B's ≈ 2.2 GB of active 4-bit weights per token cost ≈ 40 ms, plus
-the 262k-row tied head — call it **55 ms**, optimistic (it assumes the
-routed experts are already in RAM when the GEMVs run, and that reading and
-computing do not contend for the same five cores, which on this SoC they
-do).
+`t_compute` is the measured **68 ms** from S3b. It is still generous to the
+streaming case: it assumes the routed experts are already in RAM when the
+GEMVs run, and that reading and computing do not contend for the same five
+cores — which on this SoC they do, since the buffered read path costs CPU
+(Finding 1).
 
 | | B | I/O at 1.13 GB/s (`O_DIRECT`) | I/O at 0.90 GB/s (buffered) | Predicted tok/s, serial | Ceiling if compute hides under I/O |
 | --- | ---: | ---: | ---: | --- | --- |
-| mean token | 266 MB | 235 ms | 296 ms | **3.4 · 2.8** | 4.2 · 3.4 |
-| p90 token | 366 MB | 324 ms | 407 ms | 2.6 · 2.2 | 3.1 · 2.5 |
-| p99 token | 494 MB | 437 ms | 549 ms | 2.0 · 1.7 | 2.3 · 1.8 |
-| worst token | 608 MB | 538 ms | 676 ms | 1.7 · 1.4 | 1.9 · 1.5 |
+| mean token | 266 MB | 235 ms | 296 ms | **3.3 · 2.7** | 4.2 · 3.4 |
+| p90 token | 366 MB | 324 ms | 407 ms | 2.6 · 2.1 | 3.1 · 2.5 |
+| p99 token | 494 MB | 437 ms | 549 ms | 2.0 · 1.6 | 2.3 · 1.8 |
+| worst token | 608 MB | 538 ms | 676 ms | 1.7 · 1.3 | 1.9 · 1.5 |
 
-Prefill, with the compute side taken from the dense model's 82 tok/s scaled
-to ≈ 40 tok/s:
+Prefill, with the compute side at S3b's measured 35.9 tok/s:
 
 | Prompt | Bytes | I/O at 1.13 GB/s | + compute | Wall, serial |
 | --- | ---: | ---: | ---: | ---: |
-| 512 tokens | 33.4 GB | 30 s | 13 s | **≈ 43 s** |
-| 1,230 tokens (one realistic turn of history) | 81.7 GB | 72 s | 31 s | **≈ 103 s** |
+| 512 tokens | 33.4 GB | 30 s | 14 s | **≈ 44 s** |
+| 1,230 tokens (one realistic turn of history) | 81.7 GB | 72 s | 34 s | **≈ 106 s** |
 
 Against the pre-registered rule: decode clears 3 tok/s only on the mean
-token, only with `O_DIRECT`, and only if the optimistic compute estimate
-holds — it fails at p90 in every column. A 512-token prefill passes at ≈ 43 s;
+token and only with `O_DIRECT` — it fails at p90 in every column, and the
+compute term is measured, so there is no estimate left to be generous with.
+A 512-token prefill passes at ≈ 44 s;
 a conversation that has grown to 1.2k tokens, which Golem re-prefills on
 every turn, waits ≈ 100 s for its first token. **Not feasible as a product
 tier on this hardware.** The iPhone 17's measured 3.75 tok/s is the same
@@ -276,6 +288,43 @@ for 1.2k — still the slowest first token Golem would ever show. A larger
 decode cache would raise the hit rate, but the slot memory is the budget:
 16 slots already cost 1.50 GiB, 32 would cost 3 GiB, and the device tier
 that can spare it is the device tier that does not need streaming.
+
+## Prior art says the same thing
+
+The storage term has been measured before, on phones, by people who built
+the predictive machinery TurboFieldfare does not have:
+
+- **PowerInfer-2** (Xue et al., 2024; OnePlus 12, Snapdragon 8 Gen 3, 24 GB,
+  UFS 4.0) characterizes the same flash: "UFS storage in mobile devices has
+  only one command queue", "using multiple cores for 4KB random reads even
+  deteriorates the I/O performance by up to 40%", and random reads issued
+  from a big core reach 1 GB/s where a little core manages 760 MB/s — the
+  queue-depth and core findings in Finding 1, two years earlier on faster
+  storage. With a neuron-level predictor, a five-stage I/O/compute pipeline,
+  and a next-layer prefetch, it serves TurboSparse-Mixtral-47B at 11.68
+  tok/s when the model mostly fits and at **2.13 tok/s with 7 GB of memory
+  available** — the memory this note's phone has, on better flash, with
+  every trick applied. Its per-token cache miss rate is 3.5 % on average but
+  **18.9 % at p99**; the tail is the product.
+- **Ripple** (Wang et al., 2024; OnePlus 12 / Ace 3 / Ace 2, the last on UFS
+  3.1): 71.9–97.7 % of decode latency is I/O once half the weights live on
+  flash; reads under 24 KB are IOPS-bound, the command queue is 32 entries
+  deep, and the remedy is laying correlated neurons out contiguously so reads
+  get longer. TurboFieldfare's 3.36 MB blobs are already that remedy taken to
+  its limit — there is no read-size lever left.
+- **LLM in a flash** (Alizadeh et al., 2023): windowing and row-column
+  bundling, "up to twice the size of the available DRAM" — the 2× the
+  OnePlus 12R is at, with a dense model whose per-token sparsity a MoE does
+  not offer.
+- **HOBBIT** (Tang et al., 2024) and **FlashMoE** (2026): next-layer expert
+  prediction from the current layer's gating input is 96 % accurate at top-1
+  and ≈ 90 % two and three layers ahead; learned recency-plus-frequency
+  policies beat LRU/LFU hit rates by up to 51 % on desktop SSDs. These are
+  the two levers a future attempt would reach for first. Prediction buys
+  overlap, and overlap is bounded by the smaller term: on this phone that
+  is the 68 ms of compute under 235 ms of I/O, the "ceiling" column above.
+  A better policy raises the hit rate from 67 %; the slot memory that makes
+  a higher hit rate affordable is the RAM the device does not have.
 
 ## The three directions, priced
 
@@ -333,9 +382,10 @@ since the 81.7 GB-per-1.2k-token prefill cost is the same on the iPhone.
   upstream's 128-token tiles; the counts are deterministic at temperature 0
   for these seven prompts and are not a claim about every prompt. The tail
   (p99, max) is from 1,536 tokens.
-- `t_compute` is derived, not measured: no engine exists that runs this
-  model's routed experts from `pread` slots on this CPU. It is deliberately
-  optimistic so that the verdict does not rest on it.
+- `t_compute` is measured with every expert resident (S3b); no engine runs
+  this model's routed experts from `pread` slots on this CPU, so the
+  contention between reading and computing is not in the number. It is
+  generous to the streaming case by construction.
 - The OnePlus 12R is a 16 GB device; the measurements that matter (Findings
   1 and 2) do not depend on RAM size, and the one that did (Finding 3) was
   already 2× oversubscribed. An 8 GB phone is 3.5×.
@@ -367,6 +417,13 @@ counter to `PreadExpertStreamer.executeExpertCachePlan` (`plan.misses.count`,
 and `.token` event; `swift build -c release --product TurboFieldfareCLI`; run
 `--messages-file <prompt>.json --max-new 256 --temperature 0` and diff
 consecutive token lines.
+
+Compute ceiling (S3b): prune the GGUF with `gguf-py` from the pinned
+llama.cpp source — copy every field and tensor, slice `blk.*.ffn_*_exps.*`
+and `blk.*.ffn_gate_inp.weight` to their first 16 experts along the outermost
+axis, and set `gemma4.expert_count` to 16 — then confirm the file is smaller
+than `MemAvailable` before pushing it, and run
+`llama-bench -m <pruned.gguf> -p 512 -n 64 -t 5 -C 0xF8 --cpu-strict 1 -r 2`.
 
 The llama.cpp control is **not** to be repeated on a phone: both variants
 rebooted the device. Build it only for the `dio` smoke on a small model:
