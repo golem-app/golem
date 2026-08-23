@@ -112,4 +112,8 @@ never refuses.
 - The load preflight (`availableMemoryBytes`, #62) refuses loads that
   cannot fit free memory plus 512 MiB headroom, with a typed retryable
   failure — the floor governs what we ship to, the preflight governs the
-  moment of load, and admission (#27) governs what is offered at all.
+  moment of load, and admission (#27) governs what is offered at all. It
+  measures the file, not a working set, and on Android that is load-bearing:
+  a 14 GB mixture-of-experts GGUF that reaches `mmap` reboots the OnePlus
+  12R (`notes/2026-08-23-turbofieldfare-android-feasibility.md`), and no
+  tier above `preferred` exists to offer one.
