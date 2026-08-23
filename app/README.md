@@ -857,7 +857,7 @@ defines, so the instrument self-skips there and downloads nothing.
 
 `integration_test/model_eval_test.dart` turns model and quantization
 decisions into recorded evidence: it runs the fixed prompt set in
-`integration_test/eval/eval_spec.dart` against every requested
+`lib/features/eval/domain/eval_spec.dart` against every requested
 artifact × engine combo, scores the parsed answer channel with
 deterministic checks, captures full broker metrics (decode/prompt tok/s,
 TTFT, peak footprint) under fixed seeds, and writes `report.json` plus a
