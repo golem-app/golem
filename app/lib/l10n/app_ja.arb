@@ -276,7 +276,7 @@
   "imageCountSentence": "{count, plural, =0{} other{ 画像{count}件。}}",
   "tokenRateSummary": "{rate} tok/s · {count, plural, other{{count}トークン}}",
   "aiDisclaimer": "AIの応答は不正確な場合があります。重要な情報は確認してください。",
-  "privacyStatement": "Golemにはアカウントがなく、解析データも送信しません。モデルのダウンロード後はネットワーク権限も破棄します。オプトアウトするものはありません。",
+  "privacyStatement": "Golemにはアカウントがなく、解析データも送信しません。チャットにネットワークは不要で、Golemがオンラインになるのはモデルの取得を求めたときだけです。チャットは端末のバックアップに含まれません。移行にはエクスポートを使ってください。オプトアウトするものはありません。",
   "onThisPhone": "この端末上",
   "saveChatHistory": "チャット履歴を保存",
   "saveHistoryOffDetail": "オフにすると、アプリを閉じた時点ですべてのチャットが消去されます。",

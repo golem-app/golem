@@ -276,7 +276,7 @@
   "imageCountSentence": "{count, plural, =0{} one{ {count} image.} many{ {count} d’images.} other{ {count} images.}}",
   "tokenRateSummary": "{rate} tok/s · {count, plural, one{{count} token} many{{count} de tokens} other{{count} tokens}}",
   "aiDisclaimer": "Les réponses de l’IA peuvent être inexactes. Vérifiez les informations importantes.",
-  "privacyStatement": "Golem ne possède aucun compte, n’envoie aucune donnée d’analyse et retire son autorisation réseau après le téléchargement d’un modèle. Il n’y a rien à désactiver.",
+  "privacyStatement": "Golem ne possède aucun compte et n’envoie aucune donnée d’analyse. Discuter ne nécessite aucun réseau : Golem ne se connecte que lorsque vous lui demandez de télécharger un modèle. Les conversations restent hors des sauvegardes du téléphone ; utilisez Exporter pour les déplacer. Il n’y a rien à désactiver.",
   "onThisPhone": "Sur ce téléphone",
   "saveChatHistory": "Enregistrer l’historique des conversations",
   "saveHistoryOffDetail": "Si cette option est désactivée, chaque conversation disparaît à la fermeture de l’application.",

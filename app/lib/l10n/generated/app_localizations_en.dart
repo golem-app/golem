@@ -1018,7 +1018,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'Golem holds no account, sends no analytics, and drops its network permission once a model is downloaded. There is nothing to opt out of.';
+      'Golem holds no account and sends no analytics. Chatting needs no network — Golem goes online only when you ask it to fetch a model. Chats stay out of phone backups; use Export to move them. There is nothing to opt out of.';
 
   @override
   String get onThisPhone => 'On this phone';

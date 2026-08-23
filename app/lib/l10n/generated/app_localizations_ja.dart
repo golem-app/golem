@@ -983,7 +983,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'Golemにはアカウントがなく、解析データも送信しません。モデルのダウンロード後はネットワーク権限も破棄します。オプトアウトするものはありません。';
+      'Golemにはアカウントがなく、解析データも送信しません。チャットにネットワークは不要で、Golemがオンラインになるのはモデルの取得を求めたときだけです。チャットは端末のバックアップに含まれません。移行にはエクスポートを使ってください。オプトアウトするものはありません。';
 
   @override
   String get onThisPhone => 'この端末上';

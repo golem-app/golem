@@ -276,7 +276,7 @@
   "imageCountSentence": "{count, plural, =0{} one{ 1 imagen.} many{ {count} imágenes.} other{ {count} imágenes.}}",
   "tokenRateSummary": "{rate} tok/s · {count, plural, one{1 token} many{{count} tokens} other{{count} tokens}}",
   "aiDisclaimer": "Las respuestas de la IA pueden ser inexactas. Verifica la información importante.",
-  "privacyStatement": "Golem no tiene cuentas, no envía analíticas y elimina su permiso de red cuando se descarga un modelo. No hay nada que desactivar.",
+  "privacyStatement": "Golem no tiene cuentas y no envía analíticas. Chatear no necesita red: Golem solo se conecta cuando le pides que descargue un modelo. Los chats quedan fuera de las copias de seguridad del teléfono; usa Exportar para moverlos. No hay nada que desactivar.",
   "onThisPhone": "En este teléfono",
   "saveChatHistory": "Guardar historial de chats",
   "saveHistoryOffDetail": "Si se desactiva, todos los chats desaparecen al cerrar la app.",

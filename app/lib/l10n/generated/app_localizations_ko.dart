@@ -990,7 +990,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'Golem은 계정을 만들지 않고 분석 데이터를 보내지 않으며 모델 다운로드 후 네트워크 권한을 제거합니다. 거부할 항목이 없습니다.';
+      'Golem은 계정을 만들지 않고 분석 데이터를 보내지 않습니다. 채팅에는 네트워크가 필요 없으며, Golem은 모델 다운로드를 요청할 때만 온라인이 됩니다. 채팅은 휴대폰 백업에 포함되지 않으니 옮기려면 내보내기를 사용하세요. 거부할 항목이 없습니다.';
 
   @override
   String get onThisPhone => '이 휴대전화에서';

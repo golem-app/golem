@@ -1035,7 +1035,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'Golem nie wymaga konta, nie wysyła danych analitycznych i po pobraniu modelu nie potrzebuje dostępu do sieci. Nie ma tu opcji śledzenia, z której trzeba rezygnować.';
+      'Golem nie wymaga konta i nie wysyła danych analitycznych. Rozmowa nie potrzebuje sieci — Golem łączy się tylko wtedy, gdy poprosisz o pobranie modelu. Czaty nie trafiają do kopii zapasowych telefonu; do przeniesienia służy Eksport. Nie ma tu niczego, z czego trzeba rezygnować.';
 
   @override
   String get onThisPhone => 'Na tym telefonie';

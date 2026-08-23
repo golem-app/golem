@@ -1020,7 +1020,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'Golem không có tài khoản, không gửi dữ liệu phân tích và bỏ quyền mạng sau khi tải mô hình. Không có gì cần từ chối.';
+      'Golem không có tài khoản và không gửi dữ liệu phân tích. Trò chuyện không cần mạng — Golem chỉ lên mạng khi bạn yêu cầu tải mô hình. Các cuộc trò chuyện không nằm trong bản sao lưu của điện thoại; hãy dùng Xuất để chuyển chúng. Không có gì cần từ chối.';
 
   @override
   String get onThisPhone => 'Trên điện thoại này';

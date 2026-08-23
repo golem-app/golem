@@ -276,7 +276,7 @@
   "imageCountSentence": "{count, plural, =0{} one{ {count} görsel.} other{ {count} görsel.}}",
   "tokenRateSummary": "{rate} tok/sn · {count, plural, one{{count} token} other{{count} token}}",
   "aiDisclaimer": "Yapay zekâ yanıtları hatalı olabilir. Önemli bilgileri doğrulayın.",
-  "privacyStatement": "Golem hesap tutmaz, analiz verisi göndermez ve model indirildikten sonra ağ iznini kaldırır. Devre dışı bırakılacak hiçbir şey yoktur.",
+  "privacyStatement": "Golem hesap tutmaz ve analiz verisi göndermez. Sohbet için ağ gerekmez; Golem yalnızca bir model indirmesini istediğinizde çevrimiçi olur. Sohbetler telefon yedeklerine girmez; taşımak için Dışa Aktar’ı kullanın. Devre dışı bırakılacak hiçbir şey yoktur.",
   "onThisPhone": "Bu telefonda",
   "saveChatHistory": "Sohbet geçmişini kaydet",
   "saveHistoryOffDetail": "Kapalıyken uygulamayı kapattığınızda tüm sohbetler kaybolur.",

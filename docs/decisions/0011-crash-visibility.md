@@ -5,11 +5,14 @@ Status: decided on `chore/28-accessibility-pass` (issue #28)
 Golem ships no crash reporter, no analytics SDK, and no telemetry of any kind.
 That is not an omission waiting to be corrected before launch — it is the
 product. Settings ▸ Privacy & data tells the user, in the app, that Golem
-"holds no account, sends no analytics, and drops its network permission once a
-model is downloaded. There is nothing to opt out of." A crash SDK would make
-that sentence false, and there is no honest rewording of it that keeps a
-reporter: "we only send stack traces" is still a network call the user did not
-ask for, from an app whose entire claim is that inference stays on the device.
+"holds no account and sends no analytics. Chatting needs no network — Golem
+goes online only when you ask it to fetch a model." (The sentence once
+claimed the app "drops its network permission once a model is downloaded",
+which no platform allows and Android's `INTERNET` permission cannot do; #154
+reworded it to what the code does.) A crash SDK would make that sentence
+false, and there is no honest rewording of it that keeps a reporter: "we only
+send stack traces" is still a network call the user did not ask for, from an
+app whose entire claim is that inference stays on the device.
 
 The workspace has no such dependency today — `firebase_crashlytics`, `sentry`,
 `bugsnag` and their kin appear nowhere in `pubspec.lock` — so this record

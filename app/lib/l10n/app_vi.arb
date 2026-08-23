@@ -276,7 +276,7 @@
   "imageCountSentence": "{count, plural, =0{} =1{ 1 hình ảnh.} other{ {count} hình ảnh.}}",
   "tokenRateSummary": "{rate} tok/giây · {count, plural, =1{1 token} other{{count} token}}",
   "aiDisclaimer": "Phản hồi của AI có thể không chính xác. Hãy kiểm tra thông tin quan trọng.",
-  "privacyStatement": "Golem không có tài khoản, không gửi dữ liệu phân tích và bỏ quyền mạng sau khi tải mô hình. Không có gì cần từ chối.",
+  "privacyStatement": "Golem không có tài khoản và không gửi dữ liệu phân tích. Trò chuyện không cần mạng — Golem chỉ lên mạng khi bạn yêu cầu tải mô hình. Các cuộc trò chuyện không nằm trong bản sao lưu của điện thoại; hãy dùng Xuất để chuyển chúng. Không có gì cần từ chối.",
   "onThisPhone": "Trên điện thoại này",
   "saveChatHistory": "Lưu lịch sử trò chuyện",
   "saveHistoryOffDetail": "Khi tắt, mọi cuộc trò chuyện biến mất lúc bạn đóng ứng dụng.",

@@ -552,7 +552,7 @@
   "@tokenRateSummary": {"description": "Inference rate and token count.", "placeholders": {"rate": {"type": "String"}, "count": {"type": "int"}}},
   "aiDisclaimer": "AI responses can be inaccurate. Check important information.",
   "@aiDisclaimer": {"description": "AI accuracy disclaimer."},
-  "privacyStatement": "Golem holds no account, sends no analytics, and drops its network permission once a model is downloaded. There is nothing to opt out of.",
+  "privacyStatement": "Golem holds no account and sends no analytics. Chatting needs no network — Golem goes online only when you ask it to fetch a model. Chats stay out of phone backups; use Export to move them. There is nothing to opt out of.",
   "@privacyStatement": {"description": "Privacy screen summary."},
   "onThisPhone": "On this phone",
   "@onThisPhone": {"description": "Local data settings section."},

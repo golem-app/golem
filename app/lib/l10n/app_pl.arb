@@ -276,7 +276,7 @@
   "imageCountSentence": "{count, plural, =0{} one{ 1 obraz.} few{ {count} obrazy.} many{ {count} obrazów.} other{ {count} obrazu.}}",
   "tokenRateSummary": "{rate} tok./s · {count, plural, one{1 token} few{{count} tokeny} many{{count} tokenów} other{{count} tokenu}}",
   "aiDisclaimer": "Odpowiedzi AI mogą być niedokładne. Ważne informacje należy zweryfikować.",
-  "privacyStatement": "Golem nie wymaga konta, nie wysyła danych analitycznych i po pobraniu modelu nie potrzebuje dostępu do sieci. Nie ma tu opcji śledzenia, z której trzeba rezygnować.",
+  "privacyStatement": "Golem nie wymaga konta i nie wysyła danych analitycznych. Rozmowa nie potrzebuje sieci — Golem łączy się tylko wtedy, gdy poprosisz o pobranie modelu. Czaty nie trafiają do kopii zapasowych telefonu; do przeniesienia służy Eksport. Nie ma tu niczego, z czego trzeba rezygnować.",
   "onThisPhone": "Na tym telefonie",
   "saveChatHistory": "Zapisuj historię czatów",
   "saveHistoryOffDetail": "Po wyłączeniu każdy czat zniknie po zamknięciu aplikacji.",

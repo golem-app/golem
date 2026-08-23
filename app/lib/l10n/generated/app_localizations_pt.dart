@@ -1043,7 +1043,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'O Golem não mantém contas, não envia dados analíticos e remove sua permissão de rede assim que um modelo é baixado. Não há nada para desativar.';
+      'O Golem não mantém contas e não envia dados analíticos. Conversar não precisa de rede: o Golem só fica online quando você pede para baixar um modelo. Os chats ficam fora dos backups do telefone; use Exportar para movê-los. Não há nada para desativar.';
 
   @override
   String get onThisPhone => 'Neste celular';
@@ -2972,7 +2972,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get privacyStatement =>
-      'O Golem não mantém contas, não envia dados analíticos e remove sua permissão de rede assim que um modelo é baixado. Não há nada para desativar.';
+      'O Golem não mantém contas e não envia dados analíticos. Conversar não precisa de rede: o Golem só fica online quando você pede para baixar um modelo. Os chats ficam fora dos backups do telefone; use Exportar para movê-los. Não há nada para desativar.';
 
   @override
   String get onThisPhone => 'Neste celular';

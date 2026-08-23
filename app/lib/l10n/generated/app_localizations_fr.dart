@@ -1038,7 +1038,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'Golem ne possède aucun compte, n’envoie aucune donnée d’analyse et retire son autorisation réseau après le téléchargement d’un modèle. Il n’y a rien à désactiver.';
+      'Golem ne possède aucun compte et n’envoie aucune donnée d’analyse. Discuter ne nécessite aucun réseau : Golem ne se connecte que lorsque vous lui demandez de télécharger un modèle. Les conversations restent hors des sauvegardes du téléphone ; utilisez Exporter pour les déplacer. Il n’y a rien à désactiver.';
 
   @override
   String get onThisPhone => 'Sur ce téléphone';
