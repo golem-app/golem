@@ -1,13 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/domain/download_pace.dart';
 
-/// A window wide enough to quote an ETA from: three samples a second apart.
-DownloadPaceEstimator _settledWindow({int bytesPerSecond = 44000000}) =>
-    DownloadPaceEstimator()
-      ..add(Duration.zero, 0)
-      ..add(const Duration(seconds: 1), bytesPerSecond)
-      ..add(const Duration(seconds: 2), bytesPerSecond * 2)
-      ..add(const Duration(seconds: 3), bytesPerSecond * 3);
+/// A window wide enough to quote an ETA from: four samples a second apart at
+/// 44 MB/s.
+DownloadPaceEstimator _settledWindow() => DownloadPaceEstimator()
+  ..add(Duration.zero, 0)
+  ..add(const Duration(seconds: 1), 44000000)
+  ..add(const Duration(seconds: 2), 88000000)
+  ..add(const Duration(seconds: 3), 132000000);
 
 void main() {
   group('DownloadPaceEstimator', () {
@@ -114,15 +114,33 @@ void main() {
       expect(pace.eta(880000000), const Duration(seconds: 20));
     });
 
-    test('an eta ages out of its own window', () {
+    test('samples age out of the eta window without a stall', () {
+      // Reporting every two seconds — inside the stall threshold — so the
+      // history is pruned by age rather than cleared. A slow opening must stop
+      // dragging the estimate down once it has aged out.
       final pace = DownloadPaceEstimator(etaWindow: const Duration(seconds: 6));
-      for (var second = 0; second <= 6; second++) {
-        pace.add(Duration(seconds: second), 44000000 * second);
+      var bytes = 0;
+      for (var second = 0; second <= 6; second += 2) {
+        pace.add(Duration(seconds: second), bytes);
+        bytes += 2000000;
       }
-      expect(pace.eta(880000000), const Duration(seconds: 20));
-      // A single later sample after a stall clears the history; the samples
-      // behind it cannot be borrowed to keep quoting a time left.
-      pace.add(const Duration(seconds: 20), 900000000);
+      expect(pace.eta(880000000), const Duration(seconds: 880));
+      for (var second = 8; second <= 14; second += 2) {
+        bytes += 88000000;
+        pace.add(Duration(seconds: second), bytes);
+      }
+      expect(
+        pace.eta(880000000),
+        const Duration(seconds: 20),
+        reason: 'only the last six seconds are still in the window',
+      );
+    });
+
+    test('a stall clears the history rather than ageing it', () {
+      // Both downloaders report at least every 2.5 s while bytes move, so a
+      // longer silence is a transfer that stopped, not a slow reporter.
+      final pace = _settledWindow()
+        ..add(const Duration(seconds: 20), 900000000);
       expect(pace.eta(880000000), isNull);
     });
 

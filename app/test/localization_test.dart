@@ -430,28 +430,70 @@ void main() {
       'ko': AppLocalizationsKo(),
     };
     for (final MapEntry(key: locale, value: l10n) in localizations.entries) {
-      expect(l10n.etaAboutHoursLeft(2), contains('2'), reason: locale);
+      // The hours figure may be spelled rather than interpolated — Arabic's
+      // dual is a word, not a digit — but the minutes always come as a number.
+      expect(l10n.etaAboutHoursLeft(2), isNotEmpty, reason: locale);
       expect(l10n.etaAboutHoursLeft(1), isNotEmpty, reason: locale);
-      final compound = l10n.etaAboutHoursMinutesLeft(1, 20);
-      expect(compound, contains('1'), reason: locale);
+      final compound = l10n.etaAboutHoursMinutesLeft(3, 20);
+      expect(compound, contains('3'), reason: locale);
       expect(compound, contains('20'), reason: locale);
       // Above an hour every catalog abbreviates; the minutes-only form below
       // it keeps the spelled-out unit, so the two must not read alike.
       expect(compound, isNot(l10n.etaAboutMinutesLeft(20)), reason: locale);
-    }
-    // The three catalogs whose verb agrees with the count inflect it; the
-    // abbreviated units elsewhere do not.
-    for (final l10n in [
-      AppLocalizationsEs(),
-      AppLocalizationsPtBr(),
-      AppLocalizationsFr(),
-    ]) {
-      expect(l10n.etaAboutHoursLeft(1), isNot(l10n.etaAboutHoursLeft(2)));
       expect(
         l10n.etaAboutHoursMinutesLeft(1, 20),
-        isNot(l10n.etaAboutHoursMinutesLeft(2, 20)),
+        isNotEmpty,
+        reason: '$locale one hour',
       );
     }
+    // Rendering one count against another proves nothing — the interpolated
+    // digit differs either way — so the branches are read off the catalogs.
+    // Every language whose wording changes with the count carries them.
+    for (final locale in ['es', 'pt', 'pt_BR', 'fr', 'hi', 'ar']) {
+      final catalog = _catalog('lib/l10n/app_$locale.arb');
+      expect(
+        catalog['etaAboutHoursLeft']! as String,
+        matches(RegExp(r'(=1|one)\{')),
+        reason: '$locale hours',
+      );
+    }
+    for (final locale in ['es', 'pt', 'pt_BR', 'hi', 'ar']) {
+      expect(
+        _catalog('lib/l10n/app_$locale.arb')['etaAboutHoursMinutesLeft']!
+            as String,
+        matches(RegExp(r'(=1|one)\{')),
+        reason: '$locale hours and minutes',
+      );
+    }
+    // Spanish and Brazilian Portuguese carry the verb; one hour takes the
+    // singular in both forms.
+    for (final (l10n, singular, plural) in [
+      (AppLocalizationsEs(), 'Queda ', 'Quedan '),
+      (AppLocalizationsPtBr(), 'Falta ', 'Faltam '),
+    ]) {
+      expect(l10n.etaAboutHoursLeft(1), startsWith(singular));
+      expect(l10n.etaAboutHoursLeft(2), startsWith(plural));
+      expect(l10n.etaAboutHoursMinutesLeft(1, 20), startsWith(singular));
+      expect(l10n.etaAboutHoursMinutesLeft(2, 20), startsWith(plural));
+    }
+    // French agrees with the whole quantity: a lone hour is singular, an hour
+    // and twenty minutes is not.
+    final fr = AppLocalizationsFr();
+    expect(fr.etaAboutHoursLeft(1), endsWith('restante'));
+    expect(fr.etaAboutHoursLeft(2), endsWith('restantes'));
+    expect(fr.etaAboutHoursMinutesLeft(1, 20), endsWith('restantes'));
+    // Hindi inflects the noun rather than a verb.
+    final hi = AppLocalizationsHi();
+    expect(hi.etaAboutHoursLeft(1), contains('घंटा'));
+    expect(hi.etaAboutHoursLeft(2), contains('घंटे'));
+    expect(hi.etaAboutHoursMinutesLeft(1, 20), contains('घंटा'));
+    expect(hi.etaAboutHoursMinutesLeft(2, 20), contains('घंटे'));
+    // Arabic runs one, two, and the plural branches.
+    final ar = AppLocalizationsAr();
+    expect(ar.etaAboutHoursLeft(1), contains('ساعة واحدة'));
+    expect(ar.etaAboutHoursLeft(2), contains('ساعتين'));
+    expect(ar.etaAboutHoursLeft(3), contains('ساعات'));
+    expect(ar.etaAboutHoursMinutesLeft(2, 20), contains('ساعتين'));
   });
 
   test('every repository refusal has actionable localized copy', () {

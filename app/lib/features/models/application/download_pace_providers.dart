@@ -72,7 +72,11 @@ class DownloadPace extends _$DownloadPace {
     _estimator.add(now.difference(_origin!), progressed);
     final rate = _estimator.mbPerSecond;
     if (rate == null) {
-      _etaGate.reset();
+      // The snapshot goes, because a surface has no rate to show. The gate
+      // stays: the rate window can thin out for a tick — two reports 400 ms
+      // apart — while the ETA's longer window is still intact, and re-arming
+      // here would blank a settled time left for the five seconds it takes to
+      // prove itself again.
       state = null;
       return;
     }

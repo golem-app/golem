@@ -590,7 +590,13 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String etaAboutHoursMinutesLeft(int hours, int minutes) {
-    return 'लगभग $hours घंटे $minutes मिनट बाकी';
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'लगभग $hours घंटे $minutes मिनट बाकी',
+      one: 'लगभग 1 घंटा $minutes मिनट बाकी',
+    );
+    return '$_temp0';
   }
 
   @override

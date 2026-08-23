@@ -711,8 +711,9 @@ void main() {
       tester,
       textScale: 1.3,
       eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+      // A real transfer: only a real one is measured, so only a real one has
+      // a time left to tick.
       model: const ModelState(
-        simulated: true,
         artifacts: {
           'gemma4-mlx': ArtifactStatus(
             phase: ArtifactPhase.downloading,

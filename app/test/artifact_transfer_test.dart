@@ -194,10 +194,11 @@ void main() {
       expect(transfer.chip, '0.0 MB/s', reason: 'the rate is still honest');
     });
 
-    test('a simulated transfer quotes no rate', () {
+    test('a simulated transfer measures neither rate nor time left', () {
       // The fake repository walks the whole artifact in about a second, so
       // measuring it honestly reported 2755 MB/s on the demo build. The
-      // percentage, the sizes and the phase are real; the link speed is not.
+      // percentage, the sizes and the phase are real; the link speed and the
+      // time divided out of it are not.
       final transfer = project(
         const ArtifactStatus(
           phase: ArtifactPhase.downloading,
@@ -206,14 +207,27 @@ void main() {
         pace: const DownloadPaceSnapshot(
           artifactKey: 'test-gguf',
           mbPerSecond: 2754.9,
+          eta: Duration(seconds: 90),
         ),
         simulated: true,
       );
       expect(transfer.chip, isNull);
       expect(transfer.chipSlot, isNull, reason: 'no pill to keep one width');
+      expect(transfer.remainder, isNull);
       expect(transfer.chipIsLive, isTrue);
       expect(transfer.percent, 25);
       expect(transfer.transferred, '1.00 GB');
+
+      // A phase that quotes no measurement still says where it stopped.
+      final paused = project(
+        const ArtifactStatus(
+          phase: ArtifactPhase.paused,
+          downloadedBytes: 1000000000,
+        ),
+        simulated: true,
+      );
+      expect(paused.chip, 'Paused');
+      expect(paused.remainder, '3.00 GB left');
     });
 
     test('a snapshot for another artifact is not borrowed', () {

@@ -99,6 +99,12 @@ final class DownloadPaceEstimator {
   /// stalled and recovered, and averaging across the silence would quote a
   /// wildly wrong rate; a decreasing [elapsed] means the clock stepped. All
   /// three clear the history so the sample starts a fresh window.
+  ///
+  /// The stall threshold stays [window] even though samples are retained for
+  /// [etaWindow]: both platform downloaders report at least every 2.5 seconds
+  /// while any byte moves (`TaskRunner.shouldSendProgressUpdate` on Android,
+  /// `TaskFunctions` on Apple), so a longer silence is a transfer that stopped,
+  /// and an ETA measured across it would be as wrong as the rate.
   void add(Duration elapsed, int bytes) {
     if (_samples.isNotEmpty) {
       final last = _samples.last;
@@ -117,7 +123,7 @@ final class DownloadPaceEstimator {
 
   /// Decimal megabytes per second across the retained window, or `null` while
   /// the window is too thin to be honest.
-  double? get mbPerSecond => _rateOver(window);
+  double? get mbPerSecond => _rateOf(_retained(window));
 
   /// Time to fetch [remainingBytes] at the settled rate, or `null` while the
   /// window is unknown, zero, or too young to divide by.
@@ -127,7 +133,7 @@ final class DownloadPaceEstimator {
     if (samples.last.elapsed - samples.first.elapsed < etaMinimumSpan) {
       return null;
     }
-    final rate = _rateOver(etaWindow);
+    final rate = _rateOf(samples);
     if (rate == null || rate <= 0) return null;
     if (remainingBytes <= 0) return Duration.zero;
     return Duration(milliseconds: (remainingBytes / (rate * 1000)).round());
@@ -148,8 +154,7 @@ final class DownloadPaceEstimator {
     return _samples.sublist(start);
   }
 
-  double? _rateOver(Duration span) {
-    final samples = _retained(span);
+  double? _rateOf(List<({Duration elapsed, int bytes})> samples) {
     if (samples.length < 2) return null;
     final observed = samples.last.elapsed - samples.first.elapsed;
     if (observed < minimumSpan) return null;
