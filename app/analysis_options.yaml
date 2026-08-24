@@ -1,0 +1,31 @@
+include: package:flutter_lints/flutter.yaml
+
+# Written by Flutter 3.47's own migration of this file: the platform folders
+# hold generated and vendored code that no app lint should read. Generated
+# Dart is deliberately *not* excluded: a `.g.dart` is a part of a hand-written
+# library, and excluding it would hide a stale part's hard errors from the
+# only analyzer gate this repository runs; its lints carry their own pragmas.
+analyzer:
+  # Four versioned JSON stores are hand-parsed: an implicit cast out of the
+  # dynamic that jsonDecode returns must be an error, not a runtime surprise
+  # (ADR 0017, handbook v5.0 §5.1).
+  language:
+    strict-casts: true
+    strict-raw-types: true
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
+
+linter:
+  # The two of packages/inferno's five that fit a widget tree: a discarded
+  # Future in a statement is the fire-and-forget #154 found stranding a row,
+  # and a dynamic call is the runtime half of strict-casts. The other three
+  # are declined, with the counts, in ADR 0017.
+  rules:
+    avoid_dynamic_calls: true
+    unawaited_futures: true

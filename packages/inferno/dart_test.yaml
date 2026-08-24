@@ -1,0 +1,7 @@
+tags:
+  # Env-gated suites that load real multi-gigabyte model artifacts. The
+  # budget covers one cold load (first-run Metal shader compilation
+  # included); expected runs finish far sooner. These suites never run in
+  # CI — the gating env vars are only set locally.
+  real-model:
+    timeout: 5m

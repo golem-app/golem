@@ -1,0 +1,597 @@
+import 'dart:async';
+
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/chrome/golem_chrome.dart';
+import '../../../core/chrome/golem_tappable.dart';
+import '../../../core/chrome/golem_toast.dart';
+import '../../../core/domain/models.dart';
+import '../../../core/providers/app_providers.dart';
+import '../../../core/services/image_intake.dart';
+import '../../../core/theme/golem_theme.dart';
+import '../../../l10n/bidi.dart';
+import '../../../l10n/l10n.dart';
+import '../../models/application/model_providers.dart';
+import '../../models/model_label.dart';
+import '../../preferences/application/preferences_providers.dart';
+import '../application/active_model_providers.dart';
+import '../application/chat_providers.dart';
+import 'attach_sheet.dart';
+import 'model_picker_sheet.dart';
+
+class Composer extends ConsumerStatefulWidget {
+  const Composer({
+    required this.controller,
+    required this.focus,
+    required this.reasoningEnabled,
+    required this.generation,
+    required this.activeId,
+    this.picker = const AttachmentPicker(),
+    super.key,
+  });
+  final TextEditingController controller;
+  final FocusNode focus;
+  final bool reasoningEnabled;
+  final GenerationPhase generation;
+
+  /// The active conversation, if one exists yet.
+  final String? activeId;
+
+  final AttachmentPicker picker;
+
+  @override
+  ConsumerState<Composer> createState() => _ComposerState();
+}
+
+class _ComposerState extends ConsumerState<Composer> {
+  /// Images chosen but not yet sent. Composition state, like the draft text:
+  /// nothing durable exists until send copies the bytes into the store.
+  final List<PreparedImage> _pending = [];
+
+  /// A picked image belongs to the chat it was picked in. The Composer element
+  /// is reused across a drawer switch, so without this the tray would follow
+  /// the user into the next conversation and send there. A fresh chat
+  /// materializing under the tray (null → id) is this conversation coming
+  /// into existence, not a switch away from it.
+  @override
+  void didUpdateWidget(Composer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.activeId != null &&
+        widget.activeId != oldWidget.activeId &&
+        _pending.isNotEmpty) {
+      setState(_pending.clear);
+    }
+    // Focus is dropped on both edges of a turn, because a disabled field could
+    // not hold it and a read-only one can. Entering: the keyboard would sit
+    // over the answer as it streams. Leaving: the user may have tapped in to
+    // copy their prompt, and `EditableText.didUpdateWidget` reopens the input
+    // connection when readOnly clears on a focused field — so the keyboard
+    // springs up over the answer the moment it lands.
+    final wasIdle = oldWidget.generation == GenerationPhase.idle;
+    final isIdle = widget.generation == GenerationPhase.idle;
+    if (wasIdle != isIdle) widget.focus.unfocus();
+  }
+
+  /// Rejections surface as a toast rather than a banner: nothing was sent, and
+  /// the user's next move is simply to pick a different picture.
+  Future<void> _attach(String modelLabel, bool supportsImages) async {
+    try {
+      final source = await showAttachSheet(
+        context,
+        modelLabel: modelLabel,
+        supportsImages: supportsImages,
+      );
+      if (source == null || !mounted) return;
+      final picked = await widget.picker.pick(
+        source,
+        filesLabel: context.l10n.images,
+      );
+      if (picked == null || !mounted) return;
+      setState(() => _pending.add(picked));
+    } on ImageRejectedException catch (error) {
+      if (!mounted) return;
+      showGolemToast(context, switch (error.reason) {
+        ImageRejection.unsupportedType => context.l10n.unsupportedImageType,
+        ImageRejection.tooLarge => context.l10n.imageTooLarge,
+        ImageRejection.undecodable => context.l10n.imageUnreadable,
+      });
+    } catch (error) {
+      // The picker is a platform channel: a denied permission, a revoked grant
+      // and a photo that never materialized all arrive as something other than
+      // a rejection. Silence would look like a dead button.
+      if (!mounted) return;
+      final denied =
+          error is PlatformException &&
+          const {
+            'camera_access_denied',
+            'camera_access_restricted',
+            'photo_access_denied',
+            'photo_access_restricted',
+          }.contains(error.code);
+      showGolemToast(
+        context,
+        denied
+            ? context.l10n.imagePermissionDenied
+            : context.l10n.imageAddFailed,
+      );
+    }
+  }
+
+  Widget _tray(BuildContext context) => Padding(
+    key: const Key('composer-attachments'),
+    padding: const EdgeInsets.only(top: GolemSpace.s3, bottom: GolemSpace.s1),
+    child: Row(
+      children: [
+        for (var index = 0; index < _pending.length; index++)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: GolemSpace.s2),
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(GolemRadius.field),
+                  child: Image.memory(
+                    _pending[index].bytes,
+                    width: 56,
+                    height: 56,
+                    fit: BoxFit.cover,
+                    // Decorative: the remove button beside it carries the
+                    // accessible name.
+                    excludeFromSemantics: true,
+                  ),
+                ),
+                PositionedDirectional(
+                  top: -6,
+                  end: -6,
+                  child: GolemTappable(
+                    key: Key('composer-attachment-remove-$index'),
+                    padding: EdgeInsets.zero,
+                    onPressed: () => setState(() => _pending.removeAt(index)),
+                    child: Semantics(
+                      button: true,
+                      label: context.l10n.removeAttachedImage,
+                      child: Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: CupertinoDynamicColor.resolve(
+                            GolemTheme.surface,
+                            context,
+                          ),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: CupertinoDynamicColor.resolve(
+                              GolemTheme.divider,
+                              context,
+                            ),
+                          ),
+                        ),
+                        child: Icon(
+                          CupertinoIcons.xmark,
+                          size: 12,
+                          color: CupertinoDynamicColor.resolve(
+                            GolemTheme.mutedInk,
+                            context,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    ),
+  );
+
+  TextEditingController get controller => widget.controller;
+  FocusNode get focus => widget.focus;
+  bool get reasoningEnabled => widget.reasoningEnabled;
+  GenerationPhase get generation => widget.generation;
+  String? get activeId => widget.activeId;
+
+  @override
+  Widget build(BuildContext context) {
+    final generating = generation != GenerationPhase.idle;
+    final backend = ref.watch(inferenceBackendProvider);
+    final catalog = ref.watch(effectiveModelCatalogProvider);
+    final loadable = ref.watch(loadableModelKeysProvider);
+    // On a real engine, the exact resolution `ChatController.send` performs,
+    // so the button, the label and the turn cannot disagree. Gating on the raw
+    // `modelKey ?? artifactKey` left Send dark while the header honestly read
+    // "on device" off the fallback the send path would have taken, and lit it
+    // for an artifact of the other engine that `statusOf` called installed
+    // (#118).
+    final target = ref.watch(activeModelKeyProvider);
+    final modelLabel = modelDisplayLabel(
+      backend: backend,
+      catalog: catalog,
+      activeKey: target,
+    );
+    final supportsImages = modelSupportsImages(
+      catalog: catalog,
+      activeKey: target,
+    );
+    // The simulation runs the whole catalog without weights, so its send path
+    // never refuses — the only reason to hold Send is first run's deferred
+    // setup. That lifts once setup has produced an installed artifact, not
+    // once one specific key is installed: `onboardingModelKey` is never
+    // cleared, so keying on it left the gate armed for the life of the
+    // install and re-armed it if that one model was later deleted.
+    final setupPending =
+        ref.watch(preferencesControllerProvider).value?.onboardingModelKey !=
+            null &&
+        loadable.isEmpty;
+    final modelReady =
+        backend.sideloaded ||
+        (backend.simulatedInference ? !setupPending : target != null);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        GolemSpace.gutter,
+        8,
+        GolemSpace.gutter,
+        8 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      // Per the handoff: a solid card with the float shadow, not glass.
+      child: Container(
+        key: const Key('composer-card'),
+        decoration: BoxDecoration(
+          color: CupertinoDynamicColor.resolve(GolemTheme.surface, context),
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(
+            color: CupertinoDynamicColor.resolve(GolemTheme.divider, context),
+          ),
+          boxShadow: GolemShadow.float(context),
+        ),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(18, 2, 10, 7),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_pending.isNotEmpty) _tray(context),
+              ListenableBuilder(
+                listenable: controller,
+                builder: (context, _) => ConstrainedBox(
+                  // The field is the largest tap target in the composer and
+                  // still landed a point under the Android floor on its
+                  // padding alone.
+                  constraints: BoxConstraints(
+                    minHeight: GolemChrome.current.minimumTapTarget,
+                  ),
+                  child: CupertinoTextField.borderless(
+                    key: const Key('chat-composer'),
+                    controller: controller,
+                    focusNode: focus,
+                    textDirection: contentTextDirection(
+                      controller.text,
+                      fallback: Directionality.of(context),
+                    ),
+                    // Read-only rather than disabled: a disabled field announces
+                    // itself as such to a screen reader, which overstates a state
+                    // that lasts one turn, and it takes the in-flight prompt out of
+                    // reach for selection and copying.
+                    readOnly: generating,
+                    minLines: 1,
+                    maxLines: 6,
+                    placeholder: context.l10n.messagePlaceholder,
+                    textInputAction: TextInputAction.newline,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // The left cluster yields as one group so send stays pinned
+                  // right; inside it only the model chip shrinks.
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _PowerButton(
+                          buttonKey: const Key('composer-attach'),
+                          semanticLabel: context.l10n.addToChat,
+                          onPressed: generating
+                              ? null
+                              : () => _attach(modelLabel, supportsImages),
+                          child: _circle(
+                            context,
+                            child: Icon(
+                              CupertinoIcons.plus,
+                              size: 19,
+                              color: CupertinoDynamicColor.resolve(
+                                GolemTheme.mutedInk,
+                                context,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Intrinsic width with a hard cap: sharing flex with a
+                        // trailing Spacer starved the label to nothing on device.
+                        Flexible(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 190),
+                            child: _PowerButton(
+                              buttonKey: const Key('composer-model-chip'),
+                              semanticLabel: context.l10n.modelForChat,
+                              onPressed: generating
+                                  ? null
+                                  : () => _openModelPicker(context, ref),
+                              child: Container(
+                                height: 34,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: CupertinoDynamicColor.resolve(
+                                    GolemTheme.field,
+                                    context,
+                                  ),
+                                  borderRadius: BorderRadius.circular(
+                                    GolemRadius.pill,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 7,
+                                      height: 7,
+                                      decoration: BoxDecoration(
+                                        color: CupertinoDynamicColor.resolve(
+                                          GolemTheme.accent,
+                                          context,
+                                        ),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 7),
+                                    Flexible(
+                                      child: Text(
+                                        modelLabel,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GolemText.captionStrong.copyWith(
+                                          color: CupertinoDynamicColor.resolve(
+                                            GolemTheme.mutedInk,
+                                            context,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      CupertinoIcons.chevron_down,
+                                      size: 14,
+                                      color: CupertinoDynamicColor.resolve(
+                                        GolemTheme.tertiaryInk,
+                                        context,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        _PowerButton(
+                          buttonKey: const Key('reasoning-toggle'),
+                          semanticLabel: reasoningEnabled
+                              ? context.l10n.reasoningOn
+                              : context.l10n.reasoningOff,
+                          onPressed: generating
+                              ? null
+                              : () => ref
+                                    .read(chatControllerProvider.notifier)
+                                    .toggleReasoning(),
+                          child: reasoningEnabled
+                              ? Container(
+                                  height: 34,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: CupertinoDynamicColor.resolve(
+                                      GolemTheme.reasoningSurface,
+                                      context,
+                                    ),
+                                    borderRadius: BorderRadius.circular(
+                                      GolemRadius.pill,
+                                    ),
+                                    border: Border.all(
+                                      color: CupertinoDynamicColor.resolve(
+                                        GolemTheme.reasoningBorder,
+                                        context,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        CupertinoIcons.lightbulb_fill,
+                                        size: 15,
+                                        color: GolemTheme.amber,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        context.l10n.think,
+                                        style: GolemText.captionStrong.copyWith(
+                                          color: CupertinoDynamicColor.resolve(
+                                            GolemTheme.ink,
+                                            context,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : _circle(
+                                  context,
+                                  child: Icon(
+                                    CupertinoIcons.lightbulb,
+                                    size: 18,
+                                    color: CupertinoDynamicColor.resolve(
+                                      GolemTheme.mutedInk,
+                                      context,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // A gap the cluster cannot claim: the chip's cap let a long
+                  // model name fill the row until the Think pill touched
+                  // send (#143). Only the chip shrinks; the pill keeps its
+                  // label. 8 here and before the chip, 10 between the pills:
+                  // send and attach each carry 2pt of hit box, so every
+                  // visible gap is 10.
+                  const SizedBox(width: GolemSpace.s2),
+                  // Only send depends on the live text, so it listens to the
+                  // controller alone instead of rebuilding the whole composer
+                  // on every keystroke.
+                  ListenableBuilder(
+                    listenable: controller,
+                    builder: (context, _) {
+                      final hasText = controller.text.trim().isNotEmpty;
+                      // An image alone is a complete turn — but a tray the
+                      // current model cannot read is not one. The picture stays,
+                      // with its remove button, so the way out is visible.
+                      final canSend =
+                          (hasText || _pending.isNotEmpty) &&
+                          (_pending.isEmpty || supportsImages) &&
+                          modelReady;
+                      return GolemTappable(
+                        key: Key(generating ? 'stop-button' : 'send-button'),
+                        padding: EdgeInsets.zero,
+                        onPressed: generating
+                            ? () => ref
+                                  .read(chatControllerProvider.notifier)
+                                  .stop()
+                            : !canSend
+                            ? null
+                            : () async {
+                                final text = controller.text;
+                                final images = List.of(_pending);
+                                controller.clear();
+                                setState(_pending.clear);
+                                if (ref
+                                        .read(preferencesControllerProvider)
+                                        .value
+                                        ?.hapticsOnSend ??
+                                    true) {
+                                  unawaited(HapticFeedback.lightImpact());
+                                }
+                                try {
+                                  await ref
+                                      .read(chatControllerProvider.notifier)
+                                      .send(text, images: images);
+                                } catch (_) {
+                                  // send() only throws when an attachment never
+                                  // reached disk; the banner is already up, so
+                                  // this puts the turn back within reach rather
+                                  // than losing the picture with it.
+                                  if (!mounted) return;
+                                  controller.text = text;
+                                  setState(() => _pending.addAll(images));
+                                }
+                              },
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: generating || canSend
+                                ? CupertinoDynamicColor.resolve(
+                                    GolemTheme.accent,
+                                    context,
+                                  )
+                                : CupertinoDynamicColor.resolve(
+                                    GolemTheme.divider,
+                                    context,
+                                  ),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Center(
+                            child: generating
+                                ? Semantics(
+                                    label: context.l10n.stop,
+                                    child: Container(
+                                      width: 14,
+                                      height: 14,
+                                      decoration: BoxDecoration(
+                                        color: CupertinoColors.white,
+                                        borderRadius: BorderRadius.circular(3),
+                                      ),
+                                    ),
+                                  )
+                                : Icon(
+                                    CupertinoIcons.arrow_up,
+                                    semanticLabel: context.l10n.send,
+                                    color: CupertinoColors.white,
+                                    size: 20,
+                                  ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openModelPicker(BuildContext context, WidgetRef ref) async {
+    var conversationId = activeId;
+    if (conversationId == null) {
+      final controller = ref.read(chatControllerProvider.notifier);
+      await controller.newChat();
+      conversationId = ref.read(chatControllerProvider).value?.activeId;
+    }
+    if (conversationId == null || !context.mounted) return;
+    await showModelPickerSheet(context, conversationId: conversationId);
+  }
+
+  // The same 40pt as send: the two circles bracket the row, and at 34pt the
+  // attach button read as the smaller sibling.
+  Widget _circle(BuildContext context, {required Widget child}) => Container(
+    width: 40,
+    height: 40,
+    decoration: BoxDecoration(
+      color: CupertinoDynamicColor.resolve(GolemTheme.field, context),
+      shape: BoxShape.circle,
+    ),
+    child: Center(child: child),
+  );
+}
+
+/// A power-row control with a 34pt visual inside a platform-minimum hit target.
+final class _PowerButton extends StatelessWidget {
+  const _PowerButton({
+    required this.buttonKey,
+    required this.semanticLabel,
+    required this.onPressed,
+    required this.child,
+  });
+  final Key buttonKey;
+  final String semanticLabel;
+  final VoidCallback? onPressed;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => GolemTappable(
+    key: buttonKey,
+    padding: EdgeInsets.zero,
+    onPressed: onPressed,
+    child: Semantics(label: semanticLabel, child: child),
+  );
+}

@@ -1,0 +1,372 @@
+import 'dart:io';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/core/domain/app_preferences.dart';
+import 'package:golem_flutter/core/domain/app_state.dart';
+import 'package:golem_flutter/core/domain/model_catalog.dart';
+import 'package:golem_flutter/core/domain/models.dart';
+import 'package:golem_flutter/core/providers/app_providers.dart';
+import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
+import 'package:golem_flutter/core/repositories/file_attachment_repository.dart';
+import 'package:golem_flutter/features/chat/application/chat_providers.dart';
+import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
+
+import 'support/in_memory_attachment_repository.dart';
+import 'support/in_memory_chat_history_repository.dart';
+import 'support/in_memory_preferences_repository.dart';
+
+ImagePart _imagePart(String id) => ImagePart(
+  attachmentId: id,
+  mimeType: 'image/jpeg',
+  width: 8,
+  height: 8,
+  byteCount: 3,
+);
+
+void main() {
+  group('FileAttachmentRepository', () {
+    late Directory directory;
+    late FileAttachmentRepository repository;
+
+    setUp(() async {
+      directory = await Directory.systemTemp.createTemp('golem-attachments-');
+      repository = FileAttachmentRepository(
+        Directory('${directory.path}/attachments'),
+      );
+    });
+    tearDown(() => directory.delete(recursive: true));
+
+    test('stores bytes, reads them back, and reports its size', () async {
+      final stored = await repository.store(const [
+        1,
+        2,
+        3,
+        4,
+      ], mimeType: 'image/png');
+      expect(stored.id, endsWith('.png'));
+      expect(stored.byteCount, 4);
+      expect(await repository.read(stored.id), [1, 2, 3, 4]);
+      expect(await repository.storedBytes(), 4);
+    });
+
+    test('an empty store reports nothing rather than failing', () async {
+      expect(await repository.storedBytes(), 0);
+      expect(await repository.read('nothing.jpg'), isNull);
+    });
+
+    test('refuses an image type no engine path accepts', () async {
+      expect(
+        () => repository.store(const [1], mimeType: 'image/tiff'),
+        throwsArgumentError,
+      );
+    });
+
+    test('ids address this directory and nothing outside it', () async {
+      for (final hostile in [
+        '../escape.jpg',
+        'nested/child.jpg',
+        r'..\escape.jpg',
+        '',
+      ]) {
+        expect(await repository.read(hostile), isNull, reason: hostile);
+      }
+    });
+
+    test('retainOnly keeps referenced bytes and drops the rest', () async {
+      final keep = await repository.store(const [1, 2], mimeType: 'image/jpeg');
+      final drop = await repository.store(const [3], mimeType: 'image/jpeg');
+      expect(await repository.storedBytes(), 3);
+
+      await repository.retainOnly({keep.id});
+
+      expect(await repository.read(keep.id), [1, 2]);
+      expect(await repository.read(drop.id), isNull);
+      expect(await repository.storedBytes(), 2);
+    });
+
+    test('retainOnly on a store that was never written is harmless', () async {
+      await repository.retainOnly({'anything.jpg'});
+      expect(await repository.storedBytes(), 0);
+    });
+
+    test('ids are unique across rapid stores', () async {
+      final ids = <String>{};
+      for (var i = 0; i < 25; i++) {
+        ids.add((await repository.store(const [0], mimeType: 'image/jpeg')).id);
+      }
+      expect(ids, hasLength(25));
+    });
+  });
+
+  group('attachment lifecycle follows the conversations', () {
+    ProviderContainer containerWith(
+      InMemoryAttachmentRepository attachments, {
+      ChatHistorySnapshot? history,
+      InMemoryPreferencesRepository? preferences,
+    }) => ProviderContainer(
+      overrides: [
+        chatHistoryRepositoryProvider.overrideWithValue(
+          InMemoryChatHistoryRepository(
+            history ?? const ChatHistorySnapshot(conversations: []),
+          ),
+        ),
+        attachmentRepositoryProvider.overrideWithValue(attachments),
+        // Explicitly empty (#127): the catalog read behind a send no longer
+        // tolerates an absent seam, and this suite is about bytes, not models.
+        modelCatalogEntriesProvider.overrideWithValue(
+          const <ModelCatalogEntry>[],
+        ),
+        preferencesRepositoryProvider.overrideWithValue(
+          preferences ?? InMemoryPreferencesRepository(),
+        ),
+        inferenceRepositoryProvider.overrideWithValue(
+          FakeInferenceRepository(eventDelay: Duration.zero),
+        ),
+      ],
+    );
+
+    ChatHistorySnapshot historyWith(List<String> attachmentIds) =>
+        ChatHistorySnapshot(
+          activeId: 'chat',
+          conversations: [
+            ChatConversation(
+              id: 'chat',
+              title: 'With pictures',
+              updatedAt: DateTime.utc(2026, 8, 9),
+              messages: [
+                ChatMessage(
+                  id: 'u1',
+                  role: MessageRole.user,
+                  parts: [
+                    for (final id in attachmentIds) _imagePart(id),
+                    const TextPart('What is this?'),
+                  ],
+                  createdAt: DateTime.utc(2026, 8, 9),
+                ),
+              ],
+            ),
+          ],
+        );
+
+    test('deleting a message drops only its attachments', () async {
+      final attachments = InMemoryAttachmentRepository();
+      final kept = await attachments.store(const [1], mimeType: 'image/jpeg');
+      final dropped = await attachments.store(const [
+        2,
+        3,
+      ], mimeType: 'image/jpeg');
+
+      final container = containerWith(
+        attachments,
+        history: ChatHistorySnapshot(
+          activeId: 'chat',
+          conversations: [
+            ChatConversation(
+              id: 'chat',
+              title: 'Two pictures',
+              updatedAt: DateTime.utc(2026, 8, 9),
+              messages: [
+                ChatMessage(
+                  id: 'keep',
+                  role: MessageRole.user,
+                  parts: [_imagePart(kept.id)],
+                  createdAt: DateTime.utc(2026, 8, 9),
+                ),
+                ChatMessage(
+                  id: 'drop',
+                  role: MessageRole.user,
+                  parts: [_imagePart(dropped.id)],
+                  createdAt: DateTime.utc(2026, 8, 9),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+      addTearDown(container.dispose);
+      await container.read(chatControllerProvider.future);
+
+      await container
+          .read(chatControllerProvider.notifier)
+          .deleteMessage('drop');
+
+      expect(await attachments.read(kept.id), isNotNull);
+      expect(await attachments.read(dropped.id), isNull);
+    });
+
+    test(
+      'failed conversation save keeps bytes until retry commits deletion',
+      () async {
+        final attachments = InMemoryAttachmentRepository();
+        final stored = await attachments.store(const [
+          1,
+          2,
+          3,
+        ], mimeType: 'image/jpeg');
+        final history = InMemoryChatHistoryRepository(historyWith([stored.id]))
+          ..failingSaves = 1;
+        final container = ProviderContainer(
+          overrides: [
+            chatHistoryRepositoryProvider.overrideWithValue(history),
+            attachmentRepositoryProvider.overrideWithValue(attachments),
+            preferencesRepositoryProvider.overrideWithValue(
+              InMemoryPreferencesRepository(),
+            ),
+            inferenceRepositoryProvider.overrideWithValue(
+              FakeInferenceRepository(eventDelay: Duration.zero),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+        await container.read(chatControllerProvider.future);
+
+        final controller = container.read(chatControllerProvider.notifier);
+        await controller.deleteConversation('chat');
+
+        expect(
+          container.read(chatControllerProvider).requireValue.conversations,
+          isEmpty,
+        );
+        expect(history.snapshot.conversations, isNotEmpty);
+        expect(await attachments.read(stored.id), isNotNull);
+        expect(
+          container.read(chatControllerProvider).requireValue.persistencePhase,
+          ChatPersistencePhase.failed,
+        );
+
+        await controller.retryPersistence();
+
+        expect(history.snapshot.conversations, isEmpty);
+        expect(await attachments.read(stored.id), isNull);
+      },
+    );
+
+    test('editing a message keeps its pictures', () async {
+      final attachments = InMemoryAttachmentRepository();
+      final stored = await attachments.store(const [1], mimeType: 'image/png');
+      final container = containerWith(
+        attachments,
+        history: historyWith([stored.id]),
+      );
+      addTearDown(container.dispose);
+      await container.read(chatControllerProvider.future);
+
+      await container
+          .read(chatControllerProvider.notifier)
+          .editAndTruncate('u1', 'What is that?');
+
+      final edited = container
+          .read(chatControllerProvider)
+          .value!
+          .active!
+          .messages
+          .first;
+      expect(edited.text, 'What is that?');
+      expect(edited.images, hasLength(1));
+      expect(await attachments.read(stored.id), isNotNull);
+    });
+
+    test(
+      'startup collects bytes no restored conversation references',
+      () async {
+        final attachments = InMemoryAttachmentRepository();
+        final kept = await attachments.store(const [1], mimeType: 'image/jpeg');
+        final orphan = await attachments.store(const [
+          2,
+        ], mimeType: 'image/jpeg');
+        final container = containerWith(
+          attachments,
+          history: historyWith([kept.id]),
+        );
+        addTearDown(container.dispose);
+
+        await container.read(chatControllerProvider.future);
+
+        expect(await attachments.read(kept.id), isNotNull);
+        expect(await attachments.read(orphan.id), isNull);
+      },
+    );
+
+    test(
+      'a recovered history keeps every attachment until dismissed',
+      () async {
+        // A quarantined store hydrates empty; sweeping on that would delete the
+        // pictures the unreadable file still names (#154). The notice and the
+        // held bytes outlive ordinary saves and go together, on dismissal.
+        final attachments = InMemoryAttachmentRepository();
+        final stored = await attachments.store(const [
+          1,
+        ], mimeType: 'image/png');
+        final container = containerWith(
+          attachments,
+          history: const ChatHistorySnapshot(
+            conversations: [],
+            recovered: true,
+          ),
+        );
+        addTearDown(container.dispose);
+        final controller = container.read(chatControllerProvider.notifier);
+
+        final state = await container.read(chatControllerProvider.future);
+        expect(state.historyRecovered, isTrue);
+        await controller.newChat();
+        expect(
+          container.read(chatControllerProvider).requireValue.historyRecovered,
+          isTrue,
+        );
+        expect(await attachments.read(stored.id), isNotNull);
+
+        controller.acknowledgeRecovery();
+        expect(
+          container.read(chatControllerProvider).requireValue.historyRecovered,
+          isFalse,
+        );
+        await controller.newChat();
+        expect(await attachments.read(stored.id), isNull);
+      },
+    );
+
+    test('deleting every chat collects every attachment', () async {
+      final attachments = InMemoryAttachmentRepository();
+      final stored = await attachments.store(const [1], mimeType: 'image/png');
+      final container = containerWith(
+        attachments,
+        history: historyWith([stored.id]),
+      );
+      addTearDown(container.dispose);
+      await container.read(chatControllerProvider.future);
+
+      await container.read(chatControllerProvider.notifier).deleteAllChats();
+
+      expect(await attachments.storedBytes(), 0);
+    });
+
+    test('with history off the session keeps its pictures readable', () async {
+      final attachments = InMemoryAttachmentRepository();
+      final stored = await attachments.store(const [7], mimeType: 'image/png');
+      final preferences = InMemoryPreferencesRepository(
+        const AppPreferences(saveHistory: false),
+      );
+      final container = containerWith(
+        attachments,
+        history: historyWith([stored.id]),
+        preferences: preferences,
+      );
+      addTearDown(container.dispose);
+      await container.read(chatControllerProvider.future);
+      await container.read(preferencesControllerProvider.future);
+
+      // A mutation runs the cascade even though nothing reaches disk.
+      await container
+          .read(chatControllerProvider.notifier)
+          .renameConversation('chat', 'Renamed');
+
+      expect(
+        await attachments.read(stored.id),
+        isNotNull,
+        reason: 'in-memory conversations still reference it',
+      );
+    });
+  });
+}

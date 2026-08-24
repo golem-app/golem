@@ -1,0 +1,225 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/broker/model_catalog.dart';
+import 'package:golem_flutter/broker/runtime.dart';
+import 'package:golem_flutter/core/domain/model_catalog.dart';
+import 'package:golem_flutter/core/domain/models.dart';
+
+void main() {
+  test('model state v3 round-trips artifacts and drops wiring stamps', () {
+    const state = ModelState(
+      artifacts: {
+        'gemma4-mlx': ArtifactStatus(
+          phase: ArtifactPhase.paused,
+          downloadedBytes: 123456789,
+          verifiedBytes: 5,
+        ),
+        'qwen35-gguf': ArtifactStatus(
+          phase: ArtifactPhase.failed,
+          downloadedBytes: 42,
+          failure: 'Needs 3.4 GB free; 1.1 GB available.',
+          failureReason: ArtifactFailure(
+            ArtifactFailureKind.insufficientStorage,
+            requiredBytes: 3400000000,
+            availableBytes: 1100000000,
+          ),
+        ),
+      },
+      runtime: RuntimePhase.loaded,
+      failure: RuntimeFailureKind.engineLoad,
+      activeArtifactKey: 'gemma4-mlx',
+      simulated: true,
+    );
+    final json = state.toJson();
+    expect(json['schemaVersion'], 3);
+    // Wiring stamps come from the repository configuration on every load;
+    // persisting them would let stale configuration lie after a rebuild.
+    expect(json.containsKey('activeArtifactKey'), isFalse);
+    expect(json.containsKey('simulated'), isFalse);
+    // The artifact diagnostic quotes whatever failed — a platform message, an
+    // exception, a path on this device — so it never reaches the file (#130).
+    final artifact = json['artifacts']! as Map;
+    expect(
+      (artifact['qwen35-gguf']! as Map).containsKey('failure'),
+      isFalse,
+      reason: 'the diagnostic is in-memory only; failureReason is the record',
+    );
+    // A verify phase never survives a relaunch, so its counter is not stored.
+    expect(
+      (artifact['gemma4-mlx']! as Map).containsKey('verifiedBytes'),
+      isFalse,
+    );
+
+    final decoded = ModelState.fromJson(json);
+    expect(decoded.statusOf('gemma4-mlx').phase, ArtifactPhase.paused);
+    expect(decoded.statusOf('gemma4-mlx').downloadedBytes, 123456789);
+    expect(decoded.statusOf('gemma4-mlx').verifiedBytes, 0);
+    expect(decoded.statusOf('qwen35-gguf').phase, ArtifactPhase.failed);
+    expect(decoded.statusOf('qwen35-gguf').failure, isNull);
+    expect(
+      decoded.statusOf('qwen35-gguf').failureReason,
+      const ArtifactFailure(
+        ArtifactFailureKind.insufficientStorage,
+        requiredBytes: 3400000000,
+        availableBytes: 1100000000,
+      ),
+    );
+    expect(decoded.runtime, RuntimePhase.loaded);
+    expect(decoded.failure, RuntimeFailureKind.engineLoad);
+    expect(decoded.activeArtifactKey, isNull);
+    expect(decoded.simulated, isFalse);
+
+    final stamped = decoded.stamp(
+      activeArtifactKey: 'gemma4-mlx',
+      simulated: true,
+    );
+    expect(stamped.statusOf('gemma4-mlx').phase, ArtifactPhase.paused);
+    final installed = stamped.withArtifact(
+      'gemma4-mlx',
+      const ArtifactStatus(phase: ArtifactPhase.installed),
+    );
+    // copyWith and withArtifact carry the stamps through transitions.
+    expect(installed.simulated, isTrue);
+    expect(installed.activeArtifactKey, 'gemma4-mlx');
+  });
+
+  test('v1 model state files are rejected as an unknown schema', () {
+    expect(
+      () => ModelState.fromJson({'schemaVersion': 1, 'backend': 'mlx'}),
+      throwsFormatException,
+    );
+  });
+
+  // Reading v2 keeps a user's installs; its runtime sentence is dropped rather
+  // than kept, because no kind can be recovered from prose and prose is what
+  // #130 exists to get out of the store.
+  test('a v2 store reads, and its free-text runtime failure does not', () {
+    final decoded = ModelState.fromJson({
+      'schemaVersion': 2,
+      'runtime': 'failed',
+      'failure': 'Install the selected simulated model first.',
+      'artifacts': {
+        'gemma4-mlx': {
+          'phase': 'installed',
+          'downloadedBytes': 3300000000,
+          'failure': '/Users/someone/Library/.../model.safetensors is missing.',
+        },
+      },
+    });
+    expect(decoded.runtime, RuntimePhase.failed);
+    expect(decoded.failure, isNull);
+    expect(decoded.statusOf('gemma4-mlx').phase, ArtifactPhase.installed);
+    expect(decoded.statusOf('gemma4-mlx').downloadedBytes, 3300000000);
+    expect(decoded.statusOf('gemma4-mlx').failure, isNull);
+  });
+
+  test('an unrecognized runtime failure name reads as nothing classified', () {
+    final decoded = ModelState.fromJson({
+      'schemaVersion': 3,
+      'runtime': 'failed',
+      'failure': 'somethingALaterBuildAdded',
+      'artifacts': const <String, Object?>{},
+    });
+    expect(decoded.failure, isNull);
+  });
+
+  test('every runtime failure kind survives the file', () {
+    for (final kind in RuntimeFailureKind.values) {
+      final decoded = ModelState.fromJson(
+        ModelState(runtime: RuntimePhase.failed, failure: kind).toJson(),
+      );
+      expect(decoded.failure, kind, reason: kind.name);
+    }
+  });
+
+  test('the broker catalog mirrors the pinned Inferno manifest', () {
+    final byKey = {for (final entry in modelCatalog) entry.key: entry};
+    expect(byKey.keys, [
+      'gemma4-mlx',
+      'gemma4-gguf',
+      'qwen35-2b-mlx',
+      'qwen35-2b-gguf',
+      'qwen35-mlx',
+      'qwen35-gguf',
+    ]);
+    const artifacts = {
+      'gemma4-mlx': gemma4E2BMlx4Bit,
+      'gemma4-gguf': gemma4E2BGgufQ4,
+      'qwen35-2b-mlx': qwen35TwoBMlx4Bit,
+      'qwen35-2b-gguf': qwen35TwoBGgufQ4,
+      'qwen35-mlx': qwen35Mlx4Bit,
+      'qwen35-gguf': qwen35GgufQ4,
+    };
+    for (final MapEntry(:key, value: artifact) in artifacts.entries) {
+      final entry = byKey[key]!;
+      expect(entry.repository, artifact.repository, reason: key);
+      expect(entry.revision, artifact.revision, reason: key);
+      expect(entry.files.length, artifact.files.length, reason: key);
+      for (var i = 0; i < entry.files.length; i++) {
+        expect(entry.files[i].path, artifact.files[i].path, reason: key);
+        expect(entry.files[i].bytes, artifact.files[i].bytes, reason: key);
+        expect(entry.files[i].sha256, artifact.files[i].sha256, reason: key);
+        expect(
+          entry.files[i].repository,
+          artifact.files[i].repository,
+          reason: key,
+        );
+        expect(
+          entry.files[i].revision,
+          artifact.files[i].revision,
+          reason: key,
+        );
+      }
+      expect(
+        entry.totalBytes,
+        artifact.files.fold<int>(0, (sum, file) => sum + file.bytes),
+        reason: key,
+      );
+      expect(entry.installDirectory, 'models/$key', reason: key);
+      expect(
+        entry.repositoryUrl.toString(),
+        'https://huggingface.co/${artifact.repository}/tree/${artifact.revision}',
+        reason: key,
+      );
+    }
+  });
+
+  test('a per-file source overrides the artifact download location', () {
+    final entry = modelCatalog.singleWhere((item) => item.key == 'gemma4-gguf');
+    final projector = entry.files.singleWhere(
+      (file) => file.role == ModelFileRole.projector,
+    );
+    expect(
+      entry.resolveUrlFor(projector).toString(),
+      'https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/'
+      'resolve/64ef033dc9f85a88f88e70cceb0a7457366bea64/'
+      'mmproj-gemma-4-E2B-it-Q8_0.gguf',
+    );
+  });
+
+  test('the active artifact derives from the inference dart-defines', () {
+    expect(
+      activeArtifactKeyFor(backend: 'mlx', modelProfile: 'gemma4'),
+      'gemma4-mlx',
+    );
+    expect(
+      activeArtifactKeyFor(backend: 'llama', modelProfile: 'qwen35'),
+      'qwen35-gguf',
+    );
+    expect(
+      activeArtifactKeyFor(backend: 'fake', modelProfile: 'gemma4'),
+      isNull,
+    );
+    // Every derivable key names a real catalog entry.
+    final keys = {for (final entry in modelCatalog) entry.key};
+    for (final profile in ['gemma4', 'qwen35']) {
+      for (final backend in ['mlx', 'llama']) {
+        expect(
+          keys,
+          contains(
+            activeArtifactKeyFor(backend: backend, modelProfile: profile),
+          ),
+        );
+      }
+    }
+  });
+}

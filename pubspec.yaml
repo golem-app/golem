@@ -1,0 +1,10 @@
+name: golem_workspace
+description: Workspace for the Golem application and its Dart packages.
+publish_to: none
+
+environment:
+  sdk: ^3.12.2
+
+workspace:
+  - app
+  - packages/inferno

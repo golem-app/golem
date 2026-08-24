@@ -1,0 +1,10 @@
+# Golem QA (red) launcher icons — see flutter_launcher_icons-production.yaml.
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/images/golem_launcher_qa.png
+  image_path_ios: assets/source/golem_icon_qa_1024.png
+  adaptive_icon_background: assets/images/golem_adaptive_background_qa.png
+  adaptive_icon_foreground: assets/images/golem_adaptive_foreground.png
+  remove_alpha_ios: true
+  background_color_ios: "#0F1524"

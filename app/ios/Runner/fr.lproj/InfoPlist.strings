@@ -1,0 +1,2 @@
+"NSCameraUsageDescription" = "Golem utilise l’appareil photo uniquement lorsque vous prenez une photo à joindre à une conversation. Les photos restent sur cet appareil.";
+"NSPhotoLibraryUsageDescription" = "Golem accède à une photo uniquement lorsque vous la joignez à une conversation. Les photos restent sur cet appareil.";
