@@ -402,7 +402,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get modelDownloadsSimulated =>
-      'मॉडल डाउनलोड पिन किए गए कैटलॉग का निश्चित सिम्युलेशन है; नेटवर्क का उपयोग नहीं होता।';
+      'मॉडल डाउनलोड पहले से तय कैटलॉग का नियतात्मक सिम्युलेशन है; नेटवर्क का उपयोग नहीं होता।';
 
   @override
   String get modelDownloadsReal =>
@@ -410,7 +410,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get inferenceSimulated =>
-      'इन्फ़रेंस एक निश्चित UI सिम्युलेशन है—इसमें मॉडल वेट, इंजन या हार्डवेयर माप शामिल नहीं है।';
+      'इन्फ़रेंस एक नियतात्मक UI सिम्युलेशन है—इसमें मॉडल वेट, इंजन या हार्डवेयर माप शामिल नहीं है।';
 
   @override
   String get inferenceLocal =>
@@ -486,7 +486,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'यह बिल्ड पूरा पिन किया गया कैटलॉग दिखाता है। डाउनलोड और मॉडल चलाना सिम्युलेट किया जाता है।';
+      'यह बिल्ड पहले से तय किया गया पूरा कैटलॉग दिखाता है। डाउनलोड और मॉडल चलाना सिम्युलेट किया जाता है।';
 
   @override
   String get catalogDeviceDetail =>
@@ -546,7 +546,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get downloadSimulationComplete =>
-      'निश्चित सिम्युलेशन पूरा हुआ; कोई वेट स्टोर नहीं किया गया।';
+      'नियतात्मक सिम्युलेशन पूरा हुआ; कोई वेट स्टोर नहीं किया गया।';
 
   @override
   String get downloadComplete =>
@@ -697,7 +697,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get simulatedDownloadShort =>
-      'निश्चित सिम्युलेशन; कोई नेटवर्क या वेट नहीं।';
+      'नियतात्मक सिम्युलेशन; कोई नेटवर्क या वेट नहीं।';
 
   @override
   String get downloadBeforeSending =>
@@ -1386,7 +1386,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get nothingInstalledSimulated =>
-      'अभी कुछ भी इंस्टॉल नहीं है। यहाँ डाउनलोड निश्चित सिम्युलेशन हैं।';
+      'अभी कुछ भी इंस्टॉल नहीं है। यहाँ डाउनलोड नियतात्मक सिम्युलेशन हैं।';
 
   @override
   String get runtime => 'रनटाइम';
@@ -1645,7 +1645,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get benchmarkProtocolDetail =>
-      'ट्रैक किए गए प्रोडक्शन प्रॉम्प्ट फ़िक्स्चर का उपयोग करता है। आउटपुट और समय केवल निश्चित सिम्युलेशन हैं।';
+      'ट्रैक किए गए प्रोडक्शन प्रॉम्प्ट फ़िक्स्चर का उपयोग करता है। आउटपुट और समय केवल नियतात्मक सिम्युलेशन हैं।';
 
   @override
   String get simulationStatus => 'सिम्युलेशन की स्थिति';
@@ -1675,7 +1675,8 @@ class AppLocalizationsHi extends AppLocalizations {
   String get runSimulatedBenchmark => 'सिम्युलेटेड परीक्षण चलाएँ';
 
   @override
-  String get generatingDeterministicResult => 'निश्चित परिणाम बनाया जा रहा है…';
+  String get generatingDeterministicResult =>
+      'नियतात्मक परिणाम बनाया जा रहा है…';
 
   @override
   String get simulatedResult => 'सिम्युलेटेड परिणाम';

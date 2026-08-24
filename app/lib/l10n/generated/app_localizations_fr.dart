@@ -403,7 +403,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get modelDownloadsSimulated =>
-      'Les téléchargements de modèles simulent de façon déterministe le catalogue épinglé ; aucun accès réseau n’est effectué.';
+      'Les téléchargements de modèles simulent de façon déterministe le catalogue intégré ; aucun accès réseau n’est effectué.';
 
   @override
   String get modelDownloadsReal =>
@@ -488,7 +488,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'Cette version affiche tout le catalogue épinglé. Les téléchargements et l’exécution des modèles sont simulés.';
+      'Cette version affiche tout le catalogue intégré. Les téléchargements et l’exécution des modèles sont simulés.';
 
   @override
   String get catalogDeviceDetail =>

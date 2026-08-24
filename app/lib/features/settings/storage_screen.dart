@@ -142,9 +142,12 @@ class _UsageCard extends StatelessWidget {
                     child: Text(gigabytes(used), style: GolemText.display),
                   ),
                   if (free != null)
-                    Text(
-                      context.l10n.storageFree(gigabytes(free)),
-                      style: GolemText.footnote.copyWith(color: muted),
+                    Flexible(
+                      child: Text(
+                        context.l10n.storageFree(gigabytes(free)),
+                        style: GolemText.footnote.copyWith(color: muted),
+                        textAlign: TextAlign.end,
+                      ),
                     ),
                 ],
               ),

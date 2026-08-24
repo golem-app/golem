@@ -401,7 +401,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get modelDownloadsSimulated =>
-      'Unduhan model merupakan simulasi deterministik dari katalog tetap; tidak ada akses jaringan.';
+      'Unduhan model merupakan simulasi deterministik dari katalog bawaan; tidak ada akses jaringan.';
 
   @override
   String get modelDownloadsReal =>
@@ -486,7 +486,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'Versi ini menampilkan seluruh katalog tetap. Unduhan dan proses model disimulasikan.';
+      'Versi ini menampilkan seluruh katalog bawaan. Unduhan dan proses model disimulasikan.';
 
   @override
   String get catalogDeviceDetail =>
@@ -1018,7 +1018,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'Golem tidak memiliki akun dan tidak mengirim analitik. Mengobrol tidak memerlukan jaringan — Golem hanya online saat Anda memintanya mengunduh model. Chat tidak masuk ke cadangan ponsel; gunakan Ekspor untuk memindahkannya. Tidak ada yang perlu dinonaktifkan.';
+      'Golem tidak memiliki akun dan tidak mengirim analitik. Percakapan tidak memerlukan jaringan — Golem hanya online saat Anda memintanya mengunduh model. Percakapan tidak masuk ke cadangan ponsel; gunakan Ekspor untuk memindahkannya. Tidak ada yang perlu dinonaktifkan.';
 
   @override
   String get onThisPhone => 'Di ponsel ini';
@@ -1225,7 +1225,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get chatHistoryPartlyUnreadable =>
-      'Beberapa chat tidak dapat dibaca dan disisihkan. Semua yang lain ada di sini.';
+      'Beberapa percakapan tidak dapat dibaca dan disisihkan. Semua yang lain ada di sini.';
 
   @override
   String get saving => 'Menyimpan…';

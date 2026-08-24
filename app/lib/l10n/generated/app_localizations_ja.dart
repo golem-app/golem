@@ -394,7 +394,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get modelDownloadsSimulated =>
-      'モデルのダウンロードは固定カタログの決定論的シミュレーションです。ネットワークにはアクセスしません。';
+      'モデルのダウンロードは組み込みカタログの決定論的シミュレーションです。ネットワークにはアクセスしません。';
 
   @override
   String get modelDownloadsReal =>
@@ -473,7 +473,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'このビルドでは固定カタログ全体を表示します。ダウンロードとモデル実行はシミュレーションです。';
+      'このビルドでは組み込みカタログ全体を表示します。ダウンロードとモデル実行はシミュレーションです。';
 
   @override
   String get catalogDeviceDetail =>
@@ -983,7 +983,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'Golemにはアカウントがなく、解析データも送信しません。チャットにネットワークは不要で、Golemがオンラインになるのはモデルの取得を求めたときだけです。チャットは端末のバックアップに含まれません。移行にはエクスポートを使ってください。オプトアウトするものはありません。';
+      'Golemにはアカウントがなく、解析データも送信しません。会話にネットワーク接続は不要で、Golemがオンラインになるのはモデルの取得を求めたときだけです。会話は端末のバックアップに含まれません。移行にはエクスポートを使ってください。オプトアウトするものはありません。';
 
   @override
   String get onThisPhone => 'この端末上';
@@ -1114,7 +1114,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'Golemはオープンソースソフトウェアを使用しています。これらの通知には、Golemが同梱するネイティブエンジンと直接依存するパッケージが記載され、オフラインでも確認できます。';
+      'Golemはオープンソースソフトウェアを使用しています。これらの表記には、Golemが同梱するネイティブエンジンと直接依存するパッケージが記載され、オフラインでも確認できます。';
 
   @override
   String licenseEntries(int count) {
@@ -1183,7 +1183,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get chatHistoryPartlyUnreadable =>
-      '一部のチャットを読み込めなかったため、脇に退避しました。それ以外はすべてここにあります。';
+      '一部の会話を読み込めなかったため、別に退避しました。それ以外はすべてここにあります。';
 
   @override
   String get saving => '保存中…';

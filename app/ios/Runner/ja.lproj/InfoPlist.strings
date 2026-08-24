@@ -1,2 +1,2 @@
-"NSCameraUsageDescription" = "Golemは、チャットに添付する写真を撮るときにだけカメラを使用します。写真はこの端末に保存されます。";
-"NSPhotoLibraryUsageDescription" = "Golemは、チャットに添付するときにだけ写真を読み取ります。写真はこの端末に保存されます。";
+"NSCameraUsageDescription" = "Golemは、チャットに添付する写真を撮るときにだけカメラを使用します。写真はこの端末内にのみ保持されます。";
+"NSPhotoLibraryUsageDescription" = "Golemは、チャットに添付するときにだけ写真を読み取ります。写真はこの端末内にのみ保持されます。";

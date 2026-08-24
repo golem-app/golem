@@ -402,7 +402,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get modelDownloadsSimulated =>
-      'Las descargas de modelos son una simulación determinista del catálogo fijado; no hay acceso a la red.';
+      'Las descargas de modelos simulan de forma determinista el catálogo integrado; no hay acceso a la red.';
 
   @override
   String get modelDownloadsReal =>
@@ -487,7 +487,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'Esta versión muestra todo el catálogo fijado. Las descargas y ejecuciones de modelos son simuladas.';
+      'Esta versión muestra todo el catálogo integrado. Las descargas y la ejecución de modelos se simulan.';
 
   @override
   String get catalogDeviceDetail =>
@@ -1040,7 +1040,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'Golem no tiene cuentas y no envía analíticas. Chatear no necesita red: Golem solo se conecta cuando le pides que descargue un modelo. Los chats quedan fuera de las copias de seguridad del teléfono; usa Exportar para moverlos. No hay nada que desactivar.';
+      'Golem no tiene cuentas y no envía analíticas. Conversar no necesita red: Golem solo se conecta cuando le pides que descargue un modelo. Las conversaciones quedan fuera de las copias de seguridad del teléfono; usa Exportar para moverlas. No hay nada que desactivar.';
 
   @override
   String get onThisPhone => 'En este teléfono';
@@ -1249,7 +1249,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get chatHistoryPartlyUnreadable =>
-      'Algunos chats no se pudieron leer y se apartaron. Todo lo demás está aquí.';
+      'Algunas conversaciones no se pudieron leer y se apartaron. Todo lo demás está aquí.';
 
   @override
   String get saving => 'Guardando…';

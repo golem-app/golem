@@ -4,14 +4,21 @@ import 'package:golem_flutter/broker/model_catalog.dart';
 import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/domain/app_preferences.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
+import 'package:golem_flutter/core/domain/device_eligibility.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/chat/widgets/attach_sheet.dart';
 import 'package:golem_flutter/features/chat/widgets/recovery_banner.dart';
+import 'package:golem_flutter/features/legal/model_attribution_screen.dart';
 import 'package:golem_flutter/features/models/model_download_consent.dart';
+import 'package:golem_flutter/features/onboarding/application/onboarding_controller.dart';
+import 'package:golem_flutter/features/onboarding/first_run_screen.dart';
 import 'package:golem_flutter/features/settings/language_screen.dart';
 import 'package:golem_flutter/features/settings/models_screen.dart';
+import 'package:golem_flutter/features/settings/privacy_screen.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';
+import 'package:golem_flutter/features/settings/storage_screen.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_ar.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_en.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_es.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_fr.dart';
@@ -19,6 +26,7 @@ import 'package:golem_flutter/l10n/generated/app_localizations_hi.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_id.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_ja.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_ko.dart';
+import 'package:golem_flutter/l10n/generated/app_localizations_pl.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_pt.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_tr.dart';
 import 'package:golem_flutter/l10n/generated/app_localizations_vi.dart';
@@ -27,6 +35,13 @@ import 'support/harness.dart';
 import 'support/in_memory_preferences_repository.dart';
 
 const _localeCases = [
+  (
+    name: 'Polish',
+    locale: Locale('pl'),
+    language: AppLanguage.polish,
+    rowKey: 'language-polish',
+    endonym: 'Polski',
+  ),
   (
     name: 'Spanish',
     locale: Locale('es'),
@@ -90,9 +105,17 @@ const _localeCases = [
     rowKey: 'language-korean',
     endonym: '한국어',
   ),
+  (
+    name: 'Arabic',
+    locale: Locale('ar'),
+    language: AppLanguage.arabic,
+    rowKey: 'language-arabic',
+    endonym: 'العربية',
+  ),
 ];
 
 AppLocalizations _localizations(Locale locale) => switch (locale.languageCode) {
+  'pl' => AppLocalizationsPl(),
   'es' => AppLocalizationsEs(),
   'pt' => AppLocalizationsPtBr(),
   'ja' => AppLocalizationsJa(),
@@ -102,18 +125,23 @@ AppLocalizations _localizations(Locale locale) => switch (locale.languageCode) {
   'vi' => AppLocalizationsVi(),
   'tr' => AppLocalizationsTr(),
   'ko' => AppLocalizationsKo(),
+  'ar' => AppLocalizationsAr(),
   _ => throw ArgumentError.value(locale),
 };
 
 void main() {
   const progressState = ModelState(
+    simulated: true,
     artifacts: {
       'gemma4-mlx': ArtifactStatus(
         phase: ArtifactPhase.downloading,
         downloadedBytes: 1200000000,
       ),
+      'gemma4-gguf': ArtifactStatus(
+        phase: ArtifactPhase.downloading,
+        downloadedBytes: 1200000000,
+      ),
     },
-    simulated: true,
   );
 
   for (final localeCase in _localeCases) {
@@ -125,6 +153,23 @@ void main() {
           final preferences = InMemoryPreferencesRepository(
             AppPreferences(language: localeCase.language),
           );
+
+          await pumpWithRepositories(
+            tester,
+            brightness: brightness,
+            locale: localeCase.locale,
+            textScale: 1.6,
+            preferences: preferences,
+            model: progressState,
+            eligibility: const DeviceEligibility(tier: DeviceTier.preferred),
+            child: const FirstRunScreen(initialStep: FirstRunStep.download),
+          );
+          expect(
+            find.byKey(const Key('first-run-download-progress')),
+            findsOneWidget,
+          );
+          expect(find.text(l10n.downloadNote), findsWidgets);
+          expect(tester.takeException(), isNull);
 
           await pumpWithRepositories(
             tester,
@@ -164,6 +209,39 @@ void main() {
             targetKey: const Key('settings-language-row'),
           );
           expect(find.text(localeCase.endonym), findsOneWidget);
+          expect(tester.takeException(), isNull);
+
+          await pumpWithRepositories(
+            tester,
+            brightness: brightness,
+            locale: localeCase.locale,
+            textScale: 1.6,
+            preferences: preferences,
+            child: const PrivacyScreen(),
+          );
+          expect(find.text(l10n.privacyStatement), findsOneWidget);
+          expect(tester.takeException(), isNull);
+
+          await pumpWithRepositories(
+            tester,
+            brightness: brightness,
+            locale: localeCase.locale,
+            textScale: 1.6,
+            preferences: preferences,
+            child: const StorageScreen(),
+          );
+          expect(find.text(l10n.settingsStorage), findsWidgets);
+          expect(tester.takeException(), isNull);
+
+          await pumpWithRepositories(
+            tester,
+            brightness: brightness,
+            locale: localeCase.locale,
+            textScale: 1.6,
+            preferences: preferences,
+            child: const ModelAttributionScreen(),
+          );
+          expect(find.text(l10n.modelAttributionIntroduction), findsOneWidget);
           expect(tester.takeException(), isNull);
 
           await pumpWithRepositories(

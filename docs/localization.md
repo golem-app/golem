@@ -46,6 +46,11 @@ Do not translate user messages, model responses, model/repository names,
 engine and quantization tokens, file names, stable identifiers, URLs, or
 diagnostic payloads.
 
+“Pinned catalog” describes Golem’s built-in, release-fixed model selection; it
+is not a visual pin. Translate that product meaning rather than the English
+metaphor (for example, *wbudowany*, *integrado*, *prédefinido*, or the natural
+equivalent in the target language).
+
 Spanish copy is neutral Latin American Spanish. Avoid country-specific
 idioms and use these terms consistently:
 
@@ -128,6 +133,7 @@ never add letter spacing to Devanagari headings.
 | on-device inference / privacy | डिवाइस पर इन्फ़रेंस / निजता |
 | benchmark / token | प्रदर्शन परीक्षण / टोकन |
 | chat / attachment | चैट / अटैचमेंट |
+| deterministic simulation | नियतात्मक सिम्युलेशन |
 
 French copy is neutral international French. Use non-breaking punctuation
 spacing and avoid country-specific administrative vocabulary.
@@ -150,6 +156,7 @@ user and model text may remain in any canonically equivalent representation.
 | on-device inference / privacy | suy luận trên thiết bị / quyền riêng tư |
 | benchmark / token | kiểm tra hiệu năng / token |
 | chat / attachment | cuộc trò chuyện / tệp đính kèm |
+| deterministic simulation | mô phỏng tất định |
 
 Turkish copy follows contemporary Türkiye usage. Any presentation casing must
 respect dotted `i/İ` and dotless `ı/I`; never apply locale-blind uppercasing.

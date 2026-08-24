@@ -222,6 +222,11 @@ void main() {
     final project = await File(
       'ios/Runner.xcodeproj/project.pbxproj',
     ).readAsString();
+    const permissionKeys = {
+      'NSCameraUsageDescription',
+      'NSPhotoLibraryUsageDescription',
+    };
+    final descriptions = <String, Map<String, String>>{};
     for (final locale in [
       'en',
       'pl',
@@ -240,11 +245,38 @@ void main() {
       final file = File('ios/Runner/$locale.lproj/InfoPlist.strings');
       expect(file.existsSync(), isTrue, reason: locale);
       final contents = await file.readAsString();
-      expect(contents, contains('NSCameraUsageDescription'), reason: locale);
+      final entries = <String, String>{
+        for (final match in RegExp(
+          r'^"([A-Za-z]+)"\s*=\s*"([^"]*)";$',
+          multiLine: true,
+        ).allMatches(contents))
+          match.group(1)!: match.group(2)!,
+      };
+      expect(entries.keys.toSet(), permissionKeys, reason: locale);
+      for (final entry in entries.entries) {
+        expect(entry.value.trim(), isNotEmpty, reason: '$locale:${entry.key}');
+      }
+      descriptions[locale] = entries;
+    }
+    for (final locale in descriptions.keys.where((locale) => locale != 'en')) {
+      for (final key in permissionKeys) {
+        expect(
+          descriptions[locale]![key],
+          isNot(descriptions['en']![key]),
+          reason: '$locale:$key must not fall back to English',
+        );
+      }
+    }
+    final fallback = await File('ios/Runner/Info.plist').readAsString();
+    for (final key in permissionKeys) {
+      final match = RegExp(
+        '<key>$key</key>\\s*<string>([^<]*)</string>',
+      ).firstMatch(fallback);
+      expect(match, isNotNull, reason: 'English fallback:$key');
       expect(
-        contents,
-        contains('NSPhotoLibraryUsageDescription'),
-        reason: locale,
+        match!.group(1)!.trim(),
+        isNotEmpty,
+        reason: 'English fallback:$key',
       );
     }
     expect(project, contains('name = InfoPlist.strings;'));

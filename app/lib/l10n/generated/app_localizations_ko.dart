@@ -394,7 +394,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get modelDownloadsSimulated =>
-      '모델 다운로드는 고정된 카탈로그의 결정론적 시뮬레이션이며 네트워크에 접근하지 않습니다.';
+      '모델 다운로드는 기본 제공 카탈로그의 결정론적 시뮬레이션이며 네트워크에 접근하지 않습니다.';
 
   @override
   String get modelDownloadsReal =>
@@ -473,7 +473,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      '이 빌드는 고정된 전체 카탈로그를 표시합니다. 다운로드와 모델 실행은 시뮬레이션됩니다.';
+      '이 빌드는 기본 제공 카탈로그 전체를 표시합니다. 다운로드와 모델 실행은 시뮬레이션됩니다.';
 
   @override
   String get catalogDeviceDetail =>
@@ -990,7 +990,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'Golem은 계정을 만들지 않고 분석 데이터를 보내지 않습니다. 채팅에는 네트워크가 필요 없으며, Golem은 모델 다운로드를 요청할 때만 온라인이 됩니다. 채팅은 휴대폰 백업에 포함되지 않으니 옮기려면 내보내기를 사용하세요. 거부할 항목이 없습니다.';
+      'Golem은 계정을 만들지 않고 분석 데이터를 보내지 않습니다. 대화에는 네트워크가 필요 없으며, Golem은 모델 다운로드를 요청할 때만 온라인이 됩니다. 대화는 휴대폰 백업에 포함되지 않으니 옮기려면 내보내기를 사용하세요. 거부할 항목이 없습니다.';
 
   @override
   String get onThisPhone => '이 휴대전화에서';
@@ -1190,7 +1190,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get chatHistoryPartlyUnreadable =>
-      '일부 채팅을 읽을 수 없어 따로 보관했습니다. 나머지는 모두 여기에 있습니다.';
+      '일부 대화를 읽을 수 없어 따로 보관했습니다. 나머지는 모두 여기에 있습니다.';
 
   @override
   String get saving => '저장 중…';

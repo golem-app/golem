@@ -1,7 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
+import 'package:golem_flutter/features/legal/model_attribution_screen.dart';
+import 'package:golem_flutter/features/settings/models_screen.dart';
 import 'package:golem_flutter/features/settings/language_screen.dart';
+import 'package:golem_flutter/features/settings/privacy_screen.dart';
+import 'package:golem_flutter/features/settings/settings_screen.dart';
+import 'package:golem_flutter/features/settings/storage_screen.dart';
 import 'package:golem_flutter/l10n/l10n.dart';
 import 'package:golem_flutter/main.dart' as app;
 import 'package:integration_test/integration_test.dart';
@@ -9,6 +14,11 @@ import 'package:integration_test/integration_test.dart';
 import 'support/first_run.dart';
 
 const _localeCases = [
+  (
+    key: 'language-polish',
+    locale: Locale('pl'),
+    systemLabel: 'Domyślny systemu',
+  ),
   (
     key: 'language-spanish',
     locale: Locale('es'),
@@ -42,6 +52,7 @@ const _localeCases = [
     systemLabel: 'Sistem varsayılanı',
   ),
   (key: 'language-korean', locale: Locale('ko'), systemLabel: '시스템 기본값'),
+  (key: 'language-arabic', locale: Locale('ar'), systemLabel: 'لغة النظام'),
 ];
 
 void main() {
@@ -70,6 +81,7 @@ void main() {
           Localizations.localeOf(tester.element(find.byType(ChatScreen))),
           localeCase.locale,
         );
+        await _inspectLocalizedSettingsSurfaces(tester);
       }
 
       await _openLanguageScreen(tester);
@@ -92,6 +104,57 @@ void main() {
       );
     },
   );
+}
+
+Future<void> _inspectLocalizedSettingsSurfaces(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('open-drawer')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('open-settings')));
+  await tester.pumpAndSettle();
+  final l10n = tester.element(find.byType(SettingsScreen)).l10n;
+
+  await _openSettingsRow(tester, const Key('settings-model-row'));
+  expect(find.byType(ModelsScreen), findsOneWidget);
+  expect(find.text(l10n.models), findsWidgets);
+  Navigator.of(tester.element(find.byType(ModelsScreen))).pop();
+  await tester.pumpAndSettle();
+
+  await _openSettingsRow(tester, const Key('settings-privacy-row'));
+  expect(find.byType(PrivacyScreen), findsOneWidget);
+  expect(find.text(l10n.privacyStatement), findsOneWidget);
+  Navigator.of(tester.element(find.byType(PrivacyScreen))).pop();
+  await tester.pumpAndSettle();
+
+  await _openSettingsRow(tester, const Key('settings-storage-row'));
+  expect(find.byType(StorageScreen), findsOneWidget);
+  expect(find.text(l10n.settingsStorage), findsWidgets);
+  Navigator.of(tester.element(find.byType(StorageScreen))).pop();
+  await tester.pumpAndSettle();
+
+  await _openSettingsRow(tester, const Key('model-attribution-row'));
+  expect(find.byType(ModelAttributionScreen), findsOneWidget);
+  expect(find.text(l10n.modelAttributionIntroduction), findsOneWidget);
+  Navigator.of(tester.element(find.byType(ModelAttributionScreen))).pop();
+  await tester.pumpAndSettle();
+
+  Navigator.of(tester.element(find.byType(SettingsScreen))).pop();
+  await tester.pumpAndSettle();
+  expect(find.byType(ChatScreen), findsOneWidget);
+}
+
+Future<void> _openSettingsRow(WidgetTester tester, Key key) async {
+  final scrollable = find.descendant(
+    of: find.byKey(const Key('settings-list')),
+    matching: find.byType(Scrollable),
+  );
+  await tester.scrollUntilVisible(
+    find.byKey(key),
+    220,
+    scrollable: scrollable.first,
+  );
+  await tester.ensureVisible(find.byKey(key));
+  await tester.tap(find.byKey(key));
+  await tester.pumpAndSettle();
 }
 
 Future<void> _openLanguageScreen(WidgetTester tester) async {

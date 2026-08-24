@@ -402,7 +402,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get modelDownloadsSimulated =>
-      'Pobieranie modeli jest deterministyczną symulacją przypiętego katalogu bez dostępu do sieci.';
+      'Pobieranie modeli jest deterministyczną symulacją wbudowanego katalogu bez dostępu do sieci.';
 
   @override
   String get modelDownloadsReal =>
@@ -485,7 +485,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'Ta wersja pokazuje pełny przypięty katalog. Pobieranie i uruchamianie modeli są symulowane.';
+      'Ta wersja pokazuje cały wbudowany katalog. Pobieranie i uruchamianie modeli są symulowane.';
 
   @override
   String get catalogDeviceDetail =>
@@ -1171,7 +1171,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'Golem korzysta z oprogramowania open source. Te informacje wymieniają natywne silniki dołączone do Golema oraz pakiety, od których zależy bezpośrednio, i są dostępne offline.';
+      'Golem korzysta z oprogramowania open source. Te informacje są dostępne offline i obejmują natywne silniki dołączone do Golema oraz pakiety, od których zależy bezpośrednio.';
 
   @override
   String licenseEntries(int count) {
