@@ -1198,22 +1198,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Repositories added by hand are governed by their own upstream terms. Golem does not certify or redistribute them.';
 
   @override
-  String get startupFailed => 'Starting failed';
-
-  @override
   String get startupCouldNotFinish => 'Golem could not finish starting';
-
-  @override
-  String get preparingFirstRun => 'Preparing first-run setup';
-
-  @override
-  String get preparingSetup => 'Preparing setup';
-
-  @override
-  String get startingOnDevice => 'Starting Golem on this device';
-
-  @override
-  String get gettingReady => 'Getting things ready';
 
   @override
   String get splashTagline => 'Private, local, and ready when you are.';

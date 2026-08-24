@@ -1236,22 +1236,7 @@ class AppLocalizationsAr extends AppLocalizations {
       'تخضع المستودعات المضافة يدويًا لشروط مصادرها. لا يعتمدها Golem ولا يعيد توزيعها.';
 
   @override
-  String get startupFailed => 'فشل بدء التشغيل';
-
-  @override
   String get startupCouldNotFinish => 'تعذر على Golem إكمال بدء التشغيل';
-
-  @override
-  String get preparingFirstRun => 'جارٍ إعداد التشغيل الأول';
-
-  @override
-  String get preparingSetup => 'جارٍ تحضير الإعداد';
-
-  @override
-  String get startingOnDevice => 'جارٍ تشغيل Golem على هذا الجهاز';
-
-  @override
-  String get gettingReady => 'جارٍ التحضير';
 
   @override
   String get splashTagline => 'خاص ومحلي وجاهز دائمًا.';

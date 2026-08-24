@@ -1198,23 +1198,8 @@ class AppLocalizationsId extends AppLocalizations {
       'Repositori yang ditambahkan secara manual tunduk pada ketentuan sumbernya masing-masing. Golem tidak mengesahkan atau mendistribusikannya kembali.';
 
   @override
-  String get startupFailed => 'Gagal memulai';
-
-  @override
   String get startupCouldNotFinish =>
       'Golem tidak dapat menyelesaikan proses mulai';
-
-  @override
-  String get preparingFirstRun => 'Menyiapkan pengaturan awal';
-
-  @override
-  String get preparingSetup => 'Menyiapkan pengaturan';
-
-  @override
-  String get startingOnDevice => 'Memulai Golem di perangkat ini';
-
-  @override
-  String get gettingReady => 'Menyiapkan semuanya';
 
   @override
   String get splashTagline => 'Privat, lokal, dan siap saat Anda siap.';

@@ -41,7 +41,8 @@ import 'package:golem_flutter/features/settings/response_style_screen.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';
 import 'package:golem_flutter/features/settings/storage_screen.dart';
 import 'package:golem_flutter/features/settings/system_prompt_screen.dart';
-import 'package:golem_flutter/features/splash/splash_screen.dart';
+import 'package:golem_flutter/app/bootstrap.dart';
+import 'package:golem_flutter/core/widgets/progress_track.dart';
 
 import 'support/harness.dart';
 import 'support/in_memory_chat_history_repository.dart';
@@ -115,69 +116,33 @@ ChatHistorySnapshot _arabicMixedHistory() {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('splash golden', (tester) async {
-    setViewport(tester);
-    await tester.pumpWidget(
-      // The splash now reads the backend signal for honest copy; the
-      // default scope resolves to the fake, matching the recorded golden.
-      ProviderScope(
-        child: wrapApp(
-          brightness: Brightness.light,
-          child: SplashScreen(
-            state: const StartupState(
-              phase: StartupPhase.preloading,
-              progress: 0.72,
-            ),
-            retry: () {},
-          ),
-        ),
-      ),
-    );
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 50)),
-    );
-    await tester.pump();
-    await tester.pumpAndSettle();
-    await expectLater(
-      find.byType(SplashScreen),
-      matchesGoldenFile('goldens/splash.png'),
-    );
-  }, variant: iosChrome);
-
-  testWidgets('splash scaffold failure renders its copy and retry', (
-    tester,
-  ) async {
+  testWidgets('launch pane failure renders its copy and retry', (tester) async {
     setViewport(tester);
     var retried = 0;
     await tester.pumpWidget(
       wrapApp(
         brightness: Brightness.light,
-        child: SplashScaffold(
-          semanticValue: 'Loading failed',
-          caption: 'Golem could not finish starting.',
-          progress: 0.4,
+        child: LaunchPane(
+          message: 'Golem could not finish starting.',
           onRetry: () => retried++,
         ),
       ),
     );
     expect(find.text('Golem could not finish starting.'), findsOneWidget);
     expect(find.byKey(const Key('launch-splash')), findsOneWidget);
+    // No progress of any kind: the pane says what happened, nothing more.
+    expect(find.byType(ProgressTrack), findsNothing);
+    expect(find.byType(CupertinoActivityIndicator), findsNothing);
     await tester.tap(find.byKey(const Key('splash-retry')));
     expect(retried, 1);
   });
 
-  testWidgets('splash scaffold without a retry offers no button', (
-    tester,
-  ) async {
+  testWidgets('launch pane without a retry offers no button', (tester) async {
     setViewport(tester);
     await tester.pumpWidget(
       wrapApp(
         brightness: Brightness.light,
-        child: const SplashScaffold(
-          semanticValue: 'Loading model on this device',
-          caption: 'Loading model on this device',
-          progress: 0.2,
-        ),
+        child: const LaunchPane(message: 'Starting up'),
       ),
     );
     expect(find.byKey(const Key('splash-retry')), findsNothing);
@@ -1563,20 +1528,6 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('preview simulates'), findsNothing);
-
-    await pumpWithRepositories(
-      tester,
-      backend: backend,
-      child: SplashScreen(
-        state: const StartupState(
-          phase: StartupPhase.preloading,
-          progress: 0.72,
-        ),
-        retry: () {},
-      ),
-    );
-    expect(find.text('Getting things ready'), findsOneWidget);
-    expect(find.textContaining('simulated'), findsNothing);
   }, variant: iosChrome);
 
   testWidgets('a busy composer is read-only, never disabled', (tester) async {

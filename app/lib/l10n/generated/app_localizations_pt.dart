@@ -1226,23 +1226,8 @@ class AppLocalizationsPt extends AppLocalizations {
       'Repositórios adicionados manualmente seguem seus próprios termos de origem. O Golem não os certifica nem redistribui.';
 
   @override
-  String get startupFailed => 'Falha na inicialização';
-
-  @override
   String get startupCouldNotFinish =>
       'O Golem não conseguiu concluir a inicialização';
-
-  @override
-  String get preparingFirstRun => 'Preparando a configuração inicial';
-
-  @override
-  String get preparingSetup => 'Preparando a configuração';
-
-  @override
-  String get startingOnDevice => 'Iniciando o Golem neste dispositivo';
-
-  @override
-  String get gettingReady => 'Preparando tudo';
 
   @override
   String get splashTagline => 'Privado, local e pronto quando você estiver.';
@@ -3155,23 +3140,8 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
       'Repositórios adicionados manualmente seguem seus próprios termos de origem. O Golem não os certifica nem redistribui.';
 
   @override
-  String get startupFailed => 'Falha na inicialização';
-
-  @override
   String get startupCouldNotFinish =>
       'O Golem não conseguiu concluir a inicialização';
-
-  @override
-  String get preparingFirstRun => 'Preparando a configuração inicial';
-
-  @override
-  String get preparingSetup => 'Preparando a configuração';
-
-  @override
-  String get startingOnDevice => 'Iniciando o Golem neste dispositivo';
-
-  @override
-  String get gettingReady => 'Preparando tudo';
 
   @override
   String get splashTagline => 'Privado, local e pronto quando você estiver.';

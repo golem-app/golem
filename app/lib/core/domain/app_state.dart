@@ -1,4 +1,4 @@
-/// Stays in core (#69): ChatState/StartupState/BenchmarkState are named by
+/// Stays in core (#69): ChatState/BenchmarkState are named by
 /// the controllers in core/providers and consumed across features.
 library;
 
@@ -152,14 +152,6 @@ final class ChatState {
     historyRecovered: historyRecovered ?? this.historyRecovered,
     hasUnsavedAssistant: hasUnsavedAssistant ?? this.hasUnsavedAssistant,
   );
-}
-
-enum StartupPhase { resolving, preloading, missingModel, failed, complete }
-
-final class StartupState {
-  const StartupState({this.phase = StartupPhase.resolving, this.progress = 0});
-  final StartupPhase phase;
-  final double progress;
 }
 
 /// Why a launch composition failed, classified for copy and recovery. Only

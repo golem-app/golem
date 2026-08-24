@@ -2057,41 +2057,11 @@ abstract class AppLocalizations {
   /// **'Repositories added by hand are governed by their own upstream terms. Golem does not certify or redistribute them.'**
   String get customRepositoryTerms;
 
-  /// Accessibility value when startup fails.
-  ///
-  /// In en, this message translates to:
-  /// **'Starting failed'**
-  String get startupFailed;
-
   /// Startup failure caption.
   ///
   /// In en, this message translates to:
   /// **'Golem could not finish starting'**
   String get startupCouldNotFinish;
-
-  /// Accessibility value while preparing onboarding.
-  ///
-  /// In en, this message translates to:
-  /// **'Preparing first-run setup'**
-  String get preparingFirstRun;
-
-  /// Caption while preparing onboarding.
-  ///
-  /// In en, this message translates to:
-  /// **'Preparing setup'**
-  String get preparingSetup;
-
-  /// Accessibility value during ordinary startup.
-  ///
-  /// In en, this message translates to:
-  /// **'Starting Golem on this device'**
-  String get startingOnDevice;
-
-  /// Ordinary startup caption.
-  ///
-  /// In en, this message translates to:
-  /// **'Getting things ready'**
-  String get gettingReady;
 
   /// Splash-screen product tagline.
   ///

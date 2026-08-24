@@ -23,7 +23,7 @@ const _layers = <List<String>>[
   ['chat'],
   // Screens and flows that compose everything below. Siblings: an import
   // between any two of these is as much a violation as an upward one.
-  ['settings', 'onboarding', 'benchmark', 'eval', 'splash'],
+  ['settings', 'onboarding', 'benchmark', 'eval'],
 ];
 
 const _libRoot = 'app/lib';

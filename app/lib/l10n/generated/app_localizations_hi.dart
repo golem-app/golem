@@ -1212,23 +1212,8 @@ class AppLocalizationsHi extends AppLocalizations {
       'हाथ से जोड़ी गई रिपॉज़िटरी पर उनके स्रोत की शर्तें लागू होती हैं। Golem उन्हें प्रमाणित या फिर वितरित नहीं करता।';
 
   @override
-  String get startupFailed => 'शुरू नहीं हो सका';
-
-  @override
   String get startupCouldNotFinish =>
       'Golem शुरू होने की प्रक्रिया पूरी नहीं कर सका';
-
-  @override
-  String get preparingFirstRun => 'पहली बार चलाने की तैयारी हो रही है';
-
-  @override
-  String get preparingSetup => 'सेटअप की तैयारी हो रही है';
-
-  @override
-  String get startingOnDevice => 'इस डिवाइस पर Golem शुरू हो रहा है';
-
-  @override
-  String get gettingReady => 'तैयारी हो रही है';
 
   @override
   String get splashTagline => 'निजी, स्थानीय और हमेशा तैयार।';

@@ -1164,22 +1164,7 @@ class AppLocalizationsKo extends AppLocalizations {
       '직접 추가한 저장소에는 해당 원본의 약관이 적용됩니다. Golem은 이를 인증하거나 재배포하지 않습니다.';
 
   @override
-  String get startupFailed => '시작 실패';
-
-  @override
   String get startupCouldNotFinish => 'Golem이 시작을 완료할 수 없음';
-
-  @override
-  String get preparingFirstRun => '첫 실행 준비 중';
-
-  @override
-  String get preparingSetup => '설정 준비 중';
-
-  @override
-  String get startingOnDevice => '이 기기에서 Golem 시작 중';
-
-  @override
-  String get gettingReady => '준비 중';
 
   @override
   String get splashTagline => '비공개, 로컬, 언제나 준비됨.';

@@ -1223,22 +1223,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'Los repositorios agregados manualmente se rigen por sus propias condiciones de origen. Golem no los certifica ni redistribuye.';
 
   @override
-  String get startupFailed => 'Error de inicio';
-
-  @override
   String get startupCouldNotFinish => 'Golem no pudo terminar de iniciarse';
-
-  @override
-  String get preparingFirstRun => 'Preparando la configuración inicial';
-
-  @override
-  String get preparingSetup => 'Preparando la configuración';
-
-  @override
-  String get startingOnDevice => 'Iniciando Golem en este dispositivo';
-
-  @override
-  String get gettingReady => 'Preparando todo';
 
   @override
   String get splashTagline => 'Privado, local y listo cuando tú lo estés.';

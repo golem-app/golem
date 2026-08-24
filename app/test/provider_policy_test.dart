@@ -22,7 +22,6 @@ import 'package:golem_flutter/features/onboarding/application/onboarding_control
 import 'package:golem_flutter/features/onboarding/application/startup_gate_controller.dart';
 import 'package:golem_flutter/features/preferences/application/generation_settings_providers.dart';
 import 'package:golem_flutter/features/preferences/application/preferences_providers.dart';
-import 'package:golem_flutter/features/splash/application/startup_providers.dart';
 
 /// Every generated provider, so a new annotation missing `retry: noRetry`
 /// fails here instead of silently inheriting the ten-retry default.
@@ -63,7 +62,6 @@ final _allProviders = <String, ProviderOrFamily>{
   'preferencesController': preferencesControllerProvider,
   'chatController': chatControllerProvider,
   'modelController': modelControllerProvider,
-  'startupController': startupControllerProvider,
   'benchmarkController': benchmarkControllerProvider,
   'firstRunController': firstRunControllerProvider,
   'startupGateController': startupGateControllerProvider,

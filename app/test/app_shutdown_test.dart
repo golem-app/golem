@@ -35,8 +35,8 @@ void main() {
         ),
       ),
     );
-    // Enough for the splash hold and the startup controller's timer; not
-    // pumpAndSettle, which never returns while the gate animates.
+    // Explicit pumps rather than pumpAndSettle, which never returns while a
+    // gate pane animates.
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     return (inference, container);

@@ -1221,22 +1221,7 @@ class AppLocalizationsFr extends AppLocalizations {
       'Les dépôts ajoutés manuellement sont soumis à leurs propres conditions d’origine. Golem ne les certifie ni ne les redistribue.';
 
   @override
-  String get startupFailed => 'Échec du démarrage';
-
-  @override
   String get startupCouldNotFinish => 'Golem n’a pas pu terminer son démarrage';
-
-  @override
-  String get preparingFirstRun => 'Préparation de la première utilisation';
-
-  @override
-  String get preparingSetup => 'Préparation de la configuration';
-
-  @override
-  String get startingOnDevice => 'Démarrage de Golem sur cet appareil';
-
-  @override
-  String get gettingReady => 'Préparation en cours';
 
   @override
   String get splashTagline => 'Privé, local et toujours prêt.';

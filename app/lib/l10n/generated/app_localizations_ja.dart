@@ -1157,22 +1157,7 @@ class AppLocalizationsJa extends AppLocalizations {
       '手動で追加したリポジトリには、配布元独自の条件が適用されます。Golemがそれらを認証または再配布することはありません。';
 
   @override
-  String get startupFailed => '起動に失敗しました';
-
-  @override
   String get startupCouldNotFinish => 'Golemは起動を完了できませんでした';
-
-  @override
-  String get preparingFirstRun => '初回設定を準備中';
-
-  @override
-  String get preparingSetup => '設定を準備中';
-
-  @override
-  String get startingOnDevice => 'この端末でGolemを起動中';
-
-  @override
-  String get gettingReady => '準備中';
 
   @override
   String get splashTagline => 'プライベート、ローカル、いつでも準備完了。';

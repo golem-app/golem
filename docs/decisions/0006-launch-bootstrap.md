@@ -13,13 +13,13 @@ defines.
 
 `main()` calls `runApp` immediately with a bootstrap root that owns the
 fallible composition (`app/lib/app/launch_composition.dart`). While the
-composition runs, the splash frame paints; on failure a classified pane
-offers Try again, which reruns the real composition; on success the one
-`ProviderScope` mounts with the composed overrides and the startup gate's
-scripted theatre takes over under identical visuals. The bootstrap layer is
-Riverpod-free — the scope does not exist until composition succeeds — and its
-copy claims nothing about a model, because the backend may be exactly what
-failed to resolve.
+composition runs, the first frame is deferred and the native launch screen
+stays up (ADR 0018); on failure a classified pane offers Try again, which
+reruns the real composition; on success the one `ProviderScope` mounts with
+the composed overrides and the shell is the first frame drawn. The bootstrap
+layer is Riverpod-free — the scope does not exist until composition succeeds —
+and its copy claims nothing about a model, because the backend may be exactly
+what failed to resolve.
 
 ## Classification, bounds, and the retry-or-fallback decision per task
 
@@ -32,8 +32,7 @@ failed to resolve.
 | Whole required composition | — | 8 s deadline | `TimeoutException` → failure pane + Try again. |
 | Any other `Exception` | Unknown, environmental | composition deadline | Failure pane + Try again. |
 
-The 8 s deadline is a real deadline over real work — deliberately not
-`StartupSequence.timeout`, which is scripted scenario delay. It wraps only
+The 8 s deadline is a real deadline over real work. It wraps only
 the required stages: the downloader stage runs after it under its own bound
 and can only degrade. Because `Future.timeout` abandons rather than cancels,
 a timed-out attempt keeps running past its deadline — so each composition
@@ -47,16 +46,12 @@ retries the start.
 
 ## What this does not change
 
-The startup gate's scripted theatre — `StartupController`,
-`StartupSequence`, the `GOLEM_MISSING_MODEL` / `GOLEM_SPLASH_FAILURE` /
-`GOLEM_SPLASH_TIMEOUT` scenarios — is untouched, keeping widget tests,
-goldens, and the journey deterministic. That leaves two owners of the splash
-frame with different retry semantics: the bootstrap pane retries the real
-composition, the theatre's failed scenario retries a script. The split is
-deliberate — the theatre exists for deterministic demos and tests, and
-folding real work into it would sacrifice exactly that — but it means splash
-failure copy lives in two places, and a device tap on `splash-retry` proves
-whichever layer is showing, not both. Corrupt-store quarantine remains the
-repositories' business and never throws at launch. Release-mode evidence
-uses `GOLEM_LAUNCH_FAILURES=<n>`: the first n real compositions throw, so a
-single process demonstrates failure, Try again, and recovery on a device.
+Corrupt-store quarantine remains the repositories' business and never throws
+at launch. Release-mode evidence uses `GOLEM_LAUNCH_FAILURES=<n>`: the first
+n real compositions throw, so a single process demonstrates failure, Try
+again, and recovery on a device.
+
+The startup gate's scripted theatre this decision originally left in place —
+`StartupController`, `StartupSequence` and the `GOLEM_MISSING_MODEL` /
+`GOLEM_SPLASH_FAILURE` / `GOLEM_SPLASH_TIMEOUT` scenarios — was removed by
+ADR 0018 (#159); the bootstrap pane is the splash frame's only owner.

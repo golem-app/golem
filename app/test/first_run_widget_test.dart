@@ -161,6 +161,34 @@ void main() {
     );
   });
 
+  testWidgets('the launch wait holds its indicator back for the grace', (
+    tester,
+  ) async {
+    // With no splash in front of this pane any more, the store loads behind
+    // it are the tail of the launch: the frame is the launch screen's navy and
+    // a spinner appears only once the wait has lasted the grace (#159).
+    final inference = ValidatingSideload()..park = true;
+    await pumpWithRepositories(
+      tester,
+      inference: inference,
+      backend: const InferenceBackendConfig(
+        kind: InferenceBackendKind.mlx,
+        profileKey: 'gemma4',
+        modelPath: 'documents:operator/model',
+      ),
+      child: const FirstRunGate(
+        child: SizedBox(key: Key('chat-after-first-run')),
+      ),
+    );
+    expect(find.byKey(const Key('sideload-validating')), findsOneWidget);
+    expect(find.byKey(const Key('blocking-indicator')), findsNothing);
+    await tester.pump(blockingIndicatorGrace);
+    expect(find.byKey(const Key('blocking-indicator')), findsOneWidget);
+    inference.release();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-after-first-run')), findsOneWidget);
+  });
+
   testWidgets('retrying a sideload shows the load, not the failure it retries', (
     tester,
   ) async {
@@ -198,6 +226,10 @@ void main() {
       findsNothing,
       reason: 'the load it is retrying is what the shell is waiting on',
     );
+    // A wait the user asked for is answered at once: the launch grace exists
+    // to keep a spinner from flashing on every ordinary start (#159), and
+    // this is not that.
+    expect(find.byKey(const Key('blocking-indicator')), findsOneWidget);
 
     inference.release();
     await tester.pumpAndSettle();
