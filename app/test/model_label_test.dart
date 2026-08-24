@@ -6,6 +6,21 @@ import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/models/model_label.dart';
 
+String _modelSubtitle({
+  required InferenceBackendConfig backend,
+  required List<ModelCatalogEntry> catalog,
+  required String? activeKey,
+  bool runsModels = true,
+}) => modelSubtitle(
+  backend: backend,
+  catalog: catalog,
+  activeKey: activeKey,
+  runsModels: runsModels,
+  unsupportedLabel: 'Unsupported device',
+  simulatedLabel: 'simulated',
+  onDeviceLabel: 'on device',
+);
+
 void main() {
   const real = InferenceBackendConfig(
     kind: InferenceBackendKind.mlx,
@@ -41,7 +56,7 @@ void main() {
           'the moment a model is picked',
     );
     expect(
-      modelSubtitle(
+      _modelSubtitle(
         backend: real,
         catalog: modelCatalog,
         activeKey: 'qwen35-mlx',
@@ -247,7 +262,7 @@ void main() {
     );
     expect(effectiveModelKey(backend: sideload, catalog: modelCatalog), isNull);
     expect(
-      modelSubtitle(backend: sideload, catalog: modelCatalog, activeKey: null),
+      _modelSubtitle(backend: sideload, catalog: modelCatalog, activeKey: null),
       'my-own-build.gguf · on device',
     );
     // gemma4-gguf is image-capable; the sideload must not borrow that proof.
@@ -287,7 +302,7 @@ void main() {
       'qwen35-gguf',
     );
     expect(
-      modelSubtitle(
+      _modelSubtitle(
         backend: fake,
         catalog: modelCatalog,
         activeKey: 'qwen35-gguf',
@@ -297,7 +312,7 @@ void main() {
     expect(
       // What the build boots with, which is what a surface scoped to the
       // profile rather than the conversation names (#129).
-      modelSubtitle(
+      _modelSubtitle(
         backend: fake,
         catalog: modelCatalog,
         activeKey: bootModelKey(fake, modelCatalog),
@@ -310,7 +325,7 @@ void main() {
     // "on device" is a claim about residency, and nothing will ever be
     // resident here; the subtitle drops the model rather than imply one.
     expect(
-      modelSubtitle(
+      _modelSubtitle(
         backend: const InferenceBackendConfig(
           kind: InferenceBackendKind.llama,
           profileKey: 'qwen35',
@@ -326,7 +341,7 @@ void main() {
     );
     // The fake is never refused, so it keeps saying what it is.
     expect(
-      modelSubtitle(
+      _modelSubtitle(
         backend: const InferenceBackendConfig.fake(),
         catalog: modelCatalog,
         activeKey: bootModelKey(

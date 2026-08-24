@@ -401,7 +401,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get modelDownloadsSimulated =>
-      'Việc tải mô hình là mô phỏng xác định của danh mục cố định; không có truy cập mạng.';
+      'Việc tải mô hình là mô phỏng tất định của danh mục tích hợp; không có truy cập mạng.';
 
   @override
   String get modelDownloadsReal =>
@@ -409,7 +409,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get inferenceSimulated =>
-      'Suy luận là mô phỏng giao diện xác định — không bao gồm trọng số mô hình, công cụ hay phép đo phần cứng.';
+      'Suy luận là mô phỏng giao diện tất định — không bao gồm trọng số mô hình, công cụ hay phép đo phần cứng.';
 
   @override
   String get inferenceLocal =>
@@ -485,7 +485,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'Bản dựng này hiển thị toàn bộ danh mục cố định. Việc tải xuống và chạy mô hình đều được mô phỏng.';
+      'Bản dựng này hiển thị toàn bộ danh mục tích hợp. Việc tải xuống và chạy mô hình đều được mô phỏng.';
 
   @override
   String get catalogDeviceDetail =>
@@ -545,7 +545,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get downloadSimulationComplete =>
-      'Mô phỏng xác định đã hoàn tất; không có trọng số nào được lưu.';
+      'Mô phỏng tất định đã hoàn tất; không có trọng số nào được lưu.';
 
   @override
   String get downloadComplete =>
@@ -683,7 +683,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get simulatedDownloadShort =>
-      'Mô phỏng xác định; không có mạng hay trọng số.';
+      'Mô phỏng tất định; không có mạng hay trọng số.';
 
   @override
   String get downloadBeforeSending =>
@@ -1156,7 +1156,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'Golem được xây dựng bằng phần mềm nguồn mở. Các thông báo này nêu tên những công cụ gốc mà Golem kèm theo và các gói mà ứng dụng phụ thuộc trực tiếp, và có sẵn khi ngoại tuyến.';
+      'Golem được xây dựng bằng phần mềm nguồn mở. Các thông tin này nêu tên những công cụ thực thi gốc được tích hợp trong Golem và các gói mà ứng dụng phụ thuộc trực tiếp, đồng thời có sẵn khi ngoại tuyến.';
 
   @override
   String licenseEntries(int count) {
@@ -1376,7 +1376,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get nothingInstalledSimulated =>
-      'Chưa cài đặt gì. Việc tải xuống ở đây là mô phỏng xác định.';
+      'Chưa cài đặt gì. Việc tải xuống ở đây là mô phỏng tất định.';
 
   @override
   String get runtime => 'Môi trường chạy';
@@ -1635,7 +1635,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get benchmarkProtocolDetail =>
-      'Dùng mẫu lời nhắc sản xuất được theo dõi. Đầu ra và thời gian chỉ là mô phỏng xác định.';
+      'Dùng mẫu lời nhắc sản xuất được theo dõi. Đầu ra và thời gian chỉ là mô phỏng tất định.';
 
   @override
   String get simulationStatus => 'Trạng thái mô phỏng';
@@ -1665,7 +1665,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get runSimulatedBenchmark => 'Chạy kiểm tra mô phỏng';
 
   @override
-  String get generatingDeterministicResult => 'Đang tạo kết quả xác định…';
+  String get generatingDeterministicResult => 'Đang tạo kết quả tất định…';
 
   @override
   String get simulatedResult => 'Kết quả mô phỏng';

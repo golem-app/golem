@@ -401,7 +401,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get modelDownloadsSimulated =>
-      'تنزيل النماذج محاكاة حتمية للكتالوج المثبّت؛ ولا يوجد اتصال بالشبكة.';
+      'تنزيل النماذج محاكاة حتمية للكتالوج المضمّن؛ ولا يوجد اتصال بالشبكة.';
 
   @override
   String get modelDownloadsReal =>
@@ -483,7 +483,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'يعرض هذا الإصدار الكتالوج المثبّت كاملًا. تُحاكى التنزيلات وعمليات تشغيل النماذج.';
+      'يعرض هذا الإصدار الكتالوج المضمّن كاملًا. تُحاكى التنزيلات وعمليات تشغيل النماذج.';
 
   @override
   String get catalogDeviceDetail =>
@@ -1187,7 +1187,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'بُني Golem باستخدام برمجيات مفتوحة المصدر. تذكر هذه الإشعارات المحركات الأصلية التي يشحنها Golem والحزم التي يعتمد عليها مباشرة، وهي متاحة بلا اتصال.';
+      'بُني Golem باستخدام برمجيات مفتوحة المصدر. تسرد بيانات الترخيص هذه المحركات الأصلية المضمّنة في Golem والحزم التي يعتمد عليها مباشرة، ويمكن الاطلاع عليها دون اتصال.';
 
   @override
   String licenseEntries(int count) {
@@ -1779,7 +1779,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get deviceVirtualHardware =>
-      'يشغّل Golem نماذجه على أجهزة حقيقية. لا يمكن للمحاكي أو المحاكي الافتراضي تحميلها، لذا عُطّلت التنزيلات هنا.';
+      'يشغّل Golem نماذجه على أجهزة حقيقية. لا يستطيع المحاكي أو الجهاز الافتراضي تحميلها، لذا عُطّلت التنزيلات هنا.';
 
   @override
   String outOfMemoryAtContext(int tokens) {

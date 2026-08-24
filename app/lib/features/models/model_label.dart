@@ -28,9 +28,9 @@ String modelSubtitle({
   required List<ModelCatalogEntry> catalog,
   required String? activeKey,
   bool runsModels = true,
-  String unsupportedLabel = 'Unsupported device',
-  String simulatedLabel = 'simulated',
-  String onDeviceLabel = 'on device',
+  required String unsupportedLabel,
+  required String simulatedLabel,
+  required String onDeviceLabel,
 }) {
   if (!backend.simulatedInference && !runsModels) {
     return unsupportedLabel;

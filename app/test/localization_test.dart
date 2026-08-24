@@ -45,7 +45,7 @@ Set<String> _placeholders(String message) => RegExp(
 /// Source-identical copy is limited to the product/speaker names, stable
 /// endonyms, standardized units and parameters, and documented loanwords in
 /// `docs/localization.md`. A new exception needs a product-language decision.
-const _invariantCopyAllowlist = <String>{
+const _commonSourceCopyAllowlist = <String>{
   'appName',
   'assistantSpeaker',
   'languageEnglish',
@@ -67,13 +67,18 @@ const _invariantCopyAllowlist = <String>{
   'styleSource',
   'tokenRate',
   'rateMbs',
+};
+
+const _localeLoanwordAllowlists = <String, Set<String>>{
+  'pl': {'settingsSectionModel', 'settingsModel', 'model', 'prompt'},
   // The ordinary Spanish negative response is spelled identically.
-  'no',
+  'es': {'no'},
+  // Prompt is the natural compact technical label in Brazilian Portuguese.
+  'pt_BR': {'prompt'},
   // Standard Indonesian technical loanwords.
-  'settingsSectionModel',
-  'settingsModel',
-  'model',
-  'prompt',
+  'id': {'settingsSectionModel', 'settingsModel', 'model', 'prompt'},
+  // Model is the established technical loanword in Turkish.
+  'tr': {'settingsSectionModel', 'settingsModel', 'model'},
 };
 
 void main() {
@@ -127,31 +132,62 @@ void main() {
     expect(translations['ar']!['privacyStatement'], contains('الخصوصية'));
   });
 
-  test('new catalogs contain only documented source-identical copy', () {
-    final english = _catalog('lib/l10n/app_en.arb');
-    for (final locale in [
-      'es',
-      'pt_BR',
-      'ja',
-      'id',
-      'hi',
-      'fr',
-      'vi',
-      'tr',
-      'ko',
-    ]) {
-      final translation = _catalog('lib/l10n/app_$locale.arb');
-      for (final key in _resourceKeys(english)) {
-        if (translation[key] == english[key]) {
-          expect(
-            _invariantCopyAllowlist,
-            contains(key),
-            reason: '$locale:$key unexpectedly retains English source copy',
-          );
+  test(
+    'every shipped catalog contains only documented source-identical copy',
+    () {
+      final english = _catalog('lib/l10n/app_en.arb');
+      for (final locale in [
+        'pl',
+        'es',
+        'pt_BR',
+        'ja',
+        'id',
+        'hi',
+        'fr',
+        'vi',
+        'tr',
+        'ko',
+        'ar',
+      ]) {
+        final translation = _catalog('lib/l10n/app_$locale.arb');
+        final allowed = {
+          ..._commonSourceCopyAllowlist,
+          ...?_localeLoanwordAllowlists[locale],
+        };
+        for (final key in _resourceKeys(english)) {
+          if (translation[key] == english[key]) {
+            expect(
+              allowed,
+              contains(key),
+              reason: '$locale:$key unexpectedly retains English source copy',
+            );
+          }
         }
       }
-    }
-  });
+    },
+  );
+
+  test(
+    'presentation helpers cannot hide English copy in default arguments',
+    () {
+      final defaultString = RegExp(
+        r'''String\s+[a-z][A-Za-z0-9_]*\s*=\s*(['"])[^'"]+\1''',
+      );
+      for (final root in ['lib/core/chrome', 'lib/features']) {
+        for (final entity in Directory(root).listSync(recursive: true)) {
+          if (entity is! File || !entity.path.endsWith('.dart')) continue;
+          for (final match in defaultString.allMatches(
+            entity.readAsStringSync(),
+          )) {
+            fail(
+              '${entity.path} hides presentation copy in an optional String '
+              'default: ${match.group(0)}',
+            );
+          }
+        }
+      }
+    },
+  );
 
   test('language endonyms stay stable in every UI locale', () {
     final localizations = [

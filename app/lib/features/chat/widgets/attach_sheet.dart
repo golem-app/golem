@@ -89,7 +89,7 @@ class AttachmentPicker {
 
   Future<PreparedImage?> pick(
     AttachSource source, {
-    String filesLabel = 'Images',
+    required String filesLabel,
   }) async {
     switch (source) {
       case AttachSource.photoLibrary:

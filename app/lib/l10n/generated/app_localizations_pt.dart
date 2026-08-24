@@ -405,7 +405,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get modelDownloadsSimulated =>
-      'Os downloads de modelos são uma simulação determinística do catálogo fixado; não há acesso à rede.';
+      'Os downloads de modelos são uma simulação determinística do catálogo predefinido; não há acesso à rede.';
 
   @override
   String get modelDownloadsReal =>
@@ -490,7 +490,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'Esta versão mostra todo o catálogo fixado. Os downloads e as execuções de modelos são simulados.';
+      'Esta versão mostra todo o catálogo predefinido. Os downloads e a execução dos modelos são simulados.';
 
   @override
   String get catalogDeviceDetail =>
@@ -1043,7 +1043,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get privacyStatement =>
-      'O Golem não mantém contas e não envia dados analíticos. Conversar não precisa de rede: o Golem só fica online quando você pede para baixar um modelo. Os chats ficam fora dos backups do telefone; use Exportar para movê-los. Não há nada para desativar.';
+      'O Golem não mantém contas e não envia dados analíticos. Conversar não precisa de rede: o Golem só fica online quando você pede para baixar um modelo. As conversas ficam fora dos backups do telefone; use Exportar para movê-las. Não há nada para desativar.';
 
   @override
   String get onThisPhone => 'Neste celular';
@@ -1180,7 +1180,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'O Golem é desenvolvido com software de código aberto. Estes avisos citam os mecanismos nativos que o Golem inclui e os pacotes dos quais depende diretamente, e estão disponíveis off-line.';
+      'O Golem é desenvolvido com software de código aberto. Estes avisos citam os motores nativos incluídos no Golem e os pacotes dos quais ele depende diretamente, e estão disponíveis off-line.';
 
   @override
   String licenseEntries(int count) {
@@ -1253,7 +1253,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get chatHistoryPartlyUnreadable =>
-      'Alguns chats não puderam ser lidos e foram deixados de lado. Todo o resto está aqui.';
+      'Algumas conversas não puderam ser lidas e foram deixadas de lado. Todo o resto está aqui.';
 
   @override
   String get saving => 'Salvando…';
@@ -2334,7 +2334,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get modelDownloadsSimulated =>
-      'Os downloads de modelos são uma simulação determinística do catálogo fixado; não há acesso à rede.';
+      'Os downloads de modelos são uma simulação determinística do catálogo predefinido; não há acesso à rede.';
 
   @override
   String get modelDownloadsReal =>
@@ -2419,7 +2419,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get catalogSimulationDetail =>
-      'Esta versão mostra todo o catálogo fixado. Os downloads e as execuções de modelos são simulados.';
+      'Esta versão mostra todo o catálogo predefinido. Os downloads e a execução dos modelos são simulados.';
 
   @override
   String get catalogDeviceDetail =>
@@ -2972,7 +2972,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get privacyStatement =>
-      'O Golem não mantém contas e não envia dados analíticos. Conversar não precisa de rede: o Golem só fica online quando você pede para baixar um modelo. Os chats ficam fora dos backups do telefone; use Exportar para movê-los. Não há nada para desativar.';
+      'O Golem não mantém contas e não envia dados analíticos. Conversar não precisa de rede: o Golem só fica online quando você pede para baixar um modelo. As conversas ficam fora dos backups do telefone; use Exportar para movê-las. Não há nada para desativar.';
 
   @override
   String get onThisPhone => 'Neste celular';
@@ -3109,7 +3109,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get licensesIntroduction =>
-      'O Golem é desenvolvido com software de código aberto. Estes avisos citam os mecanismos nativos que o Golem inclui e os pacotes dos quais depende diretamente, e estão disponíveis off-line.';
+      'O Golem é desenvolvido com software de código aberto. Estes avisos citam os motores nativos incluídos no Golem e os pacotes dos quais ele depende diretamente, e estão disponíveis off-line.';
 
   @override
   String licenseEntries(int count) {
@@ -3182,7 +3182,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get chatHistoryPartlyUnreadable =>
-      'Alguns chats não puderam ser lidos e foram deixados de lado. Todo o resto está aqui.';
+      'Algumas conversas não puderam ser lidas e foram deixadas de lado. Todo o resto está aqui.';
 
   @override
   String get saving => 'Salvando…';

@@ -399,7 +399,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get modelDownloadsSimulated =>
-      'Model indirmeleri sabitlenmiş kataloğun belirlenimci bir simülasyonudur; ağ erişimi yoktur.';
+      'Model indirmeleri yerleşik kataloğun belirlenimci bir simülasyonudur; ağ erişimi yoktur.';
 
   @override
   String get modelDownloadsReal =>
@@ -483,7 +483,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get catalogSimulationDetail =>
-      'Bu derleme sabitlenmiş kataloğun tamamını gösterir. İndirmeler ve model çalıştırmaları simüle edilir.';
+      'Bu derleme yerleşik kataloğun tamamını gösterir. İndirmeler ve model çalıştırmaları simüle edilir.';
 
   @override
   String get catalogDeviceDetail =>
@@ -1155,7 +1155,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get licensesIntroduction =>
-      'Golem açık kaynaklı yazılımlarla geliştirilmiştir. Bu bildirimler Golem’in içerdiği yerel motorları ve doğrudan bağımlı olduğu paketleri belirtir; çevrimdışı kullanılabilir.';
+      'Golem açık kaynaklı yazılımlarla geliştirilmiştir. Bu bilgiler Golem’le birlikte sunulan yerel motorları ve doğrudan bağımlı olduğu paketleri belirtir; çevrimdışı kullanılabilir.';
 
   @override
   String licenseEntries(int count) {
