@@ -549,18 +549,19 @@ flutter_launcher_icons can only emit one fixed macOS catalog. One
 flavors from the `flutter_launcher_icons-<flavor>.yaml` configs (their
 presence makes the tool ignore any pubspec block): the
 `AppIcon-<flavor>.appiconset` catalogs on iOS and the
-`android/app/src/<flavor>/res` source sets on Android. The launch splash is
+`android/app/src/<flavor>/res` source sets on Android. The launch screen is
 deliberately identical for every flavor.
 
-The in-app splash uses mascot-only transparent artwork over a Golem navy
+The launch failure pane uses mascot-only transparent artwork over a Golem navy
 (`#060D1F`) surface, without an app-icon tile, frame, or backing panel. The
 launcher-icon matte deliberately stays on the older `#0F1524` navy — icon
 artwork is regenerated only by an artwork change. The
 native iOS launch screen is the hand-owned, solid-navy
 `GolemLaunchScreen.storyboard` with no image: the iOS 26 launch-snapshot
 renderer draws storyboard launch images at the wrong scale and flattens their
-transparency to white, so all launch artwork is deliberately left to the
-Flutter splash. `flutter_native_splash` runs with `ios: false` and
+transparency to white — and a launch carries no artwork anyway: the navy
+holds only until the composed shell is the first Flutter frame
+(`../docs/decisions/0018-no-splash-wait.md`). `flutter_native_splash` runs with `ios: false` and
 `tool/prepare_ios_launch.dart` guards the wiring.
 `platform_assets_test.dart` guards the navy image-free storyboard, splash
 alpha, mascot transparency, the Android-only navy-matted launcher icon, and

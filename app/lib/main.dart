@@ -8,9 +8,10 @@ import 'features/legal/license_registry.dart';
 
 Future<void> main() => launch();
 
-/// Launches the app with the first frame up immediately: the fallible
-/// composition runs behind the bootstrap gate, so a launch failure renders
-/// as a retryable pane instead of the native launch screen forever. The
+/// Launches the app with `runApp` immediately and the first frame deferred:
+/// the fallible composition runs behind the bootstrap gate, so a launch
+/// failure renders as a retryable pane instead of the native launch screen
+/// forever, and a success draws the shell as its first frame (ADR 0018). The
 /// picker seam lets the integration journey drive the whole attach flow
 /// without an OS photo-library UI; the composer seam lets tests substitute
 /// failing compositions for the real one.

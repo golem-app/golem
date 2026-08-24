@@ -118,12 +118,13 @@ flutter:
 # iOS generation is disabled on purpose: the iOS 26 simulator's launch-snapshot
 # renderer draws storyboard launch images at the wrong scale and flattens their
 # transparency to white. The hand-owned solid-navy GolemLaunchScreen.storyboard
-# is the reliable native launch screen; the Flutter splash draws the artwork.
-# Android mirrors iOS exactly: a solid-navy native splash (the Android 12+
-# icon slot is suppressed with a transparent drawable since the system pins
-# it to screen center where it would jump against the Flutter splash tile),
-# then the shared Flutter splash takes over. iOS generation stays off — its
-# launch screen is the hand-owned solid-navy storyboard.
+# is the reliable native launch screen. Android mirrors iOS exactly: a
+# solid-navy native splash with the Android 12+ icon slot suppressed by a
+# transparent drawable (the system pins it to screen center, where it would
+# jump against anything Flutter draws). Neither carries artwork on purpose:
+# the launch screen is not a brand moment (ADR 0018) — it holds only until
+# the composed shell is the first Flutter frame. iOS generation stays off —
+# its launch screen is the hand-owned solid-navy storyboard.
 flutter_native_splash:
   color: "#060D1F"
   ios: false

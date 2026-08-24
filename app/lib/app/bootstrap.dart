@@ -11,11 +11,12 @@ import 'app.dart';
 import 'launch_composition.dart';
 
 /// Runs the fallible launch composition before the first frame. The frame is
-/// deferred while it runs, so the native launch screen stays up for exactly as
-/// long as the real work takes and the shell is the first thing Flutter draws;
-/// on failure the first frame is a truthful pane whose Try again reruns the
-/// composition. No Riverpod here — the scope does not exist until composition
-/// succeeds.
+/// deferred while it runs and until the composed app has read its preferences,
+/// so the native launch screen stays up for exactly as long as the real work
+/// takes and the shell — in the stored theme, language and text size — is the
+/// first thing Flutter draws; on failure the first frame is a truthful pane
+/// whose Try again reruns the composition. No Riverpod here — the scope does
+/// not exist until composition succeeds.
 class BootstrapApp extends StatefulWidget {
   const BootstrapApp({
     required this.identity,
@@ -79,7 +80,10 @@ class _BootstrapAppState extends State<BootstrapApp>
     try {
       final dependencies = await widget.compose(widget.identity);
       if (!mounted) return;
+      // The frame stays deferred: GolemApp releases it once the preferences
+      // store has answered, so the first frame is already in the user's theme.
       setState(() => _dependencies = dependencies);
+      return;
     } catch (error, stackTrace) {
       // The cause is diagnostics, never surface copy: report it once at the
       // boundary, then render the classified pane.
@@ -95,10 +99,9 @@ class _BootstrapAppState extends State<BootstrapApp>
       setState(() => _failure = classifyLaunchFailure(error));
     } finally {
       _composing = false;
-      // Whichever way the first composition ended, the answer is now what the
-      // first frame should show.
-      _allowFirstFrame();
     }
+    // A failed composition is what the first frame should show.
+    _allowFirstFrame();
   }
 
   @override
@@ -107,10 +110,24 @@ class _BootstrapAppState extends State<BootstrapApp>
     if (dependencies != null) {
       return ProviderScope(
         overrides: launchOverrides(dependencies),
-        child: GolemApp(identity: widget.identity, picker: widget.picker),
+        child: GolemApp(
+          identity: widget.identity,
+          picker: widget.picker,
+          onPreferencesSettled: _allowFirstFrame,
+        ),
       );
     }
     final failure = _failure;
+    // Nothing is composited while the frame is deferred, so nothing is built
+    // for it either: a first composition in flight is the launch screen's
+    // navy and no more — not a pane, its layout, and a full-size icon decode
+    // that would only ever be thrown away.
+    if (failure == null && _firstFrameDeferred) {
+      return const ColoredBox(
+        key: Key('launch-splash'),
+        color: GolemTheme.splash,
+      );
+    }
     return CupertinoApp(
       debugShowCheckedModeBanner: false,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -184,6 +201,9 @@ class LaunchPane extends StatelessWidget {
                       'assets/images/golem_splash_icon.png',
                       width: 132,
                       height: 132,
+                      // Decoded at the size it is drawn, not the 528 px source.
+                      cacheWidth: 396,
+                      cacheHeight: 396,
                     ),
                   ),
                   const SizedBox(height: 28),

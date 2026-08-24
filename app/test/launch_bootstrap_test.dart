@@ -105,11 +105,19 @@ void main() {
     // no hold, bar, or spinner in front of the shell.
     expect(tester.binding.sendFramesToEngine, isFalse);
     expect(find.byType(CupertinoActivityIndicator), findsNothing);
+    // Nor is the pane built for a frame nobody sees: the deferred tree is
+    // the launch screen's navy and nothing else.
+    expect(find.byType(LaunchPane), findsNothing);
+    expect(find.byKey(const Key('launch-splash')), findsOneWidget);
     gate.complete();
     await tester.pump();
-    expect(tester.binding.sendFramesToEngine, isTrue);
+    // Composed, but still deferred: the preferences store has not answered,
+    // and the first frame must already be in the stored theme.
+    expect(tester.binding.sendFramesToEngine, isFalse);
     await pumpIntoShell(tester);
+    expect(tester.binding.sendFramesToEngine, isTrue);
     expect(find.byKey(const Key('launch-splash')), findsNothing);
+    await tester.pump();
     expect(find.byKey(const Key('first-run-welcome')), findsOneWidget);
   });
 
@@ -145,6 +153,9 @@ void main() {
     gates.single.complete();
     await tester.pump();
     expect(tester.takeException(), isA<Exception>());
+    // The deferred tree was a bare box; the pane's app mounts its route on
+    // the frame after the failure lands.
+    await tester.pump();
 
     // Two tap-ups can land before the rebuild removes the button; while the
     // first retry's composition is still in flight, the guard must collapse

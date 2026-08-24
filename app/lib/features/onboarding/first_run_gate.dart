@@ -19,13 +19,25 @@ import 'first_run_screen.dart';
 ///
 /// Rendering only (#126): the decision, the sideload load it waits on and the
 /// legacy onboarding stamp all belong to [StartupGateController].
-class FirstRunGate extends ConsumerWidget {
+class FirstRunGate extends ConsumerStatefulWidget {
   const FirstRunGate({required this.child, super.key});
 
   final Widget child;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FirstRunGate> createState() => _FirstRunGateState();
+}
+
+class _FirstRunGateState extends ConsumerState<FirstRunGate> {
+  /// Whether the gate has ever decided. Its first wait is the tail of the
+  /// launch — the store loads behind what used to be the splash — and paints
+  /// as the launch screen's navy with the indicator held back; every later
+  /// wait follows a tap on Try again and answers it at once.
+  bool _decidedOnce = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = widget.child;
     // Which validation is holding the shell decides which copy the blocking
     // panes carry. It is a boot constant, so it reads even while the gate
     // itself is still loading or has failed — which is the only moment the
@@ -33,8 +45,11 @@ class FirstRunGate extends ConsumerWidget {
     final sideloaded = ref.watch(inferenceBackendProvider).sideloaded;
     final gate = ref.watch(startupGateControllerProvider);
     void retry() => ref.read(startupGateControllerProvider.notifier).retry();
+    final decided = gate.value;
+    if (decided != null || gate.hasError) _decidedOnce = true;
     final waiting = _BlockingProgress(
       key: Key(sideloaded ? 'sideload-validating' : 'first-run-loading'),
+      launch: !_decidedOnce,
     );
     final unavailable = _BlockingFailure(
       key: Key(
@@ -47,7 +62,6 @@ class FirstRunGate extends ConsumerWidget {
     // Riverpod republishes a refreshing provider as loading with its previous
     // value attached, and the gate has no "briefly undecided" state to render:
     // whatever it last decided still holds until the rebuild says otherwise.
-    final decided = gate.value;
     if (decided == null) {
       // "Still deciding" beats "the last decision failed": a refresh keeps the
       // error attached (AsyncError.copyWithPrevious), so reading hasError first
@@ -73,15 +87,20 @@ class FirstRunGate extends ConsumerWidget {
   }
 }
 
-/// How long a wait must last before it earns an indicator. The store loads
-/// an ordinary launch waits on finish in a few milliseconds, and there is no
-/// Flutter splash in front of this pane any more (#159): a spinner that
-/// appeared for one frame on every launch would be the flash this grace
-/// exists to prevent. A sideload validation runs for seconds and shows one.
+/// How long the launch wait must last before it earns an indicator. The
+/// store loads an ordinary launch waits on finish in a few milliseconds, and
+/// there is no Flutter splash in front of this pane any more (#159): a
+/// spinner that appeared for one frame on every launch would be the flash
+/// this grace exists to prevent. A sideload validation runs for seconds and
+/// shows one; a wait that follows the user's own Try again shows one at once.
 const blockingIndicatorGrace = Duration(milliseconds: 400);
 
 class _BlockingProgress extends StatefulWidget {
-  const _BlockingProgress({super.key});
+  const _BlockingProgress({required this.launch, super.key});
+
+  /// The launch wait continues the native launch screen: same navy, no
+  /// chrome. A later wait sits on the ordinary canvas it replaced.
+  final bool launch;
 
   @override
   State<_BlockingProgress> createState() => _BlockingProgressState();
@@ -89,14 +108,16 @@ class _BlockingProgress extends StatefulWidget {
 
 class _BlockingProgressState extends State<_BlockingProgress> {
   Timer? _grace;
-  bool _indicate = false;
+  late bool _indicate = !widget.launch;
 
   @override
   void initState() {
     super.initState();
-    _grace = Timer(blockingIndicatorGrace, () {
-      if (mounted) setState(() => _indicate = true);
-    });
+    if (widget.launch) {
+      _grace = Timer(blockingIndicatorGrace, () {
+        if (mounted) setState(() => _indicate = true);
+      });
+    }
   }
 
   @override
@@ -107,10 +128,18 @@ class _BlockingProgressState extends State<_BlockingProgress> {
 
   @override
   Widget build(BuildContext context) => CupertinoPageScaffold(
-    child: Center(
-      child: _indicate
-          ? const CupertinoActivityIndicator(key: Key('blocking-indicator'))
-          : const SizedBox.shrink(),
+    backgroundColor: widget.launch ? GolemTheme.splash : null,
+    child: Semantics(
+      liveRegion: true,
+      label: context.l10n.startingUp,
+      child: Center(
+        child: _indicate
+            ? CupertinoActivityIndicator(
+                key: const Key('blocking-indicator'),
+                color: widget.launch ? CupertinoColors.white : null,
+              )
+            : const SizedBox.shrink(),
+      ),
     ),
   );
 }

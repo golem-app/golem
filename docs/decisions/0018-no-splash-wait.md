@@ -22,10 +22,13 @@ while real data loads, and never add artificial delays.
 
 ## Decision
 
-- The first Flutter frame is deferred until the composition resolves
-  (`WidgetsBinding.deferFirstFrame`). The native solid-navy launch screen stays
-  up for exactly as long as the real work takes, and the shell is the first
-  frame drawn. No hold, no ticks, no bar, no spinner on the launch path.
+- The first Flutter frame is deferred (`WidgetsBinding.deferFirstFrame`)
+  until the composition resolves *and* the composed app has read its
+  preferences, so the native solid-navy launch screen stays up for exactly as
+  long as the real work takes and the shell — already in the stored theme,
+  language and text size — is the first frame drawn. While deferred the
+  bootstrap builds nothing but a navy box: no pane, no layout, no icon decode
+  for a frame nobody sees. No hold, no ticks, no bar, no spinner.
 - The theatre is deleted: `StartupController`, `StartupSequence`,
   `StartupState`/`StartupPhase`, the `StartupGate` overlay, the `splash`
   feature, its goldens and l10n strings, and the three scenario defines.
@@ -36,14 +39,20 @@ while real data loads, and never add artificial delays.
   again) and a retry in flight (caption only). It keeps the `launch-splash`
   and `splash-retry` automation keys, so the journeys' "poll the splash away"
   loops still hold.
-- The onboarding gate's waiting pane shows its activity indicator only after
-  a wait has lasted a 400 ms grace. With no splash in front of it, an instant
-  spinner would flash on every ordinary launch; a multi-second sideload
-  validation still shows one.
+- The onboarding gate's first wait — the store loads behind what used to be
+  the splash — paints as the launch screen's navy and shows its activity
+  indicator only after a 400 ms grace: with no splash in front of it, an
+  instant spinner would flash on every ordinary launch, while a multi-second
+  sideload validation still shows one. A wait that follows the user's own
+  Try again sits on the ordinary canvas and answers at once.
 
 ## Consequences
 
-An ordinary launch goes native launch screen → shell. A hang still resolves
-at the 8 s composition deadline into the failure pane rather than the native
-screen forever (ADR 0006). The former theatre's failure and missing-model
+An ordinary launch goes native launch screen → shell, with the gate's navy
+wait covering whatever the store loads still owe. A hung required stage
+still resolves at the 8 s composition deadline into the failure pane rather
+than the native screen forever; the bounded 5 s downloader start that follows
+it (ADR 0006) can only degrade, so the worst case is 13 s of navy and then the
+shell — unchanged from before, when it was 13 s of a splash with the bar at
+zero. The former theatre's failure and missing-model
 demos are gone; the failure pane is demonstrated with real injected failures.

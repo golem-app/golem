@@ -101,11 +101,18 @@ class GolemApp extends ConsumerStatefulWidget {
   const GolemApp({
     required this.identity,
     this.picker = const AttachmentPicker(),
+    this.onPreferencesSettled,
     super.key,
   });
 
   final AppIdentity identity;
   final AttachmentPicker picker;
+
+  /// Called once, the first time the preferences store has answered — with a
+  /// value or a failure. The bootstrap keeps the first frame deferred until
+  /// then, so the stored theme, language and text size are on the first frame
+  /// the user sees instead of snapping in a frame later (#159).
+  final VoidCallback? onPreferencesSettled;
 
   @override
   ConsumerState<GolemApp> createState() => _GolemAppState();
@@ -116,6 +123,7 @@ class _GolemAppState extends ConsumerState<GolemApp>
   late final GoRouter _router;
 
   Timer? _reconcileDebounce;
+  bool _preferencesSettled = false;
 
   @override
   void initState() {
@@ -187,7 +195,13 @@ class _GolemAppState extends ConsumerState<GolemApp>
     // under the splash) — or when the store failed to read — the platform
     // defaults apply. The app root must never error-screen over a prefs
     // read; the Appearance screen is where that failure shows.
-    final preferences = ref.watch(preferencesControllerProvider).value;
+    final preferencesValue = ref.watch(preferencesControllerProvider);
+    if (!_preferencesSettled &&
+        (preferencesValue.hasValue || preferencesValue.hasError)) {
+      _preferencesSettled = true;
+      widget.onPreferencesSettled?.call();
+    }
+    final preferences = preferencesValue.value;
     final brightness = switch (preferences?.theme ?? ThemeSetting.system) {
       ThemeSetting.system =>
         WidgetsBinding.instance.platformDispatcher.platformBrightness,
