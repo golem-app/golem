@@ -297,7 +297,7 @@ once in `../docs/notes/dependencies.md`.
 
 ## Screens and identifiers
 
-The app includes the launch splash, empty chat with starter chips,
+The app includes the launch failure pane, empty chat with starter chips,
 markdown transcript with syntax-highlighted code cards, reasoning and answer
 streaming (a pulsing dot until the first token, then a live generating pill),
 stop and failure recovery with the ephemeral stopped-tokens caption, message
@@ -468,9 +468,10 @@ flutter run --flavor qa --dart-define=GOLEM_LAUNCH_FAILURES=1
 
 `GOLEM_LAUNCH_FAILURES=<n>` makes the first n **real** launch compositions
 throw, so one process demonstrates the failure pane, Try again, and recovery
-(`../docs/decisions/0006-launch-bootstrap.md`). The splash frame otherwise
-paints only while the composition runs — no minimum hold, progress bar, or
-spinner (`../docs/decisions/0018-no-splash-wait.md`). The injector
+(`../docs/decisions/0006-launch-bootstrap.md`). There is no Flutter splash
+otherwise: the first frame waits for the composition, so a launch goes from the
+native launch screen straight to the shell, with no hold, progress bar, or
+spinner in between (`../docs/decisions/0018-no-splash-wait.md`). The injector
 is identity-gated: `qa` and `dev` retain it in debug and release builds, while
 production ignores the define.
 

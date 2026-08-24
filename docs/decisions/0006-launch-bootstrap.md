@@ -13,10 +13,10 @@ defines.
 
 `main()` calls `runApp` immediately with a bootstrap root that owns the
 fallible composition (`app/lib/app/launch_composition.dart`). While the
-composition runs, the splash frame paints — for exactly that long, with no
-hold or loader (ADR 0018); on failure a classified pane offers Try again,
-which reruns the real composition; on success the one `ProviderScope` mounts
-with the composed overrides and the shell replaces the frame. The bootstrap
+composition runs, the first frame is deferred and the native launch screen
+stays up (ADR 0018); on failure a classified pane offers Try again, which
+reruns the real composition; on success the one `ProviderScope` mounts with
+the composed overrides and the shell is the first frame drawn. The bootstrap
 layer is Riverpod-free — the scope does not exist until composition succeeds —
 and its copy claims nothing about a model, because the backend may be exactly
 what failed to resolve.

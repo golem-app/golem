@@ -10,11 +10,12 @@ import '../features/chat/widgets/attach_sheet.dart';
 import 'app.dart';
 import 'launch_composition.dart';
 
-/// Runs the fallible launch composition behind the splash frame. The frame
-/// paints for exactly as long as the real work takes — no hold, no loader —
-/// then the shell replaces it; on failure the same frame carries a truthful
-/// caption and a Try again that reruns the composition. No Riverpod here —
-/// the scope does not exist until composition succeeds.
+/// Runs the fallible launch composition before the first frame. The frame is
+/// deferred while it runs, so the native launch screen stays up for exactly as
+/// long as the real work takes and the shell is the first thing Flutter draws;
+/// on failure the first frame is a truthful pane whose Try again reruns the
+/// composition. No Riverpod here — the scope does not exist until composition
+/// succeeds.
 class BootstrapApp extends StatefulWidget {
   const BootstrapApp({
     required this.identity,
@@ -35,18 +36,30 @@ class _BootstrapAppState extends State<BootstrapApp>
   LaunchDependencies? _dependencies;
   LaunchFailure? _failure;
   bool _composing = false;
+  bool _firstFrameDeferred = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.deferFirstFrame();
+    _firstFrameDeferred = true;
     _run();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _allowFirstFrame();
     super.dispose();
+  }
+
+  /// Exactly once: the binding counts deferrals, and a second allow would
+  /// release a deferral that belongs to someone else.
+  void _allowFirstFrame() {
+    if (!_firstFrameDeferred) return;
+    _firstFrameDeferred = false;
+    WidgetsBinding.instance.allowFirstFrame();
   }
 
   // The pre-scope frames read the platform brightness directly, so they must
@@ -82,6 +95,9 @@ class _BootstrapAppState extends State<BootstrapApp>
       setState(() => _failure = classifyLaunchFailure(error));
     } finally {
       _composing = false;
+      // Whichever way the first composition ended, the answer is now what the
+      // first frame should show.
+      _allowFirstFrame();
     }
   }
 
@@ -106,9 +122,6 @@ class _BootstrapAppState extends State<BootstrapApp>
       home: Builder(
         builder: (context) {
           final l10n = context.l10n;
-          // Copy only when there is something to say: a composition in flight
-          // is the splash frame alone, not a status line standing in for a
-          // loader.
           final message = switch (failure?.kind) {
             LaunchFailureKind.timedOut => l10n.launchTakingLonger,
             LaunchFailureKind.storageUnavailable =>
@@ -116,7 +129,7 @@ class _BootstrapAppState extends State<BootstrapApp>
             LaunchFailureKind.invalidConfiguration =>
               l10n.launchInvalidConfiguration,
             LaunchFailureKind.unknown => l10n.launchUnknownFailure,
-            null => null,
+            null => l10n.startingUp,
           };
           return LaunchPane(
             message: message,
@@ -128,25 +141,24 @@ class _BootstrapAppState extends State<BootstrapApp>
   }
 }
 
-/// The splash frame: the native launch screen's navy, the app mark, name and
-/// tagline, and — only when there is one — a [message] with an optional Try
-/// again. It paints while the composition runs and nothing else: no track, no
-/// spinner, no minimum hold (#159). Owns the `launch-splash` and
+/// The pre-scope launch frame: the same solid navy as the native launch
+/// screen, the app mark, and one status line. It is visible only when a
+/// composition failed (with Try again) or is being retried — a successful
+/// first composition never draws it. Owns the `launch-splash` and
 /// `splash-retry` automation keys; the Try again button exists exactly when
 /// [onRetry] is non-null.
 class LaunchPane extends StatelessWidget {
-  const LaunchPane({this.message, this.onRetry, super.key});
-  final String? message;
+  const LaunchPane({required this.message, this.onRetry, super.key});
+  final String message;
   final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
     final retry = onRetry;
-    final message = this.message;
     return Semantics(
       key: const Key('launch-splash'),
       label: context.l10n.appName,
-      value: message ?? context.l10n.startingUp,
+      value: message,
       liveRegion: true,
       child: ColoredBox(
         color: GolemTheme.splash,
@@ -196,14 +208,13 @@ class LaunchPane extends StatelessWidget {
                 bottom: 66,
                 child: Column(
                   children: [
-                    if (message != null)
-                      Text(
-                        message,
-                        textAlign: TextAlign.center,
-                        style: GolemText.caption.copyWith(
-                          color: GolemTheme.mutedOnDark,
-                        ),
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: GolemText.caption.copyWith(
+                        color: GolemTheme.mutedOnDark,
                       ),
+                    ),
                     if (retry != null) ...[
                       const SizedBox(height: 14),
                       GolemButton.filled(
