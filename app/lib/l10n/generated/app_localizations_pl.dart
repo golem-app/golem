@@ -1218,22 +1218,7 @@ class AppLocalizationsPl extends AppLocalizations {
       'Repozytoria dodane ręcznie podlegają własnym warunkom źródłowym. Golem ich nie certyfikuje ani nie redystrybuuje.';
 
   @override
-  String get startupFailed => 'Uruchamianie nie powiodło się';
-
-  @override
   String get startupCouldNotFinish => 'Nie udało się uruchomić Golema';
-
-  @override
-  String get preparingFirstRun => 'Przygotowywanie pierwszej konfiguracji';
-
-  @override
-  String get preparingSetup => 'Przygotowywanie konfiguracji';
-
-  @override
-  String get startingOnDevice => 'Uruchamianie Golema na tym urządzeniu';
-
-  @override
-  String get gettingReady => 'Trwa przygotowywanie';
 
   @override
   String get splashTagline => 'Prywatnie, lokalnie i zawsze pod ręką.';

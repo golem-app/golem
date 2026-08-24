@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
@@ -17,7 +16,6 @@ import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/benchmark/application/benchmark_providers.dart';
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/models/application/model_providers.dart';
-import 'package:golem_flutter/features/splash/application/startup_providers.dart';
 
 import 'support/in_memory_attachment_repository.dart';
 import 'support/in_memory_chat_history_repository.dart';
@@ -410,31 +408,5 @@ void main() {
     final dynamicBar = bar as CupertinoDynamicColor;
     expect(dynamicBar.darkColor, isNot(dynamicBar.color));
     expect(dynamicBar.darkColor.a, closeTo(0.84, 0.01));
-  });
-
-  test('startup retry replays the ready sequence to completion', () async {
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-    // `.future` resolves with the first intermediate emission, so poll until
-    // the sequence reaches its terminal state.
-    await container.read(startupControllerProvider.future);
-    while (container.read(startupControllerProvider).requireValue.phase !=
-        StartupPhase.complete) {
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-    }
-
-    final states = <StartupState>[];
-    final subscription = container.listen(startupControllerProvider, (
-      previous,
-      next,
-    ) {
-      if (next.hasValue) states.add(next.requireValue);
-    });
-    addTearDown(subscription.close);
-
-    await container.read(startupControllerProvider.notifier).retry();
-    expect(states.first.progress, 0.2);
-    expect(states.last.phase, StartupPhase.complete);
-    expect(states.last.progress, 1);
   });
 }

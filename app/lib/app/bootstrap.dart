@@ -1,21 +1,21 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/chrome/golem_button.dart';
 import '../core/domain/app_state.dart';
 import '../core/app_identity.dart';
 import '../core/theme/golem_theme.dart';
 import '../l10n/l10n.dart';
 import '../features/chat/widgets/attach_sheet.dart';
-import '../features/splash/splash_screen.dart';
 import 'app.dart';
 import 'launch_composition.dart';
 
-/// Runs the fallible launch composition behind mounted Flutter UI. While it
-/// runs the splash frame paints; on failure a truthful pane offers Try again,
-/// which reruns the real composition; on success the one ProviderScope mounts
-/// with the composed overrides, and the startup gate's theatre takes over
-/// under identical visuals. No Riverpod here — the scope does not exist until
-/// composition succeeds.
+/// Runs the fallible launch composition before the first frame. The frame is
+/// deferred while it runs, so the native launch screen stays up for exactly as
+/// long as the real work takes and the shell is the first thing Flutter draws;
+/// on failure the first frame is a truthful pane whose Try again reruns the
+/// composition. No Riverpod here — the scope does not exist until composition
+/// succeeds.
 class BootstrapApp extends StatefulWidget {
   const BootstrapApp({
     required this.identity,
@@ -36,18 +36,30 @@ class _BootstrapAppState extends State<BootstrapApp>
   LaunchDependencies? _dependencies;
   LaunchFailure? _failure;
   bool _composing = false;
+  bool _firstFrameDeferred = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.deferFirstFrame();
+    _firstFrameDeferred = true;
     _run();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _allowFirstFrame();
     super.dispose();
+  }
+
+  /// Exactly once: the binding counts deferrals, and a second allow would
+  /// release a deferral that belongs to someone else.
+  void _allowFirstFrame() {
+    if (!_firstFrameDeferred) return;
+    _firstFrameDeferred = false;
+    WidgetsBinding.instance.allowFirstFrame();
   }
 
   // The pre-scope frames read the platform brightness directly, so they must
@@ -83,6 +95,9 @@ class _BootstrapAppState extends State<BootstrapApp>
       setState(() => _failure = classifyLaunchFailure(error));
     } finally {
       _composing = false;
+      // Whichever way the first composition ended, the answer is now what the
+      // first frame should show.
+      _allowFirstFrame();
     }
   }
 
@@ -116,13 +131,105 @@ class _BootstrapAppState extends State<BootstrapApp>
             LaunchFailureKind.unknown => l10n.launchUnknownFailure,
             null => l10n.startingUp,
           };
-          return SplashScaffold(
-            semanticValue: message,
-            caption: message,
-            progress: 0,
+          return LaunchPane(
+            message: message,
             onRetry: (failure?.retryable ?? false) ? _run : null,
           );
         },
+      ),
+    );
+  }
+}
+
+/// The pre-scope launch frame: the same solid navy as the native launch
+/// screen, the app mark, and one status line. It is visible only when a
+/// composition failed (with Try again) or is being retried — a successful
+/// first composition never draws it. Owns the `launch-splash` and
+/// `splash-retry` automation keys; the Try again button exists exactly when
+/// [onRetry] is non-null.
+class LaunchPane extends StatelessWidget {
+  const LaunchPane({required this.message, this.onRetry, super.key});
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final retry = onRetry;
+    return Semantics(
+      key: const Key('launch-splash'),
+      label: context.l10n.appName,
+      value: message,
+      liveRegion: true,
+      child: ColoredBox(
+        color: GolemTheme.splash,
+        child: SafeArea(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(32),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: GolemTheme.splashGlow,
+                          blurRadius: 50,
+                          offset: Offset(0, 20),
+                        ),
+                      ],
+                    ),
+                    child: Image.asset(
+                      'assets/images/golem_splash_icon.png',
+                      width: 132,
+                      height: 132,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  Text(
+                    context.l10n.appName,
+                    style: GolemText.hero.copyWith(
+                      color: CupertinoColors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    context.l10n.splashTagline,
+                    style: GolemText.body.copyWith(
+                      color: GolemTheme.mutedOnDark,
+                    ),
+                  ),
+                ],
+              ),
+              Positioned(
+                left: 48,
+                right: 48,
+                bottom: 66,
+                child: Column(
+                  children: [
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: GolemText.caption.copyWith(
+                        color: GolemTheme.mutedOnDark,
+                      ),
+                    ),
+                    if (retry != null) ...[
+                      const SizedBox(height: 14),
+                      GolemButton.filled(
+                        key: const Key('splash-retry'),
+                        label: context.l10n.tryAgain,
+                        onPressed: retry,
+                        expand: false,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -1,5 +1,6 @@
-// The bootstrap gate: a launch failure renders as a truthful, retryable pane
-// on the splash frame — never the native launch screen forever — and Try
+// The bootstrap gate: the first frame waits for the real composition, so the
+// shell is the first thing drawn (#159); a launch failure renders as a
+// truthful, retryable pane — never the native launch screen forever — and Try
 // again reruns the real composition (#66).
 import 'dart:async';
 import 'dart:io';
@@ -15,11 +16,10 @@ import 'package:golem_flutter/core/services/device_storage.dart';
 
 import 'support/harness.dart';
 
-/// Pumps the gate theatre to completion with explicit durations — never
-/// pumpAndSettle across the startup providers.
-Future<void> pumpThroughTheatre(WidgetTester tester) async {
-  await tester.pump(const Duration(milliseconds: 300));
-  await tester.pump(const Duration(milliseconds: 1500));
+/// Lets the composed scope build its stores — explicit pumps, never
+/// pumpAndSettle across the gate.
+Future<void> pumpIntoShell(WidgetTester tester) async {
+  await tester.pump();
   await tester.pump();
 }
 
@@ -61,7 +61,7 @@ void main() {
     await tester.tap(find.byKey(const Key('splash-retry')));
     await tester.pump();
     await tester.pump();
-    await pumpThroughTheatre(tester);
+    await pumpIntoShell(tester);
 
     expect(calls, 2);
     expect(find.byKey(const Key('launch-splash')), findsNothing);
@@ -82,9 +82,49 @@ void main() {
       ),
     );
     await tester.pump();
-    await pumpThroughTheatre(tester);
+    await pumpIntoShell(tester);
     expect(calls, 1);
     expect(find.byKey(const Key('first-run-welcome')), findsOneWidget);
+  });
+
+  testWidgets('the first frame waits for the composition', (tester) async {
+    setViewport(tester);
+    final directory = scratch();
+    final gate = Completer<void>();
+    await tester.pumpWidget(
+      BootstrapApp(
+        identity: AppIdentity.dev,
+        compose: (identity) async {
+          await gate.future;
+          return launchDependenciesWith(directory: directory);
+        },
+      ),
+    );
+    // Nothing is sent to the engine while the real work runs: the native
+    // launch screen stays up instead of a Flutter-drawn splash, and there is
+    // no hold, bar, or spinner in front of the shell.
+    expect(tester.binding.sendFramesToEngine, isFalse);
+    expect(find.byType(CupertinoActivityIndicator), findsNothing);
+    gate.complete();
+    await tester.pump();
+    expect(tester.binding.sendFramesToEngine, isTrue);
+    await pumpIntoShell(tester);
+    expect(find.byKey(const Key('launch-splash')), findsNothing);
+    expect(find.byKey(const Key('first-run-welcome')), findsOneWidget);
+  });
+
+  testWidgets('a failed composition releases the first frame', (tester) async {
+    setViewport(tester);
+    await tester.pumpWidget(
+      BootstrapApp(
+        identity: AppIdentity.dev,
+        compose: (identity) async => throw Exception('no launch'),
+      ),
+    );
+    await tester.pump();
+    expect(tester.takeException(), isA<Exception>());
+    expect(tester.binding.sendFramesToEngine, isTrue);
+    expect(find.byKey(const Key('launch-splash')), findsOneWidget);
   });
 
   testWidgets('a double-tap on Try again runs a single retry', (tester) async {

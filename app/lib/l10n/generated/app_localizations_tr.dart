@@ -1200,22 +1200,7 @@ class AppLocalizationsTr extends AppLocalizations {
       'Elle eklenen depolar kendi kaynak koşullarına tabidir. Golem bunları onaylamaz veya yeniden dağıtmaz.';
 
   @override
-  String get startupFailed => 'Başlatma başarısız';
-
-  @override
   String get startupCouldNotFinish => 'Golem başlatmayı tamamlayamadı';
-
-  @override
-  String get preparingFirstRun => 'İlk çalıştırma hazırlanıyor';
-
-  @override
-  String get preparingSetup => 'Kurulum hazırlanıyor';
-
-  @override
-  String get startingOnDevice => 'Golem bu cihazda başlatılıyor';
-
-  @override
-  String get gettingReady => 'Hazırlanıyor';
 
   @override
   String get splashTagline => 'Özel, yerel ve her zaman hazır.';

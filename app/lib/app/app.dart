@@ -24,7 +24,6 @@ import '../features/settings/response_style_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/settings/storage_screen.dart';
 import '../features/settings/system_prompt_screen.dart';
-import '../features/splash/splash_screen.dart';
 import '../l10n/l10n.dart';
 
 /// Creates the route table for one app identity. Production omits internal
@@ -240,7 +239,7 @@ class _GolemAppState extends ConsumerState<GolemApp>
             child: body,
           );
         }
-        return StartupGate(child: body);
+        return body;
       },
     );
   }

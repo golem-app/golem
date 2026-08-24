@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -71,12 +73,45 @@ class FirstRunGate extends ConsumerWidget {
   }
 }
 
-class _BlockingProgress extends StatelessWidget {
+/// How long a wait must last before it earns an indicator. The store loads
+/// an ordinary launch waits on finish in a few milliseconds, and there is no
+/// Flutter splash in front of this pane any more (#159): a spinner that
+/// appeared for one frame on every launch would be the flash this grace
+/// exists to prevent. A sideload validation runs for seconds and shows one.
+const blockingIndicatorGrace = Duration(milliseconds: 400);
+
+class _BlockingProgress extends StatefulWidget {
   const _BlockingProgress({super.key});
 
   @override
-  Widget build(BuildContext context) => const CupertinoPageScaffold(
-    child: Center(child: CupertinoActivityIndicator()),
+  State<_BlockingProgress> createState() => _BlockingProgressState();
+}
+
+class _BlockingProgressState extends State<_BlockingProgress> {
+  Timer? _grace;
+  bool _indicate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _grace = Timer(blockingIndicatorGrace, () {
+      if (mounted) setState(() => _indicate = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _grace?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => CupertinoPageScaffold(
+    child: Center(
+      child: _indicate
+          ? const CupertinoActivityIndicator(key: Key('blocking-indicator'))
+          : const SizedBox.shrink(),
+    ),
   );
 }
 

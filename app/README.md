@@ -207,7 +207,7 @@ The Flutter app never migrates, opens, or otherwise reads another app's data.
 `lib/features/`, each owning its controllers and derivations in
 `features/<name>/application/` with committed `.g.dart` parts (legal,
 preferences, models — including storage accounting — chat, settings,
-onboarding, benchmark, eval, splash). Those are also the layers of a recorded
+onboarding, benchmark, eval). Those are also the layers of a recorded
 import direction, in that order: a feature imports strictly downward and never
 sideways, `core/` imports no feature at all, and only `lib/app/` and `main.dart`
 may name every feature. `../tool/check_feature_imports.dart` and
@@ -297,7 +297,7 @@ once in `../docs/notes/dependencies.md`.
 
 ## Screens and identifiers
 
-The app includes the model-aware launch splash, empty chat with starter chips,
+The app includes the launch failure pane, empty chat with starter chips,
 markdown transcript with syntax-highlighted code cards, reasoning and answer
 streaming (a pulsing dot until the first token, then a live generating pill),
 stop and failure recovery with the ephemeral stopped-tokens caption, message
@@ -460,24 +460,20 @@ node that names it,
 The benchmark keys, route, repository, and prompt assets exist only in `qa`
 and `dev`; production does not register or bundle that internal surface.
 
-Startup failure modes are injectable at compile time:
+Launch failure is injectable at compile time:
 
 ```sh
-flutter run --flavor qa --dart-define=GOLEM_MISSING_MODEL=true
-flutter run --flavor qa --dart-define=GOLEM_SPLASH_FAILURE=true
-flutter run --flavor qa --dart-define=GOLEM_SPLASH_TIMEOUT=true
 flutter run --flavor qa --dart-define=GOLEM_LAUNCH_FAILURES=1
 ```
 
-The first three drive the startup gate's scripted scenarios; their failure
-demo always recovers on Try again. `GOLEM_LAUNCH_FAILURES=<n>` instead makes
-the first n **real** launch compositions throw, so one process demonstrates
-the bootstrap failure pane, Try again, and recovery
-(`../docs/decisions/0006-launch-bootstrap.md`). The production-style splash
-always holds for at least 1.4 seconds; the missing-model scenario adds a
-three-second setup hold.
-All four fault injectors are identity-gated: `qa` and `dev` retain them in
-debug and release builds, while production ignores the defines.
+`GOLEM_LAUNCH_FAILURES=<n>` makes the first n **real** launch compositions
+throw, so one process demonstrates the failure pane, Try again, and recovery
+(`../docs/decisions/0006-launch-bootstrap.md`). There is no Flutter splash
+otherwise: the first frame waits for the composition, so a launch goes from the
+native launch screen straight to the shell, with no hold, progress bar, or
+spinner in between (`../docs/decisions/0018-no-splash-wait.md`). The injector
+is identity-gated: `qa` and `dev` retain it in debug and release builds, while
+production ignores the define.
 
 ## Generate and verify
 
@@ -587,7 +583,7 @@ axis rides `TargetPlatformVariant` in `test/support/harness.dart` (widget
 tests report android by default, so goldens pin the platform explicitly).
 Sheets (rename, model picker, attach) record android in both appearances:
 the drag handle is the android-only painted element whose tint differs.
-They cover splash, empty/populated chat, reasoning, the markdown
+They cover empty/populated chat, reasoning, the markdown
 transcript, search, the composer sheets, the sectioned conversation
 drawer, rename overlay, every settings surface (root, models, response
 style, appearance, privacy, storage, system prompt, model attribution, and

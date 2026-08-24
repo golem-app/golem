@@ -25,7 +25,7 @@ Bottom to top. A feature imports strictly downward, and never sideways.
 
 | Layer | Features | What lives there |
 | --- | --- | --- |
-| 5 | `settings` `onboarding` `benchmark` `eval` `splash` | Screens and flows that compose everything below |
+| 5 | `settings` `onboarding` `benchmark` `eval` | Screens and flows that compose everything below |
 | 4 | `chat` | Conversations, generation, composer, drawer, picker |
 | 3 | `models` | Catalog, downloads, activation, storage accounting, model labels, consent, custom repositories |
 | 2 | `preferences` | App-wide preferences and per-model generation settings |
@@ -50,7 +50,7 @@ means deciding, in review, where it sits.
 
 ## Sideways counts as a violation
 
-Layer 5 has five members and no member may import another. This is not
+Layer 5 has four members and no member may import another. This is not
 pedantry — `settings → onboarding` existed for exactly one thing (the download
 consent dialog), and it was the edge that made "settings is above onboarding"
 and "onboarding is above settings" both true at once, depending on which file

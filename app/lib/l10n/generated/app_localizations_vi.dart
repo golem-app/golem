@@ -1201,22 +1201,7 @@ class AppLocalizationsVi extends AppLocalizations {
       'Kho lưu trữ được thêm thủ công tuân theo điều khoản riêng của nguồn. Golem không chứng nhận hoặc phân phối lại chúng.';
 
   @override
-  String get startupFailed => 'Khởi động thất bại';
-
-  @override
   String get startupCouldNotFinish => 'Golem không thể hoàn tất khởi động';
-
-  @override
-  String get preparingFirstRun => 'Đang chuẩn bị lần chạy đầu';
-
-  @override
-  String get preparingSetup => 'Đang chuẩn bị thiết lập';
-
-  @override
-  String get startingOnDevice => 'Đang khởi động Golem trên thiết bị';
-
-  @override
-  String get gettingReady => 'Đang chuẩn bị';
 
   @override
   String get splashTagline => 'Riêng tư, cục bộ và luôn sẵn sàng.';

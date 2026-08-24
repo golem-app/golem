@@ -198,6 +198,12 @@ void main() {
       findsNothing,
       reason: 'the load it is retrying is what the shell is waiting on',
     );
+    // A wait earns its indicator only once it has lasted the grace: with no
+    // splash in front of this pane, an instant spinner would flash on every
+    // ordinary launch (#159).
+    expect(find.byKey(const Key('blocking-indicator')), findsNothing);
+    await tester.pump(blockingIndicatorGrace);
+    expect(find.byKey(const Key('blocking-indicator')), findsOneWidget);
 
     inference.release();
     await tester.pumpAndSettle();
