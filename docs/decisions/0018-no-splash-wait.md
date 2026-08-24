@@ -1,4 +1,4 @@
-# No splash wait: the shell is the first frame
+# No splash wait: the frame paints only as long as the launch takes
 
 Status: decided on `fix/159-no-splash-wait` (issue #159)
 
@@ -22,20 +22,20 @@ while real data loads, and never add artificial delays.
 
 ## Decision
 
-- The first Flutter frame is deferred until the composition resolves
-  (`WidgetsBinding.deferFirstFrame`). The native solid-navy launch screen stays
-  up for exactly as long as the real work takes, and the shell is the first
-  frame drawn. No hold, no ticks, no bar, no spinner on the launch path.
+- The splash frame — the launch screen's navy, the app mark, name and
+  tagline — paints for exactly as long as the composition runs and is
+  replaced by the shell the moment it resolves. No hold, no ticks, no bar, no
+  spinner, and no status line standing in for one; copy appears only when a
+  composition has failed.
 - The theatre is deleted: `StartupController`, `StartupSequence`,
   `StartupState`/`StartupPhase`, the `StartupGate` overlay, the `splash`
   feature, its goldens and l10n strings, and the three scenario defines.
   `GOLEM_LAUNCH_FAILURES=<n>` stays as the one launch fault injector, because
   it fails real compositions.
-- The bootstrap pane (`LaunchPane`, in `app/lib/app/bootstrap.dart`) survives
-  only for what needs a frame: a failed composition (classified copy, Try
-  again) and a retry in flight (caption only). It keeps the `launch-splash`
-  and `splash-retry` automation keys, so the journeys' "poll the splash away"
-  loops still hold.
+- `LaunchPane` (`app/lib/app/bootstrap.dart`) is the frame's only owner:
+  the same widget carries the classified copy and Try again after a failure.
+  It keeps the `launch-splash` and `splash-retry` automation keys, so the
+  journeys' "poll the splash away" loops still hold.
 - The onboarding gate's waiting pane shows its activity indicator only after
   a wait has lasted a 400 ms grace. With no splash in front of it, an instant
   spinner would flash on every ordinary launch; a multi-second sideload
@@ -43,7 +43,10 @@ while real data loads, and never add artificial delays.
 
 ## Consequences
 
-An ordinary launch goes native launch screen → shell. A hang still resolves
+An ordinary launch goes native launch screen → the same frame with the app
+mark, for the few hundred milliseconds the composition takes → shell. A
+first-frame deferral (`WidgetsBinding.deferFirstFrame`) was tried and
+rejected: it hides the mark entirely, and the mark is wanted. A hang still resolves
 at the 8 s composition deadline into the failure pane rather than the native
 screen forever (ADR 0006). The former theatre's failure and missing-model
 demos are gone; the failure pane is demonstrated with real injected failures.

@@ -140,10 +140,7 @@ void main() {
   testWidgets('launch pane without a retry offers no button', (tester) async {
     setViewport(tester);
     await tester.pumpWidget(
-      wrapApp(
-        brightness: Brightness.light,
-        child: const LaunchPane(message: 'Starting up'),
-      ),
+      wrapApp(brightness: Brightness.light, child: const LaunchPane()),
     );
     expect(find.byKey(const Key('splash-retry')), findsNothing);
   });

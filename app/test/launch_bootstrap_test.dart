@@ -1,7 +1,7 @@
-// The bootstrap gate: the first frame waits for the real composition, so the
-// shell is the first thing drawn (#159); a launch failure renders as a
-// truthful, retryable pane — never the native launch screen forever — and Try
-// again reruns the real composition (#66).
+// The bootstrap gate: the splash frame paints for exactly as long as the real
+// composition runs, with no hold or loader (#159); a launch failure renders as
+// a truthful, retryable pane — never the native launch screen forever — and
+// Try again reruns the real composition (#66).
 import 'dart:async';
 import 'dart:io';
 
@@ -13,6 +13,7 @@ import 'package:golem_flutter/app/launch_composition.dart';
 import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
 import 'package:golem_flutter/core/services/device_storage.dart';
+import 'package:golem_flutter/core/widgets/progress_track.dart';
 
 import 'support/harness.dart';
 
@@ -87,7 +88,9 @@ void main() {
     expect(find.byKey(const Key('first-run-welcome')), findsOneWidget);
   });
 
-  testWidgets('the first frame waits for the composition', (tester) async {
+  testWidgets('the splash paints only while the composition runs', (
+    tester,
+  ) async {
     setViewport(tester);
     final directory = scratch();
     final gate = Completer<void>();
@@ -100,31 +103,18 @@ void main() {
         },
       ),
     );
-    // Nothing is sent to the engine while the real work runs: the native
-    // launch screen stays up instead of a Flutter-drawn splash, and there is
-    // no hold, bar, or spinner in front of the shell.
-    expect(tester.binding.sendFramesToEngine, isFalse);
+    // The frame itself, and nothing standing in for a loader: no track, no
+    // spinner, no status line.
+    expect(find.byKey(const Key('launch-splash')), findsOneWidget);
+    expect(find.byType(ProgressTrack), findsNothing);
     expect(find.byType(CupertinoActivityIndicator), findsNothing);
+    expect(find.text('Starting up'), findsNothing);
     gate.complete();
+    // Gone the moment the composition resolves — no minimum hold.
     await tester.pump();
-    expect(tester.binding.sendFramesToEngine, isTrue);
     await pumpIntoShell(tester);
     expect(find.byKey(const Key('launch-splash')), findsNothing);
     expect(find.byKey(const Key('first-run-welcome')), findsOneWidget);
-  });
-
-  testWidgets('a failed composition releases the first frame', (tester) async {
-    setViewport(tester);
-    await tester.pumpWidget(
-      BootstrapApp(
-        identity: AppIdentity.dev,
-        compose: (identity) async => throw Exception('no launch'),
-      ),
-    );
-    await tester.pump();
-    expect(tester.takeException(), isA<Exception>());
-    expect(tester.binding.sendFramesToEngine, isTrue);
-    expect(find.byKey(const Key('launch-splash')), findsOneWidget);
   });
 
   testWidgets('a double-tap on Try again runs a single retry', (tester) async {
