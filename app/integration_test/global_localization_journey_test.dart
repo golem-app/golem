@@ -8,6 +8,7 @@ import 'package:golem_flutter/features/settings/privacy_screen.dart';
 import 'package:golem_flutter/features/settings/settings_screen.dart';
 import 'package:golem_flutter/features/settings/storage_screen.dart';
 import 'package:golem_flutter/l10n/l10n.dart';
+import 'package:golem_flutter/features/onboarding/first_run_gate.dart';
 import 'package:golem_flutter/main.dart' as app;
 import 'package:integration_test/integration_test.dart';
 
@@ -195,7 +196,12 @@ Future<void> _launchToChat(WidgetTester tester) async {
   // Language screen and incorrectly conclude that startup has finished.
   await tester.pump();
   final deadline = DateTime.now().add(const Duration(seconds: 30));
-  while (find.byKey(const Key('launch-splash')).evaluate().isNotEmpty) {
+  // Until the gate has decided: launch() returns before the root widget is
+  // even attached, so the splash's absence proves nothing, and the shell's
+  // first frame waits for the composed app to read its stores (#159).
+  while (find.byKey(const Key('launch-splash')).evaluate().isNotEmpty ||
+      find.byType(FirstRunGate).evaluate().isEmpty ||
+      find.byKey(const Key('first-run-loading')).evaluate().isNotEmpty) {
     if (DateTime.now().isAfter(deadline)) {
       fail('The startup gate never completed.');
     }

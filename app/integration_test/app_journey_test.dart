@@ -31,7 +31,12 @@ void main() {
     // splash schedules no frames while it runs — pumpAndSettle alone could
     // settle on the splash. Poll the gate away on a real deadline instead.
     final gateDeadline = DateTime.now().add(const Duration(seconds: 30));
-    while (find.byKey(const Key('launch-splash')).evaluate().isNotEmpty) {
+    // Until the gate has decided: launch() returns before the root widget is
+    // even attached, so the splash's absence proves nothing, and the shell's
+    // first frame waits for the composed app to read its stores (#159).
+    while (find.byKey(const Key('launch-splash')).evaluate().isNotEmpty ||
+        find.byType(FirstRunGate).evaluate().isEmpty ||
+        find.byKey(const Key('first-run-loading')).evaluate().isNotEmpty) {
       if (DateTime.now().isAfter(gateDeadline)) {
         fail('The startup gate never completed.');
       }
