@@ -500,11 +500,13 @@ fvm flutter test
 (cd ../packages/inferno && fvm dart test)
 ```
 
-Building or running with a real inference backend executes the Inferno build
-hooks and requires `flutter config --enable-native-assets` once per machine.
-That now includes plain `flutter run`/`flutter build` (the `dev` flavor
-defaults to `auto`); only qa-flavor builds and host `flutter test` stay on
-the hook-free fake path. Android builds additionally need NDK
+Every `flutter run`, `flutter build`, and host `flutter test` executes the
+Inferno build hooks, whichever flavor is named: the hook's only gate is that
+code assets are being built, and `package:inferno` is an unconditional
+dependency. The `qa` flavor is fake at runtime, never at build time — its
+macOS bundle still needs the staged MLX resources the hook produces. Native
+assets are on by default in the pinned SDK, so no `flutter config` switch is
+needed. Android builds additionally need NDK
 `29.0.14206865` (`sdkmanager "ndk;29.0.14206865"`) — the hook refuses any
 other revision, because Flutter otherwise picks whichever NDK is newest on
 the machine and the compiler behind every shipped kernel changes with it.

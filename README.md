@@ -54,9 +54,9 @@ flutter run --release \
 against the app documents directory; `auto` derives it from the catalog.
 `GOLEM_MODEL_ARTIFACT` instead selects an exact installed catalog key and
 cannot be combined with `GOLEM_MODEL_PATH`.
-Building any flavor with a real backend (including the `dev` default)
-executes the Inferno build hooks and requires
-`flutter config --enable-native-assets` once per machine.
+Every flavor build executes the Inferno build hooks — `qa` is fake at
+runtime, not at build time — and native assets are on by default in the
+pinned SDK, so no `flutter config` switch is needed.
 
 ## Toolchain
 
