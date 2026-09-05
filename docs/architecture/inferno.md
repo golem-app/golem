@@ -10,7 +10,7 @@ ChatController -> InferenceRepository -> app/lib/broker
                                         v
                                   Inferno Dart API
                                         |
-                               shared asynchronous C ABI (version 5)
+                               shared asynchronous C ABI (version 6)
                                   /             \
                           llama.cpp shim      MLX Swift shim
                     Android · macOS · iOS*     iOS · macOS*
@@ -38,8 +38,9 @@ loaded model and one active generation. Stream cancellation and the explicit
   `native/include/inferno.h`) is checked per library before the first call,
   because the MLX carrier is a separate binary with its own copy.
 - A load crosses as one JSON payload — `modelPath`, `checkTensors`,
-  `kvCacheType` (`f16`|`q8_0`), `threadCount`, `gpuLayers`, `swaFull`, and an
-  optional `projectorPath` for a multimodal projector. Engines ignore fields
+  `kvCacheType` (`f16`|`q8_0`), `threadCount`, `gpuLayers`, `swaFull`, an
+  optional `projectorPath` for a multimodal projector, and, when a caller
+  asks for load progress, `reportProgress` (ABI 6). Engines ignore fields
   that do not apply to them.
 
 ## Chat templates are the broker's
@@ -126,6 +127,49 @@ elapsed time the request really cost. On MLX a cancel that lands during input
 preparation — image decoding runs before tokenization there — also reports a
 null prompt token count, because none exists yet. Only a decode failure
 replaces the metrics event with an error.
+
+## Observation (ABI 6)
+
+A generation can be asked to report more than its text (#58), and everything
+it can be asked for is opt-in: a load payload without `"reportProgress"` and
+a generate payload without an `"observe"` object produce exactly the event
+stream ABI 5 produced, byte for byte. That is what keeps chat's requests the
+baseline an observed bench run is compared against, and what makes the
+instrumentation overhead measurable from one binary. The broker exposes it
+as `GenerationObservation` on `InferenceRepository.generate` and the
+repository publishes the engine's phases around it — `loading` and `loaded`
+(with the activation's wall time) only when the generation had to activate
+its configuration, then `promptProcessing` before the engine call and
+`generating` at the first output.
+
+What each engine can actually observe differs, and the difference is the
+contract, not a gap to paper over:
+
+| Measurement | llama.cpp (Metal) | MLX |
+| --- | --- | --- |
+| Load progress | its own `progress_callback` fraction, forwarded rate-limited (≥ 1 % or ≥ 100 ms) on the load call | none — the library polls nothing while mapping weights; the phase and its elapsed time are all there is |
+| Prefill progress | `{"phase":"prompt","completed":n,"total":N}` after each text-prefill batch is **submitted** | none |
+| Prefill rate | on completion only (`promptTokensPerSecond`, measured after `llama_synchronize`) | on completion only |
+| Output count live | one instant per sampled token | one instant per detokenized **chunk**, which the library assembles from one or more tokens; the token count arrives with the summary |
+| Latency series | inter-token latency: `TOKEN_TIMING` batches of `"kind":"token"` | inter-chunk arrival latency: `"kind":"chunk"` — never presented or divided as tokens |
+| Batch | `promptBatchSize` on METRICS, the `n_batch` the prefill used | not reported (null) |
+| Fresh vs cached prompt tokens | not reported | not reported |
+
+Two honesty rules follow. A submitted prefill batch runs ahead of the
+backend's compute (a decode returns once the graph is queued, ADR 0020), so
+prompt progress is a count of work handed over and never a live rate; the
+rate is the metrics'. And an MLX chunk is not a token: its instants describe
+when text became visible, which is what a reader feels, but no throughput may
+be derived from them.
+
+Timing instants are milliseconds since the request was accepted — the same
+t0 the metrics measure from — on the engine's monotonic clock, batched
+(16 observations or 100 ms) into contiguous `TOKEN_TIMING` events whose
+`first` index chains from one batch to the next. On llama.cpp the first
+instant is the first token, so it agrees with `timeToFirstTokenSeconds` to
+the millisecond; the per-token cost is one clock read beside the
+`task_info` call the peak-footprint sample already makes per token. Timing
+semantics stay at version 2: no existing number changed meaning.
 
 ## Native callbacks, cancellation, and teardown
 
