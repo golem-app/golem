@@ -862,10 +862,10 @@ public func infernoMlxEngineGenerate(
                 )
 
                 var firstTokenAt: ContinuousClock.Instant?
-                // The last event's instant: the library synchronises its GPU
-                // stream after summarising and before the stream ends, and
-                // that teardown is not generation.
-                var lastEventAt: ContinuousClock.Instant?
+                // The summary's arrival: the library yields it right after
+                // measuring generateTime and before synchronising its GPU
+                // stream, so it anchors both ends of the generation window.
+                var summaryAt: ContinuousClock.Instant?
                 var peakFootprint = physicalFootprintBytes()
                 var generatedChunkCount = 0
                 var pending: [UInt8] = []
@@ -879,10 +879,9 @@ public func infernoMlxEngineGenerate(
                         stopReason = "cancelled"
                         break
                     }
-                    lastEventAt = .now
                     switch event {
                     case .chunk(let text):
-                        if firstTokenAt == nil { firstTokenAt = lastEventAt }
+                        if firstTokenAt == nil { firstTokenAt = .now }
                         generatedChunkCount += 1
                         peakFootprint = max(peakFootprint, physicalFootprintBytes())
                         if emitVisibleBytes(
@@ -895,6 +894,7 @@ public func infernoMlxEngineGenerate(
                             break
                         }
                     case .info(let info):
+                        summaryAt = .now
                         completion = info
                         switch info.stopReason {
                         case .cancelled:
@@ -917,7 +917,10 @@ public func infernoMlxEngineGenerate(
                         break
                     }
                 }
-                let generationEnd = lastEventAt ?? .now
+                // A normal completion ends at the summary, which excludes the
+                // library's stream teardown; a cancel or a stop sequence ends
+                // where the loop was left.
+                let generationEnd = summaryAt ?? .now
                 if !pending.isEmpty && stopReason != "stop_sequence" {
                     sink.emit(EventKind.textDelta, bytes: pending)
                 }
@@ -932,21 +935,22 @@ public func infernoMlxEngineGenerate(
                     ?? 0
                 let generatedCount = completion?.generationTokenCount
                     ?? generatedChunkCount
-                // Two measurements of one instant; the earlier wins. Dispatch
-                // plus the library's prompt time does not see the streaming
-                // detokenizer hold a token that ends mid-UTF-8, nor the
-                // tool-call scanner buffer a reply from its first "{"; the
-                // wall clock to the first chunk is what remains when the
-                // library's summary never arrives. Clamped because the
-                // derived one mixes the library's wall clock with this
-                // monotonic one.
+                // Two measurements of one instant; the earlier wins. The
+                // summary's arrival less the library's generateTime lands on
+                // the instant the first token was returned — everything
+                // before it, iterator setup and task dispatch included, is
+                // inside — and does not see the streaming detokenizer hold a
+                // token that ends mid-UTF-8, nor the tool-call scanner buffer
+                // a reply from its first "{". The wall clock to the first
+                // chunk is what remains when the summary never arrives.
+                // Clamped because generateTime is the library's wall clock.
                 var firstTokenCandidates: [Double] = []
                 if let firstTokenAt {
                     firstTokenCandidates.append(seconds(requestStart.duration(to: firstTokenAt)))
                 }
-                if let completion, completion.generationTokenCount > 0 {
+                if let completion, let summaryAt, completion.generationTokenCount > 0 {
                     firstTokenCandidates.append(
-                        seconds(requestStart.duration(to: generateCallStart)) + completion.promptTime
+                        seconds(requestStart.duration(to: summaryAt)) - completion.generateTime
                     )
                 }
                 let firstTokenSeconds = firstTokenCandidates.min()
