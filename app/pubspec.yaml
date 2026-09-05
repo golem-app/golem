@@ -104,11 +104,16 @@ flutter:
     - assets/images/golem_mascot.png
     - assets/images/golem_splash_icon.png
     # Masked derivatives of the native icons, drawn by in-app surfaces that
-    # get no iOS icon mask. All three ship because the asset list is shared
-    # by every flavor build; AppIdentity.iconAsset picks the running one.
+    # get no iOS icon mask. The three phone tiles ship in every build because
+    # the asset list is shared by every flavor; AppIdentity.iconAsset picks
+    # the running one. The lab's tile rides only the lab build, which is the
+    # only build that can be the lab (ADR 0021).
     - assets/images/golem_app_icon_production.png
     - assets/images/golem_app_icon_qa.png
     - assets/images/golem_app_icon_dev.png
+    - path: assets/images/golem_app_icon_lab.png
+      flavors:
+        - lab
     - assets/licenses/
     - path: assets/benchmark_prompts/
       flavors:

@@ -1,4 +1,4 @@
-# Golem QA (red) launcher icons — see flutter_launcher_icons-production.yaml.
+# Golem QA (grey) launcher icons — see flutter_launcher_icons-production.yaml.
 flutter_launcher_icons:
   android: true
   ios: true

@@ -4,28 +4,53 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/core/app_identity.dart';
 import 'package:image/image.dart' as image;
 
-/// The three build flavors, keyed by the in-app [AppIdentity] so the strings
+/// The four build flavors, keyed by the in-app [AppIdentity] so the strings
 /// the platforms ship are asserted against the single Dart-side source of
-/// truth. `displaySetting` spells out the pbxproj quoting; `dominant` selects
-/// the color channel that must lead at the artwork sample point — blue
-/// production, red QA, green dev.
+/// truth. `displaySetting` spells out the pbxproj quoting; `tint` is the
+/// color that must show at the artwork sample point — blue production, grey
+/// QA, green dev, red lab — as the channel that leads, or `neutral` for a
+/// grey where no channel may lead. `platforms` is where the flavor exists:
+/// the lab is macOS-only (ADR 0021) and owns no phone launcher inputs.
 const _flavors = [
   (
     identity: AppIdentity.production,
     displaySetting: 'GOLEM_DISPLAY_NAME = Golem;',
-    dominant: 'b',
+    tint: 'b',
+    platforms: _everyPlatform,
   ),
   (
     identity: AppIdentity.qa,
     displaySetting: 'GOLEM_DISPLAY_NAME = "Golem QA";',
-    dominant: 'r',
+    tint: 'neutral',
+    platforms: _everyPlatform,
   ),
   (
     identity: AppIdentity.dev,
     displaySetting: 'GOLEM_DISPLAY_NAME = "Golem Dev";',
-    dominant: 'g',
+    tint: 'g',
+    platforms: _everyPlatform,
+  ),
+  (
+    identity: AppIdentity.lab,
+    displaySetting: 'GOLEM_DISPLAY_NAME = "Golem Model Lab";',
+    tint: 'r',
+    platforms: {'macos'},
   ),
 ];
+
+const _everyPlatform = {'ios', 'android', 'macos'};
+
+/// The flavors that ship on [platform]; the phone loops below iterate these.
+Iterable<
+  ({
+    AppIdentity identity,
+    String displaySetting,
+    String tint,
+    Set<String> platforms,
+  })
+>
+_flavorsOn(String platform) =>
+    _flavors.where((flavor) => flavor.platforms.contains(platform));
 
 /// The Kotlin entry point, whose package moved off the retired identity in
 /// #116. Named once because three assertions and the Android `am start`
@@ -73,13 +98,24 @@ Map<String, int> _settingCounts(String project, String setting) {
   return counts;
 }
 
-void _expectDominantChannel(image.Pixel pixel, String channel) {
-  final others = {'r', 'g', 'b'}.difference({channel});
+/// A flavor's tint at a sample point: one channel strictly leading the other
+/// two, or — for `neutral` — all three within a hair of each other, which is
+/// what a luminance-preserving desaturation of the tile produces.
+void _expectTint(image.Pixel pixel, String tint) {
+  if (tint == 'neutral') {
+    final channels = [pixel.r, pixel.g, pixel.b];
+    final spread =
+        channels.reduce((a, b) => a > b ? a : b) -
+        channels.reduce((a, b) => a < b ? a : b);
+    expect(spread, lessThanOrEqualTo(8), reason: 'expected grey in $pixel');
+    return;
+  }
+  final others = {'r', 'g', 'b'}.difference({tint});
   for (final other in others) {
     expect(
-      _channel(pixel, channel),
+      _channel(pixel, tint),
       greaterThan(_channel(pixel, other)),
-      reason: 'expected $channel to lead over $other in $pixel',
+      reason: 'expected $tint to lead over $other in $pixel',
     );
   }
 }
@@ -319,7 +355,7 @@ void main() {
     // shared setting.
     expect(gradle, contains('namespace = "app.golem"'));
     expect(gradle, contains('flavorDimensions += "environment"'));
-    for (final flavor in _flavors) {
+    for (final flavor in _flavorsOn('android')) {
       expect(gradle, contains('create("${flavor.identity.name}")'));
       expect(
         gradle,
@@ -386,7 +422,7 @@ void main() {
   });
 
   test('Android launcher resources are owned by the flavor source sets', () {
-    for (final flavor in _flavors) {
+    for (final flavor in _flavorsOn('android')) {
       final res = 'android/app/src/${flavor.identity.name}/res';
       expect(File('$res/mipmap-xxxhdpi/ic_launcher.png').existsSync(), isTrue);
       expect(
@@ -400,6 +436,16 @@ void main() {
       expect(
         File('$res/drawable-xxxhdpi/ic_launcher_foreground.png').existsSync(),
         isTrue,
+      );
+    }
+    // A macOS-only flavor owns no phone source set at all: a stray directory
+    // here would make Gradle materialise a product flavor nothing declares.
+    for (final flavor in _flavors) {
+      if (flavor.platforms.contains('android')) continue;
+      expect(
+        Directory('android/app/src/${flavor.identity.name}').existsSync(),
+        isFalse,
+        reason: flavor.identity.name,
       );
     }
     // No stale flavor-shadowed launcher art may linger in main.
@@ -548,7 +594,7 @@ void main() {
         ),
       ),
     );
-    for (final flavor in _flavors) {
+    for (final flavor in _flavorsOn('ios')) {
       final name = flavor.identity.name;
       for (final mode in ['Debug', 'Release', 'Profile']) {
         expect(project, contains('name = "$mode-$name";'));
@@ -577,8 +623,10 @@ void main() {
     // Nothing this project can build carries an identity outside the shipped
     // set: the flavorless Debug/Release/Profile configurations a bare
     // `xcodebuild -scheme Runner` selects resolve to qa, artwork included, so
-    // no build path can install a fourth app. The shared Info.plist resolves
-    // the display name through the per-configuration variable.
+    // no build path can install an app the phones do not ship — the lab
+    // included, which the counts below leave out. The shared Info.plist
+    // resolves the display name through the per-configuration variable.
+    expect(project, isNot(contains(AppIdentity.lab.applicationId)));
     expect(_settingCounts(project, 'PRODUCT_BUNDLE_IDENTIFIER'), {
       AppIdentity.production.applicationId: 3,
       // Three flavor configurations plus the three flavorless ones.
@@ -631,22 +679,24 @@ void main() {
     }
 
     // The MLX Swift package declares macOS 14 and Apple silicon only; all
-    // twelve project-level configurations must hold both — a value-set
-    // assertion alone would pass with a single surviving occurrence, and the
-    // line anchor keeps EXCLUDED_ARCHS-style settings out of the match.
+    // fifteen project-level configurations (three flavorless, four flavors
+    // by three modes) must hold both — a value-set assertion alone would
+    // pass with a single surviving occurrence, and the line anchor keeps
+    // EXCLUDED_ARCHS-style settings out of the match.
+    const projectConfigurations = 3 + 3 * 4;
     final deploymentTargets = RegExp(
       r'^\s*MACOSX_DEPLOYMENT_TARGET = ([\d.]+);$',
       multiLine: true,
     ).allMatches(project).map((match) => match[1]).toList();
     expect(deploymentTargets.toSet(), {'14.0'});
-    expect(deploymentTargets, hasLength(12));
+    expect(deploymentTargets, hasLength(projectConfigurations));
 
     final architectures = RegExp(
       r'^\s*ARCHS = (\S+);$',
       multiLine: true,
     ).allMatches(project).map((match) => match[1]).toList();
     expect(architectures.toSet(), {'arm64'});
-    expect(architectures, hasLength(12));
+    expect(architectures, hasLength(projectConfigurations));
 
     // The staging phase feeds the MLX shader/tokenizer bundles into the app;
     // without it MLX fails to resolve default.metallib at runtime.
@@ -678,19 +728,31 @@ void main() {
       AppIdentity.production.applicationId: 3,
       AppIdentity.qa.applicationId: 3,
       AppIdentity.dev.applicationId: 3,
-      '${AppIdentity.qa.applicationId}.RunnerTests': 12,
+      AppIdentity.lab.applicationId: 3,
+      '${AppIdentity.qa.applicationId}.RunnerTests': projectConfigurations,
     });
     expect(_settingCounts(project, 'GOLEM_DISPLAY_NAME'), {
       AppIdentity.production.displayName: 3,
       AppIdentity.qa.displayName: 6,
       AppIdentity.dev.displayName: 3,
+      AppIdentity.lab.displayName: 3,
     });
     expect(_settingCounts(project, 'ASSETCATALOG_COMPILER_APPICON_NAME'), {
       'AppIcon-${AppIdentity.production.name}': 3,
       'AppIcon-${AppIdentity.qa.name}': 6,
       'AppIcon-${AppIdentity.dev.name}': 3,
+      'AppIcon-${AppIdentity.lab.name}': 3,
     });
+    // The window profile rides the same per-configuration mechanism as the
+    // display name: the lab's three configurations ask for the desktop
+    // window, and AppInfo.xcconfig gives every other build the tablet one.
+    expect(_settingCounts(project, 'GOLEM_WINDOW_PROFILE'), {'desktop': 3});
+    expect(
+      await File('macos/Runner/Configs/AppInfo.xcconfig').readAsString(),
+      contains('GOLEM_WINDOW_PROFILE = tablet\n'),
+    );
     final plist = await File('macos/Runner/Info.plist').readAsString();
+    expect(plist, contains(r'<string>$(GOLEM_WINDOW_PROFILE)</string>'));
     expect(
       RegExp(
         r'<string>\$\(GOLEM_DISPLAY_NAME\)</string>',
@@ -716,13 +778,23 @@ void main() {
   });
 
   test(
-    'the macOS window opens iPad-shaped, resizable, with a minimum',
+    'the macOS window opens iPad-shaped, or desktop-shaped for the lab',
     () async {
+      // Two window profiles, decided by the Info.plist key the build
+      // configuration fills in (ADR 0021): the consumer flavors keep the
+      // iPad-class portrait default, the lab opens landscape at the size its
+      // bench was designed for, and each remembers its frame separately.
       final window = await File(
         'macos/Runner/MainFlutterWindow.swift',
       ).readAsString();
+      expect(window, contains('"GolemWindowProfile"'));
       expect(window, contains('NSSize(width: 834, height: 1194)'));
-      expect(window, contains('minimumContentSize'));
+      expect(window, contains('NSSize(width: 480, height: 640)'));
+      expect(window, contains('NSSize(width: 1440, height: 900)'));
+      expect(window, contains('NSSize(width: 1000, height: 640)'));
+      expect(window, contains('"GolemMainWindow"'));
+      expect(window, contains('"GolemLabWindow"'));
+      expect(window, contains('contentMinSize'));
       expect(window, contains('setFrameAutosaveName'));
     },
   );
@@ -751,7 +823,7 @@ void main() {
       }
       // ...opaque artwork inside it, with the flavor hue leading.
       expect(icon.getPixel(512, 512).a, 255);
-      _expectDominantChannel(icon.getPixel(512, 860), entry.flavor.dominant);
+      _expectTint(icon.getPixel(512, 860), entry.flavor.tint);
       expect(
         File('$path/Contents.json').readAsStringSync(),
         contains('"filename" : "app_icon_512.png"'),
@@ -814,12 +886,12 @@ void main() {
 
       // The flavor hue survives the downscale at the launcher assertions'
       // artwork sample point, scaled from 1024 to 168.
-      _expectDominantChannel(tile.getPixel(84, 148), flavor.dominant);
+      _expectTint(tile.getPixel(84, 148), flavor.tint);
     }
   });
 
   test('platform launchers use their configured native artwork', () async {
-    for (final flavor in _flavors) {
+    for (final flavor in _flavorsOn('ios')) {
       final sourceBytes = await File(
         'assets/images/golem_launcher_${flavor.identity.name}.png',
       ).readAsBytes();
@@ -849,13 +921,13 @@ void main() {
 
       // The flavor hue shows in the artwork body and in the adaptive
       // gradient background derived from it.
-      _expectDominantChannel(source.getPixel(512, 900), flavor.dominant);
+      _expectTint(source.getPixel(512, 900), flavor.tint);
       final background = image.decodePng(
         await File(
           'assets/images/golem_adaptive_background_${flavor.identity.name}.png',
         ).readAsBytes(),
       )!;
-      _expectDominantChannel(background.getPixel(512, 512), flavor.dominant);
+      _expectTint(background.getPixel(512, 512), flavor.tint);
 
       // iOS ships the exact source artwork so the Home Screen icon keeps its
       // white matte corners, silver frame, and flavor hue.
@@ -869,7 +941,30 @@ void main() {
       expect(generatedCorner.r, greaterThan(240));
       expect(generatedCorner.g, greaterThan(240));
       expect(generatedCorner.b, greaterThan(240));
-      _expectDominantChannel(generated.getPixel(512, 900), flavor.dominant);
+      _expectTint(generated.getPixel(512, 900), flavor.tint);
+    }
+    // A macOS-only flavor generates no phone launcher art, and no
+    // flutter_launcher_icons configuration exists to make it.
+    for (final flavor in _flavors) {
+      if (flavor.platforms.contains('ios')) continue;
+      final name = flavor.identity.name;
+      expect(
+        File('flutter_launcher_icons-$name.yaml').existsSync(),
+        isFalse,
+        reason: name,
+      );
+      expect(
+        File('assets/images/golem_launcher_$name.png').existsSync(),
+        isFalse,
+        reason: name,
+      );
+      expect(
+        Directory(
+          'ios/Runner/Assets.xcassets/AppIcon-$name.appiconset',
+        ).existsSync(),
+        isFalse,
+        reason: name,
+      );
     }
   });
 }
