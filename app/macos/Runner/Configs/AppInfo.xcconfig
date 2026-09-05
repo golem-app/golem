@@ -7,10 +7,15 @@
 // The application's name. By default this is also the title of the Flutter window.
 PRODUCT_NAME = golem_flutter
 
-// The fallback for a flavorless build, mirroring iOS: the production, qa, and
-// dev flavors override this per build configuration in the pbxproj, and a
+// The fallback for a flavorless build, mirroring iOS: the production, qa, dev
+// and lab flavors override this per build configuration in the pbxproj, and a
 // build that selects no flavor is a qa build.
 PRODUCT_BUNDLE_IDENTIFIER = app.golem.qa
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 Jan Slominski
+
+// Which window MainFlutterWindow opens (ADR 0021): the consumer flavors keep
+// the iPad-shaped `tablet` default; the lab's build configurations override
+// this with `desktop`. Info.plist carries it as GolemWindowProfile.
+GOLEM_WINDOW_PROFILE = tablet
