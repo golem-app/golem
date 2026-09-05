@@ -1,22 +1,25 @@
 # Golem (Flutter app)
 
-High-fidelity Flutter implementation of Golem. The app ships as three
+High-fidelity Flutter implementation of Golem. The app ships as four
 coexisting build flavors with independent identities, containers, and
-launcher icons — and only those three:
+launcher icons — three phone flavors on every platform, and one bench that
+exists on macOS only:
 
-| Flavor | Display name | Application ID | Icon | Role |
-| --- | --- | --- | --- | --- |
-| `production` | Golem | `app.golem` | Blue | Canonical release flavor |
-| `qa` | Golem QA | `app.golem.qa` | Red | Canonical automation/QA flavor |
-| `dev` | Golem Dev | `app.golem.dev` | Green | Developer iteration flavor |
+| Flavor | Display name | Application ID | Icon | Platforms | Role |
+| --- | --- | --- | --- | --- | --- |
+| `production` | Golem | `app.golem` | Blue | iOS, Android, macOS | Canonical release flavor |
+| `qa` | Golem QA | `app.golem.qa` | Grey | iOS, Android, macOS | Canonical automation/QA flavor |
+| `dev` | Golem Dev | `app.golem.dev` | Green | iOS, Android, macOS | Developer iteration flavor |
+| `lab` | Golem Model Lab | `app.golem.lab` | Red | macOS | The model bench (ADR 0021; "Golem Model Lab" below) |
 
 Select a flavor with the standard workflow — `flutter run --flavor qa`,
 `flutter build apk --release --flavor production`,
 `flutter build ios --simulator --flavor dev`,
 `flutter build macos --flavor qa` — or omit `--flavor` to get
-`dev` (`default-flavor` in `pubspec.yaml`). The same three flavors exist on
-iOS, Android, and macOS. Each flavor stores its own versioned JSON under its
-separate application-support container. Flavors share every in-app asset and
+`dev` (`default-flavor` in `pubspec.yaml`). The three phone flavors exist on
+iOS, Android, and macOS; `lab` has macOS build configurations, a scheme and a
+Dock icon and nothing on the phones. Each flavor stores its own versioned JSON
+under its separate application-support container. Flavors share every in-app asset and
 theme but differ in identity **and default backend wiring**: `qa` wires all
 fakes, while `production` and `dev` wire the real downloader and default to
 real inference (see "Deterministic where it matters" below and
@@ -24,7 +27,8 @@ real inference (see "Deterministic where it matters" below and
 
 The flavorless `Debug`/`Release`/`Profile` configurations — what a direct
 `xcodebuild -scheme Runner` selects — carry qa's bundle id, display name, and
-launcher artwork, so **no build path produces a fourth app** (#116).
+launcher artwork, so **no build path produces an app outside the shipped
+set** (#116).
 
 Their Dart half is not equally fixed, and this is a trap worth knowing. Those
 configurations inherit `Flutter/Generated.xcconfig`, which the last
@@ -549,12 +553,17 @@ the artwork itself, and writes the per-flavor macOS Dock iconsets
 (`macos/Runner/Assets.xcassets/AppIcon-<flavor>.appiconset`) directly —
 Apple-style rounded squares on a transparent margin — because
 flutter_launcher_icons can only emit one fixed macOS catalog. One
-`dart run flutter_launcher_icons` invocation then generates all three
+`dart run flutter_launcher_icons` invocation then generates the three phone
 flavors from the `flutter_launcher_icons-<flavor>.yaml` configs (their
 presence makes the tool ignore any pubspec block): the
 `AppIcon-<flavor>.appiconset` catalogs on iOS and the
-`android/app/src/<flavor>/res` source sets on Android. The launch screen is
-deliberately identical for every flavor.
+`android/app/src/<flavor>/res` source sets on Android. A macOS-only flavor
+(`lab`) gets its Dock iconset and in-app tile from `prepare_launcher.dart`
+alone and has no launcher-icons config, because there is no phone product
+flavor for one to feed. The QA artwork is the red source desaturated —
+tile, gradient and tinted mascot to grey, sparkle, ring and matte untouched
+— and the lab carries the red artwork unchanged (ADR 0021). The launch
+screen is deliberately identical for every flavor.
 
 The launch failure pane uses mascot-only transparent artwork over a Golem navy
 (`#060D1F`) surface, without an app-icon tile, frame, or backing panel. The
@@ -690,7 +699,7 @@ flutter build ios --simulator --flavor qa
 
 QA is the canonical flavor for automated integration and visual testing.
 Every flavor build lands at the same `Runner.app` path, so install each
-flavor right after building it; the three flavors coexist side by side:
+flavor right after building it; the three phone flavors coexist side by side:
 
 ```sh
 xcrun simctl install "$GOLEM_SIMULATOR_ID" build/ios/iphonesimulator/Runner.app
@@ -745,6 +754,73 @@ logs one `INFERNO_PROBE` line hashing the raw pre-parser output, and
 `integration_test/real_backend_probe_test.dart` drives one seeded
 generation through the chat UI with a fixed prompt. Findings live in
 `../docs/notes/determinism-probe.md`.
+
+## Golem Model Lab (macOS)
+
+The fourth flavor is the bench for the models the phone flavors ship, and it
+exists on macOS only (ADR 0021):
+
+```sh
+flutter run -d macos --flavor lab          # or: flutter build macos --flavor lab
+```
+
+It opens landscape at 1440 × 900, clamped to the screen and resizable down
+to 1000 × 640, and remembers that frame separately from the consumer window
+(`GolemWindowProfile` in the built Info.plist, filled from the
+`GOLEM_WINDOW_PROFILE` build setting). It composes the real engines like
+`dev` and shares the consumer app's repositories, but none of its routes: no
+first-run gate, no chat, and nothing downloads because the lab opened.
+
+Its container is its own. Application support is bundle-scoped everywhere,
+but on this unsandboxed target `getApplicationDocumentsDirectory()` is the
+real `~/Documents`, shared by every flavor, so the lab keeps `Documents`
+under its support directory and its downloader lands files there too:
+
+```text
+~/Library/Application Support/app.golem.lab/Documents/models/<catalog-key>/
+```
+
+Provision a fetched artifact without a download — hard links from
+`../packages/inferno/build/models/` (`dart run tool/fetch_model.dart` there)
+are instant on the same volume — and the lab's Download verifies it in place:
+
+```sh
+LAB="$HOME/Library/Application Support/app.golem.lab/Documents/models"
+M=../packages/inferno/build/models
+mkdir -p "$LAB/qwen35-gguf"
+ln "$M"/Qwen3.5-4B-qat-GGUF/Qwen3.5-4B-qat-Q4_0.gguf "$LAB/qwen35-gguf/"
+ln "$M"/Qwen3.5-4B-MTP-GGUF/Qwen3.5-4B.mmproj-q8_0.gguf "$LAB/qwen35-gguf/"
+```
+
+(`../packages/inferno/lib/src/model_manifest.dart` is the authority on file
+names.) The gated proof that the plugin's destination and the repository's
+agree runs on a lab build against exactly that layout:
+
+```sh
+flutter test integration_test/lab_storage_test.dart -d macos --flavor lab \
+  --dart-define=GOLEM_LAB_STORAGE=true
+```
+
+The lab's Dart never reaches a store build: `kLabBuild` is a compile-time
+constant and the lab root is referenced only behind it. The proof reads what
+the compiler kept — build the production flavor with size analysis and run
+the checker over the retained-object profile (`snapshot.<arch>.json`; on a
+flavored macOS build the tool exits 1 *after* writing it, looking for an
+unflavored product path, and the profile is complete):
+
+```sh
+flutter build macos --release --flavor production --analyze-size \
+  --code-size-directory=build/size-macos
+flutter build apk --release --flavor production --analyze-size \
+  --target-platform android-arm64 --code-size-directory=build/size-android
+flutter build ios --release --no-codesign --flavor production --analyze-size \
+  --code-size-directory=build/size-ios
+(cd .. && dart run tool/check_lab_exclusion.dart \
+  app/build/size-macos app/build/size-android app/build/size-ios)
+```
+
+`integration_test/release_hygiene_test.dart` takes `GOLEM_EXPECTED_LAB=true`
+on a lab build and expects it false on every other flavor.
 
 ## Real-model acceptance (device)
 
