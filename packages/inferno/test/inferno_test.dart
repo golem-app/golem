@@ -89,7 +89,16 @@ void main() {
       'hello',
       ' world',
     ]);
-    expect(events.whereType<InfernoMetricsEvent>(), hasLength(1));
+    final metrics = events.whereType<InfernoMetricsEvent>().single.metrics;
+    expect(
+      metrics.timingSemanticsVersion,
+      InfernoMetrics.currentTimingSemanticsVersion,
+    );
+    expect(metrics.timeToFirstTokenSeconds, isNotNull);
+    expect(
+      metrics.timeToFirstTokenSeconds,
+      lessThanOrEqualTo(metrics.elapsedSeconds),
+    );
     expect(events.last, isA<InfernoGenerationCompleted>());
     expect(backend.lastRequest!.sampling.stopTokenIds, [1, 106]);
     expect(backend.lastRequest!.sampling.topK, 40);
@@ -232,6 +241,90 @@ void main() {
         .toList();
     expect(events.last, isA<InfernoGenerationCompleted>());
     await inferno.unload();
+  });
+
+  group('metrics payload parsing', () {
+    const payload = <String, Object?>{
+      'decodeTokensPerSecond': 31.5,
+      'promptTokensPerSecond': 812.0,
+      'generatedTokenCount': 12,
+      'elapsedSeconds': 0.61,
+      'promptTokenCount': 20,
+      'timeToFirstTokenSeconds': 0.24,
+      'peakPhysicalFootprintBytes': 483183820,
+      'timingSemanticsVersion': 2,
+    };
+
+    Matcher refuses(String key) => throwsA(
+      isA<InfernoException>()
+          .having((error) => error.code, 'code', InfernoErrorCode.internal)
+          .having((error) => error.message, 'message', contains(key)),
+    );
+
+    test('a version-2 payload parses, optional fields survive absence', () {
+      final metrics = InfernoMetrics.fromPayload(payload);
+      expect(metrics.decodeTokensPerSecond, 31.5);
+      expect(metrics.promptTokensPerSecond, 812.0);
+      expect(metrics.generatedTokenCount, 12);
+      expect(metrics.elapsedSeconds, 0.61);
+      expect(metrics.promptTokenCount, 20);
+      expect(metrics.timeToFirstTokenSeconds, 0.24);
+      expect(metrics.peakPhysicalFootprintBytes, 483183820);
+      expect(metrics.timingSemanticsVersion, 2);
+
+      // The empty-output shape: nothing generated, so no first token.
+      final empty = InfernoMetrics.fromPayload(
+        {
+          ...payload,
+          'decodeTokensPerSecond': 0,
+          'generatedTokenCount': 0,
+          'timeToFirstTokenSeconds': null,
+          'peakPhysicalFootprintBytes': null,
+        }..remove('promptTokenCount'),
+      );
+      expect(empty.generatedTokenCount, 0);
+      expect(empty.decodeTokensPerSecond, 0);
+      expect(empty.promptTokenCount, isNull);
+      expect(empty.timeToFirstTokenSeconds, isNull);
+      expect(empty.peakPhysicalFootprintBytes, isNull);
+
+      // A version this package has never heard of is a label, not a gate:
+      // the ABI check already decided the shim may speak.
+      expect(
+        InfernoMetrics.fromPayload({
+          ...payload,
+          'timingSemanticsVersion': 3,
+        }).timingSemanticsVersion,
+        3,
+      );
+    });
+
+    test('an unlabelled or malformed payload is refused, typed', () {
+      final unversioned = Map.of(payload)..remove('timingSemanticsVersion');
+      expect(
+        () => InfernoMetrics.fromPayload(unversioned),
+        refuses('timingSemanticsVersion'),
+      );
+      for (final bad in const <Object?>['2', 0, 2.0]) {
+        expect(
+          () => InfernoMetrics.fromPayload({
+            ...payload,
+            'timingSemanticsVersion': bad,
+          }),
+          refuses('timingSemanticsVersion'),
+          reason: '$bad',
+        );
+      }
+      final noElapsed = Map.of(payload)..remove('elapsedSeconds');
+      expect(
+        () => InfernoMetrics.fromPayload(noElapsed),
+        refuses('elapsedSeconds'),
+      );
+      expect(
+        () => InfernoMetrics.fromPayload({...payload, 'promptTokenCount': 'x'}),
+        refuses('promptTokenCount'),
+      );
+    });
   });
 
   test('model and native inputs stay immutably pinned', () {

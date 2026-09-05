@@ -5,6 +5,18 @@
 > Qwen 3.5 card's, so the 449-token / `dba9ee464930b4e1` GGUF baseline below
 > is historical. Direct-mode anchors remain current.
 
+> **Legacy timing semantics (v1)** — recorded before #57
+> (`docs/decisions/0020-generation-timing-semantics.md`). The `ttft s` column
+> is not a time to first token. llama.cpp stamped after the prefill was
+> submitted, and on Metal the backend settles on the first logits read, so
+> its column held the prefill compute but not tokenization, allocation or
+> dispatch; its `prompt tok/s` measured submission and reads an order of
+> magnitude high, and its `decode tok/s` absorbed the prefill compute and
+> reads low on short replies. The MLX shim reconstructed a post-prefill delay
+> by subtracting its library-reported prompt time from the wall clock, which
+> is why every MLX row below reads 0.000–0.002 s; its tok/s columns are the
+> library's own. Answers, hashes, token counts and peak GiB are unaffected.
+
 Re-run for #20. #18 replaced the Qwen 3.5 4B MLX artifact but did not re-run
 its text anchors; this closes that gap and compares the two engines on the
 exact artifacts the app pins today.

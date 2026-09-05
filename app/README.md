@@ -861,8 +861,10 @@ decisions into recorded evidence: it runs the fixed prompt set in
 `lib/features/eval/domain/eval_spec.dart` against every requested
 artifact × engine combo, scores the parsed answer channel with
 deterministic checks, captures full broker metrics (decode/prompt tok/s,
-TTFT, peak footprint) under fixed seeds, and writes `report.json` plus a
-committable `report.md` per run. Fetch the pinned artifacts first
+time to first token, peak footprint) under fixed seeds, tags them with the
+timing-semantics version the engines reported and refuses to publish a report
+that mixes two (`../docs/decisions/0020-generation-timing-semantics.md`), and
+writes `report.json` plus a committable `report.md` per run. Fetch the pinned artifacts first
 (from `../packages/inferno`: `dart run tool/fetch_model.dart gguf` and
 `dart run tool/fetch_model.dart mlx`), then one command evaluates both
 engines:

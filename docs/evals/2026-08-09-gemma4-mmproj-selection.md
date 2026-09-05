@@ -1,5 +1,14 @@
 # Gemma 4 E2B multimodal projector selection
 
+> **Legacy timing semantics (v1)** — the TTFT figures below came from a
+> bespoke CLI over the ABI-3 llama shim, which stamped after the prefill was
+> submitted. On Metal the backend settles on the first logits read, so the
+> figures hold the text prefill's compute but not the projector encode,
+> tokenization, allocation or dispatch; they are not times to first token
+> and are not comparable with v2
+> (`docs/decisions/0020-generation-timing-semantics.md`). The selection rests
+> on peak footprint and answer quality, which this note does not touch.
+
 Recorded for #18. Decides which `mmproj` ships with `gemma4-gguf`, and
 establishes that Gemma 4 E2B image input works at all through the pinned
 llama.cpp path.

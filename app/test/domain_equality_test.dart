@@ -186,6 +186,21 @@ void main() {
           ),
         ),
       );
+      // A record measured here and now claims the current contract, and the
+      // contract is part of its identity.
+      expect(metrics.timingSemanticsVersion, currentTimingSemantics);
+      expect(
+        metrics,
+        isNot(
+          const InferenceMetrics(
+            promptTokensPerSecond: 10,
+            decodeTokensPerSecond: 20,
+            tokenCount: 30,
+            elapsedSeconds: 1.5,
+            timingSemanticsVersion: legacyTimingSemantics,
+          ),
+        ),
+      );
     });
 
     test('ChatState stays identity-equal by design', () {

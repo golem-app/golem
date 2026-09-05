@@ -153,6 +153,15 @@ void main() {
 
       Future<void> install(String key) async {
         final entry = entryFor(key);
+        // The shell is the first frame since #159, so the launch wait above
+        // returns before the model store has been read; the status below is
+        // only meaningful once it has. Loading, not value: a failed load must
+        // surface through requireValue, not as an eight-minute timeout.
+        await pumpUntil(
+          tester,
+          'the model state to load',
+          () => !providers.read(modelControllerProvider).isLoading,
+        );
         final before = providers
             .read(modelControllerProvider)
             .requireValue

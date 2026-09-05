@@ -10,7 +10,7 @@ ChatController -> InferenceRepository -> app/lib/broker
                                         v
                                   Inferno Dart API
                                         |
-                               shared asynchronous C ABI (version 4)
+                               shared asynchronous C ABI (version 5)
                                   /             \
                           llama.cpp shim      MLX Swift shim
                     Android · macOS · iOS*     iOS · macOS*
@@ -89,6 +89,43 @@ Images do not join the JSON (ADR 0004): `inferno_engine_generate` takes a
 separate borrowed array of encoded image bytes, decoded by the engine, valid
 for the call only — the shim copies what it needs before returning. The
 broker maps each image onto the profile's media marker in the rendered prompt.
+
+## Timing contract
+
+Every generation that does not fail ends with one METRICS event whose numbers are measured
+against five boundaries, and whose `timingSemanticsVersion` names the contract
+they were measured under. Version 2 (ABI 5, ADR 0020) is the one below.
+Version 1 — an absent key, found only in records written before #57 —
+started its `timeToFirstTokenSeconds` at the prefill's submission; ADR 0020
+records what each engine's columns actually held.
+
+| Boundary | llama.cpp shim | MLX shim |
+| --- | --- | --- |
+| Request accepted (t0) | first statement of `inferno_engine_generate`, before the image-byte copy and the wait for a retiring worker | first statement of `inferno_mlx_engine_generate`, before the buffer copy and the wait for a retiring operation |
+| Prompt evaluation | `prefill_start → prompt_end`: the prefill batch loop (`mtmd_helper_eval_chunks` with images) followed by `llama_synchronize`, because a decode returns once the graph is submitted and the backend settles on the first logits read; tokenization and context/KV allocation precede it | the library's `promptTime`: the prefill run synchronously inside `MLXLMCommon.generate` plus the step that produces the first token; when the library never summarises (a stop sequence broke the loop, or a cancel), the interval from the `generate` call to the first chunk |
+| First output token (t1) | stamped after the first `llama_sampler_sample` that is neither end-of-generation nor a stop id, before stop-sequence hold-back | the earlier of two measurements of one instant: the summary's arrival less the library's `generateTime` (the summary is yielded right after that figure is taken, so this lands on the instant the first token was returned, with iterator setup and task dispatch inside), and the wall clock to the first streamed chunk; the first is immune to the streaming detokenizer withholding a token that ends mid-UTF-8 and to the tool-call scanner buffering a reply from its first `{`, the second is what remains when the summary never arrives |
+| Decode interval | `elapsedSeconds − timeToFirstTokenSeconds`: what follows the first token, holding one decode step per generated token — the step that yields the next token, or the one that ends the reply | same |
+| Total native request latency | t0 → the instant the generation loop stops | t0 → the summary's arrival on a normal completion, which excludes the library's stream teardown; t0 → where the loop was left after a cancel or a stop sequence |
+
+Derived: `timeToFirstTokenSeconds` is t1 − t0 and null exactly when no token
+was produced (zero would be a measurement); `elapsedSeconds` is the total
+latency; `promptTokensPerSecond` divides `promptTokenCount` by prompt
+evaluation, an intra-engine figure because the two windows differ by one
+decode step; `decodeTokensPerSecond` is `generatedTokenCount` over the decode
+interval — the per-step rate, identical on both engines and recomputable from
+the published numbers, down to a one-token reply whose window is the single
+step that ended it. A reply cut by a stop sequence skips that last step and
+reads slightly high; nothing else does. The bounded wait for a
+retiring worker sits inside t0 → t1 on purpose: a caller who cancels and
+re-sends waits through it. For every record with a token:
+`0 < ttft ≤ elapsed` and `ttft ≥ promptTokenCount / promptTokensPerSecond`.
+
+Cancellation still reports metrics. A cancel before the first token yields
+`generatedTokenCount` 0, a null first-token time, a 0 decode rate, and the
+elapsed time the request really cost. On MLX a cancel that lands during input
+preparation — image decoding runs before tokenization there — also reports a
+null prompt token count, because none exists yet. Only a decode failure
+replaces the metrics event with an error.
 
 ## Native callbacks, cancellation, and teardown
 

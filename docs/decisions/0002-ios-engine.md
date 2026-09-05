@@ -34,16 +34,22 @@ MLX the iOS `auto` engine.
 shows llama's *allocated* memory is small and its weight pages are cleanly
 evictable under pressure; MLX's buffers are resident allocations.
 
-² Measurement-window caveat: at recording time the MLX shim started its
-elapsed/TTFT clock only after `MLXLMCommon.generate` returned (post-prefill),
-while the llama shim starts before prefill, so the per-engine windows are not
-strictly comparable; the shim has since been aligned to start before the
-call. TTFT has since been aligned as well (both engines now report decode
-start → first token; MLX subtracts its library-reported prompt time), but
-the recorded MLX TTFT values predate that alignment and include prefill.
-Neither skew is large enough to change the conclusion — decode rates are
-library-reported and within ~5% — but re-record before citing these
-numbers beyond this decision.
+² Measurement-window caveat: every timing above is **timing-semantics
+version 1** (ADR 0020). At recording time the MLX shim started its elapsed
+clock only after `MLXLMCommon.generate` returned (post-prefill) while the
+llama shim started before prefill, so the two elapsed windows are not
+strictly comparable. The TTFT column is not a time to first token at all:
+llama.cpp stamped after submitting the prefill, which on Metal settles at the
+first sampled token, so its figures hold the prefill compute and nothing
+before it, and the recorded MLX values predate even that alignment and
+include prefill from a post-`generate` start. #57 replaced the whole contract
+with version 2 —
+request acceptance → first output token, prefill inside the window — so none
+of these figures may be compared with a version-2 measurement in either
+direction. Neither skew is large enough to change the conclusion — decode
+rates are within ~5%, and llama's short-answer rates read low if anything,
+because its window absorbed the prefill compute (ADR 0020) — but re-record
+before citing these numbers beyond this decision.
 
 
 The ticket's acceptance baseline for MLX on this model class and device

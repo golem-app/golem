@@ -5,11 +5,14 @@ import 'dart:typed_data';
 import 'package:inferno/inferno.dart';
 import 'package:test/test.dart';
 
+import 'timing_invariants.dart';
+
 void main() {
   final modelPath = Platform.environment['INFERNO_TOY_GGUF'];
   final skipReason = modelPath == null
       ? 'Set INFERNO_TOY_GGUF using tool/fetch_toy_model.dart.'
       : false;
+  final gemmaPath = Platform.environment['INFERNO_GEMMA_GGUF'];
 
   test('disposing mid-generation ends the stream once and stays quiet', () async {
     // #124: the app tore the isolate down while the engine's worker thread was
@@ -98,8 +101,7 @@ void main() {
         .toList();
     expect(events.whereType<InfernoTextDelta>(), isNotEmpty);
     final metrics = events.whereType<InfernoMetricsEvent>().single.metrics;
-    expect(metrics.generatedTokenCount, greaterThan(0));
-    expect(metrics.elapsedSeconds, greaterThanOrEqualTo(0));
+    expectHonestTiming(metrics);
     // Measured on Apple platforms, null elsewhere — never a misleading zero.
     if (Platform.isMacOS || Platform.isIOS) {
       expect(metrics.peakPhysicalFootprintBytes, greaterThan(0));
@@ -242,9 +244,94 @@ void main() {
         events.whereType<InfernoGenerationCompleted>().single.reason,
         InfernoStopReason.cancelled,
       );
+      // A cancel still reports metrics, and where it landed decides their
+      // shape: before the first token there is no first-token time — null,
+      // never a zero that reads like a measurement — and no decode rate.
+      // Tokenization precedes prefill, so the prompt count is known either
+      // way, and the request cost real time either way. An EOS-first reply
+      // has the same shape; the toy fixture cannot be made to produce one
+      // deterministically, so this branch is its coverage too.
+      final metrics = events.whereType<InfernoMetricsEvent>().single.metrics;
+      expect(
+        metrics.timingSemanticsVersion,
+        InfernoMetrics.currentTimingSemanticsVersion,
+      );
+      expect(metrics.elapsedSeconds, greaterThan(0));
+      expect(metrics.promptTokenCount, greaterThan(0));
+      if (metrics.generatedTokenCount == 0) {
+        expect(metrics.timeToFirstTokenSeconds, isNull);
+        expect(metrics.decodeTokensPerSecond, 0);
+      } else {
+        expect(
+          metrics.timeToFirstTokenSeconds,
+          lessThanOrEqualTo(metrics.elapsedSeconds),
+        );
+      }
       await inferno.unload();
     },
     skip: skipReason,
+  );
+
+  test('a single-token generation measures the step that ended it', () async {
+    // The window after the first token is one decode step here — the one that
+    // produced the stop token or hit the budget — so the rate is that step's.
+    final inferno = Inferno.native();
+    await inferno.load(
+      engine: InfernoEngineKind.llamaCpp,
+      modelPath: modelPath!,
+    );
+    final events = await inferno
+        .generate(
+          const InfernoGenerationRequest(
+            prompt: 'Hello',
+            sampling: InfernoSamplingParameters(maxTokens: 1, seed: 7),
+          ),
+        )
+        .toList();
+    final metrics = events.whereType<InfernoMetricsEvent>().single.metrics;
+    expect(metrics.generatedTokenCount, lessThanOrEqualTo(1));
+    if (metrics.generatedTokenCount == 1) {
+      expectHonestTiming(metrics);
+      expect(metrics.decodeTokensPerSecond, greaterThan(0));
+    } else {
+      expect(metrics.timeToFirstTokenSeconds, isNull);
+      expect(metrics.decodeTokensPerSecond, 0);
+    }
+    await inferno.unload();
+  }, skip: skipReason);
+
+  test(
+    'the pinned Gemma GGUF satisfies the timing contract',
+    () async {
+      final inferno = Inferno.native();
+      await inferno.load(
+        engine: InfernoEngineKind.llamaCpp,
+        modelPath: gemmaPath!,
+      );
+      final events = await inferno
+          .generate(
+            const InfernoGenerationRequest(
+              prompt: '<bos><|turn>user\nSay hello.<turn|>\n<|turn>model\n',
+              sampling: InfernoSamplingParameters(
+                maxTokens: 16,
+                temperature: 0.2,
+                topP: 0.9,
+                seed: 7,
+                stopTokenIds: [1, 106],
+              ),
+            ),
+          )
+          .toList();
+      expectHonestTiming(
+        events.whereType<InfernoMetricsEvent>().single.metrics,
+      );
+      await inferno.unload();
+    },
+    skip: gemmaPath == null
+        ? 'Set INFERNO_GEMMA_GGUF (see tool/fetch_model.dart) for the GGUF '
+              'timing check.'
+        : false,
+    tags: ['real-model'],
   );
 
   test('topK 1 collapses sampling to greedy regardless of seed', () async {

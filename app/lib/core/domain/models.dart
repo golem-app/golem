@@ -469,6 +469,23 @@ final class ChatHistorySnapshot {
   String encode() => const JsonEncoder.withIndent('  ').convert(toJson());
 }
 
+/// The timing contract a metrics record was measured under (ADR 0020).
+///
+/// Version 1 is what shipped before #57: `timeToFirstTokenSeconds` ran from
+/// the prefill's submission to the first token (llama.cpp — on Metal that held
+/// the prefill compute and nothing before it), or was reconstructed by
+/// subtracting the library-reported prompt time from the wall clock (MLX,
+/// which is why its recorded values read 0.000–0.002 s). Not a time to first
+/// token either way.
+const legacyTimingSemantics = 1;
+
+/// Version 2: `timeToFirstTokenSeconds` runs from the native shim accepting
+/// the request to the first output token — worker dispatch, tokenization and
+/// prefill inside the window; `elapsedSeconds` runs from acceptance to the end
+/// of generation; `decodeTokensPerSecond` is the token count over the window
+/// after the first token, which holds one engine step per token.
+const currentTimingSemantics = 2;
+
 final class InferenceMetrics {
   const InferenceMetrics({
     required this.promptTokensPerSecond,
@@ -478,6 +495,7 @@ final class InferenceMetrics {
     this.promptTokenCount,
     this.timeToFirstTokenSeconds,
     this.peakPhysicalFootprintBytes,
+    this.timingSemanticsVersion = currentTimingSemantics,
   });
   final double promptTokensPerSecond;
   final double decodeTokensPerSecond;
@@ -490,6 +508,15 @@ final class InferenceMetrics {
   final double? timeToFirstTokenSeconds;
   final int? peakPhysicalFootprintBytes;
 
+  /// Which contract produced [timeToFirstTokenSeconds], [elapsedSeconds] and
+  /// [decodeTokensPerSecond]. A producer measuring here and now takes the
+  /// default; one forwarding an engine's numbers passes the engine's version.
+  /// An absent key on the way in is [legacyTimingSemantics]: a record written
+  /// before #57 measured the old window, and relabelling it is the dishonesty
+  /// this field exists to prevent. An `int` rather than an enum so a value a
+  /// newer build wrote round-trips through this one unchanged.
+  final int timingSemanticsVersion;
+
   Map<String, Object> toJson() => {
     'promptTokensPerSecond': promptTokensPerSecond,
     'decodeTokensPerSecond': decodeTokensPerSecond,
@@ -498,6 +525,8 @@ final class InferenceMetrics {
     'promptTokenCount': ?promptTokenCount,
     'timeToFirstTokenSeconds': ?timeToFirstTokenSeconds,
     'peakPhysicalFootprintBytes': ?peakPhysicalFootprintBytes,
+    // Never sparse: this is what keeps the record self-describing on disk.
+    'timingSemanticsVersion': timingSemanticsVersion,
   };
 
   factory InferenceMetrics.fromJson(
@@ -511,6 +540,8 @@ final class InferenceMetrics {
     timeToFirstTokenSeconds: (json['timeToFirstTokenSeconds'] as num?)
         ?.toDouble(),
     peakPhysicalFootprintBytes: json['peakPhysicalFootprintBytes'] as int?,
+    timingSemanticsVersion:
+        json['timingSemanticsVersion'] as int? ?? legacyTimingSemantics,
   );
 
   @override
@@ -522,7 +553,8 @@ final class InferenceMetrics {
       other.elapsedSeconds == elapsedSeconds &&
       other.promptTokenCount == promptTokenCount &&
       other.timeToFirstTokenSeconds == timeToFirstTokenSeconds &&
-      other.peakPhysicalFootprintBytes == peakPhysicalFootprintBytes;
+      other.peakPhysicalFootprintBytes == peakPhysicalFootprintBytes &&
+      other.timingSemanticsVersion == timingSemanticsVersion;
 
   @override
   int get hashCode => Object.hash(
@@ -533,6 +565,7 @@ final class InferenceMetrics {
     promptTokenCount,
     timeToFirstTokenSeconds,
     peakPhysicalFootprintBytes,
+    timingSemanticsVersion,
   );
 }
 

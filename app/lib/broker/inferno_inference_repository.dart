@@ -373,6 +373,8 @@ final class InfernoInferenceRepository implements InferenceRepository {
                 promptTokenCount: metrics.promptTokenCount,
                 timeToFirstTokenSeconds: metrics.timeToFirstTokenSeconds,
                 peakPhysicalFootprintBytes: metrics.peakPhysicalFootprintBytes,
+                // The engine's numbers carry the engine's contract.
+                timingSemanticsVersion: metrics.timingSemanticsVersion,
               ),
             );
           case BrokerGenerationCompleted():
@@ -466,6 +468,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
     if (metrics == null) return;
     diagnosticSink?.call(
       'INFERNO_METRICS engine=${engine.name}'
+      ' timingSemanticsVersion=${metrics.timingSemanticsVersion}'
       ' stopReason=${reason.name}'
       ' decodeTokensPerSecond=${metrics.decodeTokensPerSecond.toStringAsFixed(2)}'
       ' promptTokensPerSecond=${metrics.promptTokensPerSecond.toStringAsFixed(2)}'

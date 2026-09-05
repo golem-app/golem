@@ -7,6 +7,8 @@ import 'package:inferno/inferno.dart';
 import 'package:inferno/testing.dart';
 import 'package:test/test.dart';
 
+import 'timing_invariants.dart';
+
 void main() {
   final mlxPath = Platform.environment['INFERNO_GEMMA_MLX'];
   final skipReason = mlxPath == null
@@ -50,7 +52,7 @@ void main() {
       final events = await inferno!.generate(request).toList();
       expect(events.whereType<InfernoTextDelta>(), isNotEmpty);
       final metrics = events.whereType<InfernoMetricsEvent>().single.metrics;
-      expect(metrics.generatedTokenCount, greaterThan(0));
+      expectHonestTiming(metrics);
       expect(metrics.peakPhysicalFootprintBytes, greaterThan(0));
       expect(events.last, isA<InfernoGenerationCompleted>());
     });

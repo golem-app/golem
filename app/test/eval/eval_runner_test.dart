@@ -4,6 +4,7 @@ import 'package:golem_flutter/broker/inferno_inference_repository.dart';
 import 'package:golem_flutter/broker/runtime.dart';
 
 import 'package:golem_flutter/broker/model_profile.dart';
+import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/features/eval/application/eval_runner.dart';
 import 'package:golem_flutter/features/eval/domain/eval_spec.dart';
 
@@ -65,6 +66,7 @@ const _metrics = BrokerRuntimeMetrics(
   promptTokensPerSecond: 100,
   generatedTokenCount: 12,
   elapsedSeconds: 0.5,
+  timingSemanticsVersion: currentTimingSemantics,
   promptTokenCount: 20,
   timeToFirstTokenSeconds: 0.1,
   peakPhysicalFootprintBytes: 1024,

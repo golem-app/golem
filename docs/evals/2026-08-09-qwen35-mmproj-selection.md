@@ -1,5 +1,14 @@
 # Qwen 3.5 GGUF multimodal projector selection
 
+> **Legacy timing semantics (v1)** — the TTFT figures below came from a
+> bespoke CLI over the ABI-3 llama shim, which stamped after the prefill was
+> submitted. On Metal the backend settles on the first logits read, so the
+> figures hold the text prefill's compute but not the projector encode,
+> tokenization, allocation or dispatch; they are not times to first token
+> and are not comparable with v2
+> (`docs/decisions/0020-generation-timing-semantics.md`). The selection rests
+> on peak footprint and answer quality, which this note does not touch.
+
 Recorded for #18. This independently selects the projector shipped with the
 Qwen 3.5 2B and 4B GGUF artifacts and proves that their similarly named
 projectors are not interchangeable.

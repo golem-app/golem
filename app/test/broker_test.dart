@@ -59,6 +59,7 @@ final class _RecordingRuntime implements BrokerRuntime {
         promptTokensPerSecond: 120,
         generatedTokenCount: 4,
         elapsedSeconds: 0.2,
+        timingSemanticsVersion: currentTimingSemantics,
         promptTokenCount: 12,
         timeToFirstTokenSeconds: 0.05,
         peakPhysicalFootprintBytes: 128 << 20,
@@ -78,6 +79,24 @@ final class _MetricsRuntime extends _RecordingRuntime {
         promptTokensPerSecond: 240,
         generatedTokenCount: 7,
         elapsedSeconds: 0.4,
+        timingSemanticsVersion: currentTimingSemantics,
+      ),
+    );
+    yield const BrokerGenerationCompleted(BrokerStopReason.endOfSequence);
+  }
+}
+
+final class _LegacyMetricsRuntime extends _RecordingRuntime {
+  @override
+  Stream<BrokerRuntimeEvent> generate(BrokerGenerationRequest request) async* {
+    yield const BrokerTextDelta('Answer');
+    yield const BrokerMetricsDelta(
+      BrokerRuntimeMetrics(
+        decodeTokensPerSecond: 18.5,
+        promptTokensPerSecond: 240,
+        generatedTokenCount: 7,
+        elapsedSeconds: 0.4,
+        timingSemanticsVersion: legacyTimingSemantics,
       ),
     );
     yield const BrokerGenerationCompleted(BrokerStopReason.endOfSequence);
@@ -184,6 +203,7 @@ void main() {
     expect(metrics.decodeTokensPerSecond, 20);
     expect(metrics.promptTokensPerSecond, 120);
     expect(metrics.elapsedSeconds, 0.2);
+    expect(metrics.timingSemanticsVersion, currentTimingSemantics);
     expect(events.last, isA<CompletedEvent>());
     expect(runtime.request!.prompt, contains('<|think|>'));
     expect('<bos>'.allMatches(runtime.request!.prompt), hasLength(1));
@@ -379,7 +399,7 @@ void main() {
     },
   );
 
-  test('the metrics line records the effective sampling', () async {
+  test('the metrics line records the timing contract and sampling', () async {
     final lines = <String>[];
 
     Future<String> metricsLine({SamplingOverrides? overrides}) async {
@@ -403,6 +423,7 @@ void main() {
     }
 
     final defaults = await metricsLine();
+    expect(defaults, contains(' timingSemanticsVersion=2'));
     expect(defaults, contains(' temperature=1.0'));
     expect(defaults, contains(' topK=null'));
     expect(defaults, contains(' maxTokens=2048'));
@@ -503,6 +524,33 @@ void main() {
     expect(metrics.promptTokenCount, 'Hi'.length);
     expect(metrics.timeToFirstTokenSeconds, isNotNull);
     expect(metrics.peakPhysicalFootprintBytes, 1 << 20);
+    expect(metrics.timingSemanticsVersion, currentTimingSemantics);
+    // The package and the app name the same contract; core cannot import
+    // Inferno to share the constant, so the boundary test pins the pair.
+    expect(
+      InfernoMetrics.currentTimingSemanticsVersion,
+      currentTimingSemantics,
+    );
+  });
+
+  test('the app contract carries the engine\'s timing contract', () async {
+    // Every other fixture is version 2, so only a legacy-claiming engine can
+    // prove the version is forwarded rather than stamped by this build.
+    final repository = InfernoInferenceRepository(
+      _LegacyMetricsRuntime(),
+      engine: BrokerEngine.llamaCpp,
+      profile: const Gemma4Profile(),
+      modelPath: '/local/model.gguf',
+    );
+    await repository.prepare();
+    final events = await repository
+        .generate(
+          context: [PromptMessage.text('user', 'Hello')],
+          reasoningEnabled: false,
+        )
+        .toList();
+    final metrics = events.whereType<MetricsEvent>().single.metrics;
+    expect(metrics.timingSemanticsVersion, legacyTimingSemantics);
   });
 
   test(

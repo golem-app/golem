@@ -9,7 +9,8 @@ import MLXLLM
 import MLXVLM
 import Tokenizers
 
-private let infernoMlxABI: UInt32 = 4
+private let infernoMlxABI: UInt32 = 5
+private let infernoTimingSemanticsVersion: Int = 2
 
 private enum EventKind {
     static let textDelta: Int32 = 1
@@ -517,6 +518,11 @@ private func physicalFootprintBytes() -> UInt64 {
     return result == KERN_SUCCESS ? UInt64(info.phys_footprint) : 0
 }
 
+private func seconds(_ duration: Duration) -> Double {
+    let parts = duration.components
+    return Double(parts.seconds) + Double(parts.attoseconds) / 1_000_000_000_000_000_000
+}
+
 private func firstStopRange(
     in bytes: [UInt8],
     stops: [[UInt8]]
@@ -718,6 +724,10 @@ public func infernoMlxEngineGenerate(
           let requestJSON,
           let callback
     else { return -1 }
+    // Timing semantics 2: accepted here, so the buffer copy, JSON decoding,
+    // the bounded wait for a retiring operation, tokenization and prefill
+    // are all inside the interval the caller waited through.
+    let requestStart = ContinuousClock.now
     let encoded = Data(String(cString: requestJSON).utf8)
     let sink = EventSink(
         operationID: operationID,
@@ -836,10 +846,10 @@ public func infernoMlxEngineGenerate(
                 var generationContext = context
                 generationContext.configuration.eosTokenIds = Set(request.stopTokenIds)
                 generationContext.configuration.stopStrings = []
-                // Started before generate(): the call is not lazy, so prompt
-                // processing must land inside elapsedSeconds to match the
-                // llama shim's measurement window.
-                let started = ContinuousClock.now
+                // generate() is not lazy: TokenIterator's init runs the
+                // prefill windows synchronously, so the library's promptTime
+                // is measured from here.
+                let generateCallStart = ContinuousClock.now
                 // The token-task path miscomputes Gemma 4 per-layer inputs
                 // during prefill; this overload is the streaming path proven
                 // on device against the pinned artifact. Requested stop-token
@@ -852,6 +862,10 @@ public func infernoMlxEngineGenerate(
                 )
 
                 var firstTokenAt: ContinuousClock.Instant?
+                // The summary's arrival: the library yields it right after
+                // measuring generateTime and before synchronising its GPU
+                // stream, so it anchors both ends of the generation window.
+                var summaryAt: ContinuousClock.Instant?
                 var peakFootprint = physicalFootprintBytes()
                 var generatedChunkCount = 0
                 var pending: [UInt8] = []
@@ -880,6 +894,7 @@ public func infernoMlxEngineGenerate(
                             break
                         }
                     case .info(let info):
+                        summaryAt = .now
                         completion = info
                         switch info.stopReason {
                         case .cancelled:
@@ -902,27 +917,47 @@ public func infernoMlxEngineGenerate(
                         break
                     }
                 }
+                // A normal completion ends at the summary, which excludes the
+                // library's stream teardown; a cancel or a stop sequence ends
+                // where the loop was left.
+                let generationEnd = summaryAt ?? .now
                 if !pending.isEmpty && stopReason != "stop_sequence" {
                     sink.emit(EventKind.textDelta, bytes: pending)
                 }
                 if Task.isCancelled { stopReason = "cancelled" }
 
-                let elapsed = started.duration(to: .now).components
-                let elapsedSeconds = Double(elapsed.seconds)
-                    + Double(elapsed.attoseconds) / 1_000_000_000_000_000_000
-                let promptSeconds = completion?.promptTime ?? 0
-                let decodeSeconds = completion?.generateTime ?? 0
+                let elapsedSeconds = seconds(requestStart.duration(to: generationEnd))
+                // When the loop broke early the library never summarised;
+                // the interval to the first chunk measures the same window
+                // its promptTime does (prefill plus the first-token step).
+                let promptSeconds = completion?.promptTime
+                    ?? firstTokenAt.map { seconds(generateCallStart.duration(to: $0)) }
+                    ?? 0
                 let generatedCount = completion?.generationTokenCount
                     ?? generatedChunkCount
-                // TTFT matches the llama shim's window (decode start →
-                // first token): the wall clock to the first chunk includes
-                // prefill, so the library-reported prompt time comes off.
-                let firstTokenSeconds: Double? = firstTokenAt.map { first in
-                    let duration = started.duration(to: first).components
-                    let wallClock = Double(duration.seconds)
-                        + Double(duration.attoseconds) / 1_000_000_000_000_000_000
-                    return max(0, wallClock - promptSeconds)
+                // Two measurements of one instant; the earlier wins. The
+                // summary's arrival less the library's generateTime lands on
+                // the instant the first token was returned — everything
+                // before it, iterator setup and task dispatch included, is
+                // inside — and does not see the streaming detokenizer hold a
+                // token that ends mid-UTF-8, nor the tool-call scanner buffer
+                // a reply from its first "{". The wall clock to the first
+                // chunk is what remains when the summary never arrives.
+                // Clamped because generateTime is the library's wall clock.
+                var firstTokenCandidates: [Double] = []
+                if let firstTokenAt {
+                    firstTokenCandidates.append(seconds(requestStart.duration(to: firstTokenAt)))
                 }
+                if let completion, let summaryAt, completion.generationTokenCount > 0 {
+                    firstTokenCandidates.append(
+                        seconds(requestStart.duration(to: summaryAt)) - completion.generateTime
+                    )
+                }
+                let firstTokenSeconds = firstTokenCandidates.min()
+                    .map { min(max($0, 0), elapsedSeconds) }
+                // One library step per generated token sits in this window,
+                // the last being the step that ended the reply.
+                let decodeSeconds = firstTokenSeconds.map { elapsedSeconds - $0 } ?? 0
                 sink.emitJSON(EventKind.metrics, [
                     "decodeTokensPerSecond": decodeSeconds > 0
                         ? Double(generatedCount) / decodeSeconds : 0,
@@ -933,21 +968,26 @@ public func infernoMlxEngineGenerate(
                     "promptTokenCount": promptTokenIDs.count,
                     "timeToFirstTokenSeconds": firstTokenSeconds.map { $0 as Any } ?? NSNull(),
                     "peakPhysicalFootprintBytes": peakFootprint,
+                    "timingSemanticsVersion": infernoTimingSemanticsVersion,
                 ])
                 sink.emit(EventKind.completed, text: stopReason)
                 sink.emit(EventKind.operationCompleted)
             }
         } catch is CancellationError {
-            // Nothing was decoded: the metrics the app reads are all zero,
-            // and the stop reason is the same one a mid-stream cancel reports.
+            // Cancelled before the library produced anything: no token means
+            // no first-token time and no decode window, but the request still
+            // cost the caller the time it took to get here. The prompt token
+            // count is unknown — the cancel can land before tokenization — so
+            // it is null rather than a zero that reads like a measurement.
             sink.emitJSON(EventKind.metrics, [
                 "decodeTokensPerSecond": 0,
                 "promptTokensPerSecond": 0,
                 "generatedTokenCount": 0,
-                "elapsedSeconds": 0,
-                "promptTokenCount": 0,
+                "elapsedSeconds": seconds(requestStart.duration(to: .now)),
+                "promptTokenCount": NSNull(),
                 "timeToFirstTokenSeconds": NSNull(),
                 "peakPhysicalFootprintBytes": physicalFootprintBytes(),
+                "timingSemanticsVersion": infernoTimingSemanticsVersion,
             ])
             sink.emit(EventKind.completed, text: "cancelled")
             sink.emit(EventKind.operationCompleted)

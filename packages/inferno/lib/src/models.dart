@@ -1,6 +1,8 @@
 import 'dart:collection';
 import 'dart:typed_data';
 
+import 'errors.dart';
+
 enum InfernoEngineKind { llamaCpp, mlx, mock }
 
 final class InfernoEngineProbe {
@@ -160,16 +162,68 @@ final class InfernoMetrics {
     required this.promptTokensPerSecond,
     required this.generatedTokenCount,
     required this.elapsedSeconds,
+    required this.timingSemanticsVersion,
     this.promptTokenCount,
     this.timeToFirstTokenSeconds,
     this.peakPhysicalFootprintBytes,
   });
 
+  /// Parses one METRICS payload as the shims emit it.
+  ///
+  /// Every failure is a disagreement with a native half whose ABI already
+  /// matched — a build defect — so it is a typed [InfernoException] naming
+  /// the key rather than a cast error inside the event listener.
+  factory InfernoMetrics.fromPayload(Map<String, Object?> payload) {
+    Never reject(String detail) => throw InfernoException(
+      InfernoErrorCode.internal,
+      'The native metrics payload $detail.',
+    );
+    double required(String key) => switch (payload[key]) {
+      final num value => value.toDouble(),
+      _ => reject('has no numeric "$key"'),
+    };
+    num? optional(String key) => switch (payload[key]) {
+      null => null,
+      final num value => value,
+      _ => reject('has a non-numeric "$key"'),
+    };
+    // Presence is required and the value is carried as-is: the ABI check
+    // decides whether a shim may speak at all, this field only labels what
+    // it measured, and a defaulted label is exactly what version 1 was.
+    final version = switch (payload['timingSemanticsVersion']) {
+      final int value when value >= 1 => value,
+      _ => reject('omits a usable "timingSemanticsVersion"'),
+    };
+    return InfernoMetrics(
+      decodeTokensPerSecond: required('decodeTokensPerSecond'),
+      promptTokensPerSecond: required('promptTokensPerSecond'),
+      generatedTokenCount: required('generatedTokenCount').toInt(),
+      elapsedSeconds: required('elapsedSeconds'),
+      timingSemanticsVersion: version,
+      promptTokenCount: optional('promptTokenCount')?.toInt(),
+      timeToFirstTokenSeconds: optional('timeToFirstTokenSeconds')?.toDouble(),
+      peakPhysicalFootprintBytes: optional(
+        'peakPhysicalFootprintBytes',
+      )?.toInt(),
+    );
+  }
+
+  /// The contract version 2 names (docs/architecture/inferno.md): the first
+  /// token and the elapsed time are both measured from the instant the native
+  /// shim accepted the request, and the decode rate is the token count over
+  /// the window after the first token. Version 1 — an absent key, found
+  /// only in records written before #57 — started that field at the
+  /// prefill's submission (ADR 0020).
+  static const currentTimingSemanticsVersion = 2;
+
   final double decodeTokensPerSecond;
   final double promptTokensPerSecond;
   final int generatedTokenCount;
   final double elapsedSeconds;
+  final int timingSemanticsVersion;
   final int? promptTokenCount;
+
+  /// Null exactly when no token was produced: zero would be a measurement.
   final double? timeToFirstTokenSeconds;
   final int? peakPhysicalFootprintBytes;
 }
