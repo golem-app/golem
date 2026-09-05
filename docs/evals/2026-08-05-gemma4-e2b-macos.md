@@ -1,5 +1,16 @@
 # Golem model evaluation — 2026-08-05
 
+> **Legacy timing semantics (v1)** — recorded before #57
+> (`docs/decisions/0020-generation-timing-semantics.md`). The `ttft s` column
+> is not a time to first token: llama.cpp measured from the end of prefill to
+> the first token, and the MLX shim reconstructed the same window by
+> subtracting its library-reported prompt time from the wall clock, which is
+> why every MLX row below reads 0.000–0.002 s. Prefill, tokenization and
+> worker dispatch are outside it. v2 also measures decode tok/s as
+> `tokens − 1` over first token → end, so the tok/s columns are not over the
+> same interval either. Answers, hashes, token counts and peak GiB are
+> unaffected.
+
 - Host: macos Version 26.5.2 (Build 25F84)
 - Engine pins: llama.cpp b10241 (`9bd4c09e`), MLX Swift 0.31.6 / MLX Swift LM 3.31.4
 - Mac numbers serve answer quality and relative comparison only — never quote them as mobile performance (`docs/notes/determinism-probe.md`).

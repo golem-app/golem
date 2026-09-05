@@ -5,6 +5,17 @@
 > Qwen 3.5 card's, so the 449-token / `dba9ee464930b4e1` GGUF baseline below
 > is historical. Direct-mode anchors remain current.
 
+> **Legacy timing semantics (v1)** — recorded before #57
+> (`docs/decisions/0020-generation-timing-semantics.md`). The `ttft s` column
+> is not a time to first token: llama.cpp measured from the end of prefill to
+> the first token, and the MLX shim reconstructed the same window by
+> subtracting its library-reported prompt time from the wall clock, which is
+> why every MLX row below reads 0.000–0.002 s. Prefill, tokenization and
+> worker dispatch are outside it. v2 also measures decode tok/s as
+> `tokens − 1` over first token → end, so the tok/s columns are not over the
+> same interval either. Answers, hashes, token counts and peak GiB are
+> unaffected.
+
 Re-run for #20. #18 replaced the Qwen 3.5 4B MLX artifact but did not re-run
 its text anchors; this closes that gap and compares the two engines on the
 exact artifacts the app pins today.
