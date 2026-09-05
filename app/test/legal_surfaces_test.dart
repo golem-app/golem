@@ -115,11 +115,19 @@ void main() {
     );
   });
 
+  test('first-party code carries the AGPL text in both packages', () {
+    final root = File('../LICENSE').readAsStringSync();
+    expect(root.trimLeft(), startsWith('GNU AFFERO GENERAL PUBLIC LICENSE'));
+    expect(root, contains('Version 3, 19 November 2007'));
+    expect(File('../packages/inferno/LICENSE').readAsStringSync(), root);
+    expect(File('../README.md').readAsStringSync(), contains('AGPL-3.0-only'));
+  });
+
   test('the declared list accounts for every direct dependency', () {
-    // Neither exclusion reaches Flutter's collector: `inferno` is first-party
-    // and ships no LICENSE file (its notices are the bundled declarations),
-    // and `flutter_localizations` is an SDK package whose notice is filed
-    // under `flutter`. Both were verified against a built NOTICES bundle.
+    // `inferno` is first-party: its license is the repository's own, not a
+    // third-party notice for this screen. `flutter_localizations` is an SDK
+    // package whose notice Flutter's collector files under `flutter`
+    // (verified against a built NOTICES bundle).
     expect(
       directRuntimeLicensePackages.toSet(),
       _directDependencies()

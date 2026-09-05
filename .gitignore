@@ -20,3 +20,7 @@ build/
 selfIdentity.plist
 
 references/
+
+# Local agent workspace: skills carry machine paths, settings carry local
+# permission state.
+.claude/

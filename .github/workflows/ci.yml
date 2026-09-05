@@ -110,3 +110,6 @@ jobs:
       - name: Native lifecycle, cancellation, and failure suites
         run: dart test
         working-directory: packages/inferno
+      - name: QA macOS app build (runs the Inferno hooks and the resource-staging phase)
+        run: flutter build macos --debug --flavor qa
+        working-directory: app

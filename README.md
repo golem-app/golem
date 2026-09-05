@@ -54,9 +54,9 @@ flutter run --release \
 against the app documents directory; `auto` derives it from the catalog.
 `GOLEM_MODEL_ARTIFACT` instead selects an exact installed catalog key and
 cannot be combined with `GOLEM_MODEL_PATH`.
-Building any flavor with a real backend (including the `dev` default)
-executes the Inferno build hooks and requires
-`flutter config --enable-native-assets` once per machine.
+Every flavor build executes the Inferno build hooks — `qa` is fake at
+runtime, not at build time — and native assets are on by default in the
+pinned SDK, so no `flutter config` switch is needed.
 
 ## Toolchain
 
@@ -104,3 +104,30 @@ fvm dart run tool/check_android_packaging.dart
 See [`app/README.md`](app/README.md) for the app architecture, the asset
 and splash pipeline, screen/automation identifiers, and the iPhone 17
 simulator verification workflow.
+
+## License
+
+Copyright © 2026 Jan Slominski.
+
+Everything in this repository — the Flutter app under `app/`, Inferno under
+`packages/inferno/`, and the tooling and documentation around them — is free
+software licensed under the GNU Affero General Public License, version 3
+only (`AGPL-3.0-only`; the text is in [`LICENSE`](LICENSE)), with one
+exception: the Golem name, mascot, and launcher artwork listed in
+[`TRADEMARKS.md`](TRADEMARKS.md) are reserved and not part of that grant.
+The software comes with no warranty, and there is no "or any later version"
+option.
+
+The engines and packages Golem builds on keep their own licenses and
+notices. Settings ▸ Open-source licenses discloses what each build links —
+the pinned llama.cpp graph everywhere, the MLX Swift graph on the Apple
+silicon builds that carry it — and the direct pub dependencies, with the
+audit in [ADR 0009](docs/decisions/0009-model-and-software-attribution.md).
+Model weights are never redistributed; their terms are named in Settings ▸
+Model attribution.
+
+Contributions are accepted
+under [`CLA.md`](CLA.md); [`CONTRIBUTING.md`](CONTRIBUTING.md) has the
+workflow. The reasoning, the dependency review, and the store-distribution
+basis are recorded in
+[ADR 0019](docs/decisions/0019-licensing-and-publication.md).
