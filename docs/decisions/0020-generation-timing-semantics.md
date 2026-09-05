@@ -64,6 +64,11 @@ post-prefill delay and a time to first token at once.
   window included the first token's step, MLX counted every token over the
   steps after the first. Both now report the same reciprocal inter-token
   latency.
+- The first record under version 2 is
+  `docs/evals/2026-09-05-gemma4-timing-v2-macos.md`: the same Gemma 4 E2B
+  prompt set as 2026-08-05 on both engines, with the MLX `ttft s` column now
+  reading the prefill it used to subtract, and a one-word answer reporting no
+  decode rate.
 - The next contract change is version 3, in the same three places: the shims,
   this record, and the report preamble.
 - No UI shows a latency, before or after. This is a measurement channel.
