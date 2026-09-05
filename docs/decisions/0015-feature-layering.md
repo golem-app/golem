@@ -25,6 +25,7 @@ Bottom to top. A feature imports strictly downward, and never sideways.
 
 | Layer | Features | What lives there |
 | --- | --- | --- |
+| 6 | `lab` | Golem Model Lab, macOS only (ADR 0021): reads the eval suites and chat's presentation, is read by nothing but its own root under `app/` |
 | 5 | `settings` `onboarding` `benchmark` `eval` | Screens and flows that compose everything below |
 | 4 | `chat` | Conversations, generation, composer, drawer, picker |
 | 3 | `models` | Catalog, downloads, activation, storage accounting, model labels, consent, custom repositories |

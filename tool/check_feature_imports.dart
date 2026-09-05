@@ -24,6 +24,10 @@ const _layers = <List<String>>[
   // Screens and flows that compose everything below. Siblings: an import
   // between any two of these is as much a violation as an upward one.
   ['settings', 'onboarding', 'benchmark', 'eval'],
+  // Golem Model Lab (ADR 0021): reads the eval prompt suites and chat's
+  // presentation, so it sits above both; nothing imports it but the lab
+  // root under app/, which is the only build that carries it.
+  ['lab'],
 ];
 
 const _libRoot = 'app/lib';

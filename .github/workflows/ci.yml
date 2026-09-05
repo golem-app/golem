@@ -113,3 +113,6 @@ jobs:
       - name: QA macOS app build (runs the Inferno hooks and the resource-staging phase)
         run: flutter build macos --debug --flavor qa
         working-directory: app
+      - name: Lab macOS app build (the fourth flavor exists on macOS only)
+        run: flutter build macos --debug --flavor lab
+        working-directory: app
