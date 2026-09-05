@@ -472,10 +472,11 @@ final class ChatHistorySnapshot {
 /// The timing contract a metrics record was measured under (ADR 0020).
 ///
 /// Version 1 is what shipped before #57: `timeToFirstTokenSeconds` ran from
-/// the end of prefill to the first token (llama.cpp), or was reconstructed by
+/// the prefill's submission to the first token (llama.cpp — on Metal that held
+/// the prefill compute and nothing before it), or was reconstructed by
 /// subtracting the library-reported prompt time from the wall clock (MLX,
-/// which is why its recorded values read 0.000–0.002 s). A decode-start delay,
-/// not a time to first token.
+/// which is why its recorded values read 0.000–0.002 s). Not a time to first
+/// token either way.
 const legacyTimingSemantics = 1;
 
 /// Version 2: `timeToFirstTokenSeconds` runs from the native shim accepting

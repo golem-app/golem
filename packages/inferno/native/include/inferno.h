@@ -53,7 +53,7 @@ extern "C" {
 /// The timing contract the METRICS payload names. It moves with the ABI today
 /// and exists separately because records outlive shims: a stored measurement
 /// must still say which contract produced it. Absent means 1, the pre-#57
-/// post-prefill window.
+/// window that started at the prefill's submission.
 #define INFERNO_TIMING_SEMANTICS_VERSION 2
 
 typedef struct inferno_engine inferno_engine;

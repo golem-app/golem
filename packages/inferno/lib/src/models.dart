@@ -212,8 +212,8 @@ final class InfernoMetrics {
   /// token and the elapsed time are both measured from the instant the native
   /// shim accepted the request, and the decode rate is the token count over
   /// the window after the first token. Version 1 — an absent key, found
-  /// only in records written before #57 — reported the post-prefill delay
-  /// under the same field name.
+  /// only in records written before #57 — started that field at the
+  /// prefill's submission (ADR 0020).
   static const currentTimingSemanticsVersion = 2;
 
   final double decodeTokensPerSecond;

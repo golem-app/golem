@@ -11,21 +11,21 @@
 
 - Artifact: gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf (2.44 GiB) — unsloth/gemma-4-E2B-it-qat-GGUF @ 66a399f6
 - Profile: `gemma4`
-- Load: 1.3 s
+- Load: 1.8 s
 - Result: PASS
 
 | prompt | ok | decode tok/s | prompt tok/s | ttft s | peak GiB | tokens | stop | fnv1a64 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| anchor-jupiter | pass | 71.3 | 2628.1 | 0.093 | 0.29 | 11 | endOfSequence | `d710455907eadf55` |
-| arithmetic-17x23 | pass | 72.4 | 6972.4 | 0.074 | 0.29 | 3 | endOfSequence | `574702182262f0b0` |
-| factual-capital | pass | 71.3 | 10415.2 | 0.070 | 0.29 | 7 | endOfSequence | `8bfd779284f134df` |
-| factual-author | pass | 73.2 | 7388.1 | 0.069 | 0.29 | 33 | endOfSequence | `05f1df9ce1bcba1f` |
-| instruction-one-word | pass | 66.2 | 9723.9 | 0.070 | 0.29 | 1 | endOfSequence | `6baf78886c99db89` |
-| instruction-json | pass | 73.2 | 15745.7 | 0.097 | 0.30 | 26 | endOfSequence | `08124273507b0116` |
-| instruction-translation | pass | 72.4 | 8269.2 | 0.070 | 0.30 | 19 | endOfSequence | `2151341bf8261da3` |
-| multi-turn-recall | pass | 71.4 | 17900.1 | 0.095 | 0.30 | 7 | endOfSequence | `c531954b37e8abc4` |
-| reasoning-speed | pass | 73.2 | 18696.9 | 0.096 | 0.30 | 534 | endOfSequence | `527f27adba863ab3` |
-| long-synthesis | pass | 72.4 | 10750.8 | 0.071 | 0.29 | 176 | endOfSequence | `e489845ee39a819d` |
+| anchor-jupiter | pass | 68.1 | 234.7 | 0.094 | 0.29 | 11 | endOfSequence | `d710455907eadf55` |
+| arithmetic-17x23 | pass | 68.0 | 393.7 | 0.080 | 0.29 | 3 | endOfSequence | `574702182262f0b0` |
+| factual-capital | pass | 68.1 | 405.1 | 0.071 | 0.29 | 7 | endOfSequence | `8bfd779284f134df` |
+| factual-author | pass | 65.9 | 272.5 | 0.071 | 0.30 | 33 | endOfSequence | `05f1df9ce1bcba1f` |
+| instruction-one-word | pass | 63.7 | 401.7 | 0.071 | 0.30 | 1 | endOfSequence | `6baf78886c99db89` |
+| instruction-json | pass | 66.5 | 446.0 | 0.097 | 0.30 | 26 | endOfSequence | `08124273507b0116` |
+| instruction-translation | pass | 65.4 | 302.9 | 0.073 | 0.30 | 19 | endOfSequence | `2151341bf8261da3` |
+| multi-turn-recall | pass | 66.0 | 554.4 | 0.099 | 0.30 | 7 | endOfSequence | `c531954b37e8abc4` |
+| reasoning-speed | pass | 62.8 | 553.2 | 0.097 | 0.31 | 534 | endOfSequence | `527f27adba863ab3` |
+| long-synthesis | pass | 62.4 | 400.3 | 0.082 | 0.30 | 176 | endOfSequence | `e489845ee39a819d` |
 
 ### Answers
 
@@ -110,21 +110,21 @@ Reasoning (1409 chars): Here's the thinking process to solve the problem: 1. **I
 
 - Artifact: gemma-4-e2b-it-4bit (3.34 GiB) — mlx-community/gemma-4-e2b-it-4bit @ 23876752
 - Profile: `gemma4`
-- Load: 2.2 s
+- Load: 2.9 s
 - Result: PASS
 
 | prompt | ok | decode tok/s | prompt tok/s | ttft s | peak GiB | tokens | stop | fnv1a64 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| anchor-jupiter | pass | 73.6 | 139.9 | 0.130 | 3.11 | 11 | stopToken | `d710455907eadf55` |
-| arithmetic-17x23 | pass | 74.1 | 523.6 | 0.048 | 3.13 | 3 | stopToken | `574702182262f0b0` |
-| factual-capital | pass | 73.2 | 464.7 | 0.048 | 3.13 | 7 | stopToken | `8bfd779284f134df` |
-| factual-author | pass | 74.1 | 317.1 | 0.048 | 3.14 | 12 | stopToken | `b170d328186b2491` |
-| instruction-one-word | pass | 73.9 | 468.5 | 0.047 | 3.14 | 1 | stopToken | `6baf78886c99db89` |
-| instruction-json | pass | 74.3 | 583.1 | 0.062 | 3.14 | 26 | stopToken | `08124273507b0116` |
-| instruction-translation | pass | 74.1 | 354.9 | 0.048 | 3.14 | 84 | stopToken | `3fdfa2b6b0acbffa` |
-| multi-turn-recall | pass | 73.3 | 732.3 | 0.062 | 3.14 | 7 | stopToken | `c531954b37e8abc4` |
-| reasoning-speed | pass | 71.1 | 715.2 | 0.062 | 3.16 | 701 | stopToken | `37db256a7e189b84` |
-| long-synthesis | pass | 73.7 | 482.8 | 0.048 | 3.15 | 162 | stopToken | `d9036a20dd6bc30a` |
+| anchor-jupiter | pass | 69.7 | 30.3 | 0.597 | 3.12 | 11 | stopToken | `d710455907eadf55` |
+| arithmetic-17x23 | pass | 70.4 | 500.2 | 0.051 | 3.13 | 3 | stopToken | `574702182262f0b0` |
+| factual-capital | pass | 69.4 | 433.3 | 0.051 | 3.14 | 7 | stopToken | `8bfd779284f134df` |
+| factual-author | pass | 68.4 | 301.4 | 0.051 | 3.14 | 12 | stopToken | `b170d328186b2491` |
+| instruction-one-word | pass | 70.9 | 452.1 | 0.049 | 3.14 | 1 | stopToken | `6baf78886c99db89` |
+| instruction-json | pass | 69.5 | 544.0 | 0.067 | 3.15 | 26 | stopToken | `08124273507b0116` |
+| instruction-translation | pass | 69.1 | 344.1 | 0.050 | 3.15 | 84 | stopToken | `3fdfa2b6b0acbffa` |
+| multi-turn-recall | pass | 69.4 | 714.7 | 0.064 | 3.16 | 7 | stopToken | `c531954b37e8abc4` |
+| reasoning-speed | pass | 67.1 | 696.1 | 0.064 | 3.17 | 701 | stopToken | `37db256a7e189b84` |
+| long-synthesis | pass | 69.6 | 455.7 | 0.051 | 3.16 | 162 | stopToken | `d9036a20dd6bc30a` |
 
 ### Answers
 

@@ -834,7 +834,12 @@ int32_t inferno_engine_generate(inferno_engine *engine,
         offset += count;
       }
     }
+    // A decode returns once the graph is submitted and the backend settles on
+    // the first logits read; without this the window measures submission.
+    llama_synchronize(context);
     const auto prompt_end = steady_clock::now();
+    // A prefill the cancel cut short evaluated fewer tokens than it counts.
+    const bool prefill_complete = !decode_failed && !engine->cancel_requested.load();
 
     std::string pending;
     std::string stop_reason = "max_tokens";
@@ -898,7 +903,7 @@ int32_t inferno_engine_generate(inferno_engine *engine,
       const json metrics{
           {"decodeTokensPerSecond", decode_seconds > 0 ? generated / decode_seconds : 0},
           {"promptTokensPerSecond",
-           prompt_seconds > 0 ? prompt_token_count / prompt_seconds : 0},
+           prefill_complete && prompt_seconds > 0 ? prompt_token_count / prompt_seconds : 0},
           {"generatedTokenCount", generated},
           {"elapsedSeconds", elapsed_seconds},
           {"promptTokenCount", prompt_token_count},

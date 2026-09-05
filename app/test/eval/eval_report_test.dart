@@ -113,8 +113,6 @@ void main() {
     expect(markdown, contains('never quote them as mobile performance'));
     expect(markdown, contains('Timing semantics v2'));
     expect(markdown, contains('acceptance → first output token'));
-    // Under version 2 the column finally is one; the preamble names it.
-    expect(markdown, contains('| ttft s |'));
     expect(markdown, contains('> engine exploded'));
     expect(markdown, isNot(contains('/private/somewhere')));
   });

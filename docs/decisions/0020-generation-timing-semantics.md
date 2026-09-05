@@ -5,13 +5,17 @@ Status: decided on `fix/57-honest-ttft` (issue #57)
 ## Context
 
 Both shims reported a field called `timeToFirstTokenSeconds` that was not a
-time to first token. llama.cpp measured from the end of prefill to the first
-sampled token; the MLX shim reconstructed the same window by subtracting its
-library-reported prompt time from the wall clock, which is why every recorded
-MLX row under `docs/evals/` reads 0.000–0.002 s. Prefill is the part of the
-wait a user feels on a long prompt, and both numbers excluded it. The elapsed
-clocks were uneven in the same way, and ADR 0002's footnote ² described that
-state as the aligned one.
+time to first token. llama.cpp stamped after the prefill was *submitted*: a
+decode returns before the backend has finished and settles on the first
+logits read, so on Metal the column held the prefill compute and nothing
+before it — tokenization, context allocation, dispatch — while on CPU builds
+it held a sampling call. The same lazy settle put the prefill compute into
+the decode window and left the prompt window measuring submission, an order
+of magnitude too fast. The MLX shim reconstructed a post-prefill delay by
+subtracting its library-reported prompt time from the wall clock, which is
+why every recorded MLX row under `docs/evals/` reads 0.000–0.002 s. The
+elapsed clocks were uneven in the same way, and ADR 0002's footnote ²
+described that state as the aligned one.
 
 The numbers are already on disk. Every assistant turn in a chat history
 carries an `InferenceMetrics`, and five reports under `docs/evals/` quote a
@@ -40,12 +44,14 @@ line, `InferenceMetrics`, the persisted chat history, and both evaluation
 report formats. It is an `int`, not an enum: a value a newer build writes must
 round-trip through an older one unchanged rather than degrade to "unknown".
 
-**Version 1 is what shipped before this record** — the post-prefill delay
+**Version 1 is what shipped before this record** — the windows described
 above. A persisted metrics object with no `timingSemanticsVersion` key is read
 as version 1 and re-saved as version 1. Nothing relabels a legacy number, and
 the chat history stays at schema version 3: the key is additive with a defined
 default, per the store's own convention, and a bump would make an older build
-quarantine a history it can still read.
+quarantine a history it can still read. A build older than this record drops
+the key when it saves, so a downgrade relabels version-2 turns as version 1 —
+the conservative direction.
 
 An evaluation report derives its version from the rows it holds and refuses to
 render when they disagree. One `ttft s` column cannot honestly hold a
@@ -60,15 +66,16 @@ post-prefill delay and a time to first token at once.
 - A version-2 time to first token is larger than the version-1 number for the
   same generation by roughly the prefill. A regression against a pre-#57
   baseline is a units change until proven otherwise.
-- Decode rates barely move: llama.cpp's window start shifts by one sampling
-  call on already-computed logits, and MLX's window is the library's own
-  first-token-to-end interval measured from the shim's clock. Both divide the
-  same count by the same kind of window now.
+- On llama.cpp the prefill window now ends after `llama_synchronize`, so
+  Metal prompt rates fall by an order of magnitude to their real value and
+  short-reply decode rates rise to the per-step rate; MLX's windows were the
+  library's own and barely move.
 - The first record under version 2 is
   `docs/evals/2026-09-05-gemma4-timing-v2-macos.md`: the same Gemma 4 E2B
   prompt set as 2026-08-05 on both engines, with the MLX `ttft s` column now
-  reading the prefill it used to subtract, and a one-word answer measuring
-  the single step that ended it.
+  reading the prefill it used to subtract, llama's `prompt tok/s` at the
+  compute rather than the submission, and a one-word answer measuring the
+  single step that ended it.
 - The next contract change is version 3, in the same three places: the shims,
   this record, and the report preamble.
 - No UI shows a latency, before or after. This is a measurement channel.

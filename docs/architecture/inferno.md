@@ -96,12 +96,13 @@ Every generation that does not fail ends with one METRICS event whose numbers ar
 against five boundaries, and whose `timingSemanticsVersion` names the contract
 they were measured under. Version 2 (ABI 5, ADR 0020) is the one below.
 Version 1 — an absent key, found only in records written before #57 —
-reported a post-prefill delay under the name `timeToFirstTokenSeconds`.
+started its `timeToFirstTokenSeconds` at the prefill's submission; ADR 0020
+records what each engine's columns actually held.
 
 | Boundary | llama.cpp shim | MLX shim |
 | --- | --- | --- |
 | Request accepted (t0) | first statement of `inferno_engine_generate`, before the image-byte copy and the wait for a retiring worker | first statement of `inferno_mlx_engine_generate`, before the buffer copy and the wait for a retiring operation |
-| Prompt evaluation | the prefill batch loop (`mtmd_helper_eval_chunks` with images); tokenization and context/KV allocation precede it | the library's `promptTime`: the prefill run synchronously inside `MLXLMCommon.generate` plus the step that produces the first token; when the library never summarises (a stop sequence broke the loop, or a cancel), the interval from the `generate` call to the first chunk |
+| Prompt evaluation | `prefill_start → prompt_end`: the prefill batch loop (`mtmd_helper_eval_chunks` with images) followed by `llama_synchronize`, because a decode returns once the graph is submitted and the backend settles on the first logits read; tokenization and context/KV allocation precede it | the library's `promptTime`: the prefill run synchronously inside `MLXLMCommon.generate` plus the step that produces the first token; when the library never summarises (a stop sequence broke the loop, or a cancel), the interval from the `generate` call to the first chunk |
 | First output token (t1) | stamped after the first `llama_sampler_sample` that is neither end-of-generation nor a stop id, before stop-sequence hold-back | the earlier of two measurements of one instant: the summary's arrival less the library's `generateTime` (the summary is yielded right after that figure is taken, so this lands on the instant the first token was returned, with iterator setup and task dispatch inside), and the wall clock to the first streamed chunk; the first is immune to the streaming detokenizer withholding a token that ends mid-UTF-8 and to the tool-call scanner buffering a reply from its first `{`, the second is what remains when the summary never arrives |
 | Decode interval | `elapsedSeconds − timeToFirstTokenSeconds`: what follows the first token, holding one decode step per generated token — the step that yields the next token, or the one that ends the reply | same |
 | Total native request latency | t0 → the instant the generation loop stops | t0 → the summary's arrival on a normal completion, which excludes the library's stream teardown; t0 → where the loop was left after a cancel or a stop sequence |

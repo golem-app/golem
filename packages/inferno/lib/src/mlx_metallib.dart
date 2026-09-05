@@ -26,7 +26,7 @@ void stageMlxMetallibForCliRun({bool warnOnMissing = false}) {
   } else if (warnOnMissing) {
     stderr.writeln(
       'warning: could not stage mlx.metallib '
-      '(dylib: ${dylib?.path ?? 'unmapped'}, '
+      '(dylib: ${dylib == null ? 'unmapped' : dylib.existsSync()}, '
       'metallib: ${metallib.existsSync()}); '
       'the MLX load may fail to resolve its shader library.',
     );

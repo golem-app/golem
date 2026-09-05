@@ -22,13 +22,13 @@ void expectHonestTiming(InfernoMetrics metrics) {
   expect(ttft, greaterThan(0));
   expect(ttft, lessThanOrEqualTo(metrics.elapsedSeconds));
   // Prompt evaluation is inside the first-token window, so the window the
-  // prompt rate describes cannot outlast it. The rate is published rather
-  // than the window, so the epsilon covers one divide and the JSON round
-  // trip — nanoseconds against an inversion that would be milliseconds.
+  // prompt rate describes cannot outlast it. A millisecond of slack: MLX's
+  // prompt time is the library's wall clock against the shim's monotonic
+  // one, and the anchor this guards against was off by the whole prefill.
   expect(
     ttft,
     greaterThanOrEqualTo(
-      metrics.promptTokenCount! / metrics.promptTokensPerSecond - 1e-6,
+      metrics.promptTokenCount! / metrics.promptTokensPerSecond - 1e-3,
     ),
   );
   // The decode rate is recomputable from the published numbers, down to a

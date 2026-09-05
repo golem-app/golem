@@ -366,9 +366,9 @@ final class EvalRunReport {
           'prefill included; decode tok/s is tokens over first token → end; '
           'elapsed is acceptance → generation end.',
     legacyTimingSemantics =>
-      '- Timing semantics v1 (legacy, pre-#57): `ttft s` is the post-prefill '
-          'decode delay, not a time to first token; not comparable with a v2 '
-          'report.',
+      '- Timing semantics v1 (legacy, pre-#57): `ttft s` started at the '
+          'prefill\'s submission, not at the request; not comparable with a '
+          'v2 report.',
     _ =>
       '- Timing semantics v$version: unknown to this build — do not compare '
           'these timings with any other report.',
