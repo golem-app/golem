@@ -46,7 +46,10 @@ String resolveBackendName({
       )
     ? 'fake'
     : switch (identity) {
-        AppIdentity.production || AppIdentity.dev => 'auto',
+        // The lab composes the real engines like dev; `auto` only names the
+        // inert initial target the repository is constructed around, and every
+        // bench run activates its own configuration by key (ADR 0021).
+        AppIdentity.production || AppIdentity.dev || AppIdentity.lab => 'auto',
         AppIdentity.qa => 'fake',
       };
 
