@@ -80,6 +80,8 @@ Future<void> main(List<String> arguments) async {
             tokens = event.metrics.generatedTokenCount;
           case InfernoGenerationCompleted():
             stop = event.reason.name;
+          case InfernoProgressEvent() || InfernoTokenTimingEvent():
+            break;
         }
       }
       final text = buffer.toString();

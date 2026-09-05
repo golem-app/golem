@@ -112,6 +112,104 @@ void main() {
     await inferno.unload();
   }, skip: skipReason);
 
+  test('observation is silent unless asked, then complete', () async {
+    // ABI 6. Unobserved: the ABI-5 stream, nothing more. Observed: the
+    // load's fraction, the prompt's submitted batches climbing to its token
+    // count, one instant per sampled token in contiguous batches, and the
+    // batch size the prefill used.
+    final inferno = Inferno.native();
+    final fractions = <double>[];
+    await inferno.load(
+      engine: InfernoEngineKind.llamaCpp,
+      modelPath: modelPath!,
+      onProgress: fractions.add,
+    );
+    expect(fractions, isEmpty, reason: 'progress is opt-in');
+    const sampling = InfernoSamplingParameters(
+      maxTokens: 24,
+      temperature: 0.2,
+      topP: 0.9,
+      seed: 7,
+    );
+    final quiet = await inferno
+        .generate(
+          const InfernoGenerationRequest(
+            prompt: 'Count slowly from one to ten',
+            sampling: sampling,
+          ),
+        )
+        .toList();
+    expect(quiet.whereType<InfernoProgressEvent>(), isEmpty);
+    expect(quiet.whereType<InfernoTokenTimingEvent>(), isEmpty);
+    expect(
+      quiet.whereType<InfernoMetricsEvent>().single.metrics.promptBatchSize,
+      greaterThan(0),
+    );
+    await inferno.unload();
+
+    await inferno.load(
+      engine: InfernoEngineKind.llamaCpp,
+      modelPath: modelPath,
+      options: const InfernoLoadOptions(reportProgress: true),
+      onProgress: fractions.add,
+    );
+    expect(fractions, isNotEmpty);
+    expect(fractions.last, 1.0);
+    for (var i = 1; i < fractions.length; i++) {
+      expect(fractions[i], greaterThan(fractions[i - 1]));
+    }
+    final observed = await inferno
+        .generate(
+          const InfernoGenerationRequest(
+            prompt: 'Count slowly from one to ten',
+            sampling: sampling,
+            observe: InfernoObservation(
+              promptProgress: true,
+              tokenTiming: true,
+            ),
+          ),
+        )
+        .toList();
+    final metrics = observed.whereType<InfernoMetricsEvent>().single.metrics;
+    expectHonestTiming(metrics);
+    final progress = observed.whereType<InfernoProgressEvent>().toList();
+    expect(progress, isNotEmpty);
+    for (final event in progress) {
+      expect(event.phase, InfernoProgressPhase.prompt);
+      expect(event.total, metrics.promptTokenCount);
+    }
+    expect(progress.last.completed, metrics.promptTokenCount);
+    for (var i = 1; i < progress.length; i++) {
+      expect(progress[i].completed, greaterThan(progress[i - 1].completed!));
+    }
+    // Every batch is at most n_batch tokens, so the count of progress events
+    // is what the batch size predicts.
+    expect(metrics.promptBatchSize, greaterThan(0));
+    expect(
+      progress.length,
+      (metrics.promptTokenCount! + metrics.promptBatchSize! - 1) ~/
+          metrics.promptBatchSize!,
+    );
+    expectContiguousObservations(
+      observed.whereType<InfernoTokenTimingEvent>(),
+      kind: InfernoObservationKind.token,
+      count: metrics.generatedTokenCount,
+      elapsedSeconds: metrics.elapsedSeconds,
+    );
+    // The first instant is the first token: what the metrics call TTFT.
+    final firstInstant = observed
+        .whereType<InfernoTokenTimingEvent>()
+        .first
+        .timesMs
+        .first;
+    expect(
+      firstInstant / 1000,
+      closeTo(metrics.timeToFirstTokenSeconds!, 1e-3),
+    );
+    await inferno.unload();
+    await inferno.dispose();
+  }, skip: skipReason);
+
   test('images without a projector fail as a typed error', () async {
     // Proves the ABI 3 image array marshals end to end: Dart copies the
     // buffers, the shim sees a non-zero count, and a text-only load refuses it.

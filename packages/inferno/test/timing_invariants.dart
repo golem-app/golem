@@ -41,3 +41,36 @@ void expectHonestTiming(InfernoMetrics metrics) {
     ),
   );
 }
+
+/// The observation contract (ABI 6): timing batches are contiguous — each
+/// starts where the previous ended — carry non-decreasing instants measured
+/// from the request's acceptance, and together count every observation the
+/// engine reported. [count] is what the metrics say was produced when the
+/// observations are tokens; a chunk series has no count to match.
+void expectContiguousObservations(
+  Iterable<InfernoTokenTimingEvent> batches, {
+  required InfernoObservationKind kind,
+  int? count,
+  required double elapsedSeconds,
+}) {
+  var next = 0;
+  double last = 0;
+  for (final batch in batches) {
+    expect(batch.kind, kind);
+    expect(batch.firstIndex, next, reason: 'batches are contiguous');
+    expect(batch.timesMs, isNotEmpty);
+    for (final time in batch.timesMs) {
+      expect(
+        time,
+        greaterThanOrEqualTo(last),
+        reason: 'instants never go back',
+      );
+      // A hair of slack: the elapsed clock stops at the loop's end, after the
+      // last instant, and both are the same monotonic clock.
+      expect(time, lessThanOrEqualTo(elapsedSeconds * 1000 + 1));
+      last = time;
+    }
+    next += batch.timesMs.length;
+  }
+  if (count != null) expect(next, count, reason: 'one instant per token');
+}

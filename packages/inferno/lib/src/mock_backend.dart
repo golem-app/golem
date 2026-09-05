@@ -39,10 +39,17 @@ final class MockInfernoBackend implements InfernoBackend {
     required InfernoEngineKind engine,
     required String modelPath,
     InfernoLoadOptions options = const InfernoLoadOptions(),
+    InfernoLoadProgress? onProgress,
   }) async {
     if (failLoad case final failure?) throw failure;
     lastModelPath = modelPath;
     lastLoadOptions = options;
+    // Two steps, like a real load's fraction climbing: enough to prove the
+    // channel and its opt-in without pretending to a byte count.
+    if (options.reportProgress) {
+      onProgress?.call(0.5);
+      onProgress?.call(1);
+    }
     _loaded = true;
   }
 
@@ -68,6 +75,18 @@ final class MockInfernoBackend implements InfernoBackend {
     final watch = Stopwatch()..start();
     var generated = 0;
     double? firstDeltaSeconds;
+    final observe = request.observe ?? const InfernoObservation();
+    // The prompt "prefills" in two halves, its length standing in for tokens.
+    if (observe.promptProgress) {
+      final total = request.prompt.length;
+      for (final completed in [total ~/ 2, total]) {
+        yield InfernoProgressEvent(
+          phase: InfernoProgressPhase.prompt,
+          completed: completed,
+          total: total,
+        );
+      }
+    }
     for (final delta in deltas) {
       if (delay != Duration.zero) await Future<void>.delayed(delay);
       if (epoch != _generationEpoch) {
@@ -77,6 +96,14 @@ final class MockInfernoBackend implements InfernoBackend {
       generated++;
       firstDeltaSeconds ??= _seconds(watch);
       yield InfernoTextDelta(delta);
+      // One instant per delta, unbatched: the mock's deltas are its tokens.
+      if (observe.tokenTiming) {
+        yield InfernoTokenTimingEvent(
+          kind: InfernoObservationKind.token,
+          firstIndex: generated - 1,
+          timesMs: [_seconds(watch) * 1000],
+        );
+      }
     }
     watch.stop();
     final elapsed = _seconds(watch);
