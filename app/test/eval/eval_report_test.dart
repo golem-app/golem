@@ -81,6 +81,7 @@ void main() {
     );
 
     expect(json['enginePins'], containsPair('llamaCppRelease', 'b10241'));
+    expect(json['timingSemanticsVersion'], currentTimingSemantics);
     expect(json['suite'], 'default');
     final result = (json['results']! as List).single as Map;
     expect(result['passed'], isFalse);
@@ -90,6 +91,10 @@ void main() {
     expect(
       (passRow['metrics']! as Map)['peakPhysicalFootprintBytes'],
       483183820,
+    );
+    expect(
+      (passRow['metrics']! as Map)['timingSemanticsVersion'],
+      currentTimingSemantics,
     );
     final errorRow = prompts.last as Map;
     expect(errorRow['error'], 'engine exploded');
@@ -106,8 +111,58 @@ void main() {
     expect(markdown, contains('unsloth/gemma-4-E2B-it-qat-GGUF @ 66a399f6'));
     expect(markdown, contains('`d710455907eadf55`'));
     expect(markdown, contains('never quote them as mobile performance'));
+    expect(markdown, contains('Timing semantics v2'));
+    expect(markdown, contains('acceptance → first output token'));
+    // Under version 2 the column finally is one; the preamble names it.
+    expect(markdown, contains('| ttft s |'));
     expect(markdown, contains('> engine exploded'));
     expect(markdown, isNot(contains('/private/somewhere')));
+  });
+
+  test('a report never mixes or relabels timing contracts', () {
+    EvalRunReport report(List<int> versions) => EvalRunReport(
+      createdAt: DateTime.utc(2026, 8, 5, 12),
+      host: 'macOS test-host',
+      suite: 'default',
+      profile: const Gemma4Profile(),
+      results: [
+        EvalComboResult(
+          combo: _combo,
+          loadSeconds: 2.5,
+          promptResults: [
+            for (final (index, version) in versions.indexed)
+              EvalPromptResult(
+                promptId: 'p-$index',
+                answer: 'Jupiter.',
+                metrics: InferenceMetrics(
+                  decodeTokensPerSecond: 48.2,
+                  promptTokensPerSecond: 120,
+                  tokenCount: 14,
+                  elapsedSeconds: 0.4,
+                  timeToFirstTokenSeconds: 0.119,
+                  timingSemanticsVersion: version,
+                ),
+              ),
+          ],
+        ),
+      ],
+      artifacts: const {},
+    );
+
+    // One `ttft s` column cannot hold a post-prefill delay and a time to
+    // first token at once: refused before it is written, in both formats.
+    final mixed = report([currentTimingSemantics, legacyTimingSemantics]);
+    expect(mixed.toJson, throwsStateError);
+    expect(mixed.renderMarkdown, throwsStateError);
+
+    // Old numbers stay old: the report says so instead of promoting them.
+    final legacy = report([legacyTimingSemantics, legacyTimingSemantics]);
+    expect(legacy.toJson()['timingSemanticsVersion'], legacyTimingSemantics);
+    expect(legacy.renderMarkdown(), contains('Timing semantics v1'));
+    expect(legacy.renderMarkdown(), contains('not comparable'));
+
+    // Nothing measured is this build's contract, with nothing to protect.
+    expect(report(const []).toJson()['timingSemanticsVersion'], 2);
   });
 
   test('a combo records its own profile, not the run template', () {

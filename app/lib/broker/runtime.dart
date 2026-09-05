@@ -85,6 +85,7 @@ final class BrokerRuntimeMetrics {
     required this.promptTokensPerSecond,
     required this.generatedTokenCount,
     required this.elapsedSeconds,
+    required this.timingSemanticsVersion,
     this.promptTokenCount,
     this.timeToFirstTokenSeconds,
     this.peakPhysicalFootprintBytes,
@@ -95,8 +96,15 @@ final class BrokerRuntimeMetrics {
   final int generatedTokenCount;
   final double elapsedSeconds;
 
-  // Null when an engine cannot measure them; the iOS bake-off record
-  // requires all three, so the adapter must not drop them.
+  /// The engine's own statement of the timing contract behind the numbers
+  /// above (`currentTimingSemantics` in the domain). Required, never
+  /// defaulted: the broker carries an engine's measurement and must not
+  /// supply a contract the engine did not claim.
+  final int timingSemanticsVersion;
+
+  // Null when an engine cannot measure them; the iOS bake-off record (ADR
+  // 0002, whose timings are version 1) requires all three, so the adapter
+  // must not drop them.
   final int? promptTokenCount;
   final double? timeToFirstTokenSeconds;
   final int? peakPhysicalFootprintBytes;
@@ -271,6 +279,7 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
                 promptTokensPerSecond: metrics.promptTokensPerSecond,
                 generatedTokenCount: metrics.generatedTokenCount,
                 elapsedSeconds: metrics.elapsedSeconds,
+                timingSemanticsVersion: metrics.timingSemanticsVersion,
                 promptTokenCount: metrics.promptTokenCount,
                 timeToFirstTokenSeconds: metrics.timeToFirstTokenSeconds,
                 peakPhysicalFootprintBytes: metrics.peakPhysicalFootprintBytes,

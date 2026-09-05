@@ -39,6 +39,7 @@ final class _ModelFreeRuntime implements BrokerRuntime {
         promptTokensPerSecond: 34,
         generatedTokenCount: 1,
         elapsedSeconds: 0.1,
+        timingSemanticsVersion: currentTimingSemantics,
       ),
     );
     yield const BrokerGenerationCompleted(BrokerStopReason.endOfSequence);

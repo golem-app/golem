@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:golem_flutter/broker/model_profile.dart';
 import 'package:golem_flutter/broker/runtime.dart';
+import 'package:golem_flutter/core/domain/models.dart';
 
 import '../application/eval_runner.dart';
 
@@ -152,6 +153,32 @@ final class EvalRunReport {
     'mlxSwiftLmVersion': mlxSwiftLmVersion,
   };
 
+  /// The one timing contract this run's numbers were measured under.
+  ///
+  /// Derived, never stored: a stored version could claim what its rows do
+  /// not have. One `ttft s` column cannot honestly hold a legacy post-prefill
+  /// delay and a version-2 time to first token at once, so a mix is refused
+  /// here rather than published. A run is one build against one ABI, so
+  /// reaching the throw is a defect; the per-prompt `EVAL_RESULT` console
+  /// lines already carry each row's version by then.
+  int get timingSemanticsVersion {
+    final versions = <int>{
+      for (final combo in results)
+        for (final result in combo.promptResults)
+          if (result.metrics case final metrics?)
+            metrics.timingSemanticsVersion,
+    };
+    if (versions.length > 1) {
+      throw StateError(
+        'Mixed timing semantics in one report: '
+        '${(versions.toList()..sort()).join(', ')}.',
+      );
+    }
+    // Nothing measured: the run happened on this build, and there is no
+    // legacy number to protect.
+    return versions.singleOrNull ?? currentTimingSemantics;
+  }
+
   /// The machine-readable evidence. Like the Markdown it never carries absolute
   /// paths — artifacts are identified by label, size, and pin — so both outputs
   /// are committable as-is.
@@ -175,6 +202,7 @@ final class EvalRunReport {
       },
     },
     'enginePins': _enginePins,
+    'timingSemanticsVersion': timingSemanticsVersion,
     'artifacts': [
       for (final record in artifacts.values)
         {
@@ -206,6 +234,7 @@ final class EvalRunReport {
                 'metrics': switch (result.metrics) {
                   null => null,
                   final m => {
+                    'timingSemanticsVersion': m.timingSemanticsVersion,
                     'decodeTokensPerSecond': m.decodeTokensPerSecond,
                     'promptTokensPerSecond': m.promptTokensPerSecond,
                     'generatedTokenCount': m.tokenCount,
@@ -254,6 +283,7 @@ final class EvalRunReport {
         '(`${llamaCppRevision.substring(0, 8)}`), '
         'MLX Swift $mlxSwiftVersion / MLX Swift LM $mlxSwiftLmVersion',
       )
+      ..writeln(_timingSemanticsLine(timingSemanticsVersion))
       ..writeln(
         '- Mac numbers serve answer quality and relative comparison only — '
         'never quote them as mobile performance '
@@ -328,6 +358,21 @@ final class EvalRunReport {
     }
     return buffer.toString();
   }
+
+  static String _timingSemanticsLine(int version) => switch (version) {
+    currentTimingSemantics =>
+      '- Timing semantics v2 (ADR 0020): `ttft s` is native request '
+          'acceptance → first output token, worker dispatch, tokenization and '
+          'prefill included; decode tok/s is `tokens − 1` over first token → '
+          'end; elapsed is acceptance → generation end.',
+    legacyTimingSemantics =>
+      '- Timing semantics v1 (legacy, pre-#57): `ttft s` is the post-prefill '
+          'decode delay, not a time to first token; not comparable with a v2 '
+          'report.',
+    _ =>
+      '- Timing semantics v$version: unknown to this build — do not compare '
+          'these timings with any other report.',
+  };
 
   static String _sampling(ProfileSampling sampling) =>
       '${sampling.maxTokens}/${sampling.temperature}/${sampling.topP}'

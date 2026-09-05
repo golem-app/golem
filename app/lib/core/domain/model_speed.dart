@@ -47,9 +47,12 @@ Map<String, double> _scan(
     if (only != null && effective != only) continue;
     for (final message in conversation.messages) {
       final metrics = message.metrics;
+      // A one-token reply has no inter-token interval and reports no rate
+      // (ADR 0020); it must not displace the last real measurement.
       if (message.role != MessageRole.assistant ||
           message.isStreaming ||
-          metrics == null) {
+          metrics == null ||
+          metrics.tokenCount < 2) {
         continue;
       }
       final seen = bestAt[effective];

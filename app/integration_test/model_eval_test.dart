@@ -179,6 +179,7 @@ void main() {
           ' id=${row.promptId}'
           ' pass=${row.passed}'
           ' stopReason=${row.stopReason}'
+          ' timingSemanticsVersion=${row.metrics?.timingSemanticsVersion}'
           ' decodeTokensPerSecond=${row.metrics?.decodeTokensPerSecond.toStringAsFixed(2)}'
           ' promptTokenCount=${row.metrics?.promptTokenCount}'
           ' peakPhysicalFootprintBytes=${row.metrics?.peakPhysicalFootprintBytes}'

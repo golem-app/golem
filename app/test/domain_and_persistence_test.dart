@@ -118,6 +118,90 @@ void main() {
     expect((rewritten.first as Map).containsKey('text'), isFalse);
   });
 
+  test('chat metrics carry their timing contract across a save', () async {
+    // The first direct test of InferenceMetrics on disk: no fixture in the
+    // tree carried a metrics object before #57. One turn written before the
+    // key existed, one written after.
+    final directory = await Directory.systemTemp.createTemp('golem-chat-ts-');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File('${directory.path}/history.json');
+    await file.writeAsString('''
+{
+  "schemaVersion": 3,
+  "activeConversationId": "chat-1",
+  "conversations": [
+    {
+      "id": "chat-1",
+      "title": "Timed chat",
+      "updatedAt": "2026-08-01T00:00:00.000Z",
+      "messages": [
+        {
+          "id": "legacy-turn",
+          "role": "assistant",
+          "parts": [{"type": "text", "text": "Old"}],
+          "metrics": {
+            "promptTokensPerSecond": 133.9,
+            "decodeTokensPerSecond": 27.2,
+            "tokenCount": 9,
+            "elapsedSeconds": 0.64,
+            "promptTokenCount": 41,
+            "timeToFirstTokenSeconds": 0.119,
+            "peakPhysicalFootprintBytes": 450000000
+          },
+          "createdAt": "2026-08-01T00:00:00.000Z"
+        },
+        {
+          "id": "current-turn",
+          "role": "assistant",
+          "parts": [{"type": "text", "text": "New"}],
+          "metrics": {
+            "promptTokensPerSecond": 133.9,
+            "decodeTokensPerSecond": 27.2,
+            "tokenCount": 9,
+            "elapsedSeconds": 0.64,
+            "timeToFirstTokenSeconds": 0.425,
+            "timingSemanticsVersion": 2
+          },
+          "createdAt": "2026-09-01T00:00:00.000Z"
+        }
+      ]
+    }
+  ]
+}
+''');
+
+    final repository = FileChatHistoryRepository(file);
+    final loaded = await repository.load();
+    expect(File('${file.path}.corrupt').existsSync(), isFalse);
+    final messages = loaded.conversations.single.messages;
+    final legacy = messages.first.metrics!;
+    final current = messages.last.metrics!;
+    // An unlabelled record measured the old window; it is read as legacy
+    // with every value intact, never relabelled as the corrected one.
+    expect(legacy.timingSemanticsVersion, legacyTimingSemantics);
+    expect(legacy.timeToFirstTokenSeconds, 0.119);
+    expect(legacy.promptTokenCount, 41);
+    expect(legacy.peakPhysicalFootprintBytes, 450000000);
+    expect(current.timingSemanticsVersion, currentTimingSemantics);
+    expect(current.timeToFirstTokenSeconds, 0.425);
+
+    // Re-saving labels both explicitly and stays under schema 3: the key is
+    // additive, and a bump would make an older build quarantine the file.
+    await repository.save(loaded);
+    final raw = jsonDecode(await file.readAsString()) as Map<String, Object?>;
+    expect(raw['schemaVersion'], 3);
+    final rewritten =
+        ((raw['conversations']! as List).single as Map)['messages']! as List;
+    expect(
+      ((rewritten.first as Map)['metrics'] as Map)['timingSemanticsVersion'],
+      legacyTimingSemantics,
+    );
+    expect(
+      ((rewritten.last as Map)['metrics'] as Map)['timingSemanticsVersion'],
+      currentTimingSemantics,
+    );
+  });
+
   test('image parts round-trip and expose their references', () {
     final message = ChatMessage(
       id: 'u1',
