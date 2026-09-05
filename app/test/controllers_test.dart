@@ -169,6 +169,8 @@ final class _RecordingInferenceRepository implements InferenceRepository {
     SamplingOverrides? overrides,
     String? modelKey,
     String? systemPrompt,
+    GenerationObservation? observe,
+    int? seed,
   }) async* {
     lastOverrides = overrides;
     lastModelKey = modelKey;

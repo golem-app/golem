@@ -125,15 +125,52 @@ final class FakeInferenceRepository implements InferenceRepository {
     SamplingOverrides? overrides,
     String? modelKey,
     String? systemPrompt,
+    GenerationObservation? observe,
+    // Deliberately unused: nothing here samples, so nothing is seeded.
+    int? seed,
   }) async* {
     if (!_prepared) throw StateError('The simulated runtime is unloaded.');
     final epoch = ++_generationEpoch;
+    final observation = observe ?? const GenerationObservation();
+    // An observed activation is a phase with a determinate, invented load —
+    // the bench's goldens and journeys need every state without weights.
+    // Unobserved (chat), residency flips silently as it always did.
+    final activates =
+        modelKey != null && _residency.value.catalogKey != modelKey;
+    if (activates && !observation.isEmpty) {
+      yield const RunPhaseEvent(InferencePhase.loading);
+      if (observation.loadProgress) {
+        for (final fraction in const [0.25, 0.5, 0.75, 1.0]) {
+          await Future<void>.delayed(eventDelay);
+          if (epoch != _generationEpoch) {
+            yield const CompletedEvent();
+            return;
+          }
+          yield LoadProgressEvent(fraction);
+        }
+      }
+      yield const RunPhaseEvent(
+        InferencePhase.loaded,
+        loadDuration: Duration(milliseconds: 1240),
+      );
+    }
     if (modelKey != null) {
       _residency.value = InferenceResidency(loaded: true, catalogKey: modelKey);
     }
     final profile = _profileFor(modelKey);
     final last = context.lastOrNull;
     final prompt = last?.text ?? '';
+    // The prompt "prefills" in two halves; four characters stand in for a
+    // token, which is the broker's own estimate.
+    final promptTokens = prompt.isEmpty ? 1 : (prompt.length / 4).ceil();
+    if (!observation.isEmpty) {
+      yield const RunPhaseEvent(InferencePhase.promptProcessing);
+      if (observation.promptProgress) {
+        for (final completed in [promptTokens ~/ 2, promptTokens]) {
+          yield PromptProgressEvent(completed: completed, total: promptTokens);
+        }
+      }
+    }
     // Deterministic ack so journeys can exercise an image turn offline.
     final attachedImages = last?.images.length ?? 0;
     if (attachedImages > 0) {
@@ -203,18 +240,39 @@ final class FakeInferenceRepository implements InferenceRepository {
         yield const CompletedEvent();
         return;
       }
+      if (index == 0 && !observation.isEmpty) {
+        yield const RunPhaseEvent(InferencePhase.generating);
+      }
+      final before = tokens;
       tokens += part.split(RegExp(r'\s+')).length;
       yield AnswerDelta(
         index == 0 && modelKey != null
             ? 'Simulated ${profile.name} here. $part'
             : part,
       );
+      if (observation.tokenTiming) {
+        // One instant per invented token, on an invented clock: a steady
+        // cadence from a 310 ms first token, with one stall at the eighth
+        // token so a latency chart has something honest to show a stall as.
+        yield TokenTimingEvent(
+          kind: ObservationKind.token,
+          firstIndex: before,
+          timesMs: [
+            for (var i = before; i < tokens; i++)
+              310 + i * (1000 / profile.decodeRate) + (i >= 7 ? 130 : 0),
+          ],
+        );
+      }
       yield MetricsEvent(
         InferenceMetrics(
           promptTokensPerSecond: 144,
           decodeTokensPerSecond: profile.decodeRate,
           tokenCount: tokens,
           elapsedSeconds: tokens / profile.decodeRate,
+          // Measurement-grade fields only when a bench asked: chat's
+          // simulated metrics stay exactly what its goldens record.
+          promptTokenCount: observation.isEmpty ? null : promptTokens,
+          timeToFirstTokenSeconds: observation.isEmpty ? null : 0.31,
         ),
       );
     }

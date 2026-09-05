@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -9,6 +10,7 @@ import 'context_window.dart';
 import 'hash.dart';
 import 'model_profile.dart';
 import 'model_runtime_config.dart';
+import 'effective_sampling.dart';
 import 'runtime.dart';
 
 typedef InferenceDiagnosticSink = void Function(String message);
@@ -165,10 +167,14 @@ final class InfernoInferenceRepository implements InferenceRepository {
   /// Single-flight per key: concurrent callers for the same key join the load
   /// in flight; a different key queues behind it rather than tripping the
   /// runtime's single-operation lifecycle.
-  Future<void> _ensureResident(_Target target) {
-    if (_resident != null && _resident!.catalogKey == target.catalogKey) {
-      return Future.value();
-    }
+  bool _isResident(_Target target) =>
+      _resident != null && _resident!.catalogKey == target.catalogKey;
+
+  Future<void> _ensureResident(
+    _Target target, {
+    BrokerLoadProgress? onProgress,
+  }) {
+    if (_isResident(target)) return Future.value();
     if (_activating != null && _activatingKey == target.catalogKey) {
       return _activating!;
     }
@@ -206,6 +212,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
           projectorPath: target.projectorPath == null
               ? null
               : _resolvePath(target.projectorPath!),
+          onProgress: onProgress,
         );
       } catch (error) {
         _logFailure(target.engine, phase: 'load', error: error);
@@ -282,15 +289,39 @@ final class InfernoInferenceRepository implements InferenceRepository {
     SamplingOverrides? overrides,
     String? modelKey,
     String? systemPrompt,
+    GenerationObservation? observe,
+    int? seed,
   }) async* {
     final target = _targetFor(modelKey);
-    await _ensureResident(target);
+    final observation = observe ?? const GenerationObservation();
+    if (_isResident(target)) {
+      await _ensureResident(target);
+    } else {
+      // This generation owns its activation, so the caller sees it as a
+      // phase with a measured wall time rather than as silence before the
+      // first token. The engine's fraction, when asked for, arrives on the
+      // load's own callback and is forwarded here between the two phases.
+      yield const RunPhaseEvent(InferencePhase.loading);
+      final loading = Stopwatch()..start();
+      final fractions = StreamController<double>();
+      final activation = _ensureResident(
+        target,
+        onProgress: observation.loadProgress ? fractions.add : null,
+      ).whenComplete(fractions.close);
+      await for (final fraction in fractions.stream) {
+        yield LoadProgressEvent(fraction);
+      }
+      await activation;
+      yield RunPhaseEvent(InferencePhase.loaded, loadDuration: loading.elapsed);
+    }
     final profile = target.profile;
     final parser = profile.newParser(reasoningEnabled: reasoningEnabled);
-    final (sampling, overridesApplied) = _effectiveSampling(
-      profile,
-      profile.sampling(reasoningEnabled: reasoningEnabled),
-      overrides,
+    final effectiveSeed = seed ?? this.seed;
+    final (sampling, overridesApplied) = effectiveSampling(
+      profile: profile,
+      defaults: profile.sampling(reasoningEnabled: reasoningEnabled),
+      overrides: overrides,
+      seed: effectiveSeed,
     );
     final promptChars = context.fold<int>(
       0,
@@ -339,7 +370,10 @@ final class InfernoInferenceRepository implements InferenceRepository {
     }
     BrokerRuntimeMetrics? finalMetrics;
     var sawAnswer = false;
-    final probe = seed == null ? null : StringBuffer();
+    var sawOutput = false;
+    final probe = effectiveSeed == null ? null : StringBuffer();
+    final loadedImages = await _loadImages(images);
+    yield const RunPhaseEvent(InferencePhase.promptProcessing);
     try {
       await for (final event in _runtime.generate(
         BrokerGenerationRequest(
@@ -348,11 +382,16 @@ final class InfernoInferenceRepository implements InferenceRepository {
             reasoningEnabled: reasoningEnabled,
           ),
           sampling: sampling,
-          images: await _loadImages(images),
+          images: loadedImages,
+          observe: observation.isEmpty ? null : observation,
         ),
       )) {
         switch (event) {
           case BrokerTextDelta():
+            if (!sawOutput) {
+              sawOutput = true;
+              yield const RunPhaseEvent(InferencePhase.generating);
+            }
             probe?.write(event.text);
             for (final domainEvent in _domainEvents(
               parser.consume(event.text),
@@ -375,7 +414,25 @@ final class InfernoInferenceRepository implements InferenceRepository {
                 peakPhysicalFootprintBytes: metrics.peakPhysicalFootprintBytes,
                 // The engine's numbers carry the engine's contract.
                 timingSemanticsVersion: metrics.timingSemanticsVersion,
+                promptBatchSize: metrics.promptBatchSize,
               ),
+            );
+          case BrokerPromptProgress():
+            yield PromptProgressEvent(
+              completed: event.completed,
+              total: event.total,
+            );
+          case BrokerTokenTiming():
+            // An engine's first instant can land before the text it belongs
+            // to is visible (a stop-sequence hold-back), and is output too.
+            if (!sawOutput) {
+              sawOutput = true;
+              yield const RunPhaseEvent(InferencePhase.generating);
+            }
+            yield TokenTimingEvent(
+              kind: event.kind,
+              firstIndex: event.firstIndex,
+              timesMs: event.timesMs,
             );
           case BrokerGenerationCompleted():
             _logMetrics(
@@ -415,45 +472,6 @@ final class InfernoInferenceRepository implements InferenceRepository {
       );
       rethrow;
     }
-  }
-
-  /// Pinned modes keep their sampling fields (a correctness constraint — see
-  /// the profile); token budgets stay the user's to size.
-  (BrokerSamplingParameters, bool) _effectiveSampling(
-    ModelProfile profile,
-    ProfileSampling defaults,
-    SamplingOverrides? overrides,
-  ) {
-    final user = overrides ?? const SamplingOverrides();
-    final samplingOverridable = !defaults.pinned;
-    final applied =
-        user.maxTokens != null ||
-        user.contextLength != null ||
-        (samplingOverridable &&
-            (user.temperature != null ||
-                user.topP != null ||
-                user.topK != null));
-    return (
-      BrokerSamplingParameters(
-        maxTokens: user.maxTokens ?? defaults.maxTokens,
-        temperature: samplingOverridable
-            ? (user.temperature ?? defaults.temperature)
-            : defaults.temperature,
-        topP: samplingOverridable
-            ? (user.topP ?? defaults.topP)
-            : defaults.topP,
-        topK: samplingOverridable
-            ? (user.topK ?? defaults.topK)
-            : defaults.topK,
-        // A correctness knob, never a preference: no user channel exists.
-        presencePenalty: defaults.presencePenalty,
-        contextLength: user.contextLength ?? defaults.contextLength,
-        seed: seed,
-        stopSequences: profile.stopSequences,
-        stopTokenIds: profile.stopTokenIds,
-      ),
-      applied,
-    );
   }
 
   /// One greppable line per completed generation — the on-device measurement

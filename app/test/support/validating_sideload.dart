@@ -66,5 +66,7 @@ final class ValidatingSideload implements InferenceRepository {
     SamplingOverrides? overrides,
     String? modelKey,
     String? systemPrompt,
+    GenerationObservation? observe,
+    int? seed,
   }) => const Stream.empty();
 }

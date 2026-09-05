@@ -30,15 +30,23 @@ final class _RecordingRuntime implements BrokerRuntime {
 
   BrokerLoadOptions? lastLoadOptions;
 
+  /// Whether the last load was asked for progress — the ABI-6 opt-in.
+  bool? lastLoadObserved;
+
   @override
   Future<void> load({
     required BrokerEngine engine,
     required String modelPath,
     BrokerLoadOptions options = const BrokerLoadOptions(),
     String? projectorPath,
+    BrokerLoadProgress? onProgress,
   }) async {
     loads++;
     lastLoadOptions = options;
+    lastLoadObserved = onProgress != null;
+    // Like the llama shim: a fraction only when asked.
+    onProgress?.call(0.5);
+    onProgress?.call(1);
   }
 
   @override
@@ -50,9 +58,28 @@ final class _RecordingRuntime implements BrokerRuntime {
   @override
   Stream<BrokerRuntimeEvent> generate(BrokerGenerationRequest request) async* {
     this.request = request;
+    // Observation events only when the request asked — the shims' contract.
+    if (request.observe?.promptProgress ?? false) {
+      yield const BrokerPromptProgress(completed: 6, total: 12);
+      yield const BrokerPromptProgress(completed: 12, total: 12);
+    }
     yield const BrokerTextDelta('<|chan');
     yield const BrokerTextDelta('nel>thought\nprivate ');
+    if (request.observe?.tokenTiming ?? false) {
+      yield const BrokerTokenTiming(
+        kind: ObservationKind.token,
+        firstIndex: 0,
+        timesMs: [50, 98, 151],
+      );
+    }
     yield const BrokerTextDelta('work\n<channel|>Visible answer.');
+    if (request.observe?.tokenTiming ?? false) {
+      yield const BrokerTokenTiming(
+        kind: ObservationKind.token,
+        firstIndex: 3,
+        timesMs: [200],
+      );
+    }
     yield const BrokerMetricsDelta(
       BrokerRuntimeMetrics(
         decodeTokensPerSecond: 20,
@@ -63,6 +90,7 @@ final class _RecordingRuntime implements BrokerRuntime {
         promptTokenCount: 12,
         timeToFirstTokenSeconds: 0.05,
         peakPhysicalFootprintBytes: 128 << 20,
+        promptBatchSize: 512,
       ),
     );
     yield const BrokerGenerationCompleted(BrokerStopReason.endOfSequence);
@@ -112,6 +140,7 @@ final class _SlowLoadRuntime extends _RecordingRuntime {
     required String modelPath,
     BrokerLoadOptions options = const BrokerLoadOptions(),
     String? projectorPath,
+    BrokerLoadProgress? onProgress,
   }) async {
     loads++;
     await loading.future;
@@ -399,6 +428,132 @@ void main() {
     },
   );
 
+  group('observation (#58)', () {
+    InfernoInferenceRepository build(_RecordingRuntime runtime, {int? seed}) =>
+        InfernoInferenceRepository(
+          runtime,
+          engine: BrokerEngine.llamaCpp,
+          profile: const Gemma4Profile(),
+          modelPath: '/local/model',
+          initialCatalogKey: 'gemma4-gguf',
+          seed: seed,
+        );
+
+    test('a chat-shaped call sees no phases beyond the engine\'s and asks '
+        'the engine for nothing', () async {
+      final runtime = _RecordingRuntime();
+      final repository = build(runtime);
+      await repository.prepare();
+      final events = await repository
+          .generate(
+            context: [PromptMessage.text('user', 'Hello')],
+            reasoningEnabled: false,
+          )
+          .toList();
+      expect(runtime.request!.observe, isNull);
+      expect(runtime.lastLoadObserved, isFalse);
+      expect(events.whereType<LoadProgressEvent>(), isEmpty);
+      expect(events.whereType<PromptProgressEvent>(), isEmpty);
+      expect(events.whereType<TokenTimingEvent>(), isEmpty);
+      // Resident already: no activation phases, only the engine's two.
+      expect(events.whereType<RunPhaseEvent>().map((e) => e.phase), [
+        InferencePhase.promptProcessing,
+        InferencePhase.generating,
+      ]);
+      // The engine's batch size still rides the metrics.
+      expect(
+        events.whereType<MetricsEvent>().last.metrics.promptBatchSize,
+        512,
+      );
+    });
+
+    test('an observed generation that activates reports every phase in '
+        'order, with the load\'s fraction between loading and loaded', () async {
+      final runtime = _RecordingRuntime();
+      final repository = build(runtime);
+      final events = await repository
+          .generate(
+            context: [PromptMessage.text('user', 'Hello')],
+            reasoningEnabled: true,
+            observe: GenerationObservation.everything,
+          )
+          .toList();
+      expect(runtime.lastLoadObserved, isTrue);
+      expect(runtime.request!.observe, GenerationObservation.everything);
+      final order = [
+        for (final event in events)
+          switch (event) {
+            RunPhaseEvent() => event.phase.name,
+            LoadProgressEvent() => 'load ${event.fraction}',
+            PromptProgressEvent() => 'prompt ${event.completed}/${event.total}',
+            TokenTimingEvent() => 'timing ${event.firstIndex}',
+            _ => null,
+          },
+      ].nonNulls.toList();
+      expect(order, [
+        'loading',
+        'load 0.5',
+        'load 1.0',
+        'loaded',
+        'promptProcessing',
+        'prompt 6/12',
+        'prompt 12/12',
+        'generating',
+        'timing 0',
+        'timing 3',
+      ]);
+      final loaded = events.whereType<RunPhaseEvent>().firstWhere(
+        (e) => e.phase == InferencePhase.loaded,
+      );
+      expect(loaded.loadDuration, isNotNull);
+      // Generating is marked exactly once, by the first output of either kind.
+      expect(
+        events.whereType<RunPhaseEvent>().where(
+          (e) => e.phase == InferencePhase.generating,
+        ),
+        hasLength(1),
+      );
+      final timings = events.whereType<TokenTimingEvent>().toList();
+      expect(timings.first.kind, ObservationKind.token);
+      expect(timings.last.timesMs, [200]);
+    });
+
+    test('a per-run seed reaches the engine and turns the probe on', () async {
+      final runtime = _RecordingRuntime();
+      final repository = build(runtime);
+      await repository.prepare();
+      final unseeded = await repository
+          .generate(
+            context: [PromptMessage.text('user', 'Hello')],
+            reasoningEnabled: false,
+          )
+          .toList();
+      expect(runtime.request!.sampling.seed, isNull);
+      expect(unseeded.whereType<CompletedEvent>().single.rawTextHash, isNull);
+
+      final seeded = await repository
+          .generate(
+            context: [PromptMessage.text('user', 'Hello')],
+            reasoningEnabled: false,
+            seed: 9,
+          )
+          .toList();
+      expect(runtime.request!.sampling.seed, 9);
+      expect(seeded.whereType<CompletedEvent>().single.rawTextHash, isNotNull);
+
+      // The process-wide seed still applies when a run names none.
+      final processSeeded = build(runtime, seed: 7);
+      await processSeeded.prepare();
+      await processSeeded
+          .generate(
+            context: [PromptMessage.text('user', 'Hello')],
+            reasoningEnabled: false,
+          )
+          .drain<void>();
+      expect(runtime.request!.sampling.seed, 7);
+    });
+  });
+
   test('the metrics line records the timing contract and sampling', () async {
     final lines = <String>[];
 
@@ -605,7 +760,12 @@ void main() {
           context: [PromptMessage.text('user', 'Hello')],
           reasoningEnabled: false,
         )
-        .listen((_) => unawaited(subscription.cancel()));
+        .listen((event) {
+          // The first engine-originated event: the phase before it is the
+          // repository's own, published before the runtime stream exists,
+          // and a cancel there has nothing to tear down.
+          if (event is AnswerDelta) unawaited(subscription.cancel());
+        });
     for (var i = 0; i < 10; i++) {
       await Future<void>.delayed(Duration.zero);
     }
@@ -1215,6 +1375,7 @@ final class _ResidencyRuntime implements BrokerRuntime {
     required String modelPath,
     BrokerLoadOptions options = const BrokerLoadOptions(),
     String? projectorPath,
+    BrokerLoadProgress? onProgress,
   }) async {
     if (gate != null) await gate!.future;
     if (failNextLoad) {

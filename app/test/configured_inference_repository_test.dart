@@ -21,6 +21,7 @@ final class _StubRuntime implements BrokerRuntime {
     required String modelPath,
     BrokerLoadOptions options = const BrokerLoadOptions(),
     String? projectorPath,
+    BrokerLoadProgress? onProgress,
   }) async {
     loadedModelPath = modelPath;
     loadedProjectorPath = projectorPath;

@@ -24,6 +24,7 @@ final class _ModelFreeRuntime implements BrokerRuntime {
     required String modelPath,
     BrokerLoadOptions options = const BrokerLoadOptions(),
     String? projectorPath,
+    BrokerLoadProgress? onProgress,
   }) async {}
 
   @override

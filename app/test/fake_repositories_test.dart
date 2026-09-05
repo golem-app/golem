@@ -160,6 +160,93 @@ void main() {
     },
   );
 
+  test(
+    'the simulation observes only when asked, and then completely',
+    () async {
+      // Chat never asks, and its stream — and therefore its goldens — must not
+      // move: no phases, no progress, no instants, no measurement-grade
+      // metrics fields. The bench asks for everything and gets a determinate
+      // load, the prompt in two halves, one instant per invented token and
+      // a stall to draw.
+      final repository = FakeInferenceRepository(eventDelay: Duration.zero);
+      final quiet = await repository
+          .generate(
+            context: [PromptMessage.text('user', 'Read a CSV without pandas')],
+            reasoningEnabled: false,
+            modelKey: 'gemma4-gguf',
+          )
+          .toList();
+      expect(quiet.whereType<RunPhaseEvent>(), isEmpty);
+      expect(quiet.whereType<LoadProgressEvent>(), isEmpty);
+      expect(quiet.whereType<PromptProgressEvent>(), isEmpty);
+      expect(quiet.whereType<TokenTimingEvent>(), isEmpty);
+      expect(
+        quiet.whereType<MetricsEvent>().last.metrics.promptTokenCount,
+        isNull,
+      );
+
+      await repository.unload();
+      await repository.prepare();
+      final observed = await repository
+          .generate(
+            context: [PromptMessage.text('user', 'Read a CSV without pandas')],
+            reasoningEnabled: false,
+            modelKey: 'qwen35-gguf',
+            observe: GenerationObservation.everything,
+          )
+          .toList();
+      expect(observed.whereType<RunPhaseEvent>().map((e) => e.phase), [
+        InferencePhase.loading,
+        InferencePhase.loaded,
+        InferencePhase.promptProcessing,
+        InferencePhase.generating,
+      ]);
+      expect(observed.whereType<LoadProgressEvent>().map((e) => e.fraction), [
+        0.25,
+        0.5,
+        0.75,
+        1.0,
+      ]);
+      final progress = observed.whereType<PromptProgressEvent>().toList();
+      expect(progress.last.completed, progress.last.total);
+      expect(
+        progress.last.total,
+        ('Read a CSV without pandas'.length / 4).ceil(),
+      );
+      final timings = observed.whereType<TokenTimingEvent>().toList();
+      final metrics = observed.whereType<MetricsEvent>().last.metrics;
+      var next = 0;
+      double last = 0;
+      for (final batch in timings) {
+        expect(batch.kind, ObservationKind.token);
+        expect(batch.firstIndex, next);
+        for (final time in batch.timesMs) {
+          expect(time, greaterThan(last));
+          last = time;
+        }
+        next += batch.timesMs.length;
+      }
+      expect(next, metrics.tokenCount, reason: 'one instant per token');
+      expect(metrics.promptTokenCount, progress.last.total);
+      expect(metrics.timeToFirstTokenSeconds, 0.31);
+      // The observed activation is a second one: the first call left the
+      // repository resident on gemma, and observing does not re-load a
+      // resident configuration.
+      final again = await repository
+          .generate(
+            context: [PromptMessage.text('user', 'Again')],
+            reasoningEnabled: false,
+            modelKey: 'qwen35-gguf',
+            observe: GenerationObservation.everything,
+          )
+          .toList();
+      expect(
+        again.whereType<RunPhaseEvent>().first.phase,
+        InferencePhase.promptProcessing,
+      );
+    },
+  );
+
   test('fake inference supports cancellation and injected failure', () async {
     final repository = FakeInferenceRepository(
       eventDelay: const Duration(milliseconds: 20),

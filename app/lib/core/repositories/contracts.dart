@@ -144,12 +144,19 @@ abstract interface class InferenceRepository {
   /// real backend and ignored by the fake. [modelKey] is activated when it is
   /// not already resident. [systemPrompt] renders as the leading system turn;
   /// the fake acknowledges it so the round-trip is provable model-free.
+  ///
+  /// [observe] asks for the phase, progress and timing events the bench
+  /// reads (#58); null keeps the stream chat has always received. [seed]
+  /// fixes this run's sampling seed and turns the determinism probe on for
+  /// it, over the process-wide seed a build may carry.
   Stream<InferenceEvent> generate({
     required List<PromptMessage> context,
     required bool reasoningEnabled,
     SamplingOverrides? overrides,
     String? modelKey,
     String? systemPrompt,
+    GenerationObservation? observe,
+    int? seed,
   });
 
   /// Stops the engine synchronously and stays usable — a later [prepare]

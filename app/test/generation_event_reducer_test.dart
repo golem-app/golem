@@ -97,6 +97,22 @@ void main() {
     );
   });
 
+  test('observation events change nothing in a transcript', () {
+    final messages = _turn(_draft(text: 'so far'));
+    for (final event in const <InferenceEvent>[
+      RunPhaseEvent(InferencePhase.generating),
+      LoadProgressEvent(0.5),
+      PromptProgressEvent(completed: 1, total: 2),
+      TokenTimingEvent(
+        kind: ObservationKind.token,
+        firstIndex: 0,
+        timesMs: [1],
+      ),
+    ]) {
+      expect(applyGenerationEvent(messages, event), isNull, reason: '$event');
+    }
+  });
+
   test('an empty conversation has no draft to fold into', () {
     expect(applyGenerationEvent(const [], const AnswerDelta('x')), isNull);
   });
