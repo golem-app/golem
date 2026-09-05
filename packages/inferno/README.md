@@ -41,3 +41,12 @@ Gemma-specific templating, reasoning-tag parsing, and end-of-turn policy live in
 `app/lib/broker/`. Engines receive raw rendered text and return raw generated
 text. BOS/EOS policy is documented and verified at token level in the broker
 parity fixture; no engine applies its embedded chat template.
+
+## License
+
+Copyright © 2026 Jan Slominski. Inferno is licensed under the GNU Affero
+General Public License, version 3 only (`AGPL-3.0-only`; the text is in
+[`LICENSE`](LICENSE), identical to the repository's). The engines it drives
+are not part of that grant: llama.cpp (MIT) and the MLX Swift graph (MIT and
+Apache-2.0) are fetched at build time under their own licenses, and the app
+discloses them in Settings ▸ Open-source licenses.

@@ -1,12 +1,14 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_identity.dart';
 import '../../core/app_version.dart';
 import '../../core/chrome/golem_chrome.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_sheet.dart';
+import '../../core/chrome/golem_tappable.dart';
 import '../../core/domain/app_preferences.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/golem_theme.dart';
@@ -267,12 +269,35 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 8),
+            // An SPDX identifier and a host name, so no catalog string.
+            GolemTappable(
+              key: const Key('about-license'),
+              shape: GolemTapShape.wide,
+              padding: EdgeInsets.zero,
+              alignment: AlignmentDirectional.centerStart,
+              onPressed: () => launchUrl(
+                _sourceRepository,
+                mode: LaunchMode.externalApplication,
+              ),
+              child: Text(
+                'AGPL-3.0-only · ${_sourceRepository.host}${_sourceRepository.path}',
+                style: GolemText.footnote.copyWith(
+                  color: CupertinoDynamicColor.resolve(
+                    GolemTheme.accent,
+                    context,
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 }
+
+final _sourceRepository = Uri.https('github.com', '/golem-app/golem');
 
 String _styleLabel(ResponseStyle style, AppLocalizations l10n) =>
     switch (style) {

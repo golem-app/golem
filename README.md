@@ -104,3 +104,27 @@ fvm dart run tool/check_android_packaging.dart
 See [`app/README.md`](app/README.md) for the app architecture, the asset
 and splash pipeline, screen/automation identifiers, and the iPhone 17
 simulator verification workflow.
+
+## License
+
+Copyright © 2026 Jan Slominski.
+
+Golem's first-party code — the Flutter app under `app/`, Inferno under
+`packages/inferno/`, and the tooling and documentation around them — is free
+software licensed under the GNU Affero General Public License, version 3
+only (`AGPL-3.0-only`; the text is in [`LICENSE`](LICENSE)). It comes with
+no warranty, and there is no "or any later version" option.
+
+The engines and packages Golem builds on keep their own licenses and
+notices: the pinned llama.cpp and MLX graphs and every direct pub dependency
+are disclosed in Settings ▸ Open-source licenses, with the audit in
+[ADR 0009](docs/decisions/0009-model-and-software-attribution.md). Model
+weights are never redistributed; their terms are named in Settings ▸ Model
+attribution.
+
+The Golem name, mascot, and launcher artwork are not covered by the code
+license — see [`TRADEMARKS.md`](TRADEMARKS.md). Contributions are accepted
+under [`CLA.md`](CLA.md); [`CONTRIBUTING.md`](CONTRIBUTING.md) has the
+workflow. The reasoning, the dependency review, and the store-distribution
+basis are recorded in
+[ADR 0019](docs/decisions/0019-licensing-and-publication.md).

@@ -244,11 +244,11 @@ void registerGolemLicenses({bool? apple}) {
 }
 
 /// Direct runtime dependencies of `app/pubspec.yaml`, the packages a reader
-/// looks for by name. Two manifest entries are absent on purpose, because
-/// Flutter's collector never yields them: `inferno` is first-party and ships
-/// no `LICENSE` file of its own, and `flutter_localizations` is an SDK
-/// package whose notice is attributed to `flutter`. Listing either would put
-/// a name in the order that no registry entry can fill.
+/// looks for by name. Two manifest entries are absent on purpose: `inferno`
+/// is first-party — its AGPL text is the repository's, not a third-party
+/// notice this screen discloses — and `flutter_localizations` is an SDK
+/// package whose notice Flutter's collector files under `flutter`, so no
+/// registry entry could fill that name.
 /// `legal_surfaces_test.dart` holds this list to the manifest, so a new
 /// dependency has to be placed here deliberately.
 const directRuntimeLicensePackages = <String>[

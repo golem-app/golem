@@ -746,6 +746,18 @@ void main() {
           .first,
     );
     expect(find.text(appVersion), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('about-row')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('about-row')));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('about-license')),
+        matching: find.text('AGPL-3.0-only · github.com/golem-app/golem'),
+      ),
+      findsOneWidget,
+    );
   }, variant: iosChrome);
 
   /// Reveals the Advanced-mode custom repository card and types a name into it.

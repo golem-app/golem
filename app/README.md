@@ -229,9 +229,10 @@ sizes it owns are why `features/` holds no hard-coded 44 or 48.
 `lib/core/providers/app_providers.dart` holds only what is genuinely shared:
 the launch seams wired by `launchOverrides`, the boot-constant derivations,
 and the session bridges through which one feature's controller offers
-capabilities to another without a feature→feature import (#88). The design
-source of truth is the handoff under `references/ui_redesign/` at the repo
-root.
+capabilities to another without a feature→feature import (#88). The visual
+design was handed off as a set of mockups the maintainer holds outside this
+repository; the Golem Navy tokens under `lib/core/theme/` are their
+committed form.
 
 One artifact transfer is projected once, by
 `features/models/artifact_transfer.dart`: the percentage, the pace figures,
@@ -427,7 +428,8 @@ itself a button, so a download inside it cannot swallow the tap),
 `model-attribution-row`, `open-source-licenses-row`, `licenses-list`,
 `license-<name>` plus `license-text-<name>`,
 `settings-{model,style,system-prompt,appearance,privacy,storage}-row`,
-`advanced-mode-switch`, `about-row`, `about-sheet`,
+`advanced-mode-switch`, `about-row`, `about-sheet`, `about-license`
+(the sheet's license line, which opens the source repository),
 `models-tab-{all,installed}`, `model-card-<key>`, `model-status-<key>`,
 `model-download-<key>`, `model-pause-<key>`, `model-cancel-<key>`,
 `model-progress-<key>` (the download bar, whose percentage is a semantic
@@ -884,3 +886,10 @@ reuses the determinism probe's exact prompt and sampling, so its
 `fnv1a64` hash cross-references `../docs/notes/determinism-probe.md`.
 Mac numbers serve answer quality and relative comparison only — never
 quote them as mobile performance.
+
+## License
+
+The app is `AGPL-3.0-only`, © 2026 Jan Slominski — see the repository
+[`LICENSE`](../LICENSE) and the root README's License section. The Golem
+name, mascot, and launcher artwork are reserved
+([`TRADEMARKS.md`](../TRADEMARKS.md)); a distributed fork rebrands first.
