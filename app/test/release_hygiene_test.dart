@@ -45,6 +45,13 @@ void main() {
     }
   });
 
+  test('only the phone-internal identities compose the benchmark', () {
+    expect(composesSimulatedBenchmark(AppIdentity.qa), isTrue);
+    expect(composesSimulatedBenchmark(AppIdentity.dev), isTrue);
+    expect(composesSimulatedBenchmark(AppIdentity.production), isFalse);
+    expect(composesSimulatedBenchmark(AppIdentity.lab), isFalse);
+  });
+
   test('production composition can leave benchmark unwired', () {
     final dependencies = launchDependenciesWith(includeBenchmark: false);
     final container = ProviderContainer(

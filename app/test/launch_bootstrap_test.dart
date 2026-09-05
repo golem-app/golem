@@ -8,10 +8,13 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golem_flutter/app/app.dart';
 import 'package:golem_flutter/app/bootstrap.dart';
+import 'package:golem_flutter/app/lab_app.dart';
 import 'package:golem_flutter/app/launch_composition.dart';
 import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/domain/app_state.dart';
+import 'package:golem_flutter/core/services/artifact_downloader.dart';
 import 'package:golem_flutter/core/services/device_storage.dart';
 
 import 'support/harness.dart';
@@ -35,8 +38,36 @@ void main() {
   test('launch fault injection is internal-identity only', () {
     expect(shouldInjectLaunchFailure(AppIdentity.dev, 1), isTrue);
     expect(shouldInjectLaunchFailure(AppIdentity.qa, 1), isTrue);
+    expect(shouldInjectLaunchFailure(AppIdentity.lab, 1), isTrue);
     expect(shouldInjectLaunchFailure(AppIdentity.production, 1), isFalse);
     expect(shouldInjectLaunchFailure(AppIdentity.dev, 0), isFalse);
+  });
+
+  test('the lab keeps its documents under its own support container', () {
+    // On an unsandboxed Mac the documents directory is the user's real
+    // ~/Documents, shared by every flavor, so the lab's models and its
+    // downloads both move under application support — and to the same place,
+    // or a transfer would land where verification never looks (ADR 0021).
+    final support = Directory('/support/app.golem.lab');
+    final documents = Directory('/Users/jan/Documents');
+    final lab = storageLayoutFor(
+      AppIdentity.lab,
+      support: support,
+      documents: documents,
+    );
+    expect(lab.documents.path, '/support/app.golem.lab/Documents');
+    expect(lab.downloadRoot, ArtifactDownloadRoot.applicationSupport);
+    expect(lab.downloadSubdirectory, 'Documents');
+    for (final identity in AppIdentity.values.where((i) => !i.isLab)) {
+      final layout = storageLayoutFor(
+        identity,
+        support: support,
+        documents: documents,
+      );
+      expect(layout.documents.path, documents.path, reason: identity.name);
+      expect(layout.downloadRoot, ArtifactDownloadRoot.documents);
+      expect(layout.downloadSubdirectory, isEmpty);
+    }
   });
 
   testWidgets('a failed composition retries into the app', (tester) async {
@@ -85,6 +116,10 @@ void main() {
     await pumpIntoShell(tester);
     expect(calls, 1);
     expect(find.byKey(const Key('first-run-welcome')), findsOneWidget);
+    // Host tests are a dev build: the consumer root, never the lab's.
+    expect(kLabBuild, isFalse);
+    expect(find.byType(GolemApp), findsOneWidget);
+    expect(find.byType(LabApp), findsNothing);
   });
 
   testWidgets('the first frame waits for the composition', (tester) async {

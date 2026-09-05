@@ -8,6 +8,7 @@ import '../core/theme/golem_theme.dart';
 import '../l10n/l10n.dart';
 import '../features/chat/widgets/attach_sheet.dart';
 import 'app.dart';
+import 'lab_app.dart';
 import 'launch_composition.dart';
 
 /// Runs the fallible launch composition before the first frame. The frame is
@@ -108,6 +109,17 @@ class _BootstrapAppState extends State<BootstrapApp>
   Widget build(BuildContext context) {
     final dependencies = _dependencies;
     if (dependencies != null) {
+      // A constant condition: every other flavor compiles without the lab
+      // root behind it (ADR 0021).
+      if (kLabBuild) {
+        return ProviderScope(
+          overrides: labLaunchOverrides(dependencies),
+          child: LabApp(
+            identity: widget.identity,
+            onPreferencesSettled: _allowFirstFrame,
+          ),
+        );
+      }
       return ProviderScope(
         overrides: launchOverrides(dependencies),
         child: GolemApp(
