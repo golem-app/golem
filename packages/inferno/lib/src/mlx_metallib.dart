@@ -33,27 +33,32 @@ void stageMlxMetallibForCliRun({bool warnOnMissing = false}) {
   }
 }
 
-/// The carrier named by the nearest native-assets mapping, walking up from the
-/// working directory the way the VM resolves the mapping itself.
+/// The carrier named by the nearest native-assets mapping above the working
+/// directory — the file dartdev wrote for this run. Best effort like its
+/// caller: anything unreadable is null, never a throw.
 File? _mappedMlxCarrier() {
   const carrier = 'package:inferno/inferno_mlx.dart';
   var directory = Directory.current;
   while (true) {
     final mapping = File('${directory.path}/.dart_tool/native_assets.yaml');
     if (mapping.existsSync()) {
-      // JSON under a comment header, as dartdev writes it.
-      final body = mapping
-          .readAsLinesSync()
-          .where((line) => !line.trimLeft().startsWith('#'))
-          .join('\n');
-      final assets =
-          (jsonDecode(body) as Map<String, Object?>)['native-assets'];
-      if (assets is! Map<String, Object?>) return null;
-      for (final target in assets.values) {
-        final entry = (target as Map<String, Object?>)[carrier];
-        if (entry is List && entry.length == 2 && entry.first == 'absolute') {
-          return File(entry.last as String);
+      try {
+        // JSON under a comment header, as dartdev writes it.
+        final body = mapping
+            .readAsLinesSync()
+            .where((line) => !line.trimLeft().startsWith('#'))
+            .join('\n');
+        final assets =
+            (jsonDecode(body) as Map<String, Object?>)['native-assets'];
+        if (assets is! Map<String, Object?>) return null;
+        for (final target in assets.values) {
+          final entry = (target as Map<String, Object?>)[carrier];
+          if (entry is List && entry.length == 2 && entry.first == 'absolute') {
+            return File(entry.last as String);
+          }
         }
+      } on Object {
+        return null;
       }
       return null;
     }

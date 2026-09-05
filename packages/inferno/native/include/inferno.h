@@ -41,9 +41,10 @@ extern "C" {
 /// worker dispatch, request parsing, tokenization, allocation and prompt
 /// evaluation inside — and is null when no token was produced.
 /// `elapsedSeconds` runs from that same entry to the end of the generation
-/// loop. `decodeTokensPerSecond` is `(generatedTokenCount - 1) /
-/// (elapsedSeconds - timeToFirstTokenSeconds)`, 0 without an inter-token
-/// interval. `promptTokensPerSecond` keeps its per-engine prompt-evaluation
+/// loop. `decodeTokensPerSecond` is `generatedTokenCount / (elapsedSeconds -
+/// timeToFirstTokenSeconds)`: that window holds one decode step per generated
+/// token, the last being the step that ended the reply.
+/// `promptTokensPerSecond` keeps its per-engine prompt-evaluation
 /// window. The ABI moves with it because the field names do not: only the
 /// version check keeps a shim measuring the old windows from feeding
 /// corrected-looking numbers to a caller that believes them (#57).

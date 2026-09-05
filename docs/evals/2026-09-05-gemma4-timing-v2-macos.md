@@ -4,28 +4,28 @@
 - Suite: `default`
 - Template profile: `gemma4` — thinking 2048/1.0/0.95, direct 2048/1.0/0.95; stop `<turn|>` [1, 106]
 - Engine pins: llama.cpp b10241 (`9bd4c09e`), MLX Swift 0.31.6 / MLX Swift LM 3.31.4+31.g60bd0d78
-- Timing semantics v2 (ADR 0020): `ttft s` is native request acceptance → first output token, worker dispatch, tokenization and prefill included; decode tok/s is `tokens − 1` over first token → end; elapsed is acceptance → generation end.
+- Timing semantics v2 (ADR 0020): `ttft s` is native request acceptance → first output token, worker dispatch, tokenization and prefill included; decode tok/s is tokens over first token → end; elapsed is acceptance → generation end.
 - Mac numbers serve answer quality and relative comparison only — never quote them as mobile performance (`docs/notes/determinism-probe.md`).
 
 ## gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf · llamaCpp
 
 - Artifact: gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf (2.44 GiB) — unsloth/gemma-4-E2B-it-qat-GGUF @ 66a399f6
 - Profile: `gemma4`
-- Load: 12.9 s
+- Load: 1.9 s
 - Result: PASS
 
 | prompt | ok | decode tok/s | prompt tok/s | ttft s | peak GiB | tokens | stop | fnv1a64 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| anchor-jupiter | pass | 52.9 | 37.2 | 0.568 | 0.30 | 11 | endOfSequence | `d710455907eadf55` |
-| arithmetic-17x23 | pass | 43.8 | 53.1 | 0.560 | 0.31 | 3 | endOfSequence | `574702182262f0b0` |
-| factual-capital | pass | 52.4 | 9974.5 | 0.077 | 0.29 | 7 | endOfSequence | `8bfd779284f134df` |
-| factual-author | pass | 61.9 | 6984.9 | 0.074 | 0.29 | 33 | endOfSequence | `05f1df9ce1bcba1f` |
-| instruction-one-word | pass | 0.0 | 9824.7 | 0.077 | 0.29 | 1 | endOfSequence | `6baf78886c99db89` |
-| instruction-json | pass | 61.5 | 15823.9 | 0.103 | 0.29 | 26 | endOfSequence | `08124273507b0116` |
-| instruction-translation | pass | 57.6 | 8062.0 | 0.078 | 0.29 | 19 | endOfSequence | `2151341bf8261da3` |
-| multi-turn-recall | pass | 54.8 | 3771.8 | 0.112 | 0.30 | 7 | endOfSequence | `c531954b37e8abc4` |
-| reasoning-speed | pass | 62.9 | 18928.1 | 0.100 | 0.32 | 534 | endOfSequence | `527f27adba863ab3` |
-| long-synthesis | pass | 63.0 | 10391.2 | 0.073 | 0.31 | 176 | endOfSequence | `e489845ee39a819d` |
+| anchor-jupiter | pass | 69.0 | 2340.6 | 0.087 | 0.29 | 11 | endOfSequence | `d710455907eadf55` |
+| arithmetic-17x23 | pass | 67.8 | 7906.8 | 0.074 | 0.29 | 3 | endOfSequence | `574702182262f0b0` |
+| factual-capital | pass | 68.2 | 10293.0 | 0.071 | 0.29 | 7 | endOfSequence | `8bfd779284f134df` |
+| factual-author | pass | 69.4 | 6771.2 | 0.070 | 0.29 | 33 | endOfSequence | `05f1df9ce1bcba1f` |
+| instruction-one-word | pass | 66.4 | 10464.1 | 0.070 | 0.30 | 1 | endOfSequence | `6baf78886c99db89` |
+| instruction-json | pass | 71.3 | 16552.4 | 0.097 | 0.30 | 26 | endOfSequence | `08124273507b0116` |
+| instruction-translation | pass | 69.2 | 7784.9 | 0.071 | 0.30 | 19 | endOfSequence | `2151341bf8261da3` |
+| multi-turn-recall | pass | 68.9 | 16824.3 | 0.097 | 0.30 | 7 | endOfSequence | `c531954b37e8abc4` |
+| reasoning-speed | pass | 64.3 | 17559.9 | 0.096 | 0.31 | 534 | endOfSequence | `527f27adba863ab3` |
+| long-synthesis | pass | 63.7 | 9529.1 | 0.073 | 0.30 | 176 | endOfSequence | `e489845ee39a819d` |
 
 ### Answers
 
@@ -110,21 +110,21 @@ Reasoning (1409 chars): Here's the thinking process to solve the problem: 1. **I
 
 - Artifact: gemma-4-e2b-it-4bit (3.34 GiB) — mlx-community/gemma-4-e2b-it-4bit @ 23876752
 - Profile: `gemma4`
-- Load: 2.2 s
+- Load: 2.8 s
 - Result: PASS
 
 | prompt | ok | decode tok/s | prompt tok/s | ttft s | peak GiB | tokens | stop | fnv1a64 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| anchor-jupiter | pass | 56.5 | 5.4 | 3.334 | 3.11 | 11 | stopToken | `d710455907eadf55` |
-| arithmetic-17x23 | pass | 39.4 | 218.2 | 0.115 | 3.13 | 3 | stopToken | `574702182262f0b0` |
-| factual-capital | pass | 54.6 | 439.3 | 0.051 | 3.14 | 7 | stopToken | `8bfd779284f134df` |
-| factual-author | pass | 59.9 | 118.2 | 0.127 | 3.14 | 12 | stopToken | `b170d328186b2491` |
-| instruction-one-word | pass | 0.0 | 437.0 | 0.051 | 3.14 | 1 | stopToken | `6baf78886c99db89` |
-| instruction-json | pass | 47.1 | 95.8 | 0.377 | 3.15 | 26 | stopToken | `08124273507b0116` |
-| instruction-translation | pass | 67.9 | 84.8 | 0.201 | 3.15 | 84 | stopToken | `3fdfa2b6b0acbffa` |
-| multi-turn-recall | pass | 54.8 | 217.0 | 0.208 | 3.15 | 7 | stopToken | `c531954b37e8abc4` |
-| reasoning-speed | pass | 63.8 | 621.3 | 0.071 | 3.17 | 701 | stopToken | `37db256a7e189b84` |
-| long-synthesis | pass | 66.9 | 444.7 | 0.052 | 3.16 | 162 | stopToken | `d9036a20dd6bc30a` |
+| anchor-jupiter | pass | 69.1 | 34.3 | 0.532 | 3.12 | 11 | stopToken | `d710455907eadf55` |
+| arithmetic-17x23 | pass | 67.3 | 492.3 | 0.051 | 3.14 | 3 | stopToken | `574702182262f0b0` |
+| factual-capital | pass | 67.6 | 446.4 | 0.050 | 3.15 | 7 | stopToken | `8bfd779284f134df` |
+| factual-author | pass | 69.4 | 302.6 | 0.050 | 3.15 | 12 | stopToken | `b170d328186b2491` |
+| instruction-one-word | pass | 70.2 | 446.3 | 0.050 | 3.15 | 1 | stopToken | `6baf78886c99db89` |
+| instruction-json | pass | 69.2 | 564.5 | 0.064 | 3.16 | 26 | stopToken | `08124273507b0116` |
+| instruction-translation | pass | 69.3 | 342.6 | 0.050 | 3.16 | 84 | stopToken | `3fdfa2b6b0acbffa` |
+| multi-turn-recall | pass | 68.5 | 703.4 | 0.065 | 3.16 | 7 | stopToken | `c531954b37e8abc4` |
+| reasoning-speed | pass | 66.5 | 699.7 | 0.063 | 3.17 | 701 | stopToken | `37db256a7e189b84` |
+| long-synthesis | pass | 68.7 | 453.3 | 0.051 | 3.16 | 162 | stopToken | `d9036a20dd6bc30a` |
 
 ### Answers
 

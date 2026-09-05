@@ -272,9 +272,9 @@ void main() {
     skip: skipReason,
   );
 
-  test('a single-token generation reports no decode rate', () async {
-    // One token leaves no inter-token interval; the old window would have
-    // inverted one decode step into tens of thousands of tokens per second.
+  test('a single-token generation measures the step that ended it', () async {
+    // The window after the first token is one decode step here — the one that
+    // produced the stop token or hit the budget — so the rate is that step's.
     final inferno = Inferno.native();
     await inferno.load(
       engine: InfernoEngineKind.llamaCpp,
@@ -290,13 +290,12 @@ void main() {
         .toList();
     final metrics = events.whereType<InfernoMetricsEvent>().single.metrics;
     expect(metrics.generatedTokenCount, lessThanOrEqualTo(1));
-    expect(metrics.decodeTokensPerSecond, 0);
     if (metrics.generatedTokenCount == 1) {
-      expect(metrics.timeToFirstTokenSeconds, isNotNull);
-      expect(
-        metrics.timeToFirstTokenSeconds,
-        lessThanOrEqualTo(metrics.elapsedSeconds),
-      );
+      expectHonestTiming(metrics);
+      expect(metrics.decodeTokensPerSecond, greaterThan(0));
+    } else {
+      expect(metrics.timeToFirstTokenSeconds, isNull);
+      expect(metrics.decodeTokensPerSecond, 0);
     }
     await inferno.unload();
   }, skip: skipReason);

@@ -210,8 +210,8 @@ final class InfernoMetrics {
 
   /// The contract version 2 names (docs/architecture/inferno.md): the first
   /// token and the elapsed time are both measured from the instant the native
-  /// shim accepted the request, and the decode rate is over the inter-token
-  /// intervals that follow the first token. Version 1 — an absent key, found
+  /// shim accepted the request, and the decode rate is the token count over
+  /// the window after the first token. Version 1 — an absent key, found
   /// only in records written before #57 — reported the post-prefill delay
   /// under the same field name.
   static const currentTimingSemanticsVersion = 2;

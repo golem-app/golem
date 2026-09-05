@@ -890,14 +890,13 @@ int32_t inferno_engine_generate(inferno_engine *engine,
       const double elapsed_seconds = seconds_between(request_start, generation_end);
       const double first_token_seconds =
           has_first_token ? seconds_between(request_start, first_token) : 0.0;
-      // What follows the first token holds generated - 1 inter-token
-      // intervals; a one-token reply has none, so it has no decode rate
-      // rather than one decode step inverted into a rate.
+      // The window after the first token holds one decode step per generated
+      // token — the step that yields the next token or the one that ends the
+      // reply — so the count over it is the per-step rate, down to one token.
       const double decode_seconds =
           has_first_token ? elapsed_seconds - first_token_seconds : 0.0;
       const json metrics{
-          {"decodeTokensPerSecond",
-           generated > 1 && decode_seconds > 0 ? (generated - 1) / decode_seconds : 0},
+          {"decodeTokensPerSecond", decode_seconds > 0 ? generated / decode_seconds : 0},
           {"promptTokensPerSecond",
            prompt_seconds > 0 ? prompt_token_count / prompt_seconds : 0},
           {"generatedTokenCount", generated},

@@ -31,16 +31,13 @@ void expectHonestTiming(InfernoMetrics metrics) {
       metrics.promptTokenCount! / metrics.promptTokensPerSecond - 1e-6,
     ),
   );
-  // The decode rate is recomputable from the published numbers.
-  if (metrics.generatedTokenCount > 1) {
-    expect(
-      metrics.decodeTokensPerSecond,
-      closeTo(
-        (metrics.generatedTokenCount - 1) / (metrics.elapsedSeconds - ttft!),
-        1e-6,
-      ),
-    );
-  } else {
-    expect(metrics.decodeTokensPerSecond, 0);
-  }
+  // The decode rate is recomputable from the published numbers, down to a
+  // one-token reply, whose window is the single step that ended it.
+  expect(
+    metrics.decodeTokensPerSecond,
+    closeTo(
+      metrics.generatedTokenCount / (metrics.elapsedSeconds - ttft!),
+      1e-6,
+    ),
+  );
 }

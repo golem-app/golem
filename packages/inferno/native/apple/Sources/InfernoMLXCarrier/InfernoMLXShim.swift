@@ -862,6 +862,10 @@ public func infernoMlxEngineGenerate(
                 )
 
                 var firstTokenAt: ContinuousClock.Instant?
+                // The last event's instant: the library synchronises its GPU
+                // stream after summarising and before the stream ends, and
+                // that teardown is not generation.
+                var lastEventAt: ContinuousClock.Instant?
                 var peakFootprint = physicalFootprintBytes()
                 var generatedChunkCount = 0
                 var pending: [UInt8] = []
@@ -875,9 +879,10 @@ public func infernoMlxEngineGenerate(
                         stopReason = "cancelled"
                         break
                     }
+                    lastEventAt = .now
                     switch event {
                     case .chunk(let text):
-                        if firstTokenAt == nil { firstTokenAt = .now }
+                        if firstTokenAt == nil { firstTokenAt = lastEventAt }
                         generatedChunkCount += 1
                         peakFootprint = max(peakFootprint, physicalFootprintBytes())
                         if emitVisibleBytes(
@@ -912,9 +917,7 @@ public func infernoMlxEngineGenerate(
                         break
                     }
                 }
-                // Stamped where the llama shim stamps generation_end: before
-                // the trailing flush.
-                let generationEnd = ContinuousClock.now
+                let generationEnd = lastEventAt ?? .now
                 if !pending.isEmpty && stopReason != "stop_sequence" {
                     sink.emit(EventKind.textDelta, bytes: pending)
                 }
@@ -946,13 +949,14 @@ public func infernoMlxEngineGenerate(
                         seconds(requestStart.duration(to: generateCallStart)) + completion.promptTime
                     )
                 }
-                let firstTokenSeconds = firstTokenCandidates.min().map { min($0, elapsedSeconds) }
-                // generated - 1 inter-token intervals follow the first token;
-                // a one-token reply has none and no decode rate.
+                let firstTokenSeconds = firstTokenCandidates.min()
+                    .map { min(max($0, 0), elapsedSeconds) }
+                // One library step per generated token sits in this window,
+                // the last being the step that ended the reply.
                 let decodeSeconds = firstTokenSeconds.map { elapsedSeconds - $0 } ?? 0
                 sink.emitJSON(EventKind.metrics, [
-                    "decodeTokensPerSecond": generatedCount > 1 && decodeSeconds > 0
-                        ? Double(generatedCount - 1) / decodeSeconds : 0,
+                    "decodeTokensPerSecond": decodeSeconds > 0
+                        ? Double(generatedCount) / decodeSeconds : 0,
                     "promptTokensPerSecond": promptSeconds > 0
                         ? Double(promptTokenIDs.count) / promptSeconds : 0,
                     "generatedTokenCount": generatedCount,

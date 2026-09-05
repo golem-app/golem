@@ -28,10 +28,10 @@ The contract is **version 2**, defined once in
   Worker dispatch, request parsing, tokenization, allocation and prefill are
   inside the window. Null when no token was produced.
 - `elapsedSeconds` — request acceptance → end of the generation loop.
-- `decodeTokensPerSecond` — `(tokens − 1)` over the inter-token intervals
-  after the first token, on both engines. A one-token reply has no interval
-  and reports no rate; the model-speed label skips such a turn rather than
-  quote a zero.
+- `decodeTokensPerSecond` — tokens over the window after the first token,
+  on both engines. That window holds one engine step per token, the last
+  being the step that ended the reply, so a one-token answer measures that
+  one step rather than dividing by nothing.
 
 Every metrics record states its contract in `timingSemanticsVersion`, carried
 from the shim payload (`INFERNO_ABI_VERSION` 5, `INFERNO_TIMING_SEMANTICS_VERSION`
@@ -60,15 +60,15 @@ post-prefill delay and a time to first token at once.
 - A version-2 time to first token is larger than the version-1 number for the
   same generation by roughly the prefill. A regression against a pre-#57
   baseline is a units change until proven otherwise.
-- Decode rates move by about a percent in opposite directions: llama.cpp's old
-  window included the first token's step, MLX counted every token over the
-  steps after the first. Both now report the same reciprocal inter-token
-  latency.
+- Decode rates barely move: llama.cpp's window start shifts by one sampling
+  call on already-computed logits, and MLX's window is the library's own
+  first-token-to-end interval measured from the shim's clock. Both divide the
+  same count by the same kind of window now.
 - The first record under version 2 is
   `docs/evals/2026-09-05-gemma4-timing-v2-macos.md`: the same Gemma 4 E2B
   prompt set as 2026-08-05 on both engines, with the MLX `ttft s` column now
-  reading the prefill it used to subtract, and a one-word answer reporting no
-  decode rate.
+  reading the prefill it used to subtract, and a one-word answer measuring
+  the single step that ended it.
 - The next contract change is version 3, in the same three places: the shims,
   this record, and the report preamble.
 - No UI shows a latency, before or after. This is a measurement channel.

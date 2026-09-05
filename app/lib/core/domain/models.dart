@@ -481,8 +481,8 @@ const legacyTimingSemantics = 1;
 /// Version 2: `timeToFirstTokenSeconds` runs from the native shim accepting
 /// the request to the first output token — worker dispatch, tokenization and
 /// prefill inside the window; `elapsedSeconds` runs from acceptance to the end
-/// of generation; `decodeTokensPerSecond` is over the inter-token intervals
-/// after the first token, so a one-token reply has none.
+/// of generation; `decodeTokensPerSecond` is the token count over the window
+/// after the first token, which holds one engine step per token.
 const currentTimingSemantics = 2;
 
 final class InferenceMetrics {

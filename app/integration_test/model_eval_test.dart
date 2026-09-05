@@ -180,6 +180,7 @@ void main() {
           ' pass=${row.passed}'
           ' stopReason=${row.stopReason}'
           ' timingSemanticsVersion=${row.metrics?.timingSemanticsVersion}'
+          ' generatedTokenCount=${row.metrics?.tokenCount}'
           ' decodeTokensPerSecond=${row.metrics?.decodeTokensPerSecond.toStringAsFixed(2)}'
           ' promptTokenCount=${row.metrics?.promptTokenCount}'
           ' peakPhysicalFootprintBytes=${row.metrics?.peakPhysicalFootprintBytes}'

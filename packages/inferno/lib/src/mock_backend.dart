@@ -85,8 +85,8 @@ final class MockInfernoBackend implements InfernoBackend {
     // holds; the prefill relation (ttft >= prompt window) is not modelled.
     yield InfernoMetricsEvent(
       InfernoMetrics(
-        decodeTokensPerSecond: generated > 1 && decodeSeconds > 0
-            ? (generated - 1) / decodeSeconds
+        decodeTokensPerSecond: decodeSeconds > 0
+            ? generated / decodeSeconds
             : 0,
         promptTokensPerSecond: 100,
         generatedTokenCount: generated,

@@ -363,8 +363,8 @@ final class EvalRunReport {
     currentTimingSemantics =>
       '- Timing semantics v2 (ADR 0020): `ttft s` is native request '
           'acceptance → first output token, worker dispatch, tokenization and '
-          'prefill included; decode tok/s is `tokens − 1` over first token → '
-          'end; elapsed is acceptance → generation end.',
+          'prefill included; decode tok/s is tokens over first token → end; '
+          'elapsed is acceptance → generation end.',
     legacyTimingSemantics =>
       '- Timing semantics v1 (legacy, pre-#57): `ttft s` is the post-prefill '
           'decode delay, not a time to first token; not comparable with a v2 '

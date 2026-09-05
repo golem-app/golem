@@ -6,10 +6,9 @@
 > the first token, and the MLX shim reconstructed the same window by
 > subtracting its library-reported prompt time from the wall clock, which is
 > why every MLX row below reads 0.000–0.002 s. Prefill, tokenization and
-> worker dispatch are outside it. v2 also measures decode tok/s as
-> `tokens − 1` over first token → end, so the tok/s columns are not over the
-> same interval either. Answers, hashes, token counts and peak GiB are
-> unaffected.
+> worker dispatch are outside it. The decode and prompt tok/s columns kept
+> their windows to within one sampling call. Answers, hashes, token counts
+> and peak GiB are unaffected.
 
 - Host: macos Version 26.5.2 (Build 25F84)
 - Engine pins: llama.cpp b10241 (`9bd4c09e`), MLX Swift 0.31.6 / MLX Swift LM 3.31.4

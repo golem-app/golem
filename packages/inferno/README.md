@@ -25,7 +25,7 @@ Dart binding receives them through `NativeCallable.listener`, copies callback
 bytes before returning, and serializes lifecycle state in Dart. Cancelling a
 stream subscription invokes the same native cancellation path as `cancel()`.
 
-Every generation ends with one metrics event — decode and prompt rates, token
+Every generation that does not fail ends with one metrics event — decode and prompt rates, token
 counts, time to first token, elapsed time, peak physical footprint on Apple
 platforms — measured against the timing contract in
 `docs/architecture/inferno.md` and stamped with its `timingSemanticsVersion`,

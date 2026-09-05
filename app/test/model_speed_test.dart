@@ -8,10 +8,10 @@ import 'package:golem_flutter/core/domain/models.dart';
 /// so the two surfaces agreeing depends entirely on this one walk. It was only
 /// ever reached through those surfaces, which asserted the sentence and not the
 /// rule (#120).
-InferenceMetrics _metrics(double decode, {int tokens = 4}) => InferenceMetrics(
+InferenceMetrics _metrics(double decode) => InferenceMetrics(
   promptTokensPerSecond: 13,
   decodeTokensPerSecond: decode,
-  tokenCount: tokens,
+  tokenCount: 4,
   elapsedSeconds: 0.2,
 );
 
@@ -19,7 +19,6 @@ ChatMessage _answer(
   String id,
   DateTime at, {
   double? decode,
-  int tokens = 4,
   MessageRole role = MessageRole.assistant,
   bool streaming = false,
 }) => ChatMessage.text(
@@ -27,7 +26,7 @@ ChatMessage _answer(
   role: role,
   text: 'hi',
   createdAt: at,
-  metrics: decode == null ? null : _metrics(decode, tokens: tokens),
+  metrics: decode == null ? null : _metrics(decode),
   isStreaming: streaming,
 );
 
@@ -137,19 +136,6 @@ void main() {
       ], defaultModelKey: null);
 
       expect(rates, {'gemma4-gguf': 12});
-    });
-
-    // Under timing semantics v2 a one-token reply has no inter-token interval
-    // and reports no rate (ADR 0020); quoting its zero would read as a stall.
-    test('a one-token reply is not a measurement', () {
-      final rates = measuredTokensPerSecondByModel([
-        _chat('c1', [
-          _answer('m1', DateTime.utc(2026, 1, 1), decode: 30),
-          _answer('m2', DateTime.utc(2026, 1, 2), decode: 0, tokens: 1),
-        ], modelKey: 'gemma4-gguf'),
-      ], defaultModelKey: null);
-
-      expect(rates, {'gemma4-gguf': 30});
     });
 
     test('order in the history does not decide, the timestamp does', () {
