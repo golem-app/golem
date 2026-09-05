@@ -67,6 +67,7 @@ final class MockInfernoBackend implements InfernoBackend {
     final epoch = ++_generationEpoch;
     final watch = Stopwatch()..start();
     var generated = 0;
+    double? firstDeltaSeconds;
     for (final delta in deltas) {
       if (delay != Duration.zero) await Future<void>.delayed(delay);
       if (epoch != _generationEpoch) {
@@ -74,18 +75,25 @@ final class MockInfernoBackend implements InfernoBackend {
         return;
       }
       generated++;
+      firstDeltaSeconds ??= _seconds(watch);
       yield InfernoTextDelta(delta);
     }
     watch.stop();
-    final elapsed = watch.elapsedMicroseconds / Duration.microsecondsPerSecond;
+    final elapsed = _seconds(watch);
+    final decodeSeconds = elapsed - (firstDeltaSeconds ?? elapsed);
+    // Measured from the top of the call like the shims, so ttft <= elapsed
+    // holds; the prefill relation (ttft >= prompt window) is not modelled.
     yield InfernoMetricsEvent(
       InfernoMetrics(
-        decodeTokensPerSecond: elapsed == 0 ? 0 : generated / elapsed,
+        decodeTokensPerSecond: generated > 1 && decodeSeconds > 0
+            ? (generated - 1) / decodeSeconds
+            : 0,
         promptTokensPerSecond: 100,
         generatedTokenCount: generated,
         elapsedSeconds: elapsed,
+        timingSemanticsVersion: InfernoMetrics.currentTimingSemanticsVersion,
         promptTokenCount: request.prompt.length,
-        timeToFirstTokenSeconds: elapsed == 0 ? 0 : elapsed / generated,
+        timeToFirstTokenSeconds: firstDeltaSeconds,
         peakPhysicalFootprintBytes: 1 << 20,
       ),
     );
@@ -101,3 +109,6 @@ final class MockInfernoBackend implements InfernoBackend {
   @override
   void dispose() {}
 }
+
+double _seconds(Stopwatch watch) =>
+    watch.elapsedMicroseconds / Duration.microsecondsPerSecond;

@@ -34,7 +34,26 @@ extern "C" {
 /// window covers the whole generation (window = maxTokens). A shim that
 /// reports 4 must honor the field — dropping it silently reintroduces the
 /// budget-length think loop the field exists to break (#80).
-#define INFERNO_ABI_VERSION 4
+///
+/// ABI 5: the METRICS payload carries a required `"timingSemanticsVersion"`
+/// (int) and three of its numbers change meaning. `timeToFirstTokenSeconds`
+/// runs from entry into `inferno_engine_generate` to the first output token —
+/// worker dispatch, request parsing, tokenization, allocation and prompt
+/// evaluation inside — and is null when no token was produced.
+/// `elapsedSeconds` runs from that same entry to the end of the generation
+/// loop. `decodeTokensPerSecond` is `(generatedTokenCount - 1) /
+/// (elapsedSeconds - timeToFirstTokenSeconds)`, 0 without an inter-token
+/// interval. `promptTokensPerSecond` keeps its per-engine prompt-evaluation
+/// window. The ABI moves with it because the field names do not: only the
+/// version check keeps a shim measuring the old windows from feeding
+/// corrected-looking numbers to a caller that believes them (#57).
+#define INFERNO_ABI_VERSION 5
+
+/// The timing contract the METRICS payload names. It moves with the ABI today
+/// and exists separately because records outlive shims: a stored measurement
+/// must still say which contract produced it. Absent means 1, the pre-#57
+/// post-prefill window.
+#define INFERNO_TIMING_SEMANTICS_VERSION 2
 
 typedef struct inferno_engine inferno_engine;
 

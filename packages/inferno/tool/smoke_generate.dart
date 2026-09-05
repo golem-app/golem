@@ -49,11 +49,16 @@ Future<void> main(List<String> arguments) async {
         buffer.write(event.text);
       case InfernoMetricsEvent():
         final m = event.metrics;
+        // Enough to read ttft <= elapsed and ttft >= promptTokens / prompt
+        // rate off one line.
         stderr.writeln(
-          'metrics: decode=${m.decodeTokensPerSecond.toStringAsFixed(1)} tok/s'
+          'metrics(v${m.timingSemanticsVersion}):'
+          ' decode=${m.decodeTokensPerSecond.toStringAsFixed(1)} tok/s'
           ' prompt=${m.promptTokensPerSecond.toStringAsFixed(1)} tok/s'
+          ' promptTokens=${m.promptTokenCount}'
           ' tokens=${m.generatedTokenCount}'
           ' ttft=${m.timeToFirstTokenSeconds?.toStringAsFixed(3)}s'
+          ' elapsed=${m.elapsedSeconds.toStringAsFixed(3)}s'
           ' peakBytes=${m.peakPhysicalFootprintBytes}',
         );
       case InfernoGenerationCompleted():

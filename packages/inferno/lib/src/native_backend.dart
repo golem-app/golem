@@ -61,7 +61,7 @@ const _mlxAssetId = 'package:inferno/inferno_mlx.dart';
 
 /// The C ABI revision this package speaks. A mismatch fails before any native
 /// object is created rather than crashing inside one.
-const infernoAbiVersion = 4;
+const infernoAbiVersion = 5;
 
 @Native<Uint32 Function()>(
   symbol: 'inferno_abi_version',
@@ -807,25 +807,30 @@ final class NativeInfernoBackend implements InfernoBackend {
     switch (eventKind) {
       case 2:
         if (operation is _PendingGeneration) {
-          final json = jsonDecode(payload) as Map<String, Object?>;
-          operation.controller.add(
-            InfernoMetricsEvent(
-              InfernoMetrics(
-                decodeTokensPerSecond: (json['decodeTokensPerSecond']! as num)
-                    .toDouble(),
-                promptTokensPerSecond: (json['promptTokensPerSecond']! as num)
-                    .toDouble(),
-                generatedTokenCount: (json['generatedTokenCount']! as num)
-                    .toInt(),
-                elapsedSeconds: (json['elapsedSeconds']! as num).toDouble(),
-                promptTokenCount: (json['promptTokenCount'] as num?)?.toInt(),
-                timeToFirstTokenSeconds:
-                    (json['timeToFirstTokenSeconds'] as num?)?.toDouble(),
-                peakPhysicalFootprintBytes:
-                    (json['peakPhysicalFootprintBytes'] as num?)?.toInt(),
-              ),
-            ),
-          );
+          final InfernoMetrics metrics;
+          try {
+            metrics = InfernoMetrics.fromPayload(
+              jsonDecode(payload) as Map<String, Object?>,
+            );
+          } on Object catch (failure) {
+            // Numbers whose meaning cannot be established are worse than
+            // none. A throw out of the listener would strand the completer,
+            // so the failure ends the stream instead.
+            _operations.remove(operationId);
+            operation.closeText();
+            operation.controller.addError(
+              failure is InfernoException
+                  ? failure
+                  : InfernoException(
+                      InfernoErrorCode.internal,
+                      'The native metrics payload could not be read.',
+                      cause: failure,
+                    ),
+            );
+            unawaited(operation.controller.close());
+            return;
+          }
+          operation.controller.add(InfernoMetricsEvent(metrics));
         }
       case 3:
         if (operation is _PendingGeneration) {

@@ -558,6 +558,11 @@ int32_t inferno_engine_generate(inferno_engine *engine,
                                 void *user_data) {
   if (engine == nullptr || engine->model == nullptr || request_json == nullptr) return -1;
   if (image_count > 0 && images == nullptr) return -1;
+  // Timing semantics 2: the clock starts where the request is accepted, not
+  // where decoding starts. Copying the borrowed image bytes, waiting for a
+  // retiring worker, parsing, tokenizing, allocating the context and its KV
+  // cache, and prefill are all latency the caller paid for its first token.
+  const auto request_start = steady_clock::now();
   const std::string encoded(request_json);
   // The caller lends these buffers for this call only, and generation runs on
   // a worker that outlives it — so the bytes are copied here, before the
@@ -794,7 +799,8 @@ int32_t inferno_engine_generate(inferno_engine *engine,
     llama_sampler_chain_add(sampler, llama_sampler_init_temp(temperature));
     llama_sampler_chain_add(sampler, llama_sampler_init_dist(seed));
 
-    const auto operation_start = steady_clock::now();
+    // Prompt evaluation alone: the window promptTokensPerSecond describes.
+    const auto prefill_start = steady_clock::now();
     bool decode_failed = false;
     if (has_images) {
       // mtmd interleaves the prompt's text runs with encoded image
@@ -879,22 +885,29 @@ int32_t inferno_engine_generate(inferno_engine *engine,
                  "llama.cpp failed while evaluating tokens.",
                  user_data);
     } else {
-      const double prompt_seconds = seconds_between(operation_start, prompt_end);
-      const double decode_seconds = seconds_between(prompt_end, generation_end);
-      const double elapsed_seconds = seconds_between(operation_start, generation_end);
+      const bool has_first_token = first_token != steady_clock::time_point{};
+      const double prompt_seconds = seconds_between(prefill_start, prompt_end);
+      const double elapsed_seconds = seconds_between(request_start, generation_end);
+      const double first_token_seconds =
+          has_first_token ? seconds_between(request_start, first_token) : 0.0;
+      // What follows the first token holds generated - 1 inter-token
+      // intervals; a one-token reply has none, so it has no decode rate
+      // rather than one decode step inverted into a rate.
+      const double decode_seconds =
+          has_first_token ? elapsed_seconds - first_token_seconds : 0.0;
       const json metrics{
-          {"decodeTokensPerSecond", decode_seconds > 0 ? generated / decode_seconds : 0},
+          {"decodeTokensPerSecond",
+           generated > 1 && decode_seconds > 0 ? (generated - 1) / decode_seconds : 0},
           {"promptTokensPerSecond",
            prompt_seconds > 0 ? prompt_token_count / prompt_seconds : 0},
           {"generatedTokenCount", generated},
           {"elapsedSeconds", elapsed_seconds},
           {"promptTokenCount", prompt_token_count},
           {"timeToFirstTokenSeconds",
-           first_token == steady_clock::time_point{}
-               ? json(nullptr)
-               : json(seconds_between(prompt_end, first_token))},
+           has_first_token ? json(first_token_seconds) : json(nullptr)},
           {"peakPhysicalFootprintBytes",
-           peak_footprint > 0 ? json(peak_footprint) : json(nullptr)}};
+           peak_footprint > 0 ? json(peak_footprint) : json(nullptr)},
+          {"timingSemanticsVersion", INFERNO_TIMING_SEMANTICS_VERSION}};
       emit(callback, operation_id, INFERNO_EVENT_METRICS, metrics.dump(), user_data);
       emit(callback, operation_id, INFERNO_EVENT_COMPLETED, stop_reason, user_data);
       emit(callback, operation_id, INFERNO_EVENT_OPERATION_COMPLETED, "", user_data);

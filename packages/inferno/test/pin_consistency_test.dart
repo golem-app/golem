@@ -85,4 +85,36 @@ void main() {
     expect(manifest, contains(mlxSwiftLmRevision));
     expect(manifest, contains(mlxSwiftRevision));
   });
+
+  // The timing contract's version rides in every METRICS payload and both
+  // shims stamp it from their own constant, so it is pinned the same way the
+  // ABI number is: a shim stamping 2 while this package reads 3 would label
+  // the old windows as the new ones (#57).
+  test('the C header defines the timing semantics this package speaks', () {
+    expect(
+      read('native/include/inferno.h'),
+      matches(
+        RegExp(
+          r'^#define INFERNO_TIMING_SEMANTICS_VERSION '
+          '${InfernoMetrics.currentTimingSemanticsVersion}'
+          r'\s*$',
+          multiLine: true,
+        ),
+      ),
+    );
+  });
+
+  test('the MLX carrier stamps the timing semantics this package speaks', () {
+    expect(
+      read('native/apple/Sources/InfernoMLXCarrier/InfernoMLXShim.swift'),
+      matches(
+        RegExp(
+          r'^\s*(private\s+)?let infernoTimingSemanticsVersion: Int = '
+          '${InfernoMetrics.currentTimingSemanticsVersion}'
+          r'\s*$',
+          multiLine: true,
+        ),
+      ),
+    );
+  });
 }
