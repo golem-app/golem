@@ -51,10 +51,10 @@ this agreement to that party end on the day the litigation is filed.
 
 The Steward will make every Contribution accepted into the Project
 available under the Project's public license as of the date of acceptance
-(currently `AGPL-3.0-only`), or under a later license approved by the Free
-Software Foundation or the Open Source Initiative, in addition to any other
-terms the Steward chooses. This commitment survives any transfer of the
-Project.
+(currently `AGPL-3.0-only`), or under a later version of the GNU Affero
+General Public License published by the Free Software Foundation, in
+addition to any other terms the Steward chooses. This commitment survives
+any transfer of the Project.
 
 ## 5. You keep your rights
 
@@ -87,11 +87,12 @@ individual it designates to submit Contributions on its behalf.
 
 ## 8. How to accept
 
-Opening a pull request whose description states that You have read this
-agreement and agree to it — the pull request template carries that
-statement — is Your acceptance for that Contribution and for every later
-Contribution You submit. The pull request is the record of the agreement.
-If You cannot accept it, say so in the pull request and do not submit the
+You accept this agreement by ticking the acceptance box the pull request
+template provides, or by stating in Your own words in the pull request
+description that You have read this agreement and agree to it. An unticked
+box is not acceptance. Acceptance covers that Contribution and every later
+Contribution You submit, and the pull request is the record of it. If You
+cannot accept it, say so in the pull request and do not submit the
 Contribution.
 
 The Steward may publish new versions of this agreement. A new version

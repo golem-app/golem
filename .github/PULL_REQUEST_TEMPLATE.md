@@ -12,4 +12,4 @@ golden changes, simulator or device checks. -->
 ## Contributor License Agreement
 
 - [ ] I have read [CLA.md](https://github.com/golem-app/golem/blob/main/CLA.md)
-      and agree to it for this contribution.
+      and agree to it. (Tick to accept; an unticked box is not acceptance.)

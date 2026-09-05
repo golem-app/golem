@@ -28,8 +28,9 @@ binaries-only carrier fallback. The fallback clause is retired.
 
 - Building with hooks required `flutter config --enable-native-assets` once
   per machine on the SDK of the day; `dart test` needed no flag. Since the
-  3.47.1 pin native assets are on by default on stable and the switch is
-  gone (#12).
+  3.47.1 pin native assets are on by default on stable (#12); the switch
+  still exists, and a machine that once persisted `--no-enable-native-assets`
+  skips the hook and fails the Apple resource-staging phase.
 - MLX Swift is Apple-silicon-only. The hook skips the carrier for non-arm64
   Apple slices (Flutter still invokes the hook for x86_64 simulator slices
   regardless of Xcode settings), and the Runner project excludes x86_64

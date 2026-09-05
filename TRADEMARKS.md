@@ -24,13 +24,17 @@ Copyright © 2026 Jan Slominski. All rights reserved for:
     and `flutter_native_splash` generate from those masters.
 
 These files are in the repository so that the project builds and its tests
-run. They are not licensed under the AGPL or under any other open-source
-license.
+run. They are not part of the program licensed under [`LICENSE`](LICENSE)
+and are not licensed under the AGPL or under any other open-source license;
+the README's License section states the same exception.
 
 ## What you may do
 
 - Build, run, test, and modify Golem from this repository for yourself,
   including on your own devices, with the artwork in place.
+- Copy and redistribute this repository as a whole — a fork on a code host,
+  a mirror, a source archive — with the brand assets in it, so that others
+  can build and contribute to Golem.
 - Contribute changes back (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
 - Refer to Golem by name to say truthfully that your software is derived
   from it, is compatible with it, or was tested against it.

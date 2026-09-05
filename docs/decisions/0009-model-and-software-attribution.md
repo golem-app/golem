@@ -124,7 +124,10 @@ nor certifies those repositories.
   stays uncovered: a declared pub package whose `NOTICES` key stops matching
   its pubspec name is skipped silently, and the entry count shrinks with no
   failure. The two known divergences (`inferno`, `flutter_localizations`) were
-  found by reading a built bundle by hand. No test can close this — the
+  found by reading a built bundle by hand; since #12 the collector does yield
+  `inferno` (and the workspace root) from their AGPL `LICENSE` files, and the
+  allowlist keeps both first-party texts off the screen. No test can close
+  this — the
   framework's test bindings register no `NOTICES` collector at all
   (`TestWidgetsFlutterBinding.initLicenses`), so the pub half is observable
   only in a real app run. Re-read the rendered list on both platforms when

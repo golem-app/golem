@@ -11,7 +11,7 @@ disabled since 2026-08-05 (#31): on the org's free plan, private-repo macOS
 minutes bill at 10× against 2,000 included minutes with a $0 spending limit,
 and a single Apple job consumed ~150 of them. Going public restores
 unmetered standard runners, but a public repository with no license is
-"all rights reserved" in a tree whose app already tells users, in fourteen
+"all rights reserved" in a tree whose app already tells users, in thirteen
 locales, that Golem is open source. Before the flip the owner had to decide
 what the license is, what it does not cover, what a contribution grants,
 and what a store binary's terms rest on — and the tree and its history had
@@ -160,9 +160,11 @@ Runner target itself assembles — scheme `qa`, configuration `Debug-qa`,
 ad-hoc signing, no team — and its last build phase, "Stage Inferno Apple
 Resources", finds the bundles the hook wrote under
 `packages/inferno/build/apple-resources/macosx/` and copies them into the
-app. The phase is unconditional and hard-fails, so a hook that stopped
-producing resources for arm64 macOS would fail this step and nothing
-earlier. The `qa` flavor does not skip the hook: the hook's only gate is
+app. The phase is unconditional and hard-fails when the directory is
+missing or holds no bundle (the hook recreates it before populating it, so
+an empty one is a carrier build that produced nothing), so a hook that
+stopped producing resources for arm64 macOS would fail this step and
+nothing earlier. The `qa` flavor does not skip the hook: the hook's only gate is
 that code assets are being built, and native assets are on by default on
 the pinned stable SDK — three documents said otherwise and were corrected
 with this change.

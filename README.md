@@ -109,21 +109,24 @@ simulator verification workflow.
 
 Copyright © 2026 Jan Slominski.
 
-Golem's first-party code — the Flutter app under `app/`, Inferno under
+Everything in this repository — the Flutter app under `app/`, Inferno under
 `packages/inferno/`, and the tooling and documentation around them — is free
 software licensed under the GNU Affero General Public License, version 3
-only (`AGPL-3.0-only`; the text is in [`LICENSE`](LICENSE)). It comes with
-no warranty, and there is no "or any later version" option.
+only (`AGPL-3.0-only`; the text is in [`LICENSE`](LICENSE)), with one
+exception: the Golem name, mascot, and launcher artwork listed in
+[`TRADEMARKS.md`](TRADEMARKS.md) are reserved and not part of that grant.
+The software comes with no warranty, and there is no "or any later version"
+option.
 
 The engines and packages Golem builds on keep their own licenses and
-notices: the pinned llama.cpp and MLX graphs and every direct pub dependency
-are disclosed in Settings ▸ Open-source licenses, with the audit in
-[ADR 0009](docs/decisions/0009-model-and-software-attribution.md). Model
-weights are never redistributed; their terms are named in Settings ▸ Model
-attribution.
+notices. Settings ▸ Open-source licenses discloses what each build links —
+the pinned llama.cpp graph everywhere, the MLX Swift graph on the Apple
+silicon builds that carry it — and the direct pub dependencies, with the
+audit in [ADR 0009](docs/decisions/0009-model-and-software-attribution.md).
+Model weights are never redistributed; their terms are named in Settings ▸
+Model attribution.
 
-The Golem name, mascot, and launcher artwork are not covered by the code
-license — see [`TRADEMARKS.md`](TRADEMARKS.md). Contributions are accepted
+Contributions are accepted
 under [`CLA.md`](CLA.md); [`CONTRIBUTING.md`](CONTRIBUTING.md) has the
 workflow. The reasoning, the dependency review, and the store-distribution
 basis are recorded in

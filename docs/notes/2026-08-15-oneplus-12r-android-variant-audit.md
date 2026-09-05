@@ -18,7 +18,8 @@ local filesystem paths, model files, and pre-existing chat contents.
   existing integration journeys, and the GOLEM.app organization project.
 - Additional acceptance guidance: Flutter Architecture Handbook v5.0,
   explicitly requested for this audit. The user instruction makes it
-  applicable even though `references/README.md` labels it candidate guidance.
+  applicable even though the maintainer-held reference index labels it
+  candidate guidance.
 - External documentation: official Flutter build-mode/flavor guidance and
   official Android 48 dp touch-target guidance, both queried through Context7.
 - Board review: 76 project items reviewed on 2026-08-15. #116 tracks retirement

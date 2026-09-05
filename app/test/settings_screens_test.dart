@@ -721,6 +721,7 @@ void main() {
   testWidgets('the root reflects the active style and advanced rows', (
     tester,
   ) async {
+    final opened = <Uri>[];
     await pumpWithRepositories(
       tester,
       preferences: InMemoryPreferencesRepository(
@@ -729,7 +730,13 @@ void main() {
           systemPrompt: 'Short answers.',
         ).withStyle('gemma4', ResponseStyle.precise),
       ),
-      child: const SettingsScreen(identity: AppIdentity.dev),
+      child: SettingsScreen(
+        identity: AppIdentity.dev,
+        openUri: (uri) async {
+          opened.add(uri);
+          return true;
+        },
+      ),
     );
     expect(find.text('Precise'), findsOneWidget);
     expect(find.text('Custom'), findsOneWidget);
@@ -758,6 +765,9 @@ void main() {
       ),
       findsOneWidget,
     );
+    await tester.tap(find.byKey(const Key('about-license')));
+    await tester.pump();
+    expect(opened, [Uri.parse('https://github.com/golem-app/golem')]);
   }, variant: iosChrome);
 
   /// Reveals the Advanced-mode custom repository card and types a name into it.

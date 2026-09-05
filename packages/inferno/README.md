@@ -49,4 +49,4 @@ General Public License, version 3 only (`AGPL-3.0-only`; the text is in
 [`LICENSE`](LICENSE), identical to the repository's). The engines it drives
 are not part of that grant: llama.cpp (MIT) and the MLX Swift graph (MIT and
 Apache-2.0) are fetched at build time under their own licenses, and the app
-discloses them in Settings ▸ Open-source licenses.
+discloses the ones each build links in Settings ▸ Open-source licenses.

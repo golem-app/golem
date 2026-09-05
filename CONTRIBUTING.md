@@ -25,18 +25,25 @@ NDK revision named in `app/README.md`.
 
 ## The gate
 
-A pull request is ready when the whole local gate is green — the same steps
-CI runs:
+A pull request is ready when the whole local gate is green. From the repo
+root:
 
 ```sh
-cd app && fvm flutter pub get && fvm dart run build_runner build
-fvm dart format --output=none --set-exit-if-changed .    # repo root
+(cd app && fvm flutter pub get && fvm dart run build_runner build)
+fvm dart format --output=none --set-exit-if-changed .
 fvm dart run tool/check_inferno_imports.dart
 fvm dart run tool/check_feature_imports.dart
 fvm dart run tool/check_toolchain.dart
-cd app && fvm flutter analyze && fvm flutter test         # goldens compare on macOS
-cd packages/inferno && fvm dart analyze && fvm dart test
+(cd app && fvm flutter analyze && fvm flutter test)      # goldens compare on macOS
+(cd packages/inferno && fvm dart analyze && fvm dart test)
 ```
+
+CI (`.github/workflows/ci.yml`) runs the same checks minus `build_runner`,
+whose output is committed, and adds what a laptop rarely repeats: the
+Inferno native suites against fetched toy fixtures, and
+`flutter build macos --debug --flavor qa` on the Apple job. A change to the
+Inferno hook or to the Apple resource-staging phase is worth running that
+build locally too (`app/README.md`, "macOS verification").
 
 Goldens are rendered on macOS at the iPhone 17 viewport; regenerate with
 `--update-goldens` only on macOS, only for a deliberate visual change, and
@@ -61,5 +68,5 @@ platform surfaces is verified on a device, and the pull request says which.
 
 ## Reporting a security problem
 
-Do not open a public issue for a vulnerability. Use GitHub's private
-vulnerability reporting on this repository.
+See [`SECURITY.md`](SECURITY.md). Do not open a public issue for a
+vulnerability.

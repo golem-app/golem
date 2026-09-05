@@ -17,6 +17,7 @@ import '../../core/widgets/settings_rows.dart';
 import '../../l10n/l10n.dart';
 import '../chat/application/active_model_providers.dart';
 import '../legal/ai_disclaimer.dart';
+import '../legal/model_attribution_screen.dart' show ExternalUriLauncher;
 import '../models/application/model_providers.dart';
 import '../models/application/storage_providers.dart';
 import '../models/model_label.dart';
@@ -26,9 +27,16 @@ import 'save_feedback.dart';
 /// The minimal settings root: model and app rows, the Advanced mode
 /// switch, and About. Everything heavier lives one screen deeper.
 class SettingsScreen extends ConsumerWidget {
-  const SettingsScreen({required this.identity, super.key});
+  const SettingsScreen({
+    required this.identity,
+    this.openUri = _launchExternally,
+    super.key,
+  });
 
   final AppIdentity identity;
+
+  /// Opens the source repository from the About sheet; tests capture it.
+  final ExternalUriLauncher openUri;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -230,7 +238,9 @@ class SettingsScreen extends ConsumerWidget {
     showGolemSheet<void>(
       context: context,
       sheetKey: const Key('about-sheet'),
-      builder: (context) => Padding(
+      // The sheet caps its height; past that the body scrolls, and a large
+      // text scale reaches the cap on the smallest supported phone.
+      builder: (context) => SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -276,10 +286,7 @@ class SettingsScreen extends ConsumerWidget {
               shape: GolemTapShape.wide,
               padding: EdgeInsets.zero,
               alignment: AlignmentDirectional.centerStart,
-              onPressed: () => launchUrl(
-                _sourceRepository,
-                mode: LaunchMode.externalApplication,
-              ),
+              onPressed: () => openUri(_sourceRepository),
               child: Text(
                 'AGPL-3.0-only · ${_sourceRepository.host}${_sourceRepository.path}',
                 style: GolemText.footnote.copyWith(
@@ -298,6 +305,9 @@ class SettingsScreen extends ConsumerWidget {
 }
 
 final _sourceRepository = Uri.https('github.com', '/golem-app/golem');
+
+Future<bool> _launchExternally(Uri uri) =>
+    launchUrl(uri, mode: LaunchMode.externalApplication);
 
 String _styleLabel(ResponseStyle style, AppLocalizations l10n) =>
     switch (style) {
