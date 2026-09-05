@@ -85,6 +85,42 @@ class MainFlutterWindow: NSWindow {
       result(false)
       return
     }
+    // The bench's live memory reading (#58): the same phys_footprint the
+    // engines sample for their peak figure, read for this process now.
+    if call.method == "physicalFootprintBytes" {
+      var info = task_vm_info_data_t()
+      var count = mach_msg_type_number_t(
+        MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size
+      )
+      let status = withUnsafeMutablePointer(to: &info) { pointer in
+        pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+          task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+        }
+      }
+      result(status == KERN_SUCCESS ? Int(info.phys_footprint) : nil)
+      return
+    }
+    // What this machine is, for the provenance every bench measurement
+    // carries (#58). Each reading is independent: one that fails stays nil
+    // rather than taking the others with it.
+    if call.method == "deviceProvenance" {
+      let process = ProcessInfo.processInfo
+      let thermal: String = switch process.thermalState {
+      case .nominal: "nominal"
+      case .fair: "fair"
+      case .serious: "serious"
+      case .critical: "critical"
+      @unknown default: "unknown"
+      }
+      result([
+        "model": Self.sysctlString("hw.model") as Any,
+        "chip": Self.sysctlString("machdep.cpu.brand_string") as Any,
+        "memoryBytes": Int(process.physicalMemory),
+        "osVersion": process.operatingSystemVersionString,
+        "thermalState": thermal,
+      ] as [String: Any])
+      return
+    }
     guard
       let arguments = call.arguments as? [String: Any],
       let path = arguments["path"] as? String
@@ -133,6 +169,14 @@ class MainFlutterWindow: NSWindow {
     default:
       result(FlutterMethodNotImplemented)
     }
+  }
+
+  private static func sysctlString(_ name: String) -> String? {
+    var size = 0
+    guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return nil }
+    var buffer = [CChar](repeating: 0, count: size)
+    guard sysctlbyname(name, &buffer, &size, nil, 0) == 0 else { return nil }
+    return String(cString: buffer)
   }
 
   private static func clampedDefaultContentSize(

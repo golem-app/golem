@@ -503,11 +503,13 @@ void main() {
       _mainActivity,
     ]) {
       final source = File(handler).readAsStringSync();
-      // macOS answers one method fewer on purpose: there is no jetsam
-      // ceiling to report, so the mobile load preflight has nothing to ask.
+      // Each side answers a few methods fewer on purpose. macOS has no
+      // jetsam ceiling, so the mobile load preflight has nothing to ask it;
+      // the phones never run the bench, so its live footprint and machine
+      // provenance readings (#58) are the Mac's alone.
       final exempt = handler.startsWith('macos')
           ? const {'availableMemoryBytes'}
-          : const <String>{};
+          : const {'physicalFootprintBytes', 'deviceProvenance'};
       for (final method in invoked.difference(exempt)) {
         expect(source, contains("\"$method\""), reason: '$handler: $method');
       }
