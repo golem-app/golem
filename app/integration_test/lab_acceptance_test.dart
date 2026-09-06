@@ -219,7 +219,7 @@ void main() {
         // climbs there, MLX reports none and the loaded phase says so; a
         // warm run has no load phase at all.
         expect(telemetry.loadFraction, cold ? 1 : isNull, reason: run.id);
-        expect(telemetry.peakFootprintBytes, greaterThan(0), reason: run.id);
+        expect(telemetry.footprintBytes, greaterThan(0), reason: run.id);
         expect(run.configuration.artifact.verified, isTrue, reason: run.id);
         expect(run.configuration.device?.chip, isNotNull, reason: run.id);
       }
@@ -306,7 +306,7 @@ void main() {
         'cancelled run=${cancelled.id} tokens=${cancelled.metrics!.tokenCount} '
         'answer_chars=${cancelled.answer.length}',
       );
-      expect(await bench.retry(), isTrue);
+      expect(bench.retry(), isTrue);
       await pumpUntil(tester, 'the retried run to end', () => !state().locked);
       await tester.pump(const Duration(milliseconds: 200));
       final retried = state().session.active!.last!;
@@ -338,7 +338,7 @@ void main() {
       expect(failed.failure, InferenceFailureKind.budgetExhaustedBeforeAnswer);
       expect(failed.configuration.sampling.maxTokens, 1);
       expect(find.byKey(const Key('lab-failed-notice')), findsOneWidget);
-      expect(await bench.retry(), isTrue);
+      expect(bench.retry(), isTrue);
       await pumpUntil(
         tester,
         'the retried failure to end',
@@ -365,7 +365,7 @@ void main() {
       for (final key in ['gemma4-gguf', 'gemma4-mlx']) {
         final observed = <double>[];
         final silent = <double>[];
-        Future<void> cell(bool observe) async {
+        Future<void> cell(bool observe, {bool record = true}) async {
           InferenceMetrics? result;
           await for (final event in repository.generate(
             context: [PromptMessage.text('user', _overheadPrompt)],
@@ -377,11 +377,14 @@ void main() {
           )) {
             if (event is MetricsEvent) result = event.metrics;
           }
-          (observe ? observed : silent).add(result!.decodeTokensPerSecond);
+          if (record) {
+            (observe ? observed : silent).add(result!.decodeTokensPerSecond);
+          }
         }
 
-        // A warm-up so the load is not in either cell, then alternate.
-        await cell(false);
+        // A warm-up so the load is in neither cell — recorded in neither,
+        // since a cold first sample would drag one baseline down.
+        await cell(false, record: false);
         for (var i = 0; i < _overheadRepeats; i++) {
           await cell(true);
           await cell(false);

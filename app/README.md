@@ -835,8 +835,9 @@ on a lab build and expects it false on every other flavor.
 
 The lab opens on the bench: arm a model and an engine in the Rig (or click
 a library row in the sidebar), pick a prompt from the tray or type one, and
-Run (⌘↩). Stop (Esc) keeps the partial output; ⌘N starts a new
-conversation. The Rig locks while a run is in flight — changing what a run
+Run (⌘↩). Stop (Esc) keeps the partial output and ends the run as
+cancelled whatever the engine answers, in the phase it had reached; ⌘N
+starts a new conversation. The Rig locks while a run is in flight — changing what a run
 measures under mid-run would silently invalidate the comparison — and a
 change while idle closes the conversation and starts a new one under the new
 snapshot. The Rig's artifact chip offers Download / Pause / Resume / Retry /
@@ -844,20 +845,24 @@ Delete through the same model store the phones use, after the same consent;
 nothing downloads because the lab opened or because a model was armed. Run
 settings (the contract chip) hold context, token budget, sampling, reasoning
 and a seed, applied as one change; a pinned profile shows its values and
-takes no edits.
+takes no edits. An empty seed inherits the build's `GOLEM_SAMPLING_SEED`,
+and the chip and the run's snapshot show the seed the engine received.
 
 Every run card names the configuration it ran under and shows only what the
 engine reported: load with the engine's own fraction (llama.cpp) or an
 indeterminate phase (MLX), prefill as submitted tokens then the measured
 rate, output as tokens (llama.cpp) or *chunks* (MLX, one or more tokens
 each) with the gaps between arrivals charted and labelled inter-token or
-inter-chunk accordingly, then TTFT, decode rate, peak footprint and load time
-once the metrics land. Numbers here are correctness and relative comparison
+inter-chunk accordingly (the median and stall count of a run longer than
+4,096 arrivals describe its last 4,096), then TTFT, decode rate, peak
+footprint and load time once the metrics land. The footer keeps the newest
+run's figures across a new conversation. Numbers here are correctness and relative comparison
 only — the sidebar carries the machine beside the engine pins, and nothing
 transfers to a phone. Saved history, grading, comparison and export are #59.
 
-Identifiers: `lab-shell`, `lab-sidebar`, `lab-library-<profile>`,
-`lab-rig`, `lab-rig-locked`, `lab-model-menu` / `lab-model-<profile>`,
+Identifiers: `lab-shell`, `lab-sidebar`, `lab-library-<family>` (the stem
+its catalog keys share, `gemma4`, `qwen35`), `lab-rig`, `lab-rig-locked`,
+`lab-model-menu` / `lab-model-<family>`,
 `lab-engine-menu` / `lab-engine-<engine>`, `lab-artifact-chip` plus
 `lab-artifact-{download,pause,resume,retry,delete}`, `lab-contract-chip`,
 `lab-settings-button`, `lab-settings-sheet` plus

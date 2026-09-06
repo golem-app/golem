@@ -71,3 +71,24 @@ with no failure line, and did not reproduce in the two runs that followed;
 the instrument now describes the bench's state on a timeout so a repeat can
 be attributed.
 
+
+## Rerun after the second review — 2026-09-06
+
+The instrument itself changed: the warm-up call before the overhead cells is
+now recorded in neither cell (it had been appended to the silent baseline,
+and as the slowest silent sample it biased the gate toward passing). The
+bench changed underneath it too — Stop as a flag rather than a phase, an
+error after Stop recorded as the cancellation, the live decode rate on the
+instants' own clock, a 4,096-instant ring with its series computed once per
+batch, a synchronous send, the seed resolved as the engine resolves it.
+
+| engine | silent decode tok/s | observed decode tok/s | slowdown |
+| --- | --- | --- | --- |
+| gemma4-gguf (llama.cpp) | 72.7 / 72.6 / 72.4 | 70.9 / 72.5 / 72.7 | 0.7 % |
+| gemma4-mlx (MLX) | 73.6 / 73.9 / 73.7 | 73.3 / 73.7 / 73.7 | 0.2 % |
+
+Three samples per cell now, none of them cold. Every configuration, both
+engine switches, Stop (17 tokens kept), Retry (447 tokens) and the forced
+failure behaved as before: PASS — 12 runs over 7 conversations, 26
+`INFERNO_METRICS` lines, 69 s wall time, exit 0. The run-6 stall of the
+previous rerun did not recur.
