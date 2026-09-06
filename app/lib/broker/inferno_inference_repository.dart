@@ -480,9 +480,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
             if (!sawOutput) {
               sawOutput = true;
               if (observed) {
-                if (observed) {
-                  yield const RunPhaseEvent(InferencePhase.generating);
-                }
+                yield const RunPhaseEvent(InferencePhase.generating);
               }
             }
             probe?.write(event.text);
@@ -521,9 +519,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
             if (!sawOutput) {
               sawOutput = true;
               if (observed) {
-                if (observed) {
-                  yield const RunPhaseEvent(InferencePhase.generating);
-                }
+                yield const RunPhaseEvent(InferencePhase.generating);
               }
             }
             yield TokenTimingEvent(
