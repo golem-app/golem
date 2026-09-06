@@ -181,7 +181,14 @@ class LabBenchController extends _$LabBenchController {
     } on Object {
       models = null;
     }
-    if (!ref.mounted || state.locked) return false;
+    // The bench stayed unlocked while the store answered: a run under what
+    // was armed then, not now, would mislabel the conversation.
+    if (!ref.mounted ||
+        state.locked ||
+        state.armed != armed ||
+        state.settings != settings) {
+      return false;
+    }
     final artifact = models?.statusOf(armed.key);
     final run = LabRun(
       id: 'run-${++_runSerial}',

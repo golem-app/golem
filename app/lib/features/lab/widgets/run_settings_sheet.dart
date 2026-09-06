@@ -1,10 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../broker/model_profile.dart';
 import '../../../core/chrome/golem_sheet.dart';
 import '../../../l10n/l10n.dart';
 import '../application/lab_bench_controller.dart';
-import '../application/lab_contract.dart';
 import '../domain/lab_run_settings.dart';
 import '../lab_copy.dart';
 import '../lab_theme.dart';
@@ -64,9 +64,15 @@ class _RunSettingsSheetState extends ConsumerState<_RunSettingsSheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final contract = ref.watch(labContractProvider);
-    final defaults = contract?.sampling;
-    final pinned = contract?.pinned ?? false;
+    // The profile's defaults for the draft's mode — never the contract,
+    // which already carries the committed overrides and the committed mode.
+    final armed = ref.watch(labBenchControllerProvider).armed;
+    final defaults = armed == null
+        ? null
+        : modelProfiles[armed.profileKey]!.sampling(
+            reasoningEnabled: _draft.reasoningEnabled,
+          );
+    final pinned = defaults?.pinned ?? false;
     // Scrolls inside the sheet's ceiling at large text sizes.
     return SingleChildScrollView(
       padding: const EdgeInsets.all(LabSpace.s8),

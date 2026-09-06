@@ -404,6 +404,50 @@ void main() {
     expect(settings.seed, 7);
     expect(settings.contextLength, isNull);
     expect(find.textContaining('seed 7'), findsOneWidget);
+
+    // A committed override is not a default: reopen, commit +128 on the
+    // budget, reopen again and Reset shows the profile's 2048, not 2176.
+    await tester.tap(find.byKey(const Key('lab-settings-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('lab-setting-max-tokens-plus')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('lab-settings-apply')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('max 2176'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('lab-settings-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('2176'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('lab-setting-max-tokens-reset')));
+    await tester.pump();
+    expect(find.text('2048'), findsOneWidget);
+    expect(find.text('2176'), findsNothing);
+    await tester.tap(find.byKey(const Key('lab-settings-cancel')));
+    await tester.pumpAndSettle();
+
+    // Pinning follows the draft's mode: Qwen pins its sampling in reasoning
+    // mode, and the sheet says so the moment the toggle flips.
+    expect(
+      container
+          .read(labBenchControllerProvider.notifier)
+          .updateSettings(const LabRunSettings()),
+      isEmpty,
+    );
+    await _arm(tester, container, 'qwen35-gguf');
+    await tester.tap(find.byKey(const Key('lab-settings-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('pinned'), findsNothing);
+    expect(find.text('4096'), findsNothing);
+    await tester.tap(find.byKey(const Key('lab-setting-reasoning')));
+    await tester.pumpAndSettle();
+    expect(find.text('pinned'), findsNWidgets(3));
+    expect(find.text('4096'), findsOneWidget, reason: 'the reasoning budget');
+    expect(
+      pressedHandler(
+        tester,
+        find.byKey(const Key('lab-setting-temperature-plus')),
+      ),
+      isNull,
+    );
   }, variant: macChrome);
 
   testWidgets('⌘↩ runs, Escape stops, ⌘N starts a conversation', (

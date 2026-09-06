@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/app/launch_composition.dart';
@@ -25,15 +27,51 @@ final class _Probes implements ProcessFootprintProbe, DeviceProvenanceProbe {
       const DeviceProvenance(model: 'MacBookPro18,3', chip: 'Apple M1 Pro');
 }
 
+/// A model store that answers when told, so a test can act between a send
+/// and the store's reply.
+final class _GatedModels implements ModelManagementRepository {
+  final Completer<void> gate = Completer<void>();
+  static const _inner = StaticModels(ModelState());
+
+  @override
+  Future<ModelState> load() async {
+    await gate.future;
+    return _inner.load();
+  }
+
+  @override
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    RuntimeFailureKind? failure,
+  }) => _inner.recordRuntime(phase, failure: failure);
+  @override
+  Stream<ModelState> download(String artifactKey) =>
+      _inner.download(artifactKey);
+  @override
+  Future<ModelState> pause(String artifactKey) => _inner.pause(artifactKey);
+  @override
+  Future<ModelState> cancel(String artifactKey) => _inner.cancel(artifactKey);
+  @override
+  Future<ModelState> delete(String artifactKey) => _inner.delete(artifactKey);
+  @override
+  Future<ModelState> addModel(ModelCatalogEntry entry) =>
+      _inner.addModel(entry);
+}
+
 ProviderContainer _container({
   FakeInferenceRepository? inference,
   ModelState model = const ModelState(),
+  ModelManagementRepository? models,
   _Probes? probes,
 }) {
   final container = ProviderContainer(
     overrides: [
       ...launchOverrides(
-        launchDependenciesWith(inference: inference, model: model),
+        launchDependenciesWith(
+          inference: inference,
+          model: model,
+          models: models,
+        ),
         lab: true,
       ),
       labProbesProvider.overrideWithValue(
@@ -265,6 +303,29 @@ void main() {
         hasLength(2),
       );
       expect(container.read(labBenchControllerProvider).session.runCount, 2);
+    },
+  );
+
+  test(
+    'a send whose configuration changed before the store answered is refused',
+    () async {
+      final models = _GatedModels();
+      final container = _container(
+        inference: FakeInferenceRepository(eventDelay: Duration.zero),
+        models: models,
+      );
+      final controller = container.read(labBenchControllerProvider.notifier);
+      controller.arm('gemma4-gguf');
+      final sending = controller.send('Hello');
+      // The bench is not locked yet, so the Rig still takes a change.
+      expect(controller.arm('qwen35-gguf'), isTrue);
+      models.gate.complete();
+      expect(await sending, isFalse);
+      expect(container.read(labBenchControllerProvider).session.runCount, 0);
+      // The next send runs what is armed now.
+      expect(await controller.send('Hello'), isTrue);
+      final run = await _settle(container);
+      expect(run.configuration.catalogKey, 'qwen35-gguf');
     },
   );
 
