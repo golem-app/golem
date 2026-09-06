@@ -28,6 +28,10 @@ import 'package:golem_flutter/core/theme/golem_theme.dart';
 import 'package:golem_flutter/features/chat/chat_screen.dart';
 import 'package:golem_flutter/features/chat/search_screen.dart';
 import 'package:golem_flutter/core/domain/download_pace.dart';
+import 'package:golem_flutter/features/lab/application/lab_providers.dart';
+import 'package:golem_flutter/features/lab/lab_shell.dart';
+import 'package:golem_flutter/features/lab/lab_theme.dart';
+import 'package:golem_flutter/features/lab/widgets/lab_controls.dart';
 import 'package:golem_flutter/features/models/application/download_pace_providers.dart';
 import 'package:golem_flutter/l10n/l10n.dart';
 
@@ -41,12 +45,17 @@ export 'image_fixtures.dart';
 /// The iPhone 17 logical viewport every widget/golden suite renders in.
 const viewport = Size(402, 874);
 
+/// The window Golem Model Lab opens at, and the smallest it allows
+/// (`MainFlutterWindow.swift`'s desktop profile).
+const labViewport = Size(1440, 900);
+const labMinViewport = Size(1000, 640);
+
 Future<String> fixtureAsset(String key) async =>
     '[{"role": "user", "content": "${'x' * 400}"}]';
 
-void setViewport(WidgetTester tester) {
+void setViewport(WidgetTester tester, {Size size = viewport}) {
   tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = viewport;
+  tester.view.physicalSize = size;
   addTearDown(tester.view.resetDevicePixelRatio);
   addTearDown(tester.view.resetPhysicalSize);
 }
@@ -64,11 +73,15 @@ const bothChromes = TargetPlatformVariant(<TargetPlatform>{
   TargetPlatform.android,
 });
 
+/// The bench's chrome: it ships on macOS only (ADR 0021).
+const macChrome = TargetPlatformVariant(<TargetPlatform>{TargetPlatform.macOS});
+
 /// Filename suffix for the current variant run of a golden matrix test.
-String chromeSuffix() =>
-    debugDefaultTargetPlatformOverride == TargetPlatform.android
-    ? '-android'
-    : '';
+String chromeSuffix() => switch (debugDefaultTargetPlatformOverride) {
+  TargetPlatform.android => '-android',
+  TargetPlatform.macOS => '-macos',
+  _ => '',
+};
 
 /// The fake backend as `resolveBackendPolicy` would build it for the platform
 /// this variant runs, so `simulatedEngine` is set the way a real qa build sets
@@ -79,9 +92,11 @@ InferenceBackendConfig fakeBackendForTestPlatform() => resolveBackendPolicy(
   artifactDefine: '',
   modelPathDefine: '',
   tier: DeviceTier.preferred,
-  platform: debugDefaultTargetPlatformOverride == TargetPlatform.android
-      ? HostPlatform.android
-      : HostPlatform.ios,
+  platform: switch (debugDefaultTargetPlatformOverride) {
+    TargetPlatform.android => HostPlatform.android,
+    TargetPlatform.macOS => HostPlatform.macos,
+    _ => HostPlatform.ios,
+  },
 );
 
 /// The tap-target guideline for the chrome this variant runs, so a surface
@@ -90,9 +105,20 @@ InferenceBackendConfig fakeBackendForTestPlatform() => resolveBackendPolicy(
 /// Asserting the iOS guideline alone is what let the Android floor ship 4dp
 /// short across the shared chrome (#118).
 AccessibilityGuideline get tapTargetGuideline =>
-    debugDefaultTargetPlatformOverride == TargetPlatform.android
-    ? androidTapTargetGuideline
-    : iOSTapTargetGuideline;
+    switch (debugDefaultTargetPlatformOverride) {
+      TargetPlatform.android => androidTapTargetGuideline,
+      TargetPlatform.macOS => labTapTargetGuideline,
+      _ => iOSTapTargetGuideline,
+    };
+
+/// The pointer tier's minimum: a desktop control is not a thumb target, and
+/// the bench promises `LabSize.tapMinimum` on every one of its controls.
+final labTapTargetGuideline = MinimumTapTargetGuideline(
+  size: const Size(LabSize.tapMinimum, LabSize.tapMinimum),
+  link:
+      'https://developer.apple.com/design/human-interface-guidelines/'
+      'accessibility#Buttons-and-controls',
+);
 
 /// The tap handler behind a control, whichever chrome wrapper builds it —
 /// `null` means disabled, which is what nearly every caller is asserting.
@@ -103,6 +129,7 @@ VoidCallback? pressedHandler(WidgetTester tester, Finder finder) =>
       GolemButton(:final onPressed) => onPressed,
       GolemIconButton(:final onPressed) => onPressed,
       GolemTappable(:final onPressed) => onPressed,
+      LabButton(:final onPressed) => onPressed,
       CupertinoButton(:final onPressed) => onPressed,
       final other => throw ArgumentError(
         '${other.runtimeType} is not a button',
@@ -332,6 +359,82 @@ Future<void> pumpWithRepositories(
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(milliseconds: 300));
   }
+}
+
+/// The readings the bench takes off the machine, fixed so a golden holds:
+/// a steady footprint and one named Mac.
+final class FakeLabProbes
+    implements ProcessFootprintProbe, DeviceProvenanceProbe {
+  const FakeLabProbes({this.footprintBytes = 3250000000});
+
+  final int? footprintBytes;
+
+  @override
+  Future<int?> physicalFootprintBytes() async => footprintBytes;
+
+  @override
+  Future<DeviceProvenance?> deviceProvenance() async => const DeviceProvenance(
+    model: 'MacBookPro18,3',
+    chip: 'Apple M1 Pro',
+    memoryBytes: 32 * 1024 * 1024 * 1024,
+    osVersion: '26.6.2',
+    thermalState: 'nominal',
+  );
+}
+
+/// Pumps the bench at a desktop size over the lab's launch composition —
+/// the consumer wiring with the chat bridge left to the bench controller —
+/// and returns the container so a test can drive the controller directly.
+Future<ProviderContainer> pumpLabShell(
+  WidgetTester tester, {
+  Size size = labViewport,
+  Brightness brightness = Brightness.light,
+  Locale locale = const Locale('en'),
+  double textScale = 1,
+  bool reducedMotion = false,
+  ModelState model = const ModelState(),
+  InferenceRepository? inference,
+  LabProbes? probes,
+  DateTime Function()? clock,
+}) async {
+  setViewport(tester, size: size);
+  final container = ProviderContainer(
+    overrides: [
+      ...launchOverrides(
+        launchDependenciesWith(inference: inference, model: model),
+        lab: true,
+      ),
+      labProbesProvider.overrideWithValue(
+        probes ??
+            const LabProbes(
+              footprint: FakeLabProbes(),
+              provenance: FakeLabProbes(),
+            ),
+      ),
+    ],
+  );
+  addTearDown(container.dispose);
+  final app = UncontrolledProviderScope(
+    container: container,
+    child: wrapApp(
+      brightness: brightness,
+      locale: locale,
+      child: LabShell(clock: clock),
+    ),
+  );
+  await tester.pumpWidget(
+    textScale == 1 && !reducedMotion
+        ? app
+        : MediaQuery(
+            data: MediaQueryData.fromView(tester.view).copyWith(
+              textScaler: TextScaler.linear(textScale),
+              disableAnimations: reducedMotion,
+            ),
+            child: app,
+          ),
+  );
+  await tester.pumpAndSettle();
+  return container;
 }
 
 /// Pumps a routed app (chat at `/`, search at `/search`) already
