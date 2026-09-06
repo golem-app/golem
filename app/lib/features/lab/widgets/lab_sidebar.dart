@@ -7,6 +7,7 @@ import '../../../core/app_version.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../../../core/widgets/section_header.dart';
+import '../../../l10n/bidi.dart';
 import '../../../l10n/l10n.dart';
 import '../../../l10n/presentation_messages.dart';
 import '../application/lab_bench_controller.dart';
@@ -86,7 +87,7 @@ class LabSidebar extends ConsumerWidget {
                         style: LabText.bodyStrong.copyWith(color: context.ink),
                       ),
                       Text(
-                        l10n.labVersion(appVersion),
+                        l10n.labVersion(ltrIsolate(appVersion)),
                         style: LabText.detail.copyWith(color: context.mutedInk),
                       ),
                     ],
@@ -215,6 +216,8 @@ class _FamilyRow extends ConsumerWidget {
     final l10n = context.l10n;
     final selected = armed?.displayName == family.displayName;
     final first = family.configurations.first;
+    // The variant a click here arms — and so the size it shows.
+    final target = family.on(armed?.engine ?? first.engine) ?? first;
     return LabFocusable(
       key: Key('lab-library-${family.id}'),
       semanticLabel: family.displayName,
@@ -222,9 +225,7 @@ class _FamilyRow extends ConsumerWidget {
       selected: selected,
       onPressed: locked
           ? null
-          : () => ref
-                .read(labBenchControllerProvider.notifier)
-                .arm((family.on(armed?.engine ?? first.engine) ?? first).key),
+          : () => ref.read(labBenchControllerProvider.notifier).arm(target.key),
       borderRadius: LabRadius.chip,
       child: Container(
         height: 30,
@@ -255,7 +256,7 @@ class _FamilyRow extends ConsumerWidget {
               ),
             ),
             Text(
-              LabFormat.bytes(first.entry.totalBytes),
+              LabFormat.bytes(target.entry.totalBytes),
               style: LabText.detail.copyWith(color: context.mutedInk),
             ),
           ],

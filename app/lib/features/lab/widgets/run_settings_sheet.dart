@@ -34,7 +34,19 @@ class _RunSettingsSheetState extends ConsumerState<_RunSettingsSheet> {
   void initState() {
     super.initState();
     _draft = ref.read(labBenchControllerProvider).settings;
-    _seed = TextEditingController(text: _draft.seed?.toString() ?? '');
+    _seed = TextEditingController(text: _draft.seed?.toString() ?? '')
+      ..addListener(_clearProblems);
+  }
+
+  /// A refusal describes the draft it refused; the next edit is a new draft,
+  /// and a stale message would re-announce from its live region.
+  void _edit(LabRunSettings next) => setState(() {
+    _draft = next;
+    _problems = const [];
+  });
+
+  void _clearProblems() {
+    if (_problems.isNotEmpty) setState(() => _problems = const []);
   }
 
   @override
@@ -96,9 +108,7 @@ class _RunSettingsSheetState extends ConsumerState<_RunSettingsSheet> {
             value: _draft.contextLength,
             fallback: defaults?.contextLength,
             step: 512,
-            onChanged: (v) => setState(
-              () => _draft = _draft.copyWith(contextLength: () => v),
-            ),
+            onChanged: (v) => _edit(_draft.copyWith(contextLength: () => v)),
           ),
           _Stepper(
             name: 'max-tokens',
@@ -106,8 +116,7 @@ class _RunSettingsSheetState extends ConsumerState<_RunSettingsSheet> {
             value: _draft.maxTokens,
             fallback: defaults?.maxTokens,
             step: 128,
-            onChanged: (v) =>
-                setState(() => _draft = _draft.copyWith(maxTokens: () => v)),
+            onChanged: (v) => _edit(_draft.copyWith(maxTokens: () => v)),
           ),
           _Stepper(
             name: 'temperature',
@@ -117,8 +126,7 @@ class _RunSettingsSheetState extends ConsumerState<_RunSettingsSheet> {
             step: 0.1,
             decimals: 1,
             pinned: pinned,
-            onChanged: (v) =>
-                setState(() => _draft = _draft.copyWith(temperature: () => v)),
+            onChanged: (v) => _edit(_draft.copyWith(temperature: () => v)),
           ),
           _Stepper(
             name: 'top-p',
@@ -128,8 +136,7 @@ class _RunSettingsSheetState extends ConsumerState<_RunSettingsSheet> {
             step: 0.05,
             decimals: 2,
             pinned: pinned,
-            onChanged: (v) =>
-                setState(() => _draft = _draft.copyWith(topP: () => v)),
+            onChanged: (v) => _edit(_draft.copyWith(topP: () => v)),
           ),
           _Stepper(
             name: 'top-k',
@@ -138,8 +145,7 @@ class _RunSettingsSheetState extends ConsumerState<_RunSettingsSheet> {
             fallback: defaults?.topK,
             step: 10,
             pinned: pinned,
-            onChanged: (v) =>
-                setState(() => _draft = _draft.copyWith(topK: () => v)),
+            onChanged: (v) => _edit(_draft.copyWith(topK: () => v)),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: LabSpace.s3),
@@ -155,9 +161,8 @@ class _RunSettingsSheetState extends ConsumerState<_RunSettingsSheet> {
                   CupertinoSwitch(
                     key: const Key('lab-setting-reasoning'),
                     value: _draft.reasoningEnabled,
-                    onChanged: (v) => setState(
-                      () => _draft = _draft.copyWith(reasoningEnabled: v),
-                    ),
+                    onChanged: (v) =>
+                        _edit(_draft.copyWith(reasoningEnabled: v)),
                   ),
                 ],
               ),

@@ -2104,7 +2104,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String labDeviceMemory(String gigabytes) {
-    return '$gigabytes Go';
+    return '$gigabytes GB';
   }
 
   @override

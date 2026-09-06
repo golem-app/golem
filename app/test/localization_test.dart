@@ -127,7 +127,13 @@ const _localeLoanwordAllowlists = <String, Set<String>>{
   // Model is the established technical loanword in Turkish.
   'tr': {'settingsSectionModel', 'settingsModel', 'model', 'labDeviceMemory'},
   // *max* is the natural compact abbreviation in French; `s` its second.
-  'fr': {'labContractMax', 'labTtft', 'labPhaseGenerated', 'labElapsedSeconds'},
+  'fr': {
+    'labContractMax',
+    'labTtft',
+    'labDeviceMemory',
+    'labPhaseGenerated',
+    'labElapsedSeconds',
+  },
 };
 
 void main() {

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/chrome/golem_sheet.dart';
 import '../../core/widgets/section_header.dart';
+import '../../l10n/bidi.dart';
 import '../../l10n/l10n.dart';
 import '../../l10n/presentation_messages.dart';
 import 'application/lab_bench_controller.dart';
@@ -67,11 +68,11 @@ class _LabShellState extends ConsumerState<LabShell> {
     super.dispose();
   }
 
-  Future<void> _send() async {
+  void _send() {
     final text = _composer.text.trim();
     if (text.isEmpty) return;
-    final sent = await ref.read(labBenchControllerProvider.notifier).send(text);
-    if (sent && mounted) {
+    final sent = ref.read(labBenchControllerProvider.notifier).send(text);
+    if (sent) {
       _composer.clear();
       _composerFocus.requestFocus();
       _scrollToEnd();
@@ -86,7 +87,12 @@ class _LabShellState extends ConsumerState<LabShell> {
   }
 
   void _pick(TrayPrompt prompt) {
-    _composer.text = prompt.text;
+    // Text alone leaves the selection at −1 until the next focus change,
+    // and the field may already be focused (chat's canvas does the same).
+    _composer.value = TextEditingValue(
+      text: prompt.text,
+      selection: TextSelection.collapsed(offset: prompt.text.length),
+    );
     _composerFocus.requestFocus();
   }
 
@@ -155,7 +161,6 @@ class _LabShellState extends ConsumerState<LabShell> {
     final conversations = bench.session.conversations;
     final hasRuns = bench.session.runCount > 0;
     final canSend = bench.armed != null && !locked;
-    final lastRun = bench.session.active?.last;
     return Shortcuts(
       shortcuts: const {
         SingleActivator(LogicalKeyboardKey.enter, meta: true): _SendIntent(),
@@ -261,7 +266,9 @@ class _LabShellState extends ConsumerState<LabShell> {
                           ),
                         ),
                       ),
-                      MetricsFooter(run: bench.activeRun ?? lastRun),
+                      // The persistent band: the newest run anywhere in
+                      // the session, so a new conversation does not blank it.
+                      MetricsFooter(run: bench.session.lastRun),
                     ],
                   ),
                 ),
@@ -391,8 +398,8 @@ class _Transcript extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: LabSpace.s4),
           child: SectionHeader(
             l10n.labConversationHeader(
-              first.displayName,
-              engineLabel(first.engine),
+              ltrIsolate(first.displayName),
+              ltrIsolate(engineLabel(first.engine)),
               conversation.runs.length,
             ),
             style: LabText.overline,

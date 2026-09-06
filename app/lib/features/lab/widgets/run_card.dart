@@ -155,7 +155,10 @@ class _PhaseRow extends StatelessWidget {
           context,
           key: 'lab-phase-load',
           text: l10n.labPhaseLoad(
-            LabFormat.seconds(telemetry.loadDuration!.inMilliseconds / 1000),
+            LabFormat.seconds(
+              telemetry.loadDuration!.inMilliseconds / 1000,
+              locale,
+            ),
           ),
         ),
       );
@@ -182,7 +185,7 @@ class _PhaseRow extends StatelessWidget {
           text: metrics!.promptTokensPerSecond > 0
               ? l10n.labPhaseReadDone(
                   LabFormat.count(total, locale),
-                  LabFormat.rate(metrics.promptTokensPerSecond),
+                  LabFormat.rate(metrics.promptTokensPerSecond, locale),
                 )
               : l10n.labPhaseReadCount(LabFormat.count(total, locale)),
         ),
@@ -213,21 +216,22 @@ class _PhaseRow extends StatelessWidget {
           key: 'lab-phase-generate',
           text: l10n.labPhaseGenerated(
             LabFormat.count(metrics.tokenCount, locale),
-            LabFormat.rate(metrics.decodeTokensPerSecond),
+            LabFormat.rate(metrics.decodeTokensPerSecond, locale),
           ),
         ),
       );
     } else if (run.phase.reaches(LabRunPhase.generating) && live) {
       final count = telemetry.observationCount;
       // Tokens only — a chunk gap counts nothing — over the trailing window
-      // of the run's own clock, so the figure decays when arrivals stop.
-      final liveRate = telemetry.observationKind == ObservationKind.token
+      // of the instants' own clock, which starts at the engine's acceptance
+      // rather than at the run (the load sits between), so the figure sinks
+      // when arrivals stop.
+      final accepted = run.acceptedAt;
+      final liveRate =
+          telemetry.observationKind == ObservationKind.token && accepted != null
           ? liveDecodeRate(
               telemetry.instantsMs,
-              now
-                  .difference(run.configuration.startedAt)
-                  .inMilliseconds
-                  .toDouble(),
+              now.difference(accepted).inMilliseconds.toDouble(),
             )
           : null;
       final text = switch (telemetry.observationKind) {
@@ -236,7 +240,7 @@ class _PhaseRow extends StatelessWidget {
         ),
         _ when liveRate != null => l10n.labPhaseGeneratingRate(
           LabFormat.count(count, locale),
-          LabFormat.rate(liveRate),
+          LabFormat.rate(liveRate, locale),
         ),
         _ => l10n.labPhaseGenerating(LabFormat.count(count, locale)),
       };
@@ -253,13 +257,13 @@ class _PhaseRow extends StatelessWidget {
     if (telemetry.firstInstantMs case final first? when metrics == null) {
       chips.add(
         Text(
-          l10n.labTtft(LabFormat.ttft(first / 1000)),
+          l10n.labTtft(LabFormat.ttft(first / 1000, locale)),
           style: LabText.detail.copyWith(color: context.mutedInk),
         ),
       );
     }
 
-    final series = LatencySeries.from(telemetry.instantsMs);
+    final series = telemetry.series;
     return Wrap(
       spacing: LabSpace.s3,
       runSpacing: LabSpace.s2,
@@ -300,6 +304,7 @@ class _LatencyRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final locale = Localizations.localeOf(context);
+    final tag = locale.toString();
     final isChunk = run.telemetry.observationKind == ObservationKind.chunk;
     final label = isChunk ? l10n.labInterChunk : l10n.labInterToken;
     return Wrap(
@@ -318,12 +323,12 @@ class _LatencyRow extends StatelessWidget {
           series: series,
           semanticLabel: l10n.labLatencyChart(
             label,
-            LabFormat.milliseconds(series.medianMs ?? 0),
+            LabFormat.milliseconds(series.medianMs ?? 0, tag),
             series.stallCount,
           ),
         ),
         Text(
-          l10n.labMedian(LabFormat.milliseconds(series.medianMs ?? 0)),
+          l10n.labMedian(LabFormat.milliseconds(series.medianMs ?? 0, tag)),
           style: LabText.detail.copyWith(color: context.mutedInk),
         ),
         if (series.stallCount > 0)
@@ -361,6 +366,7 @@ class _LoadProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final locale = Localizations.localeOf(context).toString();
     final fraction = run.telemetry.loadFraction;
     final elapsed = now.difference(run.configuration.startedAt);
     final footprint = run.telemetry.footprintBytes;
@@ -371,12 +377,12 @@ class _LoadProgress extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                l10n.labLoadingModel(run.configuration.displayName),
+                l10n.labLoadingModel(ltrIsolate(run.configuration.displayName)),
                 style: LabText.bodyStrong.copyWith(color: context.ink),
               ),
             ),
             Text(
-              l10n.labElapsed(LabFormat.elapsed(elapsed, l10n)),
+              l10n.labElapsed(LabFormat.elapsed(elapsed, l10n, locale)),
               style: LabText.detailStrong.copyWith(color: context.mutedInk),
             ),
           ],
@@ -384,7 +390,9 @@ class _LoadProgress extends StatelessWidget {
         const SizedBox(height: LabSpace.s4),
         if (fraction != null)
           Semantics(
-            label: l10n.labLoadingModel(run.configuration.displayName),
+            label: l10n.labLoadingModel(
+              ltrIsolate(run.configuration.displayName),
+            ),
             value: l10n.percentValue((fraction * 100).round()),
             child: ProgressTrack(
               value: fraction,
@@ -423,14 +431,16 @@ class _LoadProgress extends StatelessWidget {
           children: [
             Text(
               l10n.labArtifactMeta(
-                LabFormat.bytes(run.configuration.artifact.totalBytes),
+                ltrIsolate(
+                  LabFormat.bytes(run.configuration.artifact.totalBytes),
+                ),
                 run.configuration.artifact.fileCount,
               ),
               style: LabText.detail.copyWith(color: context.mutedInk),
             ),
             if (footprint != null)
               Text(
-                l10n.labResident(LabFormat.bytes(footprint)),
+                l10n.labResident(ltrIsolate(LabFormat.bytes(footprint))),
                 style: LabText.detail.copyWith(color: context.mutedInk),
               ),
           ],
@@ -453,18 +463,21 @@ class _ResultRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final locale = Localizations.localeOf(context).toString();
     final metrics = run.metrics;
     final parts = <String>[];
     if (run.telemetry.loadDuration case final load?) {
       parts.add(
-        l10n.labLoadSeconds(LabFormat.seconds(load.inMilliseconds / 1000)),
+        l10n.labLoadSeconds(
+          LabFormat.seconds(load.inMilliseconds / 1000, locale),
+        ),
       );
     }
     if (metrics?.timeToFirstTokenSeconds case final ttft?) {
-      parts.add(l10n.labTtft(LabFormat.ttft(ttft)));
+      parts.add(l10n.labTtft(LabFormat.ttft(ttft, locale)));
     }
     if (metrics?.peakPhysicalFootprintBytes case final peak?) {
-      parts.add(l10n.labPeak(LabFormat.bytes(peak)));
+      parts.add(l10n.labPeak(ltrIsolate(LabFormat.bytes(peak))));
     }
     return Wrap(
       spacing: LabSpace.s3,
@@ -475,7 +488,7 @@ class _ResultRow extends StatelessWidget {
           LabChip(
             key: const Key('lab-result-chip'),
             text: l10n.tokenRateSummary(
-              LabFormat.rate(metrics.decodeTokensPerSecond),
+              LabFormat.rate(metrics.decodeTokensPerSecond, locale),
               metrics.tokenCount,
             ),
             fill: context.accentSoft,

@@ -552,7 +552,7 @@
   "labElapsedSeconds": "{seconds} s",
   "labElapsedMinutes": "{minutes} min {seconds} s",
   "labDeviceUnknown": "Appareil inconnu",
-  "labDeviceMemory": "{gigabytes} Go",
+  "labDeviceMemory": "{gigabytes} GB",
   "labMachineLabel": "Appareil",
   "labMemoryLabel": "Mémoire",
   "labEmptyTitle": "Rien de mesuré pour l’instant.",

@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/broker/runtime.dart'
     show BrokerSamplingParameters;
 import 'package:golem_flutter/core/domain/model_catalog.dart';
+import 'package:golem_flutter/core/repositories/contracts.dart';
+import 'package:golem_flutter/features/lab/widgets/lab_controls.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/repositories/fake_inference_repository.dart';
 import 'package:golem_flutter/features/lab/application/lab_bench_controller.dart';
@@ -154,6 +156,29 @@ void main() {
     await tester.enterText(_composer, 'Hello');
     await tester.pump();
     expect(pressedHandler(tester, _run), isNotNull);
+  }, variant: macChrome);
+
+  testWidgets('Delete asks the consent Models and Storage ask', (tester) async {
+    final models = _RecordingModels(_installed);
+    final container = await pumpLabShell(
+      tester,
+      model: _installed,
+      models: models,
+      inference: _fake(),
+    );
+    await _arm(tester, container, 'gemma4-gguf');
+    final delete = find.byKey(const Key('lab-artifact-delete'));
+    await tester.tap(delete);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('model-delete-dialog')), findsOneWidget);
+    await tester.tap(find.text('Keep'));
+    await tester.pumpAndSettle();
+    expect(models.deleted, isEmpty, reason: 'Keep deletes nothing');
+    await tester.tap(delete);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('confirm-model-delete')));
+    await tester.pumpAndSettle();
+    expect(models.deleted, ['gemma4-gguf']);
   }, variant: macChrome);
 
   testWidgets('the artifact chip offers the transfer the store allows', (
@@ -343,7 +368,7 @@ void main() {
     await _pumpUntil(tester, () => run().answer.isNotEmpty);
     await tester.tap(_stop);
     await tester.pump();
-    expect(run().phase, LabRunPhase.cancelling);
+    expect(run().cancelling, isTrue);
     await _pumpUntil(tester, () => run().isTerminal);
     await tester.pumpAndSettle();
     expect(run().phase, LabRunPhase.cancelled);
@@ -555,7 +580,7 @@ void main() {
     await _pumpUntil(tester, () => bench().activeRun!.answer.isNotEmpty);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pump();
-    expect(bench().activeRun!.phase, LabRunPhase.cancelling);
+    expect(bench().activeRun!.cancelling, isTrue);
     await _finish(tester, container);
     expect(bench().activeRun!.phase, LabRunPhase.cancelled);
     await _pressMeta(tester, LogicalKeyboardKey.keyN);
@@ -564,12 +589,34 @@ void main() {
       tester.widget<CupertinoTextField>(_composer).focusNode!.hasFocus,
       isTrue,
     );
-    // A tray prompt is a keyboard target too: Tab reaches it, Space picks.
-    await tester.tap(find.byKey(const Key('lab-tray-factual-capital')));
-    await tester.pump();
+    // The persistent band keeps the newest run across the new conversation.
     expect(
-      tester.widget<CupertinoTextField>(_composer).controller!.text,
-      contains('capital of France'),
+      find.descendant(
+        of: find.byKey(const Key('lab-footer')),
+        matching: find.textContaining('run-1'),
+      ),
+      findsOneWidget,
+    );
+    // A tray prompt is a keyboard target too: Tab reaches it, Space picks.
+    const tray = Key('lab-tray-factual-capital');
+    bool trayFocused() =>
+        FocusManager.instance.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<LabFocusable>()
+            ?.key ==
+        tray;
+    for (var i = 0; i < 40 && !trayFocused(); i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+    }
+    expect(trayFocused(), isTrue, reason: 'Tab reaches the tray prompt');
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump();
+    final composer = tester.widget<CupertinoTextField>(_composer).controller!;
+    expect(composer.text, contains('capital of France'));
+    expect(
+      composer.selection.baseOffset,
+      composer.text.length,
+      reason: 'the caret follows the picked prompt',
     );
   }, variant: macChrome);
 
@@ -782,4 +829,36 @@ void main() {
       expect(find.byKey(const Key('lab-result-chip')), findsOneWidget);
     }
   }, variant: macChrome);
+}
+
+/// Static state that remembers what was deleted, since the bench's Delete
+/// is only provable by what reaches the store.
+final class _RecordingModels implements ModelManagementRepository {
+  _RecordingModels(ModelState state) : _inner = StaticModels(state);
+  final StaticModels _inner;
+  final deleted = <String>[];
+
+  @override
+  Future<ModelState> load() => _inner.load();
+  @override
+  Future<ModelState> recordRuntime(
+    RuntimePhase phase, {
+    RuntimeFailureKind? failure,
+  }) => _inner.recordRuntime(phase, failure: failure);
+  @override
+  Stream<ModelState> download(String artifactKey) =>
+      _inner.download(artifactKey);
+  @override
+  Future<ModelState> pause(String artifactKey) => _inner.pause(artifactKey);
+  @override
+  Future<ModelState> cancel(String artifactKey) => _inner.cancel(artifactKey);
+  @override
+  Future<ModelState> delete(String artifactKey) {
+    deleted.add(artifactKey);
+    return _inner.delete(artifactKey);
+  }
+
+  @override
+  Future<ModelState> addModel(ModelCatalogEntry entry) =>
+      _inner.addModel(entry);
 }

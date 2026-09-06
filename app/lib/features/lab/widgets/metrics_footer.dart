@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../l10n/bidi.dart';
 import '../../../l10n/l10n.dart';
 import '../domain/lab_run.dart';
 import '../lab_copy.dart';
@@ -26,7 +27,10 @@ class MetricsFooter extends StatelessWidget {
         l10n.labFooterLoad,
         telemetry?.loadDuration == null
             ? null
-            : LabFormat.seconds(telemetry!.loadDuration!.inMilliseconds / 1000),
+            : LabFormat.seconds(
+                telemetry!.loadDuration!.inMilliseconds / 1000,
+                localeTag,
+              ),
       ),
       (
         l10n.labFooterRead,
@@ -34,20 +38,22 @@ class MetricsFooter extends StatelessWidget {
             ? null
             : l10n.labPhaseReadDone(
                 LabFormat.count(metrics!.promptTokenCount!, localeTag),
-                LabFormat.rate(metrics.promptTokensPerSecond),
+                LabFormat.rate(metrics.promptTokensPerSecond, localeTag),
               ),
       ),
       (
         l10n.labFooterTtft,
         metrics?.timeToFirstTokenSeconds == null
             ? null
-            : LabFormat.ttft(metrics!.timeToFirstTokenSeconds!),
+            : LabFormat.ttft(metrics!.timeToFirstTokenSeconds!, localeTag),
       ),
       (
         l10n.labFooterDecode,
         metrics == null
             ? null
-            : l10n.tokenRate(LabFormat.rate(metrics.decodeTokensPerSecond)),
+            : l10n.tokenRate(
+                LabFormat.rate(metrics.decodeTokensPerSecond, localeTag),
+              ),
       ),
       (
         l10n.labFooterPeak,
@@ -58,9 +64,9 @@ class MetricsFooter extends StatelessWidget {
     ];
     final note = switch (run?.phase) {
       null => l10n.labFooterNoRun,
-      LabRunPhase.completed => l10n.labFooterRun(run!.id),
-      LabRunPhase.cancelled => l10n.labFooterCancelled(run!.id),
-      LabRunPhase.failed => l10n.labFooterFailed(run!.id),
+      LabRunPhase.completed => l10n.labFooterRun(ltrIsolate(run!.id)),
+      LabRunPhase.cancelled => l10n.labFooterCancelled(ltrIsolate(run!.id)),
+      LabRunPhase.failed => l10n.labFooterFailed(ltrIsolate(run!.id)),
       _ => l10n.labFooterLive,
     };
     return Container(

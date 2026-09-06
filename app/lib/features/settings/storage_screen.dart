@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/chrome/golem_alert.dart';
 import '../../core/chrome/golem_icon_button.dart';
 import '../../core/chrome/golem_nav_bar.dart';
 import '../../core/chrome/golem_toast.dart';
@@ -14,6 +13,7 @@ import '../../core/widgets/retry_pane.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/settings_rows.dart';
 import '../../l10n/l10n.dart';
+import '../models/model_delete_consent.dart';
 import '../chat/application/active_model_providers.dart';
 import '../models/application/model_providers.dart';
 import '../models/application/storage_providers.dart';
@@ -328,34 +328,16 @@ class _DownloadedModels extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     ModelCatalogEntry entry,
-  ) => showGolemAlert(
-    context: context,
-    dialogKey: const Key('model-delete-dialog'),
-    // Display names no longer carry a quantization, so two artifacts of one
-    // family share one (#79). A destructive dialog must still say which.
-    title: context.l10n.deleteModelArtifactTitle(
-      entry.displayName,
-      engineFormat(entry.engine),
-    ),
-    message: context.l10n.deleteModelStorageMessage(
-      gigabytes(model.statusOf(entry.key).downloadedBytes),
-    ),
-    actions: [
-      GolemAlertAction(
-        label: context.l10n.keep,
-        onPressed: () => Navigator.pop(context),
-      ),
-      GolemAlertAction(
-        key: const Key('confirm-model-delete'),
-        label: context.l10n.delete,
-        isDestructive: true,
-        onPressed: () {
-          Navigator.pop(context);
-          ref.read(modelControllerProvider.notifier).delete(entry.key);
-        },
-      ),
-    ],
-  );
+  ) async {
+    final approved = await confirmModelDelete(
+      context: context,
+      entry: entry,
+      bytes: model.statusOf(entry.key).downloadedBytes,
+    );
+    if (approved) {
+      await ref.read(modelControllerProvider.notifier).delete(entry.key);
+    }
+  }
 }
 
 String _megabytes(BuildContext context, int bytes) => bytes >= 1e9

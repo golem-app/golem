@@ -5,10 +5,12 @@ import '../../../core/domain/model_catalog.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/theme/golem_theme.dart';
+import '../../../l10n/bidi.dart';
 import '../../../l10n/l10n.dart';
 import '../../../l10n/presentation_messages.dart';
 import '../../models/application/model_providers.dart';
 import '../../models/artifact_transfer.dart';
+import '../../models/model_delete_consent.dart';
 import '../../models/model_download_consent.dart';
 import '../application/lab_bench_controller.dart';
 import '../application/lab_contract.dart';
@@ -117,18 +119,30 @@ class RigBar extends ConsumerWidget {
                 key: Key('lab-engine-${engine.name}'),
                 label: engineLabel(engine),
                 selected: engine == armed?.engine,
-                onPressed: () {
-                  final family = families
-                      .where((f) => f.displayName == armed?.displayName)
-                      .firstOrNull;
-                  final target =
-                      family?.on(engine) ??
-                      families.map((f) => f.on(engine)).nonNulls.firstOrNull;
-                  if (target != null) {
-                    ref
-                        .read(labBenchControllerProvider.notifier)
-                        .arm(target.key);
-                  }
+                // An engine gesture never changes the model: the armed
+                // family's own variant, or nothing; with none armed, the
+                // first family that ships on the engine.
+                onPressed: switch (families
+                    .where((f) => f.displayName == armed?.displayName)
+                    .firstOrNull) {
+                  final family? => switch (family.on(engine)) {
+                    final target? =>
+                      () => ref
+                          .read(labBenchControllerProvider.notifier)
+                          .arm(target.key),
+                    null => null,
+                  },
+                  null => () {
+                    final target = families
+                        .map((f) => f.on(engine))
+                        .nonNulls
+                        .firstOrNull;
+                    if (target != null) {
+                      ref
+                          .read(labBenchControllerProvider.notifier)
+                          .arm(target.key);
+                    }
+                  },
                 },
               ),
           ],
@@ -186,7 +200,9 @@ class _ChooserItem {
   final Key key;
   final String label;
   final bool selected;
-  final VoidCallback onPressed;
+
+  /// Null renders the row disabled.
+  final VoidCallback? onPressed;
 }
 
 /// A pull-down chooser: a focusable trigger over a Cupertino menu, so the
@@ -305,7 +321,7 @@ class _ArtifactChip extends ConsumerWidget {
         : blocked && affordance.note != null
         ? affordance.note!
         : l10n.labArtifactMeta(
-            LabFormat.bytes(entry.totalBytes),
+            ltrIsolate(LabFormat.bytes(entry.totalBytes)),
             entry.files.length,
           );
     return Row(
@@ -336,7 +352,16 @@ class _ArtifactChip extends ConsumerWidget {
               style: LabButtonStyle.quiet,
               destructive: true,
               height: LabSize.tapMinimum,
-              onPressed: () => controller.delete(entry.key),
+              // The same consent Models and Storage ask: a mis-click here
+              // would otherwise erase gigabytes provisioned by hand.
+              onPressed: () async {
+                final approved = await confirmModelDelete(
+                  context: context,
+                  entry: entry,
+                  bytes: entry.totalBytes,
+                );
+                if (approved) await controller.delete(entry.key);
+              },
             ),
             TransferInFlight(:final pausable) => LabButton(
               key: const Key('lab-artifact-pause'),
