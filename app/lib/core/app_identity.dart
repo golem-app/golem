@@ -1,16 +1,31 @@
 import 'package:flutter/services.dart' show appFlavor;
 
-/// The three shipped flavor identities.
+/// True only in a `--flavor lab` build. A compile-time constant: `appFlavor`
+/// is `const`, so every `if (kLabBuild)` branch is eliminated from the other
+/// flavors and the lab's code never reaches a store build (ADR 0021). Gate
+/// with an `if` statement — constant-condition elimination is the documented
+/// mechanism behind `kReleaseMode`, and an `if` is the shape it is proven on.
+const bool kLabBuild = appFlavor == 'lab';
+
+/// The four shipped flavor identities.
 ///
 /// `appFlavor` is a compile-time constant injected by `--flavor` (or by the
 /// pubspec `default-flavor`, which host-side `flutter test` runs inherit).
-/// It is null in flavorless Xcode builds (`xcodebuild -scheme Runner`), which
-/// resolve to [qa] — the same identity their bundle ids and artwork carry, so
-/// no build path can mint a fourth app.
+/// A null flavor resolves to [qa], the identity the flavorless Xcode
+/// configurations carry in their bundle ids and artwork. Note that a bare
+/// `xcodebuild -scheme Runner` does not clear the flavor: it reuses the
+/// dart-defines the last `flutter build` left in the generated xcconfig, so
+/// the Dart identity in such a bundle is whatever flavor was built last
+/// (`app/README.md`, "Flavors"). Build through `flutter` with `--flavor`.
+///
+/// [lab] exists on macOS only: Golem Model Lab, the desktop bench for the
+/// models the phone flavors ship (ADR 0021). It has no iOS or Android
+/// product flavor.
 enum AppIdentity {
   production('Golem', 'app.golem'),
   qa('Golem QA', 'app.golem.qa'),
-  dev('Golem Dev', 'app.golem.dev');
+  dev('Golem Dev', 'app.golem.dev'),
+  lab('Golem Model Lab', 'app.golem.lab');
 
   const AppIdentity(this.displayName, this.applicationId);
 
@@ -24,10 +39,23 @@ enum AppIdentity {
   ///
   /// This is deliberately flavor policy, not build-mode policy: qa release
   /// builds retain their evidence surfaces, while production stays clean in
-  /// debug as well as release.
+  /// debug as well as release. The lab is a measurement tool and keeps every
+  /// diagnostic sink.
   bool get internalToolsEnabled => switch (this) {
-    qa || dev => true,
+    qa || dev || lab => true,
     production => false,
+  };
+
+  /// Whether this build is Golem Model Lab rather than the consumer app.
+  bool get isLab => this == lab;
+
+  /// Whether this build composes the simulated benchmark and routes to it.
+  /// The phone app's internal tool: qa and dev carry it, production omits it
+  /// (ADR 0003), and the lab — which measures real engines — has no route
+  /// for a simulation either.
+  bool get composesBenchmark => switch (this) {
+    qa || dev => true,
+    production || lab => false,
   };
 
   /// The bundled app-icon tile for in-app surfaces (the drawer header).
@@ -43,6 +71,7 @@ enum AppIdentity {
     'production' => production,
     'qa' => qa,
     'dev' => dev,
+    'lab' => lab,
     _ => qa,
   };
 }

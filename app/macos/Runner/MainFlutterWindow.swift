@@ -2,13 +2,37 @@ import Cocoa
 import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
-  /// The default content size is the iPad Pro 11" logical portrait viewport,
-  /// because this target's first job is previewing tablet-proportioned layout
-  /// without an iPad. It is clamped to the screen's visible frame (preserving
-  /// the aspect ratio) so the window never opens taller than the display.
-  private static let defaultContentSize = NSSize(width: 834, height: 1194)
-  private static let minimumContentSize = NSSize(width: 480, height: 640)
-  private static let frameAutosaveKey = "GolemMainWindow"
+  /// The two shapes this window opens in, chosen by the `GolemWindowProfile`
+  /// Info.plist key that each build configuration fills from
+  /// `GOLEM_WINDOW_PROFILE` (ADR 0021). The consumer flavors open at the iPad
+  /// Pro 11" logical portrait viewport, because their first job on a Mac is
+  /// previewing tablet-proportioned layout without an iPad. The lab opens
+  /// landscape at the size its bench was designed for. Both are clamped to
+  /// the screen's visible frame (preserving the aspect ratio) so the window
+  /// never opens taller than the display, and each remembers its own frame.
+  private struct WindowProfile {
+    let defaultContentSize: NSSize
+    let minimumContentSize: NSSize
+    let frameAutosaveKey: String
+
+    static let tablet = WindowProfile(
+      defaultContentSize: NSSize(width: 834, height: 1194),
+      minimumContentSize: NSSize(width: 480, height: 640),
+      frameAutosaveKey: "GolemMainWindow"
+    )
+    static let desktop = WindowProfile(
+      defaultContentSize: NSSize(width: 1440, height: 900),
+      minimumContentSize: NSSize(width: 1000, height: 640),
+      frameAutosaveKey: "GolemLabWindow"
+    )
+
+    /// An absent or unrecognised key is the consumer window: a flavorless
+    /// build carries qa's identity and must carry qa's window too.
+    static var current: WindowProfile {
+      let profile = Bundle.main.object(forInfoDictionaryKey: "GolemWindowProfile") as? String
+      return profile == "desktop" ? .desktop : .tablet
+    }
+  }
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -20,20 +44,25 @@ class MainFlutterWindow: NSWindow {
       forInfoDictionaryKey: "CFBundleDisplayName"
     ) as? String
     self.title = displayName?.isEmpty == false ? displayName! : "Golem"
-    self.contentMinSize = Self.minimumContentSize
+    let profile = WindowProfile.current
+    self.contentMinSize = Self.clampedMinimumContentSize(
+      of: profile, for: self.screen ?? NSScreen.main
+    )
 
     // Restore the user's last frame when one was saved; otherwise open at
-    // the iPad-class default. setFrameUsingName returns false on first run.
+    // the profile's default. setFrameUsingName returns false on first run.
     // The window has no screen before it is ordered front, so fall back to
     // the main screen — otherwise the clamp silently no-ops on small
     // displays, which is exactly what it exists to prevent.
-    if !self.setFrameUsingName(Self.frameAutosaveKey) {
+    if !self.setFrameUsingName(profile.frameAutosaveKey) {
       self.setContentSize(
-        Self.clampedDefaultContentSize(for: self.screen ?? NSScreen.main)
+        Self.clampedDefaultContentSize(
+          of: profile, for: self.screen ?? NSScreen.main
+        )
       )
       self.center()
     }
-    self.setFrameAutosaveName(Self.frameAutosaveKey)
+    self.setFrameAutosaveName(profile.frameAutosaveKey)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
@@ -108,18 +137,32 @@ class MainFlutterWindow: NSWindow {
     }
   }
 
-  private static func clampedDefaultContentSize(for screen: NSScreen?) -> NSSize {
-    let target = defaultContentSize
+  /// The profile's floor, never wider or taller than the display can show.
+  private static func clampedMinimumContentSize(
+    of profile: WindowProfile, for screen: NSScreen?
+  ) -> NSSize {
+    let floor = profile.minimumContentSize
+    guard let visible = screen?.visibleFrame else { return floor }
+    return NSSize(
+      width: min(floor.width, visible.width - 40),
+      height: min(floor.height, visible.height - 60)
+    )
+  }
+
+  private static func clampedDefaultContentSize(
+    of profile: WindowProfile, for screen: NSScreen?
+  ) -> NSSize {
+    let target = profile.defaultContentSize
     guard let visible = screen?.visibleFrame else { return target }
     // Leave breathing room for the title bar and Dock; scale down uniformly.
-    let scale = min(
-      1,
-      (visible.width - 40) / target.width,
-      (visible.height - 60) / target.height
-    )
+    // The profile's floor yields to the display: a bench on a small screen
+    // opens as large as fits rather than wider than the screen.
+    let room = NSSize(width: visible.width - 40, height: visible.height - 60)
+    let scale = min(1, room.width / target.width, room.height / target.height)
+    let floor = clampedMinimumContentSize(of: profile, for: screen)
     return NSSize(
-      width: max(minimumContentSize.width, target.width * scale),
-      height: max(minimumContentSize.height, target.height * scale)
+      width: max(floor.width, target.width * scale),
+      height: max(floor.height, target.height * scale)
     )
   }
 }

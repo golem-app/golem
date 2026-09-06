@@ -81,6 +81,51 @@ final class LaunchDependencies {
 typedef LaunchComposer =
     Future<LaunchDependencies> Function(AppIdentity identity);
 
+/// The router and Settings ask the identity the same question the composition
+/// does, so a route can never exist without its repository.
+bool composesSimulatedBenchmark(AppIdentity identity) =>
+    identity.composesBenchmark;
+
+/// Where one identity keeps its documents and lands its downloads. Pure, so
+/// the one decision here is testable without the platform.
+final class StorageLayout {
+  const StorageLayout({
+    required this.documents,
+    required this.downloadRoot,
+    required this.downloadSubdirectory,
+  });
+
+  /// The directory `documents:` paths and `models/<key>/` resolve against.
+  final Directory documents;
+
+  /// The same place in the downloader's terms: its base plus the path inside
+  /// it, so a transfer lands exactly where the repository verifies.
+  final ArtifactDownloadRoot downloadRoot;
+  final String downloadSubdirectory;
+}
+
+/// The phone flavors keep the platform documents directory. The lab keeps
+/// `Documents` under its own application-support container instead (ADR
+/// 0021): support is bundle-scoped on every platform, while on an unsandboxed
+/// Mac `getApplicationDocumentsDirectory()` is the user's real `~/Documents`,
+/// shared by every flavor — so a bundle identifier alone isolates nothing
+/// there, and a lab download would land in the consumer flavors' models.
+StorageLayout storageLayoutFor(
+  AppIdentity identity, {
+  required Directory support,
+  required Directory documents,
+}) => identity.isLab
+    ? StorageLayout(
+        documents: Directory('${support.path}/Documents'),
+        downloadRoot: ArtifactDownloadRoot.applicationSupport,
+        downloadSubdirectory: 'Documents',
+      )
+    : StorageLayout(
+        documents: documents,
+        downloadRoot: ArtifactDownloadRoot.documents,
+        downloadSubdirectory: '',
+      );
+
 /// Deadline over the required launch stages: backend resolution, the
 /// application-directory lookups, the preferences read, and repository
 /// construction. The downloader start is bounded separately and can only
@@ -98,9 +143,8 @@ const downloaderStartDeadline = Duration(seconds: 5);
 /// diagnostics, never onto a surface.
 LaunchFailure classifyLaunchFailure(Object error) => switch (error) {
   TimeoutException() => const LaunchFailure(LaunchFailureKind.timedOut),
-  MissingPluginException() || PlatformException() => const LaunchFailure(
-    LaunchFailureKind.storageUnavailable,
-  ),
+  MissingPluginException() || PlatformException() || FileSystemException() =>
+    const LaunchFailure(LaunchFailureKind.storageUnavailable),
   Error() => const LaunchFailure(LaunchFailureKind.invalidConfiguration),
   _ => const LaunchFailure(LaunchFailureKind.unknown),
 };
@@ -214,7 +258,16 @@ _composeRequired({
   final (config: backendConfig, :eligibility, :virtualDevice) =
       await resolveConfiguredBackend(identity: identity);
   final support = await getApplicationSupportDirectory();
-  final documents = await getApplicationDocumentsDirectory();
+  final layout = storageLayoutFor(
+    identity,
+    support: support,
+    documents: await getApplicationDocumentsDirectory(),
+  );
+  // The platform guarantees its own documents directory; only the lab's
+  // relocated root is Golem's to create.
+  final documents = layout.downloadSubdirectory.isEmpty
+      ? layout.documents
+      : await layout.documents.create(recursive: true);
   final temporary = await getTemporaryDirectory();
   await keepOutOfBackups(const DeviceStorageChannel(), [support, documents]);
   final stateFile = File('${support.path}/flutter-model-v2.json');
@@ -283,6 +336,8 @@ _composeRequired({
           // directory for small files and application support for large ones,
           // and orphans in either survive a kill with nothing to sweep them.
           temporaryDirectories: [temporary.path, support.path],
+          root: layout.downloadRoot,
+          subdirectory: layout.downloadSubdirectory,
         );
   final realModels = artifactDownloader == null
       ? null
@@ -294,8 +349,9 @@ _composeRequired({
           diskSpace: const DeviceStorageChannel(),
           backupExclusion: const DeviceStorageChannel(),
           // A sideload has no catalog entry, so no pinned artifact may be
-          // called active on its behalf.
-          activeArtifactKey: backendConfig.sideloaded
+          // called active on its behalf; the lab arms configurations itself
+          // and never runs the boot-resolved one.
+          activeArtifactKey: backendConfig.sideloaded || identity.isLab
               ? null
               : backendConfig.artifactKey,
         );
@@ -343,7 +399,7 @@ _composeRequired({
     modelManagementRepository: modelManagement,
     deviceCapacityProbe: const DeviceStorageChannel(),
     documentsPath: documents.path,
-    benchmarkRepository: identity.internalToolsEnabled
+    benchmarkRepository: composesSimulatedBenchmark(identity)
         ? FakeBenchmarkRepository(
             Directory('${documents.path}/SimulatedBenchmarks'),
             readAsset: rootBundle.loadString,
@@ -355,7 +411,16 @@ _composeRequired({
 
 /// Maps one coherent set of launch dependencies onto the provider seams.
 /// Pure: composition failures happen in [composeLaunch], never here.
-List<Override> launchOverrides(LaunchDependencies dependencies) => [
+///
+/// [lab] leaves the chat session bridge unbound: Golem Model Lab has no chat,
+/// so the bridge answers "nothing in flight" instead of force-building
+/// `ChatController` — and reading a chat history the lab never shows — the
+/// first time a model command asks. The bench controller binds its own
+/// session state there once it exists (ADR 0021).
+List<Override> launchOverrides(
+  LaunchDependencies dependencies, {
+  bool lab = false,
+}) => [
   chatHistoryRepositoryProvider.overrideWithValue(
     dependencies.chatHistoryRepository,
   ),
@@ -397,7 +462,9 @@ List<Override> launchOverrides(LaunchDependencies dependencies) => [
   // registering a dependency.
   chatSessionBridgeProvider.overrideWith((ref) {
     final bridge = ChatSessionBridge();
-    bridge.bindEnsureOwner(() => ref.container.read(chatControllerProvider));
+    if (!lab) {
+      bridge.bindEnsureOwner(() => ref.container.read(chatControllerProvider));
+    }
     return bridge;
   }),
   modelSessionBridgeProvider.overrideWith((ref) {

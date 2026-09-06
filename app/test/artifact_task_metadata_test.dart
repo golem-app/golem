@@ -18,6 +18,28 @@ void main() {
     expectedBytes: 1234,
   );
 
+  test('the destination pair follows the root and its subdirectory', () {
+    // The phones: the artifact's own directory under documents.
+    expect(
+      artifactTaskDestination(ref: ref, root: 'documents', subdirectory: ''),
+      (base: 'documents', directory: 'models/qwen35-2b-gguf'),
+    );
+    // The lab: under application support, inside its own Documents (ADR
+    // 0021) — the pair every downloader, bench harness included, builds
+    // its tasks from, so the plugin lands files where the repository looks.
+    expect(
+      artifactTaskDestination(
+        ref: ref,
+        root: 'applicationSupport',
+        subdirectory: 'Documents',
+      ),
+      (
+        base: 'applicationSupport',
+        directory: 'Documents/models/qwen35-2b-gguf',
+      ),
+    );
+  });
+
   test('a transfer carries its key, destination and source', () {
     final meta = jsonDecode(artifactTaskMetadata(ref)) as Map<String, Object?>;
 

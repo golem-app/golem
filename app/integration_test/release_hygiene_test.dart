@@ -12,6 +12,11 @@ const _expectedInternalTools = bool.fromEnvironment(
   'GOLEM_EXPECTED_INTERNAL_TOOLS',
 );
 
+/// Whether the tested flavor is Golem Model Lab. Every phone flavor and the
+/// consumer macOS flavors must compile with `kLabBuild` false — that constant
+/// is what keeps the lab out of a store build (ADR 0021).
+const _expectedLab = bool.fromEnvironment('GOLEM_EXPECTED_LAB');
+
 final class _ModelFreeRuntime implements BrokerRuntime {
   @override
   Future<void> load({
@@ -46,6 +51,13 @@ final class _ModelFreeRuntime implements BrokerRuntime {
   }
 }
 
+Iterable<String> _routePaths(List<RouteBase> routes) sync* {
+  for (final route in routes) {
+    if (route is GoRoute) yield route.path;
+    yield* _routePaths(route.routes);
+  }
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -56,20 +68,28 @@ void main() {
       _expectedInternalTools,
       reason: 'Pass GOLEM_EXPECTED_INTERNAL_TOOLS for the tested flavor.',
     );
+    expect(
+      identity.isLab,
+      _expectedLab,
+      reason: 'Pass GOLEM_EXPECTED_LAB=true only for --flavor lab.',
+    );
+    expect(kLabBuild, _expectedLab);
 
     final router = createAppRouter(
       picker: const AttachmentPicker(),
       identity: identity,
     );
     addTearDown(router.dispose);
-    final paths = router.configuration.routes.whereType<GoRoute>().map(
-      (route) => route.path,
-    );
+    // Every route sits inside the first-run ShellRoute (ADR 0015), so only
+    // a recursive walk sees it — the top level alone holds no GoRoute, which
+    // would read as "no benchmark" on every identity.
+    final paths = _routePaths(router.configuration.routes).toList();
     expect(
       paths.contains('/benchmark'),
-      _expectedInternalTools,
-      reason: 'The internal route must follow the compiled identity.',
+      identity.composesBenchmark,
+      reason: 'The benchmark route must follow what the identity composes.',
     );
+    expect(identity.internalToolsEnabled, _expectedInternalTools);
 
     final diagnostics = <String>[];
     final repository = selectInferenceRepository(

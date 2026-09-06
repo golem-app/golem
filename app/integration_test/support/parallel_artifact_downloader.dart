@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:background_downloader/background_downloader.dart';
+import 'package:golem_flutter/core/app_identity.dart';
 import 'package:golem_flutter/core/services/artifact_downloader.dart';
+import 'package:golem_flutter/core/services/artifact_task_metadata.dart';
 
 /// Spike-quality [ArtifactFileDownloader] over the plugin's
 /// [ParallelDownloadTask]: one file split into [chunks] ranged connections —
@@ -28,9 +30,28 @@ import 'package:golem_flutter/core/services/artifact_downloader.dart';
 /// resume machinery exists in its source; [pause] is wired so the bench can
 /// settle that empirically.
 final class ParallelArtifactDownloader implements ArtifactFileDownloader {
-  ParallelArtifactDownloader({this.chunks = 4});
+  ParallelArtifactDownloader({
+    this.chunks = 4,
+    this.root = ArtifactDownloadRoot.documents,
+    this.subdirectory = '',
+  });
 
   final int chunks;
+
+  /// Where files land, the same pair the production downloader is composed
+  /// with — on a lab build that is the lab's own container, not `~/Documents`.
+  final ArtifactDownloadRoot root;
+  final String subdirectory;
+
+  /// The pair for the identity this build carries.
+  factory ParallelArtifactDownloader.forCurrentIdentity({int chunks = 4}) =>
+      AppIdentity.current.isLab
+      ? ParallelArtifactDownloader(
+          chunks: chunks,
+          root: ArtifactDownloadRoot.applicationSupport,
+          subdirectory: 'Documents',
+        )
+      : ParallelArtifactDownloader(chunks: chunks);
 
   static const _group = 'golem-bench-parallel';
 
@@ -83,12 +104,17 @@ final class ParallelArtifactDownloader implements ArtifactFileDownloader {
   static const _chunkFloorBytes = 32 * 1000 * 1000;
 
   DownloadTask _taskFor(ArtifactFileRef ref) {
+    final destination = artifactTaskDestination(
+      ref: ref,
+      root: root.name,
+      subdirectory: subdirectory,
+    );
     if (ref.expectedBytes < _chunkFloorBytes) {
       return DownloadTask(
         url: ref.sourceUrl,
-        directory: ref.directory,
+        directory: destination.directory,
         filename: ref.filename,
-        baseDirectory: BaseDirectory.applicationDocuments,
+        baseDirectory: baseDirectoryFor(root),
         group: _group,
         metaData: jsonEncode({
           'key': ref.artifactKey,
@@ -103,9 +129,9 @@ final class ParallelArtifactDownloader implements ArtifactFileDownloader {
     return ParallelDownloadTask(
       url: ref.sourceUrl,
       chunks: chunks,
-      directory: ref.directory,
+      directory: destination.directory,
       filename: ref.filename,
-      baseDirectory: BaseDirectory.applicationDocuments,
+      baseDirectory: baseDirectoryFor(root),
       group: _group,
       metaData: jsonEncode({
         'key': ref.artifactKey,

@@ -57,7 +57,7 @@ const _transport = String.fromEnvironment(
 );
 
 ArtifactFileDownloader buildLifecycleDownloader() => _transport == 'parallel'
-    ? ParallelArtifactDownloader()
+    ? ParallelArtifactDownloader.forCurrentIdentity()
     : BackgroundArtifactDownloader(
         // Short enough that an evidence run does not sit for five minutes
         // when the network really is gone.

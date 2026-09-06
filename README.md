@@ -19,8 +19,8 @@ direction ([ADR 0015](docs/decisions/0015-feature-layering.md)). The broker
 owns Gemma chat templating, reasoning-tag parsing, and stop-token policy —
 engines receive fully rendered prompts and emit raw text.
 
-The app ships as three coexisting build flavors — `production` (**Golem**,
-`app.golem`, blue icon), `qa` (**Golem QA**, `app.golem.qa`, red icon), and
+The app ships as three coexisting phone flavors — `production` (**Golem**,
+`app.golem`, blue icon), `qa` (**Golem QA**, `app.golem.qa`, grey icon), and
 `dev` (**Golem Dev**, `app.golem.dev`, green icon) — selected with
 `--flavor` (plain commands default to `dev`). QA is the canonical flavor
 for automated testing; see [`app/README.md`](app/README.md). The same
@@ -28,6 +28,10 @@ flavors exist on iOS, Android, and the macOS desktop target, which opens
 as an iPad-shaped resizable window, runs both real engines GPU-accelerated
 (llama.cpp-Metal and MLX), and deliberately disables the App Sandbox for
 development; Mac results validate correctness, never mobile performance.
+A fourth flavor, `lab` (**Golem Model Lab**, `app.golem.lab`, red icon),
+exists on macOS only: the desktop bench for the models the phone flavors
+ship, kept out of every other build by a compile-time constant
+([ADR 0021](docs/decisions/0021-golem-model-lab.md)).
 
 Backend selection is flavor-coupled with dart-define overrides
 (`docs/decisions/0003-flavor-backend-defaults.md`): `qa` and test builds

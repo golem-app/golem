@@ -6,6 +6,7 @@ void main() {
     expect(AppIdentity.forFlavor('production'), AppIdentity.production);
     expect(AppIdentity.forFlavor('qa'), AppIdentity.qa);
     expect(AppIdentity.forFlavor('dev'), AppIdentity.dev);
+    expect(AppIdentity.forFlavor('lab'), AppIdentity.lab);
 
     expect(AppIdentity.production.displayName, 'Golem');
     expect(AppIdentity.production.applicationId, 'app.golem');
@@ -13,6 +14,8 @@ void main() {
     expect(AppIdentity.qa.applicationId, 'app.golem.qa');
     expect(AppIdentity.dev.displayName, 'Golem Dev');
     expect(AppIdentity.dev.applicationId, 'app.golem.dev');
+    expect(AppIdentity.lab.displayName, 'Golem Model Lab');
+    expect(AppIdentity.lab.applicationId, 'app.golem.lab');
   });
 
   test('every identity names a bundled app-icon tile', () {
@@ -22,6 +25,7 @@ void main() {
     );
     expect(AppIdentity.qa.iconAsset, 'assets/images/golem_app_icon_qa.png');
     expect(AppIdentity.dev.iconAsset, 'assets/images/golem_app_icon_dev.png');
+    expect(AppIdentity.lab.iconAsset, 'assets/images/golem_app_icon_lab.png');
   });
 
   test('flavorless and unknown builds resolve to qa', () {
@@ -33,9 +37,24 @@ void main() {
     expect(AppIdentity.current, AppIdentity.dev);
   });
 
-  test('only dev and qa identities enable internal tools', () {
+  test('only the internal identities enable internal tools', () {
     expect(AppIdentity.dev.internalToolsEnabled, isTrue);
     expect(AppIdentity.qa.internalToolsEnabled, isTrue);
+    expect(AppIdentity.lab.internalToolsEnabled, isTrue);
     expect(AppIdentity.production.internalToolsEnabled, isFalse);
+  });
+
+  test('the lab is the only lab identity, and host tests are not it', () {
+    // kLabBuild is what keeps the bench out of every store build: it must be
+    // a compile-time false everywhere but a `--flavor lab` build, and host
+    // tests run as dev.
+    expect(AppIdentity.lab.isLab, isTrue);
+    for (final identity in AppIdentity.values.where(
+      (i) => i != AppIdentity.lab,
+    )) {
+      expect(identity.isLab, isFalse, reason: identity.name);
+    }
+    expect(kLabBuild, isFalse);
+    expect(AppIdentity.current.isLab, isFalse);
   });
 }

@@ -3,7 +3,7 @@ import 'dart:math' as math;
 
 import 'package:image/image.dart' as image;
 
-/// Produces the ANDROID launcher sources for every build flavor from the
+/// Produces the ANDROID launcher sources for every phone build flavor from the
 /// tracked copies of the native icons (assets/source/), flattening the pixels
 /// outside a slightly inset superellipse to Glacier navy so the square
 /// legacy-launcher tiles have no white corners.
@@ -17,13 +17,15 @@ import 'package:image/image.dart' as image;
 /// Screen.
 const flavors = ['production', 'qa', 'dev'];
 
+/// Flavors that exist on macOS only (ADR 0021): they get the Dock iconset and
+/// the in-app tile, and no Android or iOS launcher inputs — a
+/// `flutter_launcher_icons-<flavor>.yaml` for them would generate artwork for
+/// product flavors that do not exist.
+const macOnlyFlavors = ['lab'];
+
 void main() {
   for (final flavor in flavors) {
-    final source = File('assets/source/golem_icon_${flavor}_1024.png');
-    final icon = image.decodePng(source.readAsBytesSync());
-    if (icon == null || icon.width != 1024 || icon.height != 1024) {
-      throw StateError('Expected the tracked 1024×1024 $flavor Golem icon.');
-    }
+    final icon = _sourceIcon(flavor);
     // Order matters: the background, tile, and macOS writers sample the
     // artwork before the matte mutates the decoded icon in place.
     _writeAdaptiveBackground(flavor, icon);
@@ -31,9 +33,23 @@ void main() {
     _writeMacIconset('AppIcon-$flavor', icon);
     _writeMattedLauncher(flavor, icon);
   }
+  for (final flavor in macOnlyFlavors) {
+    final icon = _sourceIcon(flavor);
+    _writeAppIconTile(flavor, icon);
+    _writeMacIconset('AppIcon-$flavor', icon);
+  }
 
   _writeAndroid12Splash();
   _writeAdaptiveForeground();
+}
+
+image.Image _sourceIcon(String flavor) {
+  final source = File('assets/source/golem_icon_${flavor}_1024.png');
+  final icon = image.decodePng(source.readAsBytesSync());
+  if (icon == null || icon.width != 1024 || icon.height != 1024) {
+    throw StateError('Expected the tracked 1024×1024 $flavor Golem icon.');
+  }
+  return icon;
 }
 
 /// The squircle both maskers cut to, as a superellipse exponent and an inset

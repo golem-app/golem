@@ -65,20 +65,27 @@ void main() {
     expect(config.profileKey, 'gemma4');
   });
 
-  test('production and dev default to automatic platform policy', () async {
-    for (final identity in [AppIdentity.production, AppIdentity.dev]) {
-      final config = _resolve(identity: identity);
-      expect(config.kind, InferenceBackendKind.llama);
-      expect(config.simulatedInference, isFalse);
-      expect(config.profileKey, 'gemma4');
-      expect(config.artifactKey, 'gemma4-gguf');
-      expect(
-        config.modelPath,
-        'documents:models/gemma4-gguf/gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf',
-      );
-      expect(config.modelPathFromCatalog, isTrue);
-    }
-  });
+  test(
+    'production, dev and lab default to automatic platform policy',
+    () async {
+      for (final identity in [
+        AppIdentity.production,
+        AppIdentity.dev,
+        AppIdentity.lab,
+      ]) {
+        final config = _resolve(identity: identity);
+        expect(config.kind, InferenceBackendKind.llama);
+        expect(config.simulatedInference, isFalse);
+        expect(config.profileKey, 'gemma4');
+        expect(config.artifactKey, 'gemma4-gguf');
+        expect(
+          config.modelPath,
+          'documents:models/gemma4-gguf/gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf',
+        );
+        expect(config.modelPathFromCatalog, isTrue);
+      }
+    },
+  );
 
   test('automatic policy selects MLX on iOS and GGUF on Android', () {
     final ios = _resolve(platform: HostPlatform.ios);
@@ -408,7 +415,26 @@ void main() {
       }
       // Production's composition stays a build-time fact: a detection that
       // ever answered wrong on a phone may refuse a shipping build, but must
-      // never turn one into a simulation.
+      // never turn one into a simulation. Nor the lab's: a bench that
+      // reported simulated numbers as measurements would be worse than none.
+      expect(
+        resolveBackendName(
+          backendDefine: '',
+          identity: AppIdentity.lab,
+          virtualDevice: true,
+          artifactDefine: '',
+          modelPathDefine: '',
+        ),
+        'auto',
+      );
+      expect(
+        useFakeModelManagement(
+          identity: AppIdentity.lab,
+          simulatedInference: true,
+          virtualDevice: true,
+        ),
+        isFalse,
+      );
       expect(
         resolveBackendName(
           backendDefine: '',

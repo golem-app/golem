@@ -90,6 +90,20 @@ abstract interface class ArtifactFileDownloader {
   Future<ArtifactTransferSnapshot> inspect(ArtifactFileRef ref);
 }
 
+/// Where the plugin lands a transfer, in its own terms. The plugin resolves
+/// the base directory itself, so the repository's `documentsDirectory` must
+/// name the same place — the phone flavors' documents directory, or, for the
+/// lab, `Documents` under the bundle-scoped application support directory
+/// (ADR 0021): on an unsandboxed Mac the documents directory is the user's
+/// real `~/Documents`, shared by every flavor.
+enum ArtifactDownloadRoot { documents, applicationSupport }
+
+/// The plugin's base directory for a root, in one place.
+BaseDirectory baseDirectoryFor(ArtifactDownloadRoot root) => switch (root) {
+  ArtifactDownloadRoot.documents => BaseDirectory.applicationDocuments,
+  ArtifactDownloadRoot.applicationSupport => BaseDirectory.applicationSupport,
+};
+
 /// background_downloader implementation: URLSession on iOS/macOS and
 /// DownloadWorker on Android, so multi-gigabyte downloads survive screen lock
 /// and backgrounding. allowPause is mandatory — Android hard-stops plain
@@ -110,6 +124,8 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
     this.platformCallTimeout = const Duration(seconds: 20),
     this.confirmationTimeout = const Duration(seconds: 10),
     this.temporaryDirectories = const [],
+    this.root = ArtifactDownloadRoot.documents,
+    this.subdirectory = '',
   });
 
   /// Group for every model transfer. Never the plugin's default group (which
@@ -176,6 +192,13 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
   /// orphans at startup. Empty disables the sweep; the composition root passes
   /// the real paths.
   final List<String> temporaryDirectories;
+
+  /// The plugin base directory every task is placed under, and the path
+  /// inside it that an [ArtifactFileRef.directory] is relative to ('' for
+  /// the base itself). Together they must resolve to the repository's
+  /// `documentsDirectory`, or downloads land where verification never looks.
+  final ArtifactDownloadRoot root;
+  final String subdirectory;
 
   @override
   Future<void> initialize() async {
@@ -249,9 +272,13 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
 
   DownloadTask _taskFor(ArtifactFileRef ref) => DownloadTask(
     url: ref.sourceUrl,
-    directory: ref.directory,
+    directory: artifactTaskDestination(
+      ref: ref,
+      root: root.name,
+      subdirectory: subdirectory,
+    ).directory,
     filename: ref.filename,
-    baseDirectory: BaseDirectory.applicationDocuments,
+    baseDirectory: baseDirectoryFor(root),
     group: _group,
     metaData: artifactTaskMetadata(ref),
     updates: Updates.statusAndProgress,
@@ -393,9 +420,9 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
     return await file.exists() && await file.length() == ref.expectedBytes;
   }
 
-  /// The plugin owns the mapping from [BaseDirectory.applicationDocuments] to
-  /// a real path, so the destination is resolved through its own join rather
-  /// than re-derived here.
+  /// The plugin owns the mapping from the base directory to a real path, so
+  /// the destination is resolved through its own join rather than re-derived
+  /// here.
   Future<String?> _documentsPath(ArtifactFileRef ref) async {
     try {
       return await _taskFor(ref).filePath();

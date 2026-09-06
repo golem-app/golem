@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -43,6 +45,56 @@ void main() {
       addTearDown(router.dispose);
       expect(_routePaths(router), contains('/benchmark'));
     }
+  });
+
+  test('the lab route table omits benchmark too', () {
+    final router = createAppRouter(
+      picker: const AttachmentPicker(),
+      identity: AppIdentity.lab,
+    );
+    addTearDown(router.dispose);
+    expect(_routePaths(router), isNot(contains('/benchmark')));
+  });
+
+  test('the lab root is reachable only behind the kLabBuild statement', () {
+    // The store builds' freedom from the lab rests on constant-condition
+    // elimination of one `if`; the release-size proof runs by hand, so this
+    // pins the shape that proof depends on: every lab reference in the
+    // bootstrap sits inside `if (kLabBuild) {` — never a ternary, an `&&`,
+    // or a reference hoisted outside the block.
+    final source = File('lib/app/bootstrap.dart').readAsStringSync();
+    final gate = 'if (kLabBuild) {';
+    final start = source.indexOf(gate);
+    expect(start, greaterThan(0), reason: 'the gate is an if statement');
+    expect(source.indexOf(gate, start + 1), -1, reason: 'one gate');
+    var depth = 0;
+    var end = -1;
+    for (var i = start + gate.length - 1; i < source.length; i++) {
+      if (source[i] == '{') depth++;
+      if (source[i] == '}' && --depth == 0) {
+        end = i;
+        break;
+      }
+    }
+    expect(end, greaterThan(start));
+    final references = RegExp(r'\bLabApp\b|\blabLaunchOverrides\b');
+    for (final match in references.allMatches(source)) {
+      final line = source.substring(0, match.start).split('\n').length;
+      final lineText = source.split('\n')[line - 1];
+      if (lineText.trimLeft().startsWith('import ')) continue;
+      expect(
+        match.start > start && match.start < end,
+        isTrue,
+        reason: 'line $line references the lab outside the kLabBuild block',
+      );
+    }
+  });
+
+  test('only the phone-internal identities compose the benchmark', () {
+    expect(composesSimulatedBenchmark(AppIdentity.qa), isTrue);
+    expect(composesSimulatedBenchmark(AppIdentity.dev), isTrue);
+    expect(composesSimulatedBenchmark(AppIdentity.production), isFalse);
+    expect(composesSimulatedBenchmark(AppIdentity.lab), isFalse);
   });
 
   test('production composition can leave benchmark unwired', () {
