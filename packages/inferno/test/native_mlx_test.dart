@@ -91,6 +91,44 @@ void main() {
       },
     );
 
+    test('observes chunk arrivals when asked, and only then', () async {
+      // ABI 6: the library yields a chunk per one or more tokens and exposes
+      // no load or prefill progress, so this shim reports chunk instants and
+      // nothing else — and nothing at all when not asked.
+      final quiet = await inferno!.generate(request).toList();
+      expect(quiet.whereType<InfernoProgressEvent>(), isEmpty);
+      expect(quiet.whereType<InfernoTokenTimingEvent>(), isEmpty);
+      expect(
+        quiet.whereType<InfernoMetricsEvent>().single.metrics.promptBatchSize,
+        isNull,
+      );
+
+      final observed = await inferno!
+          .generate(
+            InfernoGenerationRequest(
+              prompt: request.prompt,
+              sampling: request.sampling,
+              observe: const InfernoObservation(
+                promptProgress: true,
+                tokenTiming: true,
+              ),
+            ),
+          )
+          .toList();
+      expect(observed.whereType<InfernoProgressEvent>(), isEmpty);
+      final metrics = observed.whereType<InfernoMetricsEvent>().single.metrics;
+      final batches = observed.whereType<InfernoTokenTimingEvent>().toList();
+      expect(batches, isNotEmpty);
+      expectContiguousObservations(
+        batches,
+        kind: InfernoObservationKind.chunk,
+        elapsedSeconds: metrics.elapsedSeconds,
+      );
+      // Chunks, not tokens: never more of them than tokens.
+      final chunks = batches.fold<int>(0, (n, b) => n + b.timesMs.length);
+      expect(chunks, lessThanOrEqualTo(metrics.generatedTokenCount));
+    });
+
     test('survives an unload and reload in one process', () async {
       await inferno!.unload();
       await inferno!.load(engine: InfernoEngineKind.mlx, modelPath: mlxPath!);

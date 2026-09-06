@@ -496,6 +496,7 @@ final class InferenceMetrics {
     this.timeToFirstTokenSeconds,
     this.peakPhysicalFootprintBytes,
     this.timingSemanticsVersion = currentTimingSemantics,
+    this.promptBatchSize,
   });
   final double promptTokensPerSecond;
   final double decodeTokensPerSecond;
@@ -516,6 +517,12 @@ final class InferenceMetrics {
   /// this field exists to prevent. An `int` rather than an enum so a value a
   /// newer build wrote round-trips through this one unchanged.
   final int timingSemanticsVersion;
+
+  /// The prefill batch the engine ran with, when it reports one (llama.cpp
+  /// does; MLX does not, and null means "not reported", never "unbatched").
+  /// A run's configuration record, not a persisted field: it describes how
+  /// a measurement was taken and stays out of the chat history's schema.
+  final int? promptBatchSize;
 
   Map<String, Object> toJson() => {
     'promptTokensPerSecond': promptTokensPerSecond,
@@ -554,7 +561,8 @@ final class InferenceMetrics {
       other.promptTokenCount == promptTokenCount &&
       other.timeToFirstTokenSeconds == timeToFirstTokenSeconds &&
       other.peakPhysicalFootprintBytes == peakPhysicalFootprintBytes &&
-      other.timingSemanticsVersion == timingSemanticsVersion;
+      other.timingSemanticsVersion == timingSemanticsVersion &&
+      other.promptBatchSize == promptBatchSize;
 
   @override
   int get hashCode => Object.hash(
@@ -566,6 +574,7 @@ final class InferenceMetrics {
     timeToFirstTokenSeconds,
     peakPhysicalFootprintBytes,
     timingSemanticsVersion,
+    promptBatchSize,
   );
 }
 
@@ -611,6 +620,103 @@ final class CompletedEvent extends InferenceEvent {
   /// fixed sampling seed (determinism probes, eval); never the transcript.
   final String? rawTextHash;
   final int? rawTextLength;
+}
+
+/// What a caller asks a generation to observe beyond its text (#58). Every
+/// flag is opt-in and off by default, so a caller that never asks — chat —
+/// gets the stream it always had, and an unobserved run is the baseline an
+/// observed one is measured against. Only the bench asks.
+final class GenerationObservation {
+  const GenerationObservation({
+    this.loadProgress = false,
+    this.promptProgress = false,
+    this.tokenTiming = false,
+  });
+
+  /// [LoadProgressEvent]s while this generation's own activation maps
+  /// weights in — llama.cpp reports a fraction, MLX reports nothing.
+  final bool loadProgress;
+
+  /// [PromptProgressEvent]s as prefill batches are submitted — llama.cpp
+  /// text prompts only.
+  final bool promptProgress;
+
+  /// [TokenTimingEvent]s: per sampled token on llama.cpp, per detokenized
+  /// chunk on MLX, each batch naming which.
+  final bool tokenTiming;
+
+  static const everything = GenerationObservation(
+    loadProgress: true,
+    promptProgress: true,
+    tokenTiming: true,
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      other is GenerationObservation &&
+      other.loadProgress == loadProgress &&
+      other.promptProgress == promptProgress &&
+      other.tokenTiming == tokenTiming;
+
+  @override
+  int get hashCode => Object.hash(loadProgress, promptProgress, tokenTiming);
+
+  bool get isEmpty => !loadProgress && !promptProgress && !tokenTiming;
+}
+
+/// Where a generation is, published by the repository as it moves between
+/// the engine's phases. [loading] and [loaded] appear only when the
+/// generation had to activate its configuration first; [promptProcessing]
+/// precedes the engine call and [generating] marks the first output.
+enum InferencePhase { loading, loaded, promptProcessing, generating }
+
+final class RunPhaseEvent extends InferenceEvent {
+  const RunPhaseEvent(this.phase, {this.loadDuration});
+
+  final InferencePhase phase;
+
+  /// Wall time of the activation, on [InferencePhase.loaded] only.
+  final Duration? loadDuration;
+}
+
+/// A load's fraction as the engine reports it, only ever climbing.
+final class LoadProgressEvent extends InferenceEvent {
+  const LoadProgressEvent(this.fraction);
+
+  final double fraction;
+}
+
+/// Prompt tokens submitted to the backend so far: a count of work handed
+/// over, which on Metal runs ahead of the compute — progress, never a rate.
+/// The prompt rate is the metrics' and is measured after the backend
+/// settles.
+final class PromptProgressEvent extends InferenceEvent {
+  const PromptProgressEvent({required this.completed, required this.total});
+
+  final int completed;
+  final int total;
+}
+
+/// What one timing observation is an instant of. A llama.cpp observation is
+/// one sampled token; an MLX observation is one detokenized chunk, which its
+/// library assembles from one or more tokens — so chunk instants are
+/// inter-chunk arrivals and are never presented, or divided, as tokens.
+enum ObservationKind { token, chunk }
+
+/// A contiguous batch of arrival instants in milliseconds since the request
+/// was accepted (the metrics' t0), on the engine's monotonic clock.
+/// [firstIndex] is the zero-based index of the first instant; the next batch
+/// starts at `firstIndex + timesMs.length`.
+final class TokenTimingEvent extends InferenceEvent {
+  const TokenTimingEvent({
+    required this.kind,
+    required this.firstIndex,
+    required this.timesMs,
+  });
+
+  final ObservationKind kind;
+  final int firstIndex;
+  final List<double> timesMs;
 }
 
 /// Why the engine is not holding weights. Persisted, so it names the cause

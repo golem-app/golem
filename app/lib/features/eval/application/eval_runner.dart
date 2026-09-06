@@ -170,6 +170,11 @@ Future<EvalPromptResult> _runPrompt(
           stopReason = event.stopReason;
           rawTextHash = event.rawTextHash;
           rawTextLength = event.rawTextLength ?? 0;
+        case RunPhaseEvent() ||
+            LoadProgressEvent() ||
+            PromptProgressEvent() ||
+            TokenTimingEvent():
+          break;
       }
     }
   } on Exception catch (error) {

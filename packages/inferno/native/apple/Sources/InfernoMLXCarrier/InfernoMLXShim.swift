@@ -9,7 +9,7 @@ import MLXLLM
 import MLXVLM
 import Tokenizers
 
-private let infernoMlxABI: UInt32 = 5
+private let infernoMlxABI: UInt32 = 6
 private let infernoTimingSemanticsVersion: Int = 2
 
 private enum EventKind {
@@ -19,6 +19,8 @@ private enum EventKind {
     static let error: Int32 = 4
     static let operationCompleted: Int32 = 5
     static let tokenIDs: Int32 = 6
+    static let progress: Int32 = 7
+    static let tokenTiming: Int32 = 8
 }
 
 public typealias InfernoMlxEventCallback = @convention(c) (
@@ -108,6 +110,15 @@ private struct GenerationRequest: Decodable, Sendable {
     let seed: Int64?
     let stopSequences: [String]
     let stopTokenIds: [Int]
+    // ABI 6 observation, opt-in. This shim honours tokenTiming only, and
+    // only per chunk: the library's stream yields a chunk per one or more
+    // tokens, and it exposes no load or prefill progress at all.
+    let observe: Observation?
+
+    struct Observation: Decodable, Sendable {
+        let promptProgress: Bool?
+        let tokenTiming: Bool?
+    }
 }
 
 /// Swift mirror of ABI-3's borrowed `inferno_image_input`.
@@ -868,6 +879,26 @@ public func infernoMlxEngineGenerate(
                 var summaryAt: ContinuousClock.Instant?
                 var peakFootprint = physicalFootprintBytes()
                 var generatedChunkCount = 0
+                // Chunk timing (ABI 6): one instant per library chunk — one
+                // or more tokens each, so labelled "chunk" — batched like the
+                // llama shim's token instants.
+                let observeChunkTiming = request.observe?.tokenTiming ?? false
+                var chunkTimesMs: [Double] = []
+                var chunkTimesFirst = 0
+                // The window opens at a batch's first instant, not at the
+                // request: anchored there, the prefill would have spent it.
+                var chunkTimesFlushedAt: ContinuousClock.Instant? = nil
+                func flushChunkTimes() {
+                    guard !chunkTimesMs.isEmpty else { return }
+                    sink.emitJSON(EventKind.tokenTiming, [
+                        "kind": "chunk",
+                        "first": chunkTimesFirst,
+                        "timesMs": chunkTimesMs,
+                    ])
+                    chunkTimesFirst += chunkTimesMs.count
+                    chunkTimesMs.removeAll(keepingCapacity: true)
+                    chunkTimesFlushedAt = nil
+                }
                 var pending: [UInt8] = []
                 let stopBytes = request.stopSequences.map { Array($0.utf8) }
                 let requestedStopIDs = Set(request.stopTokenIds)
@@ -881,8 +912,17 @@ public func infernoMlxEngineGenerate(
                     }
                     switch event {
                     case .chunk(let text):
-                        if firstTokenAt == nil { firstTokenAt = .now }
+                        let arrivedAt = ContinuousClock.now
+                        if firstTokenAt == nil { firstTokenAt = arrivedAt }
                         generatedChunkCount += 1
+                        if observeChunkTiming {
+                            if chunkTimesMs.isEmpty { chunkTimesFlushedAt = arrivedAt }
+                            chunkTimesMs.append(seconds(requestStart.duration(to: arrivedAt)) * 1000)
+                            if chunkTimesMs.count >= 16
+                                || arrivedAt - (chunkTimesFlushedAt ?? arrivedAt) >= .milliseconds(100) {
+                                flushChunkTimes()
+                            }
+                        }
                         peakFootprint = max(peakFootprint, physicalFootprintBytes())
                         if emitVisibleBytes(
                             pending: &pending,
@@ -921,6 +961,7 @@ public func infernoMlxEngineGenerate(
                 // library's stream teardown; a cancel or a stop sequence ends
                 // where the loop was left.
                 let generationEnd = summaryAt ?? .now
+                flushChunkTimes()
                 if !pending.isEmpty && stopReason != "stop_sequence" {
                     sink.emit(EventKind.textDelta, bytes: pending)
                 }

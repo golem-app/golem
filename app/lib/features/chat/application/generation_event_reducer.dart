@@ -31,6 +31,12 @@ List<ChatMessage>? applyGenerationEvent(
       updated = draft.copyWith(metrics: event.metrics);
     case CompletedEvent():
       return null;
+    case RunPhaseEvent() ||
+        LoadProgressEvent() ||
+        PromptProgressEvent() ||
+        TokenTimingEvent():
+      // Observation is the bench's channel; a transcript has no field for it.
+      return null;
   }
   return [...messages.take(messages.length - 1), updated];
 }

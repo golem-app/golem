@@ -5,6 +5,8 @@ import 'package:inferno/inferno.dart';
 import 'package:inferno/testing.dart';
 import 'package:test/test.dart';
 
+import 'timing_invariants.dart';
+
 void main() {
   late Directory temporary;
 
@@ -55,6 +57,73 @@ void main() {
       'projectorPath': null,
     });
   });
+
+  test(
+    'observation is opt-in, and absent from the load payload when off',
+    () async {
+      final model = File('${temporary.path}/toy.gguf');
+      await model.writeAsBytes([0x47, 0x47, 0x55, 0x46]);
+      final backend = MockInfernoBackend(deltas: const ['a', 'b', 'c']);
+      final inferno = Inferno.withBackend(backend);
+
+      // Off: no progress, no observation events, and the ABI-5 payload byte
+      // for byte — a caller that never asks cannot tell ABI 6 from ABI 5.
+      final fractions = <double>[];
+      await inferno.load(
+        engine: InfernoEngineKind.mock,
+        modelPath: model.path,
+        onProgress: fractions.add,
+      );
+      expect(fractions, isEmpty);
+      expect(
+        backend.lastLoadOptions?.toJson().containsKey('reportProgress'),
+        isFalse,
+      );
+      final quiet = await inferno
+          .generate(const InfernoGenerationRequest(prompt: 'rendered'))
+          .toList();
+      expect(quiet.whereType<InfernoProgressEvent>(), isEmpty);
+      expect(quiet.whereType<InfernoTokenTimingEvent>(), isEmpty);
+      await inferno.unload();
+
+      // On: the load's fraction reaches its sink, the prompt progresses to its
+      // total, and every token carries an instant.
+      await inferno.load(
+        engine: InfernoEngineKind.mock,
+        modelPath: model.path,
+        options: const InfernoLoadOptions(reportProgress: true),
+        onProgress: fractions.add,
+      );
+      expect(fractions, [0.5, 1.0]);
+      expect(backend.lastLoadOptions?.toJson()['reportProgress'], isTrue);
+      final observed = await inferno
+          .generate(
+            const InfernoGenerationRequest(
+              prompt: 'rendered',
+              observe: InfernoObservation(
+                promptProgress: true,
+                tokenTiming: true,
+              ),
+            ),
+          )
+          .toList();
+      final progress = observed.whereType<InfernoProgressEvent>().toList();
+      expect(progress.map((e) => e.phase).toSet(), {
+        InfernoProgressPhase.prompt,
+      });
+      expect(progress.last.completed, progress.last.total);
+      expect(progress.last.total, 'rendered'.length);
+      final metrics = observed.whereType<InfernoMetricsEvent>().single.metrics;
+      expectContiguousObservations(
+        observed.whereType<InfernoTokenTimingEvent>(),
+        kind: InfernoObservationKind.token,
+        count: metrics.generatedTokenCount,
+        elapsedSeconds: metrics.elapsedSeconds,
+      );
+      expect(observed.last, isA<InfernoGenerationCompleted>());
+      await inferno.unload();
+    },
+  );
 
   test('probe, load, stream metrics, and unload form one lifecycle', () async {
     final model = File('${temporary.path}/toy.gguf');

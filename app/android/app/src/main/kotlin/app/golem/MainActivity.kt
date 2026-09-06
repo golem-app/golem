@@ -29,6 +29,12 @@ class MainActivity : FlutterActivity() {
                 result.success(isVirtualDevice())
                 return@setMethodCallHandler
             }
+            // The bench's readings (#58) are the Mac's; a phone answers
+            // "unknown" — the null the Dart contract promises.
+            if (call.method == "physicalFootprintBytes" || call.method == "deviceProvenance") {
+                result.success(null)
+                return@setMethodCallHandler
+            }
             if (call.method == "availableMemoryBytes") {
                 val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
                 val info = ActivityManager.MemoryInfo()

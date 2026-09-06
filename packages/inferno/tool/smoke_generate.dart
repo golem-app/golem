@@ -63,6 +63,8 @@ Future<void> main(List<String> arguments) async {
         );
       case InfernoGenerationCompleted():
         stderr.writeln('stop: ${event.reason.name}');
+      case InfernoProgressEvent() || InfernoTokenTimingEvent():
+        break;
     }
   }
   stdout.writeln('OUTPUT: $buffer');

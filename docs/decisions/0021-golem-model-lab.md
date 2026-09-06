@@ -104,6 +104,38 @@ test asserts `isLab` against `GOLEM_EXPECTED_LAB` on the compiled flavor.
 reads the eval prompt suites and chat's presentation, so it sits above both,
 and nothing imports it but its own root under `app/`.
 
+### Observation is opt-in and engine-honest
+
+The bench needs live phase, progress and latency observations, and the ticket
+forbids inventing them. ABI 6 adds two event kinds — `PROGRESS` and
+`TOKEN_TIMING` — that a shim emits only when the request asked
+(`reportProgress` on the load payload, an `observe` object on the generate
+payload); a request that does not ask gets the ABI-5 stream unchanged. That
+is deliberate twice over: chat's requests never change, and the overhead of
+observing is measurable against the same engine in the same process.
+
+The capability table in `docs/architecture/inferno.md` is the contract. It
+records that only llama.cpp reports load and prefill progress, that prefill
+progress counts submitted batches (which run ahead of the backend's compute)
+and so is never a rate, and that MLX can stamp only detokenized chunks —
+one or more tokens each — so its series is inter-chunk arrival latency and is
+never called inter-token latency or turned into a throughput. The per-token
+MLX path (`generateTokens`) exists in the library but the shim records it as
+miscomputing Gemma 4 prefill, so it stays out.
+
+The repository publishes the engine's phases as `RunPhaseEvent`s and forwards
+progress and timing as domain events; chat's reducer and the eval runner
+ignore them. A per-run `seed` on `generate` overrides the process-wide one
+and turns the determinism probe on for that run, rather than riding the
+persisted sampling overrides, whose emptiness drives the Settings reset. The
+sampling a request carries is computed by one public function,
+`effectiveSampling`, so what the bench shows as an effective value is the
+call the engine received, not a second reading of the rules. The macOS
+storage channel gains `physicalFootprintBytes` (the process's
+`phys_footprint` now) and `deviceProvenance` (model, chip, memory, OS,
+thermal state) for the readings every bench measurement carries; the phones
+do not answer either, by design.
+
 ## Consequences
 
 - Four identities. Every exhaustive switch over `AppIdentity` names the lab;

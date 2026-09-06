@@ -38,13 +38,69 @@ abstract interface class DiskCapacityProbe {
   Future<int?> totalBytes(String path);
 }
 
+/// This process's resident footprint right now, for the bench's live memory
+/// reading (#58): the same `phys_footprint` the engines' peak figure samples.
+/// Null where the platform does not answer — the bench shows "not reported".
+abstract interface class ProcessFootprintProbe {
+  Future<int?> physicalFootprintBytes();
+}
+
+/// What the machine is, for the provenance every bench measurement carries
+/// (#58). Every field is nullable: an unknown reading stays unknown.
+final class DeviceProvenance {
+  const DeviceProvenance({
+    this.model,
+    this.chip,
+    this.memoryBytes,
+    this.osVersion,
+    this.thermalState,
+  });
+
+  /// The hardware model identifier (`MacBookPro18,3`).
+  final String? model;
+
+  /// The processor's marketing name (`Apple M1 Pro`).
+  final String? chip;
+  final int? memoryBytes;
+  final String? osVersion;
+
+  /// `nominal`, `fair`, `serious`, `critical` or `unknown`, as the OS
+  /// reports it.
+  final String? thermalState;
+
+  /// Every field is read by type: a value of another shape is unknown, not
+  /// a cast failure in the middle of a launch.
+  factory DeviceProvenance.fromChannel(Map<Object?, Object?> values) {
+    String? text(String key) => switch (values[key]) {
+      final String value => value,
+      _ => null,
+    };
+    return DeviceProvenance(
+      model: text('model'),
+      chip: text('chip'),
+      memoryBytes: switch (values['memoryBytes']) {
+        final int value => value,
+        _ => null,
+      },
+      osVersion: text('osVersion'),
+      thermalState: text('thermalState'),
+    );
+  }
+}
+
+abstract interface class DeviceProvenanceProbe {
+  Future<DeviceProvenance?> deviceProvenance();
+}
+
 final class DeviceStorageChannel
     implements
         DiskSpaceProbe,
         BackupExclusion,
         DeviceMemoryProbe,
         AvailableMemoryProbe,
-        DiskCapacityProbe {
+        DiskCapacityProbe,
+        ProcessFootprintProbe,
+        DeviceProvenanceProbe {
   const DeviceStorageChannel();
 
   static const _channel = MethodChannel('app.golem/storage');
@@ -68,6 +124,18 @@ final class DeviceStorageChannel
   @override
   Future<int?> totalBytes(String path) =>
       _channel.invokeMethod<int>('totalBytes', {'path': path});
+
+  @override
+  Future<int?> physicalFootprintBytes() =>
+      _channel.invokeMethod<int>('physicalFootprintBytes');
+
+  @override
+  Future<DeviceProvenance?> deviceProvenance() async {
+    final values = await _channel.invokeMethod<Map<Object?, Object?>>(
+      'deviceProvenance',
+    );
+    return values == null ? null : DeviceProvenance.fromChannel(values);
+  }
 
   /// Whether this is a simulator or emulator rather than a phone, for the
   /// admission policy. Null when the platform cannot answer — "unknown" must

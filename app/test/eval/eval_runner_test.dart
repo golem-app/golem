@@ -32,6 +32,7 @@ final class _ScriptedRuntime implements BrokerRuntime {
     required String modelPath,
     BrokerLoadOptions options = const BrokerLoadOptions(),
     String? projectorPath,
+    BrokerLoadProgress? onProgress,
   }) async {
     loads += 1;
   }

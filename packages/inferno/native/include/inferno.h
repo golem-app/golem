@@ -48,7 +48,32 @@ extern "C" {
 /// window. The ABI moves with it because the field names do not: only the
 /// version check keeps a shim measuring the old windows from feeding
 /// corrected-looking numbers to a caller that believes them (#57).
-#define INFERNO_ABI_VERSION 5
+///
+/// ABI 6: observation, opt-in per request (#58). The load payload accepts
+/// `"reportProgress"` (bool) and the generate payload an `"observe"` object
+/// `{"promptProgress": bool, "tokenTiming": bool}`; absent or false keeps a
+/// shim's event stream exactly as ABI 5 produced it. When asked, a shim may
+/// emit two further event kinds, each a complete JSON payload:
+///
+/// - INFERNO_EVENT_PROGRESS: `{"phase":"load","fraction":f}` while weights
+///   load (llama.cpp, from its own progress callback, rate-limited), and
+///   `{"phase":"prompt","completed":n,"total":N}` after each prefill batch is
+///   *submitted* (llama.cpp text prompts only — a submitted batch runs ahead
+///   of the backend's compute, so this is progress, never a rate). The MLX
+///   library exposes neither, and that shim emits no PROGRESS event.
+/// - INFERNO_EVENT_TOKEN_TIMING: `{"kind":"token"|"chunk","first":i,
+///   "timesMs":[…]}` — arrival instants in milliseconds since request
+///   acceptance (the METRICS t0) on the engine's monotonic clock, batched
+///   (16 observations or 100 ms). `first` is the zero-based index of the
+///   first observation in the batch; batches are contiguous. llama.cpp stamps
+///   each sampled token (`token`); MLX can only stamp each detokenized chunk,
+///   which the library assembles from one or more tokens (`chunk`), so those
+///   instants are inter-chunk arrivals and must never be read as tokens.
+///
+/// The llama METRICS payload additionally carries `"promptBatchSize"`, the
+/// `n_batch` the prefill actually used. Timing semantics stay at version 2:
+/// no existing number changes meaning.
+#define INFERNO_ABI_VERSION 6
 
 /// The timing contract the METRICS payload names. It moves with the ABI today
 /// and exists separately because records outlive shims: a stored measurement
@@ -76,7 +101,9 @@ typedef enum inferno_event_kind {
   INFERNO_EVENT_COMPLETED = 3,
   INFERNO_EVENT_ERROR = 4,
   INFERNO_EVENT_OPERATION_COMPLETED = 5,
-  INFERNO_EVENT_TOKEN_IDS = 6
+  INFERNO_EVENT_TOKEN_IDS = 6,
+  INFERNO_EVENT_PROGRESS = 7,
+  INFERNO_EVENT_TOKEN_TIMING = 8
 } inferno_event_kind;
 
 /// Callbacks may originate on any native worker thread. Native code allocates

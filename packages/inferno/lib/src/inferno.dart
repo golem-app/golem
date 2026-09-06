@@ -31,10 +31,14 @@ final class Inferno {
   static Future<InfernoDeviceProbe> probeDevice({InfernoEngineKind? engine}) =>
       NativeInfernoBackend.probeDevice(engine: engine);
 
+  /// [onProgress] receives the engine's load fraction when
+  /// [InfernoLoadOptions.reportProgress] asked for it; an engine that cannot
+  /// report one (MLX) never calls it.
   Future<void> load({
     required InfernoEngineKind engine,
     required String modelPath,
     InfernoLoadOptions options = const InfernoLoadOptions(),
+    InfernoLoadProgress? onProgress,
   }) async {
     if (_state != _RuntimeState.unloaded) {
       throw InfernoException(
@@ -49,6 +53,7 @@ final class Inferno {
         engine: engine,
         modelPath: modelPath,
         options: options,
+        onProgress: onProgress,
       );
       _state = _RuntimeState.loaded;
     } catch (error) {

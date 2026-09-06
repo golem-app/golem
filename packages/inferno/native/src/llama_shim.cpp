@@ -51,6 +51,15 @@ struct inferno_engine {
   ggml_type kv_cache_type = GGML_TYPE_F16;
   int32_t thread_count = 0;  // 0 = engine default
   bool swa_full = false;
+  // Load-progress plumbing (ABI 6). llama's progress callback takes only a
+  // context pointer, so the operation it reports for lives here for the
+  // duration of one load; `report_progress` is the caller's opt-in.
+  bool report_progress = false;
+  inferno_event_callback progress_callback = nullptr;
+  uint64_t progress_operation = 0;
+  void *progress_user_data = nullptr;
+  float last_progress = -1.0F;
+  std::chrono::steady_clock::time_point last_progress_at{};
 };
 
 namespace {
@@ -413,10 +422,12 @@ int32_t inferno_engine_load(inferno_engine *engine,
     std::string path;
     std::string projector_path;
     bool check_tensors = false;
+    bool report_progress = false;
     int32_t gpu_layers_override = INT32_MIN;
     try {
       const json request = json::parse(encoded);
       path = request.at("modelPath").get<std::string>();
+      report_progress = request.value("reportProgress", false);
       if (request.contains("projectorPath") &&
           !request["projectorPath"].is_null()) {
         projector_path = request["projectorPath"].get<std::string>();
@@ -458,15 +469,50 @@ int32_t inferno_engine_load(inferno_engine *engine,
     // Upstream default (false). True validates every tensor — a full
     // page-in of the mmapped weights — kept as an opt-in triage tool.
     params.check_tensors = check_tensors;
-    params.progress_callback = [](float, void *context) {
-      return !static_cast<inferno_engine *>(context)->cancel_requested.load();
+    // The callback exists for cancellation; when the caller opted in it also
+    // forwards llama's own fraction, rate-limited so a mapped load cannot
+    // flood the channel (ABI 6). It runs on this worker thread.
+    engine->report_progress = report_progress;
+    engine->progress_callback = callback;
+    engine->progress_operation = operation_id;
+    engine->progress_user_data = user_data;
+    engine->last_progress = -1.0F;
+    engine->last_progress_at = steady_clock::now();
+    params.progress_callback = [](float fraction, void *context) {
+      auto *engine = static_cast<inferno_engine *>(context);
+      if (engine->cancel_requested.load()) return false;
+      if (engine->report_progress) {
+        const auto now = steady_clock::now();
+        const bool due = fraction >= 1.0F || fraction - engine->last_progress >= 0.01F ||
+                         now - engine->last_progress_at >= std::chrono::milliseconds(100);
+        if (due && fraction > engine->last_progress) {
+          engine->last_progress = fraction;
+          engine->last_progress_at = now;
+          emit(engine->progress_callback,
+               engine->progress_operation,
+               INFERNO_EVENT_PROGRESS,
+               json{{"phase", "load"}, {"fraction", fraction}}.dump(),
+               engine->progress_user_data);
+        }
+      }
+      return true;
     };
     params.progress_callback_user_data = engine;
     consume_log_error();
     llama_model *loaded = nullptr;
+    // llama never calls the progress callback after the load returns; the
+    // plumbing is per-load and must not outlive it, whichever way the load
+    // ends. The fraction describes the weights: the projector below loads
+    // after it reaches 1.0 and reports nothing.
+    const auto clear_progress = [&] {
+      engine->report_progress = false;
+      engine->progress_callback = nullptr;
+      engine->progress_user_data = nullptr;
+    };
     try {
       loaded = llama_model_load_from_file(path.c_str(), params);
     } catch (const std::exception &error) {
+      clear_progress();
       emit_error(callback,
                  operation_id,
                  "load_failed",
@@ -474,6 +520,7 @@ int32_t inferno_engine_load(inferno_engine *engine,
                  user_data);
       return;
     } catch (...) {
+      clear_progress();
       emit_error(callback,
                  operation_id,
                  "load_failed",
@@ -481,6 +528,7 @@ int32_t inferno_engine_load(inferno_engine *engine,
                  user_data);
       return;
     }
+    clear_progress();
     if (engine->cancel_requested.load()) {
       if (loaded != nullptr) llama_model_free(loaded);
       emit_error(callback, operation_id, "cancelled", "Model loading was cancelled.", user_data);
@@ -607,6 +655,14 @@ int32_t inferno_engine_generate(inferno_engine *engine,
                               : request.value("seed", LLAMA_DEFAULT_SEED);
     const auto stop_sequences = request.value("stopSequences", std::vector<std::string>{});
     const auto stop_ids_vector = request.value("stopTokenIds", std::vector<llama_token>{});
+    // ABI 6 observation, opt-in: absent keeps the event stream as ABI 5's.
+    bool observe_prompt_progress = false;
+    bool observe_token_timing = false;
+    if (request.contains("observe") && request["observe"].is_object()) {
+      const json &observe = request["observe"];
+      observe_prompt_progress = observe.value("promptProgress", false);
+      observe_token_timing = observe.value("tokenTiming", false);
+    }
     const std::unordered_set<llama_token> stop_ids(stop_ids_vector.begin(),
                                                    stop_ids_vector.end());
     if (prompt.empty() || max_tokens <= 0 || temperature < 0 || top_p <= 0 || top_p > 1 ||
@@ -832,6 +888,20 @@ int32_t inferno_engine_generate(inferno_engine *engine,
           break;
         }
         offset += count;
+        // Submitted, not settled: a decode returns once the graph is queued,
+        // so this is how far the prompt has been handed to the backend — a
+        // progress count, never a rate (the rate is measured after
+        // llama_synchronize below).
+        if (observe_prompt_progress) {
+          emit(callback,
+               operation_id,
+               INFERNO_EVENT_PROGRESS,
+               json{{"phase", "prompt"},
+                    {"completed", offset},
+                    {"total", prompt_tokens.size()}}
+                   .dump(),
+               user_data);
+        }
       }
     }
     // A decode returns once the graph is submitted and the backend settles on
@@ -846,6 +916,28 @@ int32_t inferno_engine_generate(inferno_engine *engine,
     int32_t generated = 0;
     uint64_t peak_footprint = physical_footprint_bytes();
     steady_clock::time_point first_token{};
+    // Token timing (ABI 6): one instant per sampled token, batched so the
+    // channel carries one event per 16 tokens or 100 ms rather than one per
+    // token. The 100 ms window opens at the first instant of a batch, not at
+    // the request — anchored there, the prefill would have exhausted it
+    // before the first token and every batch would flush at once.
+    std::vector<double> token_times_ms;
+    int32_t token_times_first = 0;
+    auto token_times_flushed_at = steady_clock::time_point{};
+    const auto flush_token_times = [&] {
+      if (token_times_ms.empty()) return;
+      emit(callback,
+           operation_id,
+           INFERNO_EVENT_TOKEN_TIMING,
+           json{{"kind", "token"},
+                {"first", token_times_first},
+                {"timesMs", token_times_ms}}
+               .dump(),
+           user_data);
+      token_times_first += static_cast<int32_t>(token_times_ms.size());
+      token_times_ms.clear();
+      token_times_flushed_at = steady_clock::now();
+    };
     if (!decode_failed && !engine->cancel_requested.load()) {
       while (generated < max_tokens) {
         if (engine->cancel_requested.load()) {
@@ -862,9 +954,20 @@ int32_t inferno_engine_generate(inferno_engine *engine,
           break;
         }
         generated++;
+        // One clock read serves the first-token mark and the first instant,
+        // so the two agree by construction.
+        const auto now = steady_clock::now();
+        if (first_token == steady_clock::time_point{}) first_token = now;
+        if (observe_token_timing) {
+          if (token_times_ms.empty()) token_times_flushed_at = now;
+          token_times_ms.push_back(seconds_between(request_start, now) * 1000.0);
+          if (token_times_ms.size() >= 16 ||
+              now - token_times_flushed_at >= std::chrono::milliseconds(100)) {
+            flush_token_times();
+          }
+        }
         peak_footprint = std::max(peak_footprint, physical_footprint_bytes());
         const std::string piece = token_piece(vocab, token);
-        if (first_token == steady_clock::time_point{}) first_token = steady_clock::now();
         if (emit_visible_piece(
                 pending, piece, stop_sequences, callback, operation_id, user_data)) {
           stop_reason = "stop_sequence";
@@ -878,6 +981,7 @@ int32_t inferno_engine_generate(inferno_engine *engine,
       }
     }
     const auto generation_end = steady_clock::now();
+    flush_token_times();
     if (!pending.empty() && stop_reason != "stop_sequence") {
       emit(callback, operation_id, INFERNO_EVENT_TEXT_DELTA, pending, user_data);
     }
@@ -911,6 +1015,8 @@ int32_t inferno_engine_generate(inferno_engine *engine,
            has_first_token ? json(first_token_seconds) : json(nullptr)},
           {"peakPhysicalFootprintBytes",
            peak_footprint > 0 ? json(peak_footprint) : json(nullptr)},
+          // The batch the prefill ran with (ABI 6): reported, never tuned.
+          {"promptBatchSize", context_params.n_batch},
           {"timingSemanticsVersion", INFERNO_TIMING_SEMANTICS_VERSION}};
       emit(callback, operation_id, INFERNO_EVENT_METRICS, metrics.dump(), user_data);
       emit(callback, operation_id, INFERNO_EVENT_COMPLETED, stop_reason, user_data);

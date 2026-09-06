@@ -61,7 +61,7 @@ const _mlxAssetId = 'package:inferno/inferno_mlx.dart';
 
 /// The C ABI revision this package speaks. A mismatch fails before any native
 /// object is created rather than crashing inside one.
-const infernoAbiVersion = 5;
+const infernoAbiVersion = 6;
 
 @Native<Uint32 Function()>(
   symbol: 'inferno_abi_version',
@@ -389,9 +389,13 @@ sealed class _PendingOperation {
 }
 
 final class _PendingFuture extends _PendingOperation {
-  _PendingFuture(super.api);
+  _PendingFuture(super.api, {this.onProgress});
 
   final Completer<void> completer = Completer<void>();
+
+  /// A load's progress sink (ABI 6); null for every other operation, and
+  /// for a load that did not ask.
+  final InfernoLoadProgress? onProgress;
 }
 
 final class _PendingTokens extends _PendingOperation {
@@ -535,6 +539,7 @@ final class NativeInfernoBackend implements InfernoBackend {
     required InfernoEngineKind engine,
     required String modelPath,
     InfernoLoadOptions options = const InfernoLoadOptions(),
+    InfernoLoadProgress? onProgress,
   }) async {
     if (_engine != nullptr) {
       throw const InfernoException(
@@ -595,6 +600,7 @@ final class NativeInfernoBackend implements InfernoBackend {
           _callback.nativeFunction,
           nullptr,
         ),
+        onProgress: options.reportProgress ? onProgress : null,
       );
     } catch (_) {
       api.destroy(_engine);
@@ -632,6 +638,10 @@ final class NativeInfernoBackend implements InfernoBackend {
           'seed': request.sampling.seed,
           'stopSequences': request.sampling.stopSequences,
           'stopTokenIds': request.sampling.stopTokenIds,
+          // ABI 6: absent when nothing is observed, so an unobserved request
+          // is byte-identical to an ABI-5 one.
+          if (request.observe case final observe? when !observe.isEmpty)
+            'observe': observe.toJson(),
         }).toNativeUtf8();
         // The shim copies what it needs before its worker starts, so these
         // buffers do not have to outlive the call (ABI 3).
@@ -768,10 +778,11 @@ final class NativeInfernoBackend implements InfernoBackend {
 
   Future<void> _startFuture(
     _NativeApi api,
-    int Function(int operationId) start,
-  ) {
+    int Function(int operationId) start, {
+    InfernoLoadProgress? onProgress,
+  }) {
     final operationId = _nextOperationId++;
-    final operation = _PendingFuture(api);
+    final operation = _PendingFuture(api, onProgress: onProgress);
     _operations[operationId] = operation;
     final result = start(operationId);
     if (result != 0) {
@@ -879,6 +890,69 @@ final class NativeInfernoBackend implements InfernoBackend {
               .cast<num>()
               .map((value) => value.toInt())
               .toList(growable: false);
+        }
+      case 7:
+        // Progress (ABI 6): a load's fraction goes to the load's sink, a
+        // generation's prompt progress joins its stream. Anything else —
+        // a tokenization, an unload — has nothing to observe and ignores it;
+        // a malformed payload is dropped rather than ending a healthy
+        // operation, because progress is advisory.
+        final Map<String, Object?> progress;
+        try {
+          progress = jsonDecode(payload) as Map<String, Object?>;
+        } on Object {
+          return;
+        }
+        switch (operation) {
+          case _PendingFuture():
+            final fraction = progress['fraction'];
+            if (fraction is num) {
+              operation.onProgress?.call(fraction.toDouble());
+            }
+          case _PendingGeneration():
+            final phase = progress['phase'] == 'load'
+                ? InfernoProgressPhase.load
+                : InfernoProgressPhase.prompt;
+            final fraction = progress['fraction'];
+            final completed = progress['completed'];
+            final total = progress['total'];
+            operation.controller.add(
+              InfernoProgressEvent(
+                phase: phase,
+                fraction: fraction is num ? fraction.toDouble() : null,
+                completed: completed is num ? completed.toInt() : null,
+                total: total is num ? total.toInt() : null,
+              ),
+            );
+          case _PendingTokens():
+            break;
+        }
+      case 8:
+        if (operation is _PendingGeneration) {
+          final Map<String, Object?> batch;
+          try {
+            batch = jsonDecode(payload) as Map<String, Object?>;
+          } on Object {
+            return;
+          }
+          final times = batch['timesMs'];
+          final first = batch['first'];
+          // A batch with a non-numeric instant is dropped whole: shortening
+          // it would desynchronise `first` for every batch after it.
+          if (times is! List<Object?> ||
+              first is! num ||
+              times.any((value) => value is! num)) {
+            return;
+          }
+          operation.controller.add(
+            InfernoTokenTimingEvent(
+              kind: batch['kind'] == 'chunk'
+                  ? InfernoObservationKind.chunk
+                  : InfernoObservationKind.token,
+              firstIndex: first.toInt(),
+              timesMs: [for (final value in times) (value! as num).toDouble()],
+            ),
+          );
         }
       default:
         final failure = InfernoException(

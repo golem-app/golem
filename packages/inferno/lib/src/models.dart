@@ -45,6 +45,7 @@ final class InfernoLoadOptions {
     this.gpuLayers,
     this.swaFull = false,
     this.projectorPath,
+    this.reportProgress = false,
   }) : assert(
          threadCount == null || threadCount > 0,
          'threadCount must be positive when set',
@@ -71,6 +72,12 @@ final class InfernoLoadOptions {
   /// projector built for a different model rather than producing noise.
   final String? projectorPath;
 
+  /// Ask the engine for load progress (ABI 6). llama.cpp forwards its own
+  /// fraction, rate-limited; MLX exposes none and stays silent. Off by
+  /// default, and absent from the payload when off, so a caller that never
+  /// asks sends exactly the ABI-5 payload.
+  final bool reportProgress;
+
   Map<String, Object?> toJson() => {
     'checkTensors': checkTensors,
     'kvCacheType': kvCacheType.name,
@@ -78,6 +85,36 @@ final class InfernoLoadOptions {
     'gpuLayers': gpuLayers,
     'swaFull': swaFull,
     'projectorPath': projectorPath,
+    if (reportProgress) 'reportProgress': true,
+  };
+}
+
+/// A load's progress, forwarded from the engine while weights map in.
+typedef InfernoLoadProgress = void Function(double fraction);
+
+/// What a generation should observe beyond its text (ABI 6). Everything is
+/// opt-in: a request without one produces exactly the ABI-5 event stream,
+/// which is what keeps an unobserved run the baseline an observed one is
+/// compared against.
+final class InfernoObservation {
+  const InfernoObservation({
+    this.promptProgress = false,
+    this.tokenTiming = false,
+  });
+
+  /// `{"phase":"prompt","completed":n,"total":N}` after each prefill batch
+  /// is submitted — llama.cpp text prompts only; MLX reports nothing.
+  final bool promptProgress;
+
+  /// Arrival instants per sampled token (llama.cpp) or per detokenized chunk
+  /// (MLX), each a [InfernoTokenTimingEvent] naming which it is.
+  final bool tokenTiming;
+
+  bool get isEmpty => !promptProgress && !tokenTiming;
+
+  Map<String, Object?> toJson() => {
+    'promptProgress': promptProgress,
+    'tokenTiming': tokenTiming,
   };
 }
 
@@ -138,6 +175,7 @@ final class InfernoGenerationRequest {
     required this.prompt,
     this.sampling = const InfernoSamplingParameters(),
     this.images = const [],
+    this.observe,
   });
 
   final String prompt;
@@ -146,6 +184,9 @@ final class InfernoGenerationRequest {
   /// The rendered [prompt] must carry one media marker per entry, in this
   /// order; the engine substitutes each marker with that image's tokens.
   final List<InfernoImageInput> images;
+
+  /// Null (the default) asks for nothing beyond text and metrics.
+  final InfernoObservation? observe;
 }
 
 enum InfernoStopReason {
@@ -166,6 +207,7 @@ final class InfernoMetrics {
     this.promptTokenCount,
     this.timeToFirstTokenSeconds,
     this.peakPhysicalFootprintBytes,
+    this.promptBatchSize,
   });
 
   /// Parses one METRICS payload as the shims emit it.
@@ -205,6 +247,7 @@ final class InfernoMetrics {
       peakPhysicalFootprintBytes: optional(
         'peakPhysicalFootprintBytes',
       )?.toInt(),
+      promptBatchSize: optional('promptBatchSize')?.toInt(),
     );
   }
 
@@ -226,6 +269,11 @@ final class InfernoMetrics {
   /// Null exactly when no token was produced: zero would be a measurement.
   final double? timeToFirstTokenSeconds;
   final int? peakPhysicalFootprintBytes;
+
+  /// The prefill batch the engine ran with (ABI 6). llama.cpp reports the
+  /// `n_batch` it sized for the prompt; MLX reports nothing, and null means
+  /// exactly that — not reported, never "no batching".
+  final int? promptBatchSize;
 }
 
 sealed class InfernoGenerationEvent {
@@ -248,4 +296,48 @@ final class InfernoGenerationCompleted extends InfernoGenerationEvent {
   const InfernoGenerationCompleted(this.reason);
 
   final InfernoStopReason reason;
+}
+
+/// Which phase a progress event describes (ABI 6).
+enum InfernoProgressPhase { load, prompt }
+
+/// Progress inside a generation (a load's progress arrives through
+/// [InfernoLoadProgress] instead). [completed] and [total] are submitted
+/// prompt tokens — how much of the prompt has been handed to the backend,
+/// which on Metal runs ahead of the compute — so this is a count, never a
+/// rate; the prompt rate is the metrics'.
+final class InfernoProgressEvent extends InfernoGenerationEvent {
+  const InfernoProgressEvent({
+    required this.phase,
+    this.fraction,
+    this.completed,
+    this.total,
+  });
+
+  final InfernoProgressPhase phase;
+  final double? fraction;
+  final int? completed;
+  final int? total;
+}
+
+/// What one timing observation is an instant of. A llama.cpp observation is
+/// one sampled token; an MLX observation is one detokenized chunk, which the
+/// library assembles from one or more tokens — so chunk instants are
+/// inter-chunk arrivals and must never be read, or divided, as tokens.
+enum InfernoObservationKind { token, chunk }
+
+/// A contiguous batch of arrival instants, in milliseconds since the request
+/// was accepted (the metrics' t0) on the engine's own monotonic clock.
+/// [firstIndex] is the zero-based index of the first observation; the next
+/// batch begins at `firstIndex + timesMs.length`.
+final class InfernoTokenTimingEvent extends InfernoGenerationEvent {
+  const InfernoTokenTimingEvent({
+    required this.kind,
+    required this.firstIndex,
+    required this.timesMs,
+  });
+
+  final InfernoObservationKind kind;
+  final int firstIndex;
+  final List<double> timesMs;
 }

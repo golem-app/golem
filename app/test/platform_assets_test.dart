@@ -502,9 +502,12 @@ void main() {
     final client = File(
       'lib/core/services/device_storage.dart',
     ).readAsStringSync();
+    // One level of nested generics (`Map<Object?, Object?>`) — a flat
+    // `[^>]+` stopped at the inner `>` and never saw deviceProvenance.
     final invoked = RegExp(
-      r"invokeMethod<[^>]+>\(\s*'(\w+)'",
+      r"invokeMethod<(?:[^<>]|<[^<>]*>)+>\(\s*'(\w+)'",
     ).allMatches(client).map((match) => match[1]!).toSet();
+    expect(invoked, contains('deviceProvenance'));
     expect(invoked, isNotEmpty);
     for (final handler in const [
       'ios/Runner/AppDelegate.swift',
@@ -512,8 +515,10 @@ void main() {
       _mainActivity,
     ]) {
       final source = File(handler).readAsStringSync();
-      // macOS answers one method fewer on purpose: there is no jetsam
-      // ceiling to report, so the mobile load preflight has nothing to ask.
+      // macOS answers one method fewer on purpose: it has no jetsam
+      // ceiling, so the mobile load preflight has nothing to ask it. The
+      // phones name the bench's readings (#58) too — answering null, the
+      // unknown the Dart contract promises, rather than refusing the call.
       final exempt = handler.startsWith('macos')
           ? const {'availableMemoryBytes'}
           : const <String>{};

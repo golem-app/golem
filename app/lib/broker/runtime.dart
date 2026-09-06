@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:inferno/inferno.dart';
 
+import '../core/domain/models.dart' show GenerationObservation, ObservationKind;
 import '../core/repositories/contracts.dart'
     show InferenceException, InferenceFailureKind;
 
@@ -24,6 +25,18 @@ export 'package:inferno/inferno.dart'
         qwen35Mlx4Bit;
 
 enum BrokerEngine { llamaCpp, mlx }
+
+/// The native build behind each engine, from the pins the package carries —
+/// what a measurement cites as its engine's identity.
+String engineBuildLabel(BrokerEngine engine) => switch (engine) {
+  BrokerEngine.llamaCpp =>
+    'llama.cpp $llamaCppRelease (${llamaCppRevision.substring(0, 8)})',
+  BrokerEngine.mlx =>
+    'MLX Swift LM $mlxSwiftLmVersion · MLX Swift $mlxSwiftVersion',
+};
+
+/// A load's progress as the engine reports it (#58).
+typedef BrokerLoadProgress = void Function(double fraction);
 
 final class BrokerSamplingParameters {
   const BrokerSamplingParameters({
@@ -71,12 +84,17 @@ final class BrokerGenerationRequest {
     required this.prompt,
     required this.sampling,
     this.images = const [],
+    this.observe,
   });
 
   final String prompt;
   final BrokerSamplingParameters sampling;
 
   final List<BrokerImageInput> images;
+
+  /// Null asks the engine for nothing beyond text and metrics — the request
+  /// every chat turn sends, byte for byte.
+  final GenerationObservation? observe;
 }
 
 final class BrokerRuntimeMetrics {
@@ -89,6 +107,7 @@ final class BrokerRuntimeMetrics {
     this.promptTokenCount,
     this.timeToFirstTokenSeconds,
     this.peakPhysicalFootprintBytes,
+    this.promptBatchSize,
   });
 
   final double decodeTokensPerSecond;
@@ -108,10 +127,35 @@ final class BrokerRuntimeMetrics {
   final int? promptTokenCount;
   final double? timeToFirstTokenSeconds;
   final int? peakPhysicalFootprintBytes;
+
+  /// The prefill batch the engine used, when it reports one.
+  final int? promptBatchSize;
 }
 
 sealed class BrokerRuntimeEvent {
   const BrokerRuntimeEvent();
+}
+
+/// Prompt tokens submitted so far (#58); llama.cpp text prompts only.
+final class BrokerPromptProgress extends BrokerRuntimeEvent {
+  const BrokerPromptProgress({required this.completed, required this.total});
+
+  final int completed;
+  final int total;
+}
+
+/// A contiguous batch of arrival instants, milliseconds from the request's
+/// acceptance; [kind] says whether each is a token or a detokenized chunk.
+final class BrokerTokenTiming extends BrokerRuntimeEvent {
+  const BrokerTokenTiming({
+    required this.kind,
+    required this.firstIndex,
+    required this.timesMs,
+  });
+
+  final ObservationKind kind;
+  final int firstIndex;
+  final List<double> timesMs;
 }
 
 final class BrokerTextDelta extends BrokerRuntimeEvent {
@@ -175,11 +219,14 @@ final class BrokerLoadOptions {
 }
 
 abstract interface class BrokerRuntime {
+  /// [onProgress], when given, asks the engine to report the load's fraction
+  /// (#58); an engine that has none (MLX) never calls it.
   Future<void> load({
     required BrokerEngine engine,
     required String modelPath,
     BrokerLoadOptions options = const BrokerLoadOptions(),
     String? projectorPath,
+    BrokerLoadProgress? onProgress,
   });
   Future<void> unload();
   Stream<BrokerRuntimeEvent> generate(BrokerGenerationRequest request);
@@ -211,6 +258,7 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
     required String modelPath,
     BrokerLoadOptions options = const BrokerLoadOptions(),
     String? projectorPath,
+    BrokerLoadProgress? onProgress,
   }) => _translating(
     () => _inferno.load(
       engine: switch (engine) {
@@ -226,7 +274,9 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
             : InfernoKvCacheType.f16,
         threadCount: options.threadCount,
         gpuLayers: options.forceCpu ? 0 : null,
+        reportProgress: onProgress != null,
       ),
+      onProgress: onProgress,
     ),
   );
 
@@ -264,6 +314,13 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
         images: [
           for (final image in request.images) InfernoImageInput(image.bytes),
         ],
+        observe: switch (request.observe) {
+          null => null,
+          final observe => InfernoObservation(
+            promptProgress: observe.promptProgress,
+            tokenTiming: observe.tokenTiming,
+          ),
+        },
       ),
     );
     try {
@@ -283,7 +340,27 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
                 promptTokenCount: metrics.promptTokenCount,
                 timeToFirstTokenSeconds: metrics.timeToFirstTokenSeconds,
                 peakPhysicalFootprintBytes: metrics.peakPhysicalFootprintBytes,
+                promptBatchSize: metrics.promptBatchSize,
               ),
+            );
+          case InfernoProgressEvent():
+            // A load's fraction rides the load call, never the stream.
+            if (event.phase == InfernoProgressPhase.prompt &&
+                event.completed != null &&
+                event.total != null) {
+              yield BrokerPromptProgress(
+                completed: event.completed!,
+                total: event.total!,
+              );
+            }
+          case InfernoTokenTimingEvent():
+            yield BrokerTokenTiming(
+              kind: switch (event.kind) {
+                InfernoObservationKind.token => ObservationKind.token,
+                InfernoObservationKind.chunk => ObservationKind.chunk,
+              },
+              firstIndex: event.firstIndex,
+              timesMs: event.timesMs,
             );
           case InfernoGenerationCompleted():
             yield BrokerGenerationCompleted(switch (event.reason) {
