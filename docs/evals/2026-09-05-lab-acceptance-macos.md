@@ -51,3 +51,23 @@ Per-token stamping on llama.cpp and per-chunk stamping on MLX cost nothing a thr
 ## Result
 
 PASS — 12 runs over 7 conversations, 26 `INFERNO_METRICS` lines, 69 s wall time, exit 0.
+
+## Rerun after the review fixes — 2026-09-06
+
+The same instrument on the reworked bench (Stop watchdog, torn-down runs as
+cancelled, timing batches anchored at their first instant, phases gated on
+the observation), twice in a row:
+
+| run | llama.cpp slowdown | MLX slowdown | result |
+| --- | --- | --- | --- |
+| 7 | −0.1 % | 0.0 % | PASS, 12 runs, 66 s |
+| 8 | 1.1 % | 0.4 % | PASS, 12 runs, 69 s |
+
+Every configuration, both engine switches, Stop (20 and 23 tokens kept) and
+Retry (471 and 515 tokens), and the forced failure behaved as on the first
+record. One earlier attempt on the same build (run 6) stalled while waiting
+for the retried run to unlock the bench after the engine had finished it,
+with no failure line, and did not reproduce in the two runs that followed;
+the instrument now describes the bench's state on a timeout so a repeat can
+be attributed.
+
