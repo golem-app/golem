@@ -222,6 +222,9 @@ void main() {
         expect(batch.firstIndex, next);
         for (final time in batch.timesMs) {
           expect(time, greaterThan(last));
+          // The shared invariant the native suites assert: no instant after
+          // the run's own end.
+          expect(time, lessThanOrEqualTo(metrics.elapsedSeconds * 1000 + 1));
           last = time;
         }
         next += batch.timesMs.length;
@@ -229,6 +232,23 @@ void main() {
       expect(next, metrics.tokenCount, reason: 'one instant per token');
       expect(metrics.promptTokenCount, progress.last.total);
       expect(metrics.timeToFirstTokenSeconds, 0.31);
+      // Version-2 relations hold on the invented numbers too.
+      expect(
+        metrics.decodeTokensPerSecond,
+        closeTo(
+          metrics.tokenCount /
+              (metrics.elapsedSeconds - metrics.timeToFirstTokenSeconds!),
+          1e-6,
+        ),
+      );
+      // `generating` marks the first output of any kind, before it.
+      final generatingAt = observed.indexWhere(
+        (e) => e is RunPhaseEvent && e.phase == InferencePhase.generating,
+      );
+      final firstOutputAt = observed.indexWhere(
+        (e) => e is AnswerDelta || e is ReasoningDelta,
+      );
+      expect(generatingAt, lessThan(firstOutputAt));
       // The observed activation is a second one: the first call left the
       // repository resident on gemma, and observing does not re-load a
       // resident configuration.

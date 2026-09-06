@@ -57,7 +57,8 @@ String resolveBackendName({
 ///
 /// Only `qa` and `dev`: production's composition stays a pure build-time fact,
 /// so a device reading that ever answered wrong on a phone can refuse a
-/// shipping build but never quietly simulate one.
+/// shipping build but never quietly simulate one — and the lab, a measurement
+/// bench, must never report simulated numbers under any reading.
 ///
 /// And only a build that named no model configuration at all. An artifact or a
 /// path define is an operator asking for the real path just as much as an
@@ -72,7 +73,7 @@ bool virtualDeviceComposesFake({
   required String modelPathDefine,
 }) =>
     virtualDevice &&
-    identity.internalToolsEnabled &&
+    (identity == AppIdentity.qa || identity == AppIdentity.dev) &&
     artifactDefine.isEmpty &&
     modelPathDefine.isEmpty;
 
@@ -91,7 +92,7 @@ bool useFakeModelManagement({
 }) =>
     simulatedInference &&
     (identity == AppIdentity.qa ||
-        (virtualDevice && identity.internalToolsEnabled));
+        (virtualDevice && identity == AppIdentity.dev));
 
 /// Pure. `auto` is the platform engine's artifact of the device-policy model
 /// (ADR 0012); an operator-supplied `GOLEM_MODEL_PATH` is the separate,

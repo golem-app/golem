@@ -8,10 +8,13 @@ import 'package:golem_flutter/core/domain/models.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:path_provider/path_provider.dart';
 
-/// Golem Model Lab keeps its models in its own container, and its downloader
-/// lands files where its repository verifies them (ADR 0021). The plugin
-/// resolves its base directory itself, so only a real composition on a real
-/// lab build can prove the two halves agree:
+/// Golem Model Lab keeps its models in its own container (ADR 0021). On a
+/// real lab build this proves the composition resolves that container, that
+/// the repository verifies provisioned bytes there, and that nothing touches
+/// the consumer flavors' shared documents directory. The downloader's own
+/// destination is pinned by `artifact_task_metadata_test.dart` — provisioned
+/// files never reach the plugin, since the repository skips a file whose size
+/// already matches:
 ///
 ///   flutter test integration_test/lab_storage_test.dart -d macos \
 ///     --flavor lab --dart-define=GOLEM_LAB_STORAGE=true
@@ -65,7 +68,19 @@ void main() {
       final consumerInstall = Directory(
         '${platformDocuments.path}/${entry.installDirectory}',
       );
-      final consumerHadInstall = consumerInstall.existsSync();
+      // Every file's size and modification time: the lab must not add to,
+      // rewrite or receipt the consumer flavors' copy, present or not.
+      Map<String, (int, DateTime)> consumerListing() =>
+          consumerInstall.existsSync()
+          ? {
+              for (final file
+                  in consumerInstall
+                      .listSync(recursive: true)
+                      .whereType<File>())
+                file.path: (file.lengthSync(), file.lastModifiedSync()),
+            }
+          : const {};
+      final consumerBefore = consumerListing();
 
       final repository = dependencies.modelManagementRepository;
       await repository.load();
@@ -96,7 +111,7 @@ void main() {
       expect(sawVerifying, isTrue, reason: 'the bytes were hashed in place');
       expect(File('$root/.golem-verified.json').existsSync(), isTrue);
       // Nothing reached the consumer flavors' shared documents directory.
-      expect(consumerInstall.existsSync(), consumerHadInstall);
+      expect(consumerListing(), consumerBefore);
       // The plugin's own idea of the destination is the repository's: a second
       // pass finds the receipt and does nothing at all.
       final again = await repository

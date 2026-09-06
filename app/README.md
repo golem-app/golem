@@ -782,19 +782,22 @@ under its support directory and its downloader lands files there too:
 ```
 
 Provision a fetched artifact without a download — hard links from
-`../packages/inferno/build/models/` (`dart run tool/fetch_model.dart` there)
-are instant on the same volume — and the lab's Download verifies it in place:
+`../packages/inferno/build/models/` are instant on the same volume — and the
+lab's Download verifies it in place. Fetch by key first
+(`dart run tool/fetch_model.dart qwen-gguf` in `../packages/inferno`; the tool
+writes every file of an artifact, projector included, under
+`build/models/<repository name>/`), then link:
 
 ```sh
 LAB="$HOME/Library/Application Support/app.golem.lab/Documents/models"
-M=../packages/inferno/build/models
+M=../packages/inferno/build/models/Qwen3.5-4B-qat-GGUF
 mkdir -p "$LAB/qwen35-gguf"
-ln "$M"/Qwen3.5-4B-qat-GGUF/Qwen3.5-4B-qat-Q4_0.gguf "$LAB/qwen35-gguf/"
-ln "$M"/Qwen3.5-4B-MTP-GGUF/Qwen3.5-4B.mmproj-q8_0.gguf "$LAB/qwen35-gguf/"
+ln "$M"/Qwen3.5-4B-qat-Q4_0.gguf "$M"/Qwen3.5-4B.mmproj-q8_0.gguf "$LAB/qwen35-gguf/"
 ```
 
 (`../packages/inferno/lib/src/model_manifest.dart` is the authority on file
-names.) The gated proof that the plugin's destination and the repository's
+names; a projector fetched separately through `qwen-mmproj` lives under its
+own repository name instead.) The gated proof that the plugin's destination and the repository's
 agree runs on a lab build against exactly that layout:
 
 ```sh
@@ -810,6 +813,7 @@ flavored macOS build the tool exits 1 *after* writing it, looking for an
 unflavored product path, and the profile is complete):
 
 ```sh
+rm -rf build/size-macos build/size-android build/size-ios   # never read a stale profile
 flutter build macos --release --flavor production --analyze-size \
   --code-size-directory=build/size-macos
 flutter build apk --release --flavor production --analyze-size \

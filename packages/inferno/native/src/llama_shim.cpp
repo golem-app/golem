@@ -500,9 +500,19 @@ int32_t inferno_engine_load(inferno_engine *engine,
     params.progress_callback_user_data = engine;
     consume_log_error();
     llama_model *loaded = nullptr;
+    // llama never calls the progress callback after the load returns; the
+    // plumbing is per-load and must not outlive it, whichever way the load
+    // ends. The fraction describes the weights: the projector below loads
+    // after it reaches 1.0 and reports nothing.
+    const auto clear_progress = [&] {
+      engine->report_progress = false;
+      engine->progress_callback = nullptr;
+      engine->progress_user_data = nullptr;
+    };
     try {
       loaded = llama_model_load_from_file(path.c_str(), params);
     } catch (const std::exception &error) {
+      clear_progress();
       emit_error(callback,
                  operation_id,
                  "load_failed",
@@ -510,6 +520,7 @@ int32_t inferno_engine_load(inferno_engine *engine,
                  user_data);
       return;
     } catch (...) {
+      clear_progress();
       emit_error(callback,
                  operation_id,
                  "load_failed",
@@ -517,11 +528,7 @@ int32_t inferno_engine_load(inferno_engine *engine,
                  user_data);
       return;
     }
-    // llama never calls the progress callback after the load returns; the
-    // plumbing is per-load and must not outlive it.
-    engine->report_progress = false;
-    engine->progress_callback = nullptr;
-    engine->progress_user_data = nullptr;
+    clear_progress();
     if (engine->cancel_requested.load()) {
       if (loaded != nullptr) llama_model_free(loaded);
       emit_error(callback, operation_id, "cancelled", "Model loading was cancelled.", user_data);
@@ -911,11 +918,12 @@ int32_t inferno_engine_generate(inferno_engine *engine,
     steady_clock::time_point first_token{};
     // Token timing (ABI 6): one instant per sampled token, batched so the
     // channel carries one event per 16 tokens or 100 ms rather than one per
-    // token. Cheaper than the footprint sample above it, which already runs
-    // a mach call per token.
+    // token. The 100 ms window opens at the first instant of a batch, not at
+    // the request — anchored there, the prefill would have exhausted it
+    // before the first token and every batch would flush at once.
     std::vector<double> token_times_ms;
     int32_t token_times_first = 0;
-    auto token_times_flushed_at = request_start;
+    auto token_times_flushed_at = steady_clock::time_point{};
     const auto flush_token_times = [&] {
       if (token_times_ms.empty()) return;
       emit(callback,
@@ -946,8 +954,12 @@ int32_t inferno_engine_generate(inferno_engine *engine,
           break;
         }
         generated++;
+        // One clock read serves the first-token mark and the first instant,
+        // so the two agree by construction.
+        const auto now = steady_clock::now();
+        if (first_token == steady_clock::time_point{}) first_token = now;
         if (observe_token_timing) {
-          const auto now = steady_clock::now();
+          if (token_times_ms.empty()) token_times_flushed_at = now;
           token_times_ms.push_back(seconds_between(request_start, now) * 1000.0);
           if (token_times_ms.size() >= 16 ||
               now - token_times_flushed_at >= std::chrono::milliseconds(100)) {
@@ -956,7 +968,6 @@ int32_t inferno_engine_generate(inferno_engine *engine,
         }
         peak_footprint = std::max(peak_footprint, physical_footprint_bytes());
         const std::string piece = token_piece(vocab, token);
-        if (first_token == steady_clock::time_point{}) first_token = steady_clock::now();
         if (emit_visible_piece(
                 pending, piece, stop_sequences, callback, operation_id, user_data)) {
           stop_reason = "stop_sequence";

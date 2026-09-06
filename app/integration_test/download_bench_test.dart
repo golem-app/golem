@@ -101,7 +101,7 @@ void main() {
       ArtifactFileDownloader buildTransport(String name) {
         if (name == 'current') return BackgroundArtifactDownloader();
         if (name.startsWith('parallel')) {
-          return ParallelArtifactDownloader(
+          return ParallelArtifactDownloader.forCurrentIdentity(
             chunks: int.parse(name.substring('parallel'.length)),
           );
         }

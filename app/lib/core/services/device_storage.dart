@@ -64,17 +64,28 @@ final class DeviceProvenance {
   final int? memoryBytes;
   final String? osVersion;
 
-  /// `nominal`, `fair`, `serious` or `critical`, as the OS reports it.
+  /// `nominal`, `fair`, `serious`, `critical` or `unknown`, as the OS
+  /// reports it.
   final String? thermalState;
 
-  factory DeviceProvenance.fromChannel(Map<Object?, Object?> values) =>
-      DeviceProvenance(
-        model: values['model'] as String?,
-        chip: values['chip'] as String?,
-        memoryBytes: values['memoryBytes'] as int?,
-        osVersion: values['osVersion'] as String?,
-        thermalState: values['thermalState'] as String?,
-      );
+  /// Every field is read by type: a value of another shape is unknown, not
+  /// a cast failure in the middle of a launch.
+  factory DeviceProvenance.fromChannel(Map<Object?, Object?> values) {
+    String? text(String key) => switch (values[key]) {
+      final String value => value,
+      _ => null,
+    };
+    return DeviceProvenance(
+      model: text('model'),
+      chip: text('chip'),
+      memoryBytes: switch (values['memoryBytes']) {
+        final int value => value,
+        _ => null,
+      },
+      osVersion: text('osVersion'),
+      thermalState: text('thermalState'),
+    );
+  }
 }
 
 abstract interface class DeviceProvenanceProbe {

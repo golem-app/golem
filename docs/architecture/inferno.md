@@ -147,12 +147,12 @@ contract, not a gap to paper over:
 
 | Measurement | llama.cpp (Metal) | MLX |
 | --- | --- | --- |
-| Load progress | its own `progress_callback` fraction, forwarded rate-limited (≥ 1 % or ≥ 100 ms) on the load call | none — the library polls nothing while mapping weights; the phase and its elapsed time are all there is |
+| Load progress | its own `progress_callback` fraction, forwarded rate-limited (≥ 1 % or ≥ 100 ms) on the load call; it describes the weights — the multimodal projector loads after it reaches 1.0 and reports nothing, so `loaded` can trail the fraction's end | none — the library polls nothing while mapping weights; the phase and its elapsed time are all there is |
 | Prefill progress | `{"phase":"prompt","completed":n,"total":N}` after each text-prefill batch is **submitted** | none |
 | Prefill rate | on completion only (`promptTokensPerSecond`, measured after `llama_synchronize`) | on completion only |
 | Output count live | one instant per sampled token | one instant per detokenized **chunk**, which the library assembles from one or more tokens; the token count arrives with the summary |
 | Latency series | inter-token latency: `TOKEN_TIMING` batches of `"kind":"token"` | inter-chunk arrival latency: `"kind":"chunk"` — never presented or divided as tokens |
-| Batch | `promptBatchSize` on METRICS, the `n_batch` the prefill used | not reported (null) |
+| Batch | `promptBatchSize` on METRICS, the `n_batch` the prefill used — `min(prompt tokens, 512)`, so a prompt of 512 tokens or fewer prefills in one batch and reports one progress event | not reported (null) |
 | Fresh vs cached prompt tokens | not reported | not reported |
 
 Two honesty rules follow. A submitted prefill batch runs ahead of the
@@ -165,7 +165,9 @@ be derived from them.
 Timing instants are milliseconds since the request was accepted — the same
 t0 the metrics measure from — on the engine's monotonic clock, batched
 (16 observations or 100 ms) into contiguous `TOKEN_TIMING` events whose
-`first` index chains from one batch to the next. On llama.cpp the first
+`first` index chains from one batch to the next. A batch flushes at 16
+instants or 100 ms after its first instant, so the channel carries a few
+events per second at any shipping decode rate. On llama.cpp the first
 instant is the first token, so it agrees with `timeToFirstTokenSeconds` to
 the millisecond; the per-token cost is one clock read beside the
 `task_info` call the peak-footprint sample already makes per token. Timing

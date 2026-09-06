@@ -158,12 +158,19 @@ void main() {
     for (var i = 1; i < fractions.length; i++) {
       expect(fractions[i], greaterThan(fractions[i - 1]));
     }
+    // Long enough to prefill in more than one batch: `n_batch` is
+    // min(prompt, 512), so a chat-sized prompt is one batch and one event,
+    // which would prove nothing about the climb.
+    final longPrompt = List.filled(
+      120,
+      'Count slowly from one to ten, then start again from one.',
+    ).join(' ');
     final observed = await inferno
         .generate(
-          const InfernoGenerationRequest(
-            prompt: 'Count slowly from one to ten',
+          InfernoGenerationRequest(
+            prompt: longPrompt,
             sampling: sampling,
-            observe: InfernoObservation(
+            observe: const InfernoObservation(
               promptProgress: true,
               tokenTiming: true,
             ),
@@ -173,7 +180,8 @@ void main() {
     final metrics = observed.whereType<InfernoMetricsEvent>().single.metrics;
     expectHonestTiming(metrics);
     final progress = observed.whereType<InfernoProgressEvent>().toList();
-    expect(progress, isNotEmpty);
+    expect(progress.length, greaterThan(1), reason: 'more than one batch');
+    expect(metrics.promptBatchSize, 512);
     for (final event in progress) {
       expect(event.phase, InfernoProgressPhase.prompt);
       expect(event.total, metrics.promptTokenCount);

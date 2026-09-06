@@ -885,7 +885,9 @@ public func infernoMlxEngineGenerate(
                 let observeChunkTiming = request.observe?.tokenTiming ?? false
                 var chunkTimesMs: [Double] = []
                 var chunkTimesFirst = 0
-                var chunkTimesFlushedAt = requestStart
+                // The window opens at a batch's first instant, not at the
+                // request: anchored there, the prefill would have spent it.
+                var chunkTimesFlushedAt: ContinuousClock.Instant? = nil
                 func flushChunkTimes() {
                     guard !chunkTimesMs.isEmpty else { return }
                     sink.emitJSON(EventKind.tokenTiming, [
@@ -895,7 +897,7 @@ public func infernoMlxEngineGenerate(
                     ])
                     chunkTimesFirst += chunkTimesMs.count
                     chunkTimesMs.removeAll(keepingCapacity: true)
-                    chunkTimesFlushedAt = .now
+                    chunkTimesFlushedAt = nil
                 }
                 var pending: [UInt8] = []
                 let stopBytes = request.stopSequences.map { Array($0.utf8) }
@@ -914,9 +916,10 @@ public func infernoMlxEngineGenerate(
                         if firstTokenAt == nil { firstTokenAt = arrivedAt }
                         generatedChunkCount += 1
                         if observeChunkTiming {
+                            if chunkTimesMs.isEmpty { chunkTimesFlushedAt = arrivedAt }
                             chunkTimesMs.append(seconds(requestStart.duration(to: arrivedAt)) * 1000)
                             if chunkTimesMs.count >= 16
-                                || arrivedAt - chunkTimesFlushedAt >= .milliseconds(100) {
+                                || arrivedAt - (chunkTimesFlushedAt ?? arrivedAt) >= .milliseconds(100) {
                                 flushChunkTimes()
                             }
                         }

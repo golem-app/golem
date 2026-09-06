@@ -69,3 +69,19 @@ bool artifactTaskMetadataMatches(String metaData, ArtifactFileRef ref) {
     return false;
   }
 }
+
+/// Where a transfer lands, as the plugin's own `(baseDirectory, directory)`
+/// pair: every downloader builds its tasks from this so the destination the
+/// plugin resolves is the one the repository verifies (ADR 0021). `root`
+/// names the plugin base directory; `subdirectory` prefixes the artifact's
+/// own directory under it, empty on the phones and `Documents` for the lab.
+({String base, String directory}) artifactTaskDestination({
+  required ArtifactFileRef ref,
+  required String root,
+  required String subdirectory,
+}) => (
+  base: root,
+  directory: subdirectory.isEmpty
+      ? ref.directory
+      : '$subdirectory/${ref.directory}',
+);

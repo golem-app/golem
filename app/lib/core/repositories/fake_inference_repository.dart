@@ -39,6 +39,11 @@ final class FakeInferenceRepository implements InferenceRepository {
   @override
   ValueListenable<InferenceResidency> get residency => _residency;
 
+  /// The invented clock the observed stream is drawn on: a 310 ms first
+  /// token and one 130 ms stall at the eighth.
+  static const _firstTokenSeconds = 0.31;
+  static const _stallSeconds = 0.13;
+
   static const _reasoning = <String>[
     'I’ll identify the main idea. ',
     'Then I’ll keep the answer concise and useful.',
@@ -132,6 +137,7 @@ final class FakeInferenceRepository implements InferenceRepository {
     if (!_prepared) throw StateError('The simulated runtime is unloaded.');
     final epoch = ++_generationEpoch;
     final observation = observe ?? const GenerationObservation();
+    final observed = observe != null;
     // An observed activation is a phase with a determinate, invented load —
     // the bench's goldens and journeys need every state without weights.
     // Unobserved (chat), residency flips silently as it always did.
@@ -171,9 +177,20 @@ final class FakeInferenceRepository implements InferenceRepository {
         }
       }
     }
+    // `generating` marks the first output of any kind, as the real
+    // repository does — the image ack, a reasoning part or the answer.
+    var sawOutput = false;
+    Stream<InferenceEvent> firstOutput() async* {
+      if (observed && !sawOutput) {
+        sawOutput = true;
+        yield const RunPhaseEvent(InferencePhase.generating);
+      }
+    }
+
     // Deterministic ack so journeys can exercise an image turn offline.
     final attachedImages = last?.images.length ?? 0;
     if (attachedImages > 0) {
+      yield* firstOutput();
       yield AnswerDelta(
         attachedImages == 1
             ? 'I can see the image you attached. '
@@ -181,6 +198,7 @@ final class FakeInferenceRepository implements InferenceRepository {
       );
     }
     if (prompt.contains('[fail]')) {
+      yield* firstOutput();
       if (reasoningEnabled) yield const ReasoningDelta('A partial thought…');
       yield const AnswerDelta('A partial simulated response');
       throw const InferenceException(
@@ -191,6 +209,7 @@ final class FakeInferenceRepository implements InferenceRepository {
     if (prompt.contains('[oom]')) {
       // Metrics land before the failure so the transcript can render the
       // design's "Stopped after N tokens" caption under the partial.
+      yield* firstOutput();
       yield const AnswerDelta('A partial simulated response');
       yield MetricsEvent(
         InferenceMetrics(
@@ -222,6 +241,7 @@ final class FakeInferenceRepository implements InferenceRepository {
           yield const CompletedEvent();
           return;
         }
+        yield* firstOutput();
         yield ReasoningDelta(part);
       }
     }
@@ -229,6 +249,7 @@ final class FakeInferenceRepository implements InferenceRepository {
     // answer text arriving while reasoning still streams would end the
     // reasoning card's live state, and the injections must stay pristine.
     if (systemPrompt != null && systemPrompt.isNotEmpty) {
+      yield* firstOutput();
       yield const AnswerDelta(
         'Simulated note: your custom system prompt is applied.\n\n',
       );
@@ -240,11 +261,9 @@ final class FakeInferenceRepository implements InferenceRepository {
         yield const CompletedEvent();
         return;
       }
-      if (index == 0 && !observation.isEmpty) {
-        yield const RunPhaseEvent(InferencePhase.generating);
-      }
       final before = tokens;
       tokens += part.split(RegExp(r'\s+')).length;
+      yield* firstOutput();
       yield AnswerDelta(
         index == 0 && modelKey != null
             ? 'Simulated ${profile.name} here. $part'
@@ -259,21 +278,37 @@ final class FakeInferenceRepository implements InferenceRepository {
           firstIndex: before,
           timesMs: [
             for (var i = before; i < tokens; i++)
-              310 + i * (1000 / profile.decodeRate) + (i >= 7 ? 130 : 0),
+              _firstTokenSeconds * 1000 +
+                  i * (1000 / profile.decodeRate) +
+                  (i >= 7 ? _stallSeconds * 1000 : 0),
           ],
         );
       }
+      // Observed metrics hold the version-2 relations against the invented
+      // instants: elapsed covers the first token, every token at the profile's
+      // rate and the one stall, and the decode rate is recomputable from it.
+      // Unobserved — chat — they stay exactly what its goldens record.
+      final observedElapsed =
+          _firstTokenSeconds +
+          tokens / profile.decodeRate +
+          (tokens > 7 ? _stallSeconds : 0);
       yield MetricsEvent(
-        InferenceMetrics(
-          promptTokensPerSecond: 144,
-          decodeTokensPerSecond: profile.decodeRate,
-          tokenCount: tokens,
-          elapsedSeconds: tokens / profile.decodeRate,
-          // Measurement-grade fields only when a bench asked: chat's
-          // simulated metrics stay exactly what its goldens record.
-          promptTokenCount: observation.isEmpty ? null : promptTokens,
-          timeToFirstTokenSeconds: observation.isEmpty ? null : 0.31,
-        ),
+        observed
+            ? InferenceMetrics(
+                promptTokensPerSecond: 144,
+                decodeTokensPerSecond:
+                    tokens / (observedElapsed - _firstTokenSeconds),
+                tokenCount: tokens,
+                elapsedSeconds: observedElapsed,
+                promptTokenCount: promptTokens,
+                timeToFirstTokenSeconds: _firstTokenSeconds,
+              )
+            : InferenceMetrics(
+                promptTokensPerSecond: 144,
+                decodeTokensPerSecond: profile.decodeRate,
+                tokenCount: tokens,
+                elapsedSeconds: tokens / profile.decodeRate,
+              ),
       );
     }
     yield const CompletedEvent();

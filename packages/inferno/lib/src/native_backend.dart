@@ -937,17 +937,20 @@ final class NativeInfernoBackend implements InfernoBackend {
           }
           final times = batch['timesMs'];
           final first = batch['first'];
-          if (times is! List<Object?> || first is! num) return;
+          // A batch with a non-numeric instant is dropped whole: shortening
+          // it would desynchronise `first` for every batch after it.
+          if (times is! List<Object?> ||
+              first is! num ||
+              times.any((value) => value is! num)) {
+            return;
+          }
           operation.controller.add(
             InfernoTokenTimingEvent(
               kind: batch['kind'] == 'chunk'
                   ? InfernoObservationKind.chunk
                   : InfernoObservationKind.token,
               firstIndex: first.toInt(),
-              timesMs: [
-                for (final value in times)
-                  if (value is num) value.toDouble(),
-              ],
+              timesMs: [for (final value in times) (value! as num).toDouble()],
             ),
           );
         }

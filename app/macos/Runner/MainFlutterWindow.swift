@@ -45,7 +45,9 @@ class MainFlutterWindow: NSWindow {
     ) as? String
     self.title = displayName?.isEmpty == false ? displayName! : "Golem"
     let profile = WindowProfile.current
-    self.contentMinSize = profile.minimumContentSize
+    self.contentMinSize = Self.clampedMinimumContentSize(
+      of: profile, for: self.screen ?? NSScreen.main
+    )
 
     // Restore the user's last frame when one was saved; otherwise open at
     // the profile's default. setFrameUsingName returns false on first run.
@@ -179,20 +181,32 @@ class MainFlutterWindow: NSWindow {
     return String(cString: buffer)
   }
 
+  /// The profile's floor, never wider or taller than the display can show.
+  private static func clampedMinimumContentSize(
+    of profile: WindowProfile, for screen: NSScreen?
+  ) -> NSSize {
+    let floor = profile.minimumContentSize
+    guard let visible = screen?.visibleFrame else { return floor }
+    return NSSize(
+      width: min(floor.width, visible.width - 40),
+      height: min(floor.height, visible.height - 60)
+    )
+  }
+
   private static func clampedDefaultContentSize(
     of profile: WindowProfile, for screen: NSScreen?
   ) -> NSSize {
     let target = profile.defaultContentSize
     guard let visible = screen?.visibleFrame else { return target }
     // Leave breathing room for the title bar and Dock; scale down uniformly.
-    let scale = min(
-      1,
-      (visible.width - 40) / target.width,
-      (visible.height - 60) / target.height
-    )
+    // The profile's floor yields to the display: a bench on a small screen
+    // opens as large as fits rather than wider than the screen.
+    let room = NSSize(width: visible.width - 40, height: visible.height - 60)
+    let scale = min(1, room.width / target.width, room.height / target.height)
+    let floor = clampedMinimumContentSize(of: profile, for: screen)
     return NSSize(
-      width: max(profile.minimumContentSize.width, target.width * scale),
-      height: max(profile.minimumContentSize.height, target.height * scale)
+      width: max(floor.width, target.width * scale),
+      height: max(floor.height, target.height * scale)
     )
   }
 }
