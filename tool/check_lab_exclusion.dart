@@ -12,8 +12,11 @@
 //     --code-size-directory=build/size-macos
 //   dart run tool/check_lab_exclusion.dart app/build/size-macos [more dirs…]
 //
-// Exit 1 names every lab library found; exit 2 means a directory held no
-// usable profile, which is a misconfigured run rather than a clean one.
+// Exit 1 names every lab library found, across every directory given; exit 2
+// means some directory held no usable profile, which is a misconfigured run
+// rather than a clean one. Clear the directories before building — the build
+// writes into them without emptying them, and a build that failed early
+// leaves the previous profile behind.
 import 'dart:convert';
 import 'dart:io';
 
@@ -25,11 +28,16 @@ void main(List<String> arguments) {
     exitCode = 2;
     return;
   }
-  var failed = false;
+  var leaked = false;
+  var unusable = false;
   for (final directory in arguments) {
-    final profiles = Directory(directory).listSync().whereType<File>().where((
-      file,
-    ) {
+    final dir = Directory(directory);
+    if (!dir.existsSync()) {
+      stderr.writeln('$directory: no such directory');
+      unusable = true;
+      continue;
+    }
+    final profiles = dir.listSync().whereType<File>().where((file) {
       final name = file.uri.pathSegments.last;
       return name.startsWith('snapshot.') && name.endsWith('.json');
     }).toList();
@@ -37,15 +45,33 @@ void main(List<String> arguments) {
       stderr.writeln(
         '$directory: no snapshot.*.json — not a size-analysis run',
       );
-      exitCode = 2;
-      return;
+      unusable = true;
+      continue;
     }
     for (final profile in profiles) {
-      final libraries = _retainedGolemLibraries(profile);
+      final Set<String> libraries;
+      try {
+        libraries = _retainedGolemLibraries(profile);
+      } on Object catch (error) {
+        stderr.writeln(
+          '${profile.path}: not a retained-object profile ($error)',
+        );
+        unusable = true;
+        continue;
+      }
+      // The build writes into an existing directory without clearing it, so
+      // a profile older than the build it claims to describe is a stale one;
+      // the age is printed so a re-run after a failed build is caught by eye.
+      final age = DateTime.now().difference(profile.lastModifiedSync());
+      final written = age.inMinutes < 1
+          ? 'written just now'
+          : 'written ${age.inMinutes} min ago';
       if (libraries.isEmpty) {
-        stderr.writeln('${profile.path}: no golem_flutter library retained');
-        exitCode = 2;
-        return;
+        stderr.writeln(
+          '${profile.path}: no golem_flutter library retained ($written)',
+        );
+        unusable = true;
+        continue;
       }
       final lab = libraries
           .where((uri) => _labMarkers.any(uri.contains))
@@ -53,21 +79,28 @@ void main(List<String> arguments) {
       if (lab.isEmpty) {
         stdout.writeln(
           '${profile.path}: ${libraries.length} golem_flutter libraries '
-          'retained, none from the lab',
+          'retained, none from the lab ($written)',
         );
         continue;
       }
-      failed = true;
+      leaked = true;
       stdout.writeln(
         '${profile.path}: the lab leaked into a store build '
-        '(${lab.length} of ${libraries.length} golem_flutter libraries):',
+        '(${lab.length} of ${libraries.length} golem_flutter libraries, '
+        '$written):',
       );
       for (final uri in lab) {
         stdout.writeln('  $uri');
       }
     }
   }
-  if (failed) exitCode = 1;
+  // A leak outranks a misconfigured directory: every input is still read,
+  // and exit 1 is never downgraded by a later one being unusable.
+  exitCode = leaked
+      ? 1
+      : unusable
+      ? 2
+      : 0;
 }
 
 /// Every distinct `package:golem_flutter/…` URI a Library or Script node in
@@ -83,6 +116,9 @@ Set<String> _retainedGolemLibraries(File profile) {
   final strings = (root['strings'] as List<Object?>).cast<String>();
   final typeIndex = fields.indexOf('type');
   final nameIndex = fields.indexOf('name');
+  if (typeIndex < 0 || nameIndex < 0) {
+    throw const FormatException('node_fields lacks type/name');
+  }
   final width = fields.length;
   final libraries = <String>{};
   for (var offset = 0; offset < nodes.length; offset += width) {
