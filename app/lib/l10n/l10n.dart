@@ -1,3 +1,4 @@
+import '../core/domain/app_preferences.dart';
 import 'package:flutter/widgets.dart';
 
 import 'generated/app_localizations.dart';
@@ -45,3 +46,20 @@ Locale resolveAppLocale(
       .toList(growable: false);
   return basicLocaleListResolution(supportedPreferences, supported);
 }
+
+/// The locale a language preference asks for; null lets the platform choose.
+Locale? localeForLanguage(AppLanguage language) => switch (language) {
+  AppLanguage.system => null,
+  AppLanguage.english => const Locale('en'),
+  AppLanguage.polish => const Locale('pl'),
+  AppLanguage.spanish => const Locale('es'),
+  AppLanguage.brazilianPortuguese => const Locale('pt', 'BR'),
+  AppLanguage.japanese => const Locale('ja'),
+  AppLanguage.indonesian => const Locale('id'),
+  AppLanguage.hindi => const Locale('hi'),
+  AppLanguage.french => const Locale('fr'),
+  AppLanguage.vietnamese => const Locale('vi'),
+  AppLanguage.turkish => const Locale('tr'),
+  AppLanguage.korean => const Locale('ko'),
+  AppLanguage.arabic => const Locale('ar'),
+};

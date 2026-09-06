@@ -1919,21 +1919,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get labNothingArmed => 'Hazır değil · bir model ve bir motor seçin';
 
   @override
-  String get labArtifactVerified => 'Doğrulandı';
-
-  @override
-  String get labArtifactMissing => 'Yapıt eksik';
-
-  @override
-  String get labArtifactDownloading => 'İndiriliyor';
-
-  @override
-  String get labArtifactVerifying => 'Doğrulanıyor';
-
-  @override
-  String get labArtifactFailed => 'İndirme başarısız';
-
-  @override
   String labArtifactMeta(String size, int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2002,12 +1987,6 @@ class AppLocalizationsTr extends AppLocalizations {
       'Sonraki çalıştırmada geçerli olur. Değiştirmek yeni bir sohbet başlatır.';
 
   @override
-  String get labSettingContext => 'Bağlam uzunluğu';
-
-  @override
-  String get labSettingMaxTokens => 'En fazla token';
-
-  @override
   String get labSettingSeed => 'Tohum';
 
   @override
@@ -2069,6 +2048,19 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get labProblemSeed => 'Tohum 0 veya daha büyük bir tam sayı olmalı';
+
+  @override
+  String get labProblemLocked => 'Bir çalıştırma sürüyor; ayarlar kilitli';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds sn';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes dk $seconds sn';
+  }
 
   @override
   String get labDeviceUnknown => 'Cihaz bilinmiyor';

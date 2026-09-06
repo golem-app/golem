@@ -229,7 +229,11 @@ contracts live under `lib/core/`. No feature builds a platform button
 directly: a label is a `GolemButton`, a glyph a `GolemIconButton`, and a
 tappable row or chip a `GolemTappable`, which is the one place the platform tap
 minimum is stated. `test/chrome_boundary_test.dart` enforces that, and the
-sizes it owns are why `features/` holds no hard-coded 44 or 48.
+sizes it owns are why `features/` holds no hard-coded 44 or 48. The one
+exception is the macOS-only bench (ADR 0021): a pointer tier with its own
+controls under `features/lab/widgets/lab_controls.dart` and its own 24 pt
+minimum in `lab_theme.dart`, judged by the guideline sweep under the macOS
+variant — a phone minimum on a desktop bench would be the wrong promise.
 `lib/core/providers/app_providers.dart` holds only what is genuinely shared:
 the launch seams wired by `launchOverrides`, the boot-constant derivations,
 and the session bridges through which one feature's controller offers

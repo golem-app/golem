@@ -1931,21 +1931,6 @@ class AppLocalizationsHi extends AppLocalizations {
   String get labNothingArmed => 'कुछ तैयार नहीं · एक मॉडल और एक इंजन चुनें';
 
   @override
-  String get labArtifactVerified => 'सत्यापित';
-
-  @override
-  String get labArtifactMissing => 'आर्टिफ़ैक्ट मौजूद नहीं';
-
-  @override
-  String get labArtifactDownloading => 'डाउनलोड हो रहा है';
-
-  @override
-  String get labArtifactVerifying => 'सत्यापन हो रहा है';
-
-  @override
-  String get labArtifactFailed => 'डाउनलोड विफल';
-
-  @override
   String labArtifactMeta(String size, int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2014,12 +1999,6 @@ class AppLocalizationsHi extends AppLocalizations {
       'अगले रन पर लागू होंगी। बदलने से नई बातचीत शुरू होती है।';
 
   @override
-  String get labSettingContext => 'कॉन्टेक्स्ट लंबाई';
-
-  @override
-  String get labSettingMaxTokens => 'अधिकतम टोकन';
-
-  @override
   String get labSettingSeed => 'सीड';
 
   @override
@@ -2081,6 +2060,19 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get labProblemSeed => 'सीड 0 या उससे बड़ी पूर्ण संख्या होनी चाहिए';
+
+  @override
+  String get labProblemLocked => 'एक रन चल रहा है; सेटिंग्स लॉक हैं';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds से';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes मि $seconds से';
+  }
 
   @override
   String get labDeviceUnknown => 'डिवाइस अज्ञात';

@@ -1918,21 +1918,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get labNothingArmed => 'Nothing armed · pick a model and an engine';
 
   @override
-  String get labArtifactVerified => 'Verified';
-
-  @override
-  String get labArtifactMissing => 'Artifact missing';
-
-  @override
-  String get labArtifactDownloading => 'Downloading';
-
-  @override
-  String get labArtifactVerifying => 'Verifying';
-
-  @override
-  String get labArtifactFailed => 'Download failed';
-
-  @override
   String labArtifactMeta(String size, int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2001,12 +1986,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Applied to the next run. Changing them starts a new conversation.';
 
   @override
-  String get labSettingContext => 'Context length';
-
-  @override
-  String get labSettingMaxTokens => 'Max tokens';
-
-  @override
   String get labSettingSeed => 'Seed';
 
   @override
@@ -2068,6 +2047,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get labProblemSeed => 'Seed must be a whole number of 0 or more';
+
+  @override
+  String get labProblemLocked => 'A run is in flight; settings are locked';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds s';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes m $seconds s';
+  }
 
   @override
   String get labDeviceUnknown => 'Device unknown';

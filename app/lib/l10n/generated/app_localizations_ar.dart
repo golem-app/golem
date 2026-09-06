@@ -1963,21 +1963,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get labNothingArmed => 'لا شيء مُجهّز · اختر نموذجًا ومحرّكًا';
 
   @override
-  String get labArtifactVerified => 'مُتحقَّق منه';
-
-  @override
-  String get labArtifactMissing => 'الملفات غير موجودة';
-
-  @override
-  String get labArtifactDownloading => 'جارٍ التنزيل';
-
-  @override
-  String get labArtifactVerifying => 'جارٍ التحقق';
-
-  @override
-  String get labArtifactFailed => 'فشل التنزيل';
-
-  @override
   String labArtifactMeta(String size, int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2050,12 +2035,6 @@ class AppLocalizationsAr extends AppLocalizations {
       'تُطبَّق على التشغيل التالي. تغييرها يبدأ محادثة جديدة.';
 
   @override
-  String get labSettingContext => 'طول السياق';
-
-  @override
-  String get labSettingMaxTokens => 'الحد الأقصى للرموز';
-
-  @override
   String get labSettingSeed => 'البذرة';
 
   @override
@@ -2118,6 +2097,19 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get labProblemSeed =>
       'يجب أن تكون البذرة عددًا صحيحًا يساوي 0 أو أكبر';
+
+  @override
+  String get labProblemLocked => 'هناك تشغيل جارٍ؛ الإعدادات مقفلة';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds ث';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes د $seconds ث';
+  }
 
   @override
   String get labDeviceUnknown => 'الجهاز غير معروف';

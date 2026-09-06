@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import '../core/app_identity.dart';
 import '../core/domain/app_preferences.dart';
 import '../core/theme/golem_theme.dart';
+import '../core/providers/app_providers.dart';
+import '../features/lab/application/lab_bench_controller.dart';
 import '../features/lab/lab_shell.dart';
 import '../features/models/application/model_providers.dart';
 import '../features/preferences/application/preferences_providers.dart';
@@ -59,6 +61,12 @@ class _LabAppState extends ConsumerState<LabApp> with WidgetsBindingObserver {
       ],
     );
     WidgetsBinding.instance.addObserver(this);
+    // The bench owns the session the model commands ask about (#88): bound
+    // here, behind kLabBuild, so the first command — the post-frame
+    // reconcile below — builds the bench before it asks.
+    ref
+        .read(chatSessionBridgeProvider)
+        .bindEnsureOwner(() => ref.read(labBenchControllerProvider));
     WidgetsBinding.instance.addPostFrameCallback((_) => _reconcileDownloads());
   }
 
@@ -100,21 +108,43 @@ class _LabAppState extends ConsumerState<LabApp> with WidgetsBindingObserver {
       _preferencesSettled = true;
       widget.onPreferencesSettled?.call();
     }
-    final brightness = switch (preferencesValue.value?.theme ??
-        ThemeSetting.system) {
+    final preferences = preferencesValue.value;
+    final brightness = switch (preferences?.theme ?? ThemeSetting.system) {
       ThemeSetting.system =>
         WidgetsBinding.instance.platformDispatcher.platformBrightness,
       ThemeSetting.light => Brightness.light,
       ThemeSetting.dark => Brightness.dark,
     };
+    // The same three preferences the consumer root honours, from the same
+    // store: the lab has no settings tree to change them, but a container
+    // that carries them is not ignored.
+    final textScale = (preferences?.textScale ?? 1.0).clamp(
+      minTextScale,
+      maxTextScale,
+    );
     return CupertinoApp.router(
       title: widget.identity.displayName,
       debugShowCheckedModeBanner: false,
       routerConfig: _router,
       theme: GolemTheme.theme(brightness),
+      locale: localeForLanguage(preferences?.language ?? AppLanguage.system),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       localeListResolutionCallback: resolveAppLocale,
+      builder: (context, child) {
+        var body = child ?? const SizedBox.shrink();
+        if (textScale != 1.0) {
+          final media = MediaQuery.of(context);
+          final systemFactor = media.textScaler.scale(100) / 100;
+          body = MediaQuery(
+            data: media.copyWith(
+              textScaler: TextScaler.linear(systemFactor * textScale),
+            ),
+            child: body,
+          );
+        }
+        return body;
+      },
     );
   }
 }

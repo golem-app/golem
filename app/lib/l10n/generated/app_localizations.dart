@@ -3219,36 +3219,6 @@ abstract class AppLocalizations {
   /// **'Nothing armed · pick a model and an engine'**
   String get labNothingArmed;
 
-  /// Artifact chip: installed and hash-verified.
-  ///
-  /// In en, this message translates to:
-  /// **'Verified'**
-  String get labArtifactVerified;
-
-  /// Artifact chip: not downloaded.
-  ///
-  /// In en, this message translates to:
-  /// **'Artifact missing'**
-  String get labArtifactMissing;
-
-  /// Artifact chip: transfer in progress.
-  ///
-  /// In en, this message translates to:
-  /// **'Downloading'**
-  String get labArtifactDownloading;
-
-  /// Artifact chip: hashing in progress.
-  ///
-  /// In en, this message translates to:
-  /// **'Verifying'**
-  String get labArtifactVerifying;
-
-  /// Artifact chip: last transfer failed.
-  ///
-  /// In en, this message translates to:
-  /// **'Download failed'**
-  String get labArtifactFailed;
-
   /// Artifact chip detail: size and file count.
   ///
   /// In en, this message translates to:
@@ -3338,18 +3308,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Applied to the next run. Changing them starts a new conversation.'**
   String get labRunSettingsNote;
-
-  /// Run setting label.
-  ///
-  /// In en, this message translates to:
-  /// **'Context length'**
-  String get labSettingContext;
-
-  /// Run setting label.
-  ///
-  /// In en, this message translates to:
-  /// **'Max tokens'**
-  String get labSettingMaxTokens;
 
   /// Run setting label.
   ///
@@ -3452,6 +3410,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Seed must be a whole number of 0 or more'**
   String get labProblemSeed;
+
+  /// Settings refusal: a run is in flight.
+  ///
+  /// In en, this message translates to:
+  /// **'A run is in flight; settings are locked'**
+  String get labProblemLocked;
+
+  /// Elapsed clock under a minute.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds} s'**
+  String labElapsedSeconds(String seconds);
+
+  /// Elapsed clock of a minute or more.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} m {seconds} s'**
+  String labElapsedMinutes(int minutes, String seconds);
 
   /// Device chip when the machine could not be read.
   ///

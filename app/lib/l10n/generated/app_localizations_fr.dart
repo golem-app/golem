@@ -1952,21 +1952,6 @@ class AppLocalizationsFr extends AppLocalizations {
       'Rien d’armé · choisissez un modèle et un moteur';
 
   @override
-  String get labArtifactVerified => 'Vérifié';
-
-  @override
-  String get labArtifactMissing => 'Artefact manquant';
-
-  @override
-  String get labArtifactDownloading => 'Téléchargement';
-
-  @override
-  String get labArtifactVerifying => 'Vérification';
-
-  @override
-  String get labArtifactFailed => 'Échec du téléchargement';
-
-  @override
   String labArtifactMeta(String size, int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2035,12 +2020,6 @@ class AppLocalizationsFr extends AppLocalizations {
       'Appliqués à la prochaine exécution. Les modifier démarre une nouvelle conversation.';
 
   @override
-  String get labSettingContext => 'Longueur de contexte';
-
-  @override
-  String get labSettingMaxTokens => 'Tokens max';
-
-  @override
   String get labSettingSeed => 'Graine';
 
   @override
@@ -2105,6 +2084,20 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get labProblemSeed =>
       'La graine doit être un entier supérieur ou égal à 0';
+
+  @override
+  String get labProblemLocked =>
+      'Une exécution est en cours ; les réglages sont verrouillés';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds s';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes min $seconds s';
+  }
 
   @override
   String get labDeviceUnknown => 'Appareil inconnu';

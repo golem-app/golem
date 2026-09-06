@@ -1956,21 +1956,6 @@ class AppLocalizationsPt extends AppLocalizations {
   String get labNothingArmed => 'Nada armado · escolha um modelo e um motor';
 
   @override
-  String get labArtifactVerified => 'Verificado';
-
-  @override
-  String get labArtifactMissing => 'Artefato ausente';
-
-  @override
-  String get labArtifactDownloading => 'Baixando';
-
-  @override
-  String get labArtifactVerifying => 'Verificando';
-
-  @override
-  String get labArtifactFailed => 'Falha no download';
-
-  @override
   String labArtifactMeta(String size, int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2039,12 +2024,6 @@ class AppLocalizationsPt extends AppLocalizations {
       'Valem para a próxima execução. Alterá-las inicia uma nova conversa.';
 
   @override
-  String get labSettingContext => 'Tamanho do contexto';
-
-  @override
-  String get labSettingMaxTokens => 'Máximo de tokens';
-
-  @override
   String get labSettingSeed => 'Semente';
 
   @override
@@ -2108,6 +2087,20 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get labProblemSeed =>
       'A semente precisa ser um número inteiro de 0 ou mais';
+
+  @override
+  String get labProblemLocked =>
+      'Há uma execução em andamento; as configurações estão bloqueadas';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds s';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes min $seconds s';
+  }
 
   @override
   String get labDeviceUnknown => 'Dispositivo desconhecido';
@@ -4304,21 +4297,6 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get labNothingArmed => 'Nada armado · escolha um modelo e um motor';
 
   @override
-  String get labArtifactVerified => 'Verificado';
-
-  @override
-  String get labArtifactMissing => 'Artefato ausente';
-
-  @override
-  String get labArtifactDownloading => 'Baixando';
-
-  @override
-  String get labArtifactVerifying => 'Verificando';
-
-  @override
-  String get labArtifactFailed => 'Falha no download';
-
-  @override
   String labArtifactMeta(String size, int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -4387,12 +4365,6 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
       'Valem para a próxima execução. Alterá-las inicia uma nova conversa.';
 
   @override
-  String get labSettingContext => 'Tamanho do contexto';
-
-  @override
-  String get labSettingMaxTokens => 'Máximo de tokens';
-
-  @override
   String get labSettingSeed => 'Semente';
 
   @override
@@ -4456,6 +4428,20 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String get labProblemSeed =>
       'A semente precisa ser um número inteiro de 0 ou mais';
+
+  @override
+  String get labProblemLocked =>
+      'Há uma execução em andamento; as configurações estão bloqueadas';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds s';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes min $seconds s';
+  }
 
   @override
   String get labDeviceUnknown => 'Dispositivo desconhecido';

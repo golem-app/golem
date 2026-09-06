@@ -1850,21 +1850,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get labNothingArmed => '未設定 · モデルとエンジンを選んでください';
 
   @override
-  String get labArtifactVerified => '検証済み';
-
-  @override
-  String get labArtifactMissing => 'アーティファクトなし';
-
-  @override
-  String get labArtifactDownloading => 'ダウンロード中';
-
-  @override
-  String get labArtifactVerifying => '検証中';
-
-  @override
-  String get labArtifactFailed => 'ダウンロード失敗';
-
-  @override
   String labArtifactMeta(String size, int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -1931,12 +1916,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get labRunSettingsNote => '次の実行から適用されます。変更すると新しい会話が始まります。';
 
   @override
-  String get labSettingContext => 'コンテキスト長';
-
-  @override
-  String get labSettingMaxTokens => '最大トークン数';
-
-  @override
   String get labSettingSeed => 'シード';
 
   @override
@@ -1996,6 +1975,19 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get labProblemSeed => 'シードは 0 以上の整数にしてください';
+
+  @override
+  String get labProblemLocked => '実行中のため設定はロックされています';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds 秒';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes 分 $seconds 秒';
+  }
 
   @override
   String get labDeviceUnknown => 'デバイス不明';

@@ -1920,21 +1920,6 @@ class AppLocalizationsVi extends AppLocalizations {
       'Chưa sẵn sàng · chọn một mô hình và một engine';
 
   @override
-  String get labArtifactVerified => 'Đã xác minh';
-
-  @override
-  String get labArtifactMissing => 'Thiếu tệp mô hình';
-
-  @override
-  String get labArtifactDownloading => 'Đang tải xuống';
-
-  @override
-  String get labArtifactVerifying => 'Đang xác minh';
-
-  @override
-  String get labArtifactFailed => 'Tải xuống thất bại';
-
-  @override
   String labArtifactMeta(String size, int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2002,12 +1987,6 @@ class AppLocalizationsVi extends AppLocalizations {
       'Áp dụng cho lần chạy tiếp theo. Thay đổi sẽ bắt đầu cuộc trò chuyện mới.';
 
   @override
-  String get labSettingContext => 'Độ dài ngữ cảnh';
-
-  @override
-  String get labSettingMaxTokens => 'Số token tối đa';
-
-  @override
   String get labSettingSeed => 'Seed';
 
   @override
@@ -2069,6 +2048,19 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get labProblemSeed => 'Seed phải là số nguyên từ 0 trở lên';
+
+  @override
+  String get labProblemLocked => 'Đang có lượt chạy; cài đặt đã bị khóa';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds giây';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes phút $seconds giây';
+  }
 
   @override
   String get labDeviceUnknown => 'Thiết bị không xác định';

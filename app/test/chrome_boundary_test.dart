@@ -46,7 +46,10 @@ void main() {
   test('no feature hard-codes a tap target', () {
     final offenders = <String>[];
     // 44 on cupertino, 48 on android: written as a literal, one of the two is
-    // always wrong. `GolemChrome.current.minimumTapTarget` is the only source.
+    // always wrong. `GolemChrome.current.minimumTapTarget` is the only source
+    // for the phone chrome; the macOS-only bench states its own 24 pt pointer
+    // minimum in `features/lab/lab_theme.dart` (ADR 0021), which this scan
+    // does not mistake for a phone literal.
     final literal = RegExp(
       r'(Size\.square|Size\.fromHeight|minimumHeight:)\s*\(?\s*(44|48)\b',
     );

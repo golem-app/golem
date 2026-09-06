@@ -1951,21 +1951,6 @@ class AppLocalizationsPl extends AppLocalizations {
   String get labNothingArmed => 'Nic nie uzbrojono · wybierz model i silnik';
 
   @override
-  String get labArtifactVerified => 'Zweryfikowany';
-
-  @override
-  String get labArtifactMissing => 'Brak artefaktu';
-
-  @override
-  String get labArtifactDownloading => 'Pobieranie';
-
-  @override
-  String get labArtifactVerifying => 'Weryfikacja';
-
-  @override
-  String get labArtifactFailed => 'Pobieranie nie powiodło się';
-
-  @override
   String labArtifactMeta(String size, int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2037,12 +2022,6 @@ class AppLocalizationsPl extends AppLocalizations {
       'Obowiązują od następnego uruchomienia. Zmiana rozpoczyna nową rozmowę.';
 
   @override
-  String get labSettingContext => 'Długość kontekstu';
-
-  @override
-  String get labSettingMaxTokens => 'Maks. tokenów';
-
-  @override
   String get labSettingSeed => 'Ziarno';
 
   @override
@@ -2108,6 +2087,19 @@ class AppLocalizationsPl extends AppLocalizations {
   @override
   String get labProblemSeed =>
       'Ziarno musi być liczbą całkowitą nie mniejszą niż 0';
+
+  @override
+  String get labProblemLocked => 'Trwa uruchomienie; ustawienia są zablokowane';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds s';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes min $seconds s';
+  }
 
   @override
   String get labDeviceUnknown => 'Nieznane urządzenie';

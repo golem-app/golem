@@ -1918,21 +1918,6 @@ class AppLocalizationsId extends AppLocalizations {
       'Belum ada yang disiapkan · pilih model dan mesin';
 
   @override
-  String get labArtifactVerified => 'Terverifikasi';
-
-  @override
-  String get labArtifactMissing => 'Artefak tidak ada';
-
-  @override
-  String get labArtifactDownloading => 'Mengunduh';
-
-  @override
-  String get labArtifactVerifying => 'Memverifikasi';
-
-  @override
-  String get labArtifactFailed => 'Unduhan gagal';
-
-  @override
   String labArtifactMeta(String size, int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2000,12 +1985,6 @@ class AppLocalizationsId extends AppLocalizations {
       'Berlaku untuk eksekusi berikutnya. Mengubahnya memulai percakapan baru.';
 
   @override
-  String get labSettingContext => 'Panjang konteks';
-
-  @override
-  String get labSettingMaxTokens => 'Token maksimum';
-
-  @override
   String get labSettingSeed => 'Seed';
 
   @override
@@ -2067,6 +2046,20 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get labProblemSeed => 'Seed harus bilangan bulat 0 atau lebih';
+
+  @override
+  String get labProblemLocked =>
+      'Eksekusi sedang berjalan; pengaturan terkunci';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds dtk';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes mnt $seconds dtk';
+  }
 
   @override
   String get labDeviceUnknown => 'Perangkat tidak diketahui';

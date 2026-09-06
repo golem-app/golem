@@ -1950,21 +1950,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get labNothingArmed => 'Nada armado · elige un modelo y un motor';
 
   @override
-  String get labArtifactVerified => 'Verificado';
-
-  @override
-  String get labArtifactMissing => 'Falta el artefacto';
-
-  @override
-  String get labArtifactDownloading => 'Descargando';
-
-  @override
-  String get labArtifactVerifying => 'Verificando';
-
-  @override
-  String get labArtifactFailed => 'La descarga falló';
-
-  @override
   String labArtifactMeta(String size, int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2033,12 +2018,6 @@ class AppLocalizationsEs extends AppLocalizations {
       'Se aplican a la próxima ejecución. Cambiarlos inicia una conversación nueva.';
 
   @override
-  String get labSettingContext => 'Longitud de contexto';
-
-  @override
-  String get labSettingMaxTokens => 'Tokens máximos';
-
-  @override
   String get labSettingSeed => 'Semilla';
 
   @override
@@ -2102,6 +2081,20 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get labProblemSeed =>
       'La semilla debe ser un número entero de 0 o más';
+
+  @override
+  String get labProblemLocked =>
+      'Hay una ejecución en curso; los ajustes están bloqueados';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds s';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes min $seconds s';
+  }
 
   @override
   String get labDeviceUnknown => 'Dispositivo desconocido';

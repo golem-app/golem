@@ -61,6 +61,8 @@ void main() {
 
   final metrics = <String>[];
   late void Function(String?, {int? wrapWidth}) host;
+  // Set once the bench is up: what a timeout has to say about it.
+  String Function() describeBench = () => 'bench not up';
 
   Future<void> pumpUntil(
     WidgetTester tester,
@@ -71,7 +73,7 @@ void main() {
     final deadline = DateTime.now().add(timeout);
     do {
       if (DateTime.now().isAfter(deadline)) {
-        fail('Timed out waiting for $description');
+        fail('Timed out waiting for $description: ${describeBench()}');
       }
       await tester.pump(const Duration(milliseconds: 100));
     } while (!predicate());
@@ -115,6 +117,12 @@ void main() {
       );
 
       LabBenchState state() => providers.read(labBenchControllerProvider);
+      describeBench = () {
+        final s = state();
+        return 'locked=${s.locked} armed=${s.armed?.key} '
+            'runs=${[for (final c in s.session.conversations)
+              for (final r in c.runs) '${r.id}:${r.phase.name}'].join(',')}';
+      };
 
       // Provisioned bytes verified in place through the lab's own store,
       // offline: the path a user's Download takes, minus the network.

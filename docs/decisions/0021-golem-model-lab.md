@@ -215,6 +215,34 @@ decode slowdown of five percent or more blocks acceptance. The first record
 is `docs/evals/2026-09-05-lab-acceptance-macos.md`: every configuration
 passed, 1.4 % on llama.cpp and −0.2 % on MLX.
 
+#### Lifecycle, deliberately narrower than the phone's
+
+The handbook's rule that multi-gigabyte weights must not stay resident while
+backgrounded is a phone rule: the background ceiling kills the process. The
+lab root handles `detached` (a synchronous engine release, #124) and
+`resumed` (a download reconcile) and nothing else — no release on `paused`
+and none on memory pressure. A bench keeps its resident model between runs
+by design, macOS has no jetsam ceiling, and a release on every window switch
+would make every next run a cold one. The bench does terminate a run whose
+stream ended without its completion event as *cancelled*, never completed,
+so a teardown mid-run cannot read as a measurement.
+
+#### The session bridge, bound by the bench
+
+Model commands ask one question of the session — is a generation in flight
+— through `ChatSessionBridge`. The lab binds it to the bench's lock, and the
+lab root binds the ensure-owner hook to the bench controller, so the first
+command a launch dispatches builds the bench before it asks. The bridge's
+other fact, the active conversation's model key, is not one the bench can
+answer honestly through a fabricated chat state; it stays null, and the
+commands that read it (engine target resolution for Load/Unload) are ones
+the bench does not expose. #59's history and comparison will want a port
+split into the two facts rather than a chat state, which is recorded there.
+
+Stop waits for the engine's own end of stream, which is the honest
+terminator; an engine that never sends it would otherwise hold the whole
+bench locked, so a ten-second watchdog ends the run as cancelled.
+
 ## Consequences
 
 - Four identities. Every exhaustive switch over `AppIdentity` names the lab;

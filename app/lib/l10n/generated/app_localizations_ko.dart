@@ -1860,21 +1860,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get labNothingArmed => '준비되지 않음 · 모델과 엔진을 선택하세요';
 
   @override
-  String get labArtifactVerified => '검증됨';
-
-  @override
-  String get labArtifactMissing => '아티팩트 없음';
-
-  @override
-  String get labArtifactDownloading => '다운로드 중';
-
-  @override
-  String get labArtifactVerifying => '검증 중';
-
-  @override
-  String get labArtifactFailed => '다운로드 실패';
-
-  @override
   String labArtifactMeta(String size, int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -1941,12 +1926,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get labRunSettingsNote => '다음 실행부터 적용됩니다. 변경하면 새 대화가 시작됩니다.';
 
   @override
-  String get labSettingContext => '컨텍스트 길이';
-
-  @override
-  String get labSettingMaxTokens => '최대 토큰';
-
-  @override
   String get labSettingSeed => '시드';
 
   @override
@@ -2006,6 +1985,19 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get labProblemSeed => '시드는 0 이상의 정수여야 합니다';
+
+  @override
+  String get labProblemLocked => '실행 중이므로 설정이 잠겨 있습니다';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds초';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes분 $seconds초';
+  }
 
   @override
   String get labDeviceUnknown => '기기 알 수 없음';
