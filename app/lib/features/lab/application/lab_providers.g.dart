@@ -61,6 +61,61 @@ final class LabConfigurationListProvider
 String _$labConfigurationListHash() =>
     r'72db0d41932f44fe2cae0672973551c641ff78a1';
 
+/// The families the sidebar and the Rig list, grouped once per catalog
+/// rather than on every rebuild.
+
+@ProviderFor(labModelFamilies)
+final labModelFamiliesProvider = LabModelFamiliesProvider._();
+
+/// The families the sidebar and the Rig list, grouped once per catalog
+/// rather than on every rebuild.
+
+final class LabModelFamiliesProvider
+    extends
+        $FunctionalProvider<
+          List<LabModelFamily>,
+          List<LabModelFamily>,
+          List<LabModelFamily>
+        >
+    with $Provider<List<LabModelFamily>> {
+  /// The families the sidebar and the Rig list, grouped once per catalog
+  /// rather than on every rebuild.
+  LabModelFamiliesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: noRetry,
+        name: r'labModelFamiliesProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$labModelFamiliesHash();
+
+  @$internal
+  @override
+  $ProviderElement<List<LabModelFamily>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  List<LabModelFamily> create(Ref ref) {
+    return labModelFamilies(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<LabModelFamily> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<LabModelFamily>>(value),
+    );
+  }
+}
+
+String _$labModelFamiliesHash() => r'c8f91518fdb49b63976ca3cffc98780f1b22b1c6';
+
 @ProviderFor(labProbes)
 final labProbesProvider = LabProbesProvider._();
 

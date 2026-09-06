@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show listEquals, setEquals;
 
 import '../../../core/theme/golem_theme.dart';
 import '../domain/latency_series.dart';
@@ -91,8 +92,8 @@ class _SparklinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_SparklinePainter old) =>
-      old.gaps != gaps ||
-      old.stalls != stalls ||
+      !listEquals(old.gaps, gaps) ||
+      !setEquals(old.stalls, stalls) ||
       old.accent != accent ||
       old.stall != stall;
 }

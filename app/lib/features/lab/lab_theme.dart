@@ -63,15 +63,6 @@ abstract final class LabText {
     height: 1.2,
     letterSpacing: 0.84,
   );
-
-  /// The comparison hero figure.
-  static const hero = TextStyle(
-    fontSize: 26,
-    fontWeight: FontWeight.w700,
-    height: 1.15,
-    letterSpacing: -0.52,
-    fontFeatures: _tabular,
-  );
 }
 
 /// Desktop spacing: the same 4pt scale, at the tighter steps the bench uses.
@@ -102,9 +93,6 @@ abstract final class LabSize {
   /// target: macOS's own controls sit between 22 and 28 pt, and the guideline
   /// sweep judges the bench at this size under the macOS variant.
   static const double tapMinimum = 24;
-
-  static const double windowMinWidth = 1000;
-  static const double windowMinHeight = 640;
 }
 
 abstract final class LabRadius {
@@ -135,10 +123,6 @@ abstract final class LabColors {
   static const textOnAccent = CupertinoDynamicColor.withBrightness(
     color: Color(0xFFFFFFFF),
     darkColor: Color(0xFF0B1425),
-  );
-  static const segmentLoad = CupertinoDynamicColor.withBrightness(
-    color: Color(0xFFC6CAD2),
-    darkColor: Color(0xFF3B4B6E),
   );
 }
 

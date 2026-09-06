@@ -2,11 +2,13 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/domain/model_catalog.dart';
+import '../../../core/providers/app_providers.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/theme/golem_theme.dart';
 import '../../../l10n/l10n.dart';
 import '../../../l10n/presentation_messages.dart';
 import '../../models/application/model_providers.dart';
+import '../../models/artifact_transfer.dart';
 import '../../models/model_download_consent.dart';
 import '../application/lab_bench_controller.dart';
 import '../application/lab_contract.dart';
@@ -27,10 +29,12 @@ class RigBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
-    final bench = ref.watch(labBenchControllerProvider);
-    final armed = bench.armed;
-    final locked = bench.locked;
-    final families = labModelFamilies(ref.watch(labConfigurationListProvider));
+    // Selected: the bench state is reassigned every publish, and neither
+    // the armed configuration nor the lock can move while a run flies.
+    final (armed, locked) = ref.watch(
+      labBenchControllerProvider.select((s) => (s.armed, s.locked)),
+    );
+    final families = ref.watch(labModelFamiliesProvider);
     final groups = <Widget>[
       if (locked) ...[
         Container(
@@ -139,7 +143,12 @@ class RigBar extends ConsumerWidget {
         )
       else
         _ArtifactChip(configuration: armed, locked: locked),
-      _ContractChip(onOpenSettings: locked ? null : onOpenSettings),
+      // Settings take a profile to validate against: nothing armed, nothing
+      // to edit — a draft with no defaults could commit a value no model
+      // takes and leave Run silently refused.
+      _ContractChip(
+        onOpenSettings: locked || armed == null ? null : onOpenSettings,
+      ),
     ];
     // A Wrap, not a Row: every group truncates to the window's width on its
     // own and the Rig grows a line rather than overflowing when the window
@@ -258,36 +267,54 @@ class _ArtifactChip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
-    final status = ref
-        .watch(modelControllerProvider)
-        .value
-        ?.statusOf(configuration.key);
-    final phase = status?.phase ?? ArtifactPhase.notDownloaded;
     final entry = configuration.entry;
-    final simulated =
-        ref.watch(modelControllerProvider).value?.simulated ?? false;
+    final models = ref.watch(modelControllerProvider).value;
+    final status =
+        models?.statusOf(configuration.key) ?? const ArtifactStatus();
+    final simulated = models?.simulated ?? false;
     final controller = ref.read(modelControllerProvider.notifier);
-    final verified = phase == ArtifactPhase.installed;
-    final inFlight =
-        phase == ArtifactPhase.downloading || phase == ArtifactPhase.verifying;
-    final meta = inFlight
-        ? l10n.percentValue(
-            entry.totalBytes == 0
-                ? 0
-                : ((status!.progressBytes / entry.totalBytes) * 100).round(),
+    // The shared projection every transfer surface renders from (#131): the
+    // phase's own counter, and an affordance that already knows the single
+    // transfer slot, the device refusal and the repository's answer — so a
+    // Download here is never a dead tap.
+    final transfer = artifactTransfer(
+      entry: entry,
+      status: status,
+      localizations: l10n,
+      simulated: simulated,
+      deviceRefusal: ref.watch(deviceRefusalProvider),
+      downloadable: ref
+          .watch(downloadableModelKeysProvider)
+          .contains(entry.key),
+      transferringKey: models?.artifacts.entries
+          .where(
+            (e) =>
+                e.value.phase == ArtifactPhase.downloading ||
+                e.value.phase == ArtifactPhase.verifying,
           )
+          .map((e) => e.key)
+          .firstOrNull,
+    );
+    final affordance = transfer.affordance;
+    final verified = affordance == null;
+    final inFlight = affordance is TransferInFlight;
+    final blocked = affordance is TransferOffer && !affordance.enabled;
+    final caution = !verified && !inFlight;
+    final meta = inFlight
+        ? l10n.percentValue(transfer.percent)
+        : blocked && affordance.note != null
+        ? affordance.note!
         : l10n.labArtifactMeta(
             LabFormat.bytes(entry.totalBytes),
             entry.files.length,
           );
-    final caution = !verified && !inFlight;
     return Row(
       key: const Key('lab-artifact-chip'),
       mainAxisSize: MainAxisSize.min,
       children: [
         Flexible(
           child: LabChip(
-            lead: labArtifactPhaseLabel(l10n, phase),
+            lead: transfer.chip,
             text: meta,
             dotColor: verified ? context.accent : null,
             icon: caution ? CupertinoIcons.exclamationmark_triangle_fill : null,
@@ -302,42 +329,8 @@ class _ArtifactChip extends ConsumerWidget {
         ),
         if (!locked) ...[
           const SizedBox(width: LabSpace.s2),
-          switch (phase) {
-            ArtifactPhase.notDownloaded => LabButton(
-              key: const Key('lab-artifact-download'),
-              label: l10n.download,
-              style: LabButtonStyle.filled,
-              height: LabSize.tapMinimum,
-              onPressed: () async {
-                final approved = await confirmModelDownload(
-                  context: context,
-                  entry: entry,
-                  simulated: simulated,
-                );
-                if (approved) await controller.download(entry.key);
-              },
-            ),
-            ArtifactPhase.downloading => LabButton(
-              key: const Key('lab-artifact-pause'),
-              label: l10n.pause,
-              height: LabSize.tapMinimum,
-              onPressed: () => controller.pause(entry.key),
-            ),
-            ArtifactPhase.paused => LabButton(
-              key: const Key('lab-artifact-resume'),
-              label: l10n.resume,
-              style: LabButtonStyle.filled,
-              height: LabSize.tapMinimum,
-              onPressed: () => controller.download(entry.key),
-            ),
-            ArtifactPhase.failed => LabButton(
-              key: const Key('lab-artifact-retry'),
-              label: l10n.retry,
-              style: LabButtonStyle.filled,
-              height: LabSize.tapMinimum,
-              onPressed: () => controller.download(entry.key),
-            ),
-            ArtifactPhase.installed => LabButton(
+          switch (affordance) {
+            null => LabButton(
               key: const Key('lab-artifact-delete'),
               label: l10n.delete,
               style: LabButtonStyle.quiet,
@@ -345,7 +338,38 @@ class _ArtifactChip extends ConsumerWidget {
               height: LabSize.tapMinimum,
               onPressed: () => controller.delete(entry.key),
             ),
-            ArtifactPhase.verifying => const SizedBox.shrink(),
+            TransferInFlight(:final pausable) => LabButton(
+              key: const Key('lab-artifact-pause'),
+              label: l10n.pause,
+              height: LabSize.tapMinimum,
+              onPressed: pausable ? () => controller.pause(entry.key) : null,
+            ),
+            TransferOffer(:final action, :final enabled) => LabButton(
+              key: Key(switch (action) {
+                TransferAction.start => 'lab-artifact-download',
+                TransferAction.resume => 'lab-artifact-resume',
+                TransferAction.retry => 'lab-artifact-retry',
+              }),
+              label: switch (action) {
+                TransferAction.start => l10n.download,
+                TransferAction.resume => l10n.resume,
+                TransferAction.retry => l10n.retry,
+              },
+              style: LabButtonStyle.filled,
+              height: LabSize.tapMinimum,
+              onPressed: !enabled
+                  ? null
+                  : () async {
+                      final approved =
+                          action != TransferAction.start ||
+                          await confirmModelDownload(
+                            context: context,
+                            entry: entry,
+                            simulated: simulated,
+                          );
+                      if (approved) await controller.download(entry.key);
+                    },
+            ),
           },
         ],
       ],
@@ -363,27 +387,38 @@ class _ContractChip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
-    final bench = ref.watch(labBenchControllerProvider);
-    final contract = ref.watch(labContractProvider);
+    final (reasoning, lastBatch) = ref.watch(
+      labBenchControllerProvider.select(
+        (s) => (
+          s.settings.reasoningEnabled,
+          // The batch a run measured: the engine's, reported on completion,
+          // so the chip says what the last run on this rig actually used.
+          s.session.active?.runs.reversed
+              .map((run) => run.metrics?.promptBatchSize)
+              .nonNulls
+              .firstOrNull,
+        ),
+      ),
+    );
+    final sampling = ref.watch(labContractProvider);
     final parts = <String>[];
-    if (contract != null) {
-      final sampling = contract.sampling;
+    if (sampling != null) {
       parts.add(l10n.labContractContext(sampling.contextLength ?? 0));
       parts.add(l10n.labContractMax(sampling.maxTokens));
       parts.add(l10n.labContractTemperature(sampling.temperature.toString()));
       parts.add(l10n.labContractTopP(sampling.topP.toString()));
       if (sampling.topK case final k?) parts.add(l10n.labContractTopK(k));
-      parts.add(
-        bench.settings.reasoningEnabled
-            ? l10n.labReasoningOn
-            : l10n.labReasoningOff,
-      );
+      parts.add(reasoning ? l10n.labReasoningOn : l10n.labReasoningOff);
       parts.add(
         sampling.seed == null
             ? l10n.labContractSeedFree
             : l10n.labContractSeed(sampling.seed!),
       );
-      parts.add(l10n.labContractBatch(l10n.labNotReported));
+      parts.add(
+        l10n.labContractBatch(
+          lastBatch == null ? l10n.labNotReported : lastBatch.toString(),
+        ),
+      );
     }
     final text = parts.isEmpty ? l10n.labContractNone : parts.join(' · ');
     return LabFocusable(
@@ -398,7 +433,7 @@ class _ContractChip extends ConsumerWidget {
             ? CupertinoIcons.lock_fill
             : CupertinoIcons.slider_horizontal_3,
         text: text,
-        textColor: contract == null ? context.mutedInk : context.ink,
+        textColor: sampling == null ? context.mutedInk : context.ink,
         ellipsize: true,
       ),
     );

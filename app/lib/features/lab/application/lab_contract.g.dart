@@ -8,13 +8,34 @@ part of 'lab_contract.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// The contract the next run will carry: the broker's effective sampling for
+/// the armed profile under the current settings, exactly as `send` computes
+/// it. Null while nothing is armed. Recomputed only when its inputs move —
+/// the bench state is reassigned every publish, and a run cannot change
+/// either input while it flies.
 
 @ProviderFor(labContract)
 final labContractProvider = LabContractProvider._();
 
+/// The contract the next run will carry: the broker's effective sampling for
+/// the armed profile under the current settings, exactly as `send` computes
+/// it. Null while nothing is armed. Recomputed only when its inputs move —
+/// the bench state is reassigned every publish, and a run cannot change
+/// either input while it flies.
+
 final class LabContractProvider
-    extends $FunctionalProvider<LabContract?, LabContract?, LabContract?>
-    with $Provider<LabContract?> {
+    extends
+        $FunctionalProvider<
+          BrokerSamplingParameters?,
+          BrokerSamplingParameters?,
+          BrokerSamplingParameters?
+        >
+    with $Provider<BrokerSamplingParameters?> {
+  /// The contract the next run will carry: the broker's effective sampling for
+  /// the armed profile under the current settings, exactly as `send` computes
+  /// it. Null while nothing is armed. Recomputed only when its inputs move —
+  /// the bench state is reassigned every publish, and a run cannot change
+  /// either input while it flies.
   LabContractProvider._()
     : super(
         from: null,
@@ -31,21 +52,22 @@ final class LabContractProvider
 
   @$internal
   @override
-  $ProviderElement<LabContract?> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
+  $ProviderElement<BrokerSamplingParameters?> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
 
   @override
-  LabContract? create(Ref ref) {
+  BrokerSamplingParameters? create(Ref ref) {
     return labContract(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(LabContract? value) {
+  Override overrideWithValue(BrokerSamplingParameters? value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<LabContract?>(value),
+      providerOverride: $SyncValueProvider<BrokerSamplingParameters?>(value),
     );
   }
 }
 
-String _$labContractHash() => r'718e0bee85717e9814d98145b6f849edb1dbc7c8';
+String _$labContractHash() => r'ced13c36dbc852357eda75aaeb9bf163594227a4';

@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../broker/effective_sampling.dart';
@@ -10,31 +11,21 @@ part 'lab_contract.g.dart';
 
 /// The contract the next run will carry: the broker's effective sampling for
 /// the armed profile under the current settings, exactly as `send` computes
-/// it. Null while nothing is armed.
-final class LabContract {
-  const LabContract({required this.sampling, required this.pinned});
-
-  final BrokerSamplingParameters sampling;
-
-  /// Whether the profile pins the sampling fields in this mode, in which
-  /// case the settings sheet shows them as the profile's, not the user's.
-  final bool pinned;
-}
-
+/// it. Null while nothing is armed. Recomputed only when its inputs move —
+/// the bench state is reassigned every publish, and a run cannot change
+/// either input while it flies.
 @Riverpod(keepAlive: true, retry: noRetry)
-LabContract? labContract(Ref ref) {
-  final bench = ref.watch(labBenchControllerProvider);
-  final armed = bench.armed;
+BrokerSamplingParameters? labContract(Ref ref) {
+  final (armed, settings) = ref.watch(
+    labBenchControllerProvider.select((s) => (s.armed, s.settings)),
+  );
   if (armed == null) return null;
   final profile = modelProfiles[armed.profileKey]!;
-  final defaults = profile.sampling(
-    reasoningEnabled: bench.settings.reasoningEnabled,
-  );
   final (sampling, _) = effectiveSampling(
     profile: profile,
-    defaults: defaults,
-    overrides: bench.settings.toOverrides(),
-    seed: bench.settings.seed,
+    defaults: profile.sampling(reasoningEnabled: settings.reasoningEnabled),
+    overrides: settings.toOverrides(),
+    seed: settings.seed,
   );
-  return LabContract(sampling: sampling, pinned: defaults.pinned);
+  return sampling;
 }

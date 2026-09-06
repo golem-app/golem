@@ -14,6 +14,12 @@ part 'lab_providers.g.dart';
 List<LabConfiguration> labConfigurationList(Ref ref) =>
     labConfigurations(ref.watch(modelCatalogEntriesProvider));
 
+/// The families the sidebar and the Rig list, grouped once per catalog
+/// rather than on every rebuild.
+@Riverpod(keepAlive: true, retry: noRetry)
+List<LabModelFamily> labModelFamilies(Ref ref) =>
+    labModelFamiliesOf(ref.watch(labConfigurationListProvider));
+
 /// The readings the bench takes off the machine, behind one seam so tests
 /// substitute both without a platform channel.
 final class LabProbes {

@@ -92,7 +92,7 @@ class _RunSettingsSheetState extends ConsumerState<_RunSettingsSheet> {
           const SizedBox(height: LabSpace.s7),
           _Stepper(
             name: 'context',
-            label: l10n.labSettingContext,
+            label: l10n.contextLength,
             value: _draft.contextLength,
             fallback: defaults?.contextLength,
             step: 512,
@@ -102,7 +102,7 @@ class _RunSettingsSheetState extends ConsumerState<_RunSettingsSheet> {
           ),
           _Stepper(
             name: 'max-tokens',
-            label: l10n.labSettingMaxTokens,
+            label: l10n.maxTokens,
             value: _draft.maxTokens,
             fallback: defaults?.maxTokens,
             step: 128,
@@ -258,7 +258,9 @@ class _Stepper<T extends num> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final shown = value ?? fallback;
+    // A pinned field shows the profile's value: the user's own is not what
+    // will be sent, and the contract chip already says so.
+    final shown = pinned ? fallback : value ?? fallback;
     final text = shown == null
         ? '—'
         : decimals == 0

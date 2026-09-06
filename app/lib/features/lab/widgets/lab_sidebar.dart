@@ -6,7 +6,9 @@ import '../../../core/app_identity.dart';
 import '../../../core/app_version.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/golem_theme.dart';
+import '../../../core/widgets/section_header.dart';
 import '../../../l10n/l10n.dart';
+import '../../../l10n/presentation_messages.dart';
 import '../application/lab_bench_controller.dart';
 import '../application/lab_providers.dart';
 import '../domain/lab_configuration.dart';
@@ -22,15 +24,18 @@ class LabSidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
-    final locale = Localizations.localeOf(context);
-    final bench = ref.watch(labBenchControllerProvider);
-    final families = labModelFamilies(ref.watch(labConfigurationListProvider));
+    final (armed, locked, runCount) = ref.watch(
+      labBenchControllerProvider.select(
+        (s) => (s.armed, s.locked, s.session.runCount),
+      ),
+    );
+    final families = ref.watch(labModelFamiliesProvider);
     final resident = ref.watch(residentModelKeyProvider);
+    final residentConfiguration = families
+        .expand((f) => f.configurations)
+        .where((c) => c.key == resident)
+        .firstOrNull;
     final device = ref.watch(labDeviceProvenanceProvider).value;
-    final overline = localizedLabelStyle(
-      LabText.overline,
-      locale,
-    ).copyWith(color: context.mutedInk);
     return Container(
       key: const Key('lab-sidebar'),
       width: LabSize.sidebar,
@@ -127,20 +132,23 @@ class LabSidebar extends ConsumerWidget {
               LabSpace.s3,
               LabSpace.s2,
             ),
-            child: Semantics(
-              header: true,
-              child: Text(
-                localizedUppercase(l10n.labLibrary, locale),
-                style: overline,
-              ),
-            ),
+            child: SectionHeader(l10n.labLibrary, style: LabText.overline),
           ),
           for (final family in families)
             _FamilyRow(
               family: family,
-              armed: bench.armed,
-              resident: family.configurations.any((c) => c.key == resident),
-              locked: bench.locked,
+              armed: armed,
+              // Resident on the engine a click here would arm — the family's
+              // other engine being resident is a cold load, not a warm one.
+              resident:
+                  residentConfiguration != null &&
+                  family
+                          .on(
+                            armed?.engine ?? family.configurations.first.engine,
+                          )
+                          ?.key ==
+                      residentConfiguration.key,
+              locked: locked,
             ),
           const Spacer(),
           Container(
@@ -154,18 +162,14 @@ class LabSidebar extends ConsumerWidget {
                 _PinRow(label: 'MLX', value: mlxSwiftVersion),
                 _PinRow(
                   label: l10n.labResidentLabel,
-                  value: resident == null
-                      ? l10n.labResidentNone
-                      : (families
-                                .expand((f) => f.configurations)
-                                .where((c) => c.key == resident)
-                                .firstOrNull
-                                ?.displayName ??
-                            resident),
+                  value: residentConfiguration == null
+                      ? (resident ?? l10n.labResidentNone)
+                      : '${residentConfiguration.displayName} · '
+                            '${engineLabel(residentConfiguration.engine)}',
                 ),
                 _PinRow(
                   label: l10n.labRunsThisSession,
-                  value: bench.session.runCount.toString(),
+                  value: runCount.toString(),
                 ),
                 // Provenance beside the pins: a Mac's numbers are not a
                 // phone's, and every measurement is made under both.

@@ -149,7 +149,6 @@ class _PhaseRow extends StatelessWidget {
     final live = !run.isTerminal;
     final chips = <Widget>[];
 
-    // Load.
     if (telemetry.loadDuration != null) {
       chips.add(
         _phaseChip(
@@ -188,7 +187,7 @@ class _PhaseRow extends StatelessWidget {
               : l10n.labPhaseReadCount(LabFormat.count(total, locale)),
         ),
       );
-    } else if (run.phase.index >= LabRunPhase.promptProcessing.index &&
+    } else if (run.phase.reaches(LabRunPhase.promptProcessing) &&
         !run.isTerminal) {
       final completed = telemetry.promptCompleted;
       final total = telemetry.promptTotal;
@@ -207,7 +206,6 @@ class _PhaseRow extends StatelessWidget {
       );
     }
 
-    // Generate.
     if (metrics != null) {
       chips.add(
         _phaseChip(
@@ -219,9 +217,19 @@ class _PhaseRow extends StatelessWidget {
           ),
         ),
       );
-    } else if (run.phase.index >= LabRunPhase.generating.index && live) {
+    } else if (run.phase.reaches(LabRunPhase.generating) && live) {
       final count = telemetry.observationCount;
-      final liveRate = _liveRate(telemetry, now, run.configuration.startedAt);
+      // Tokens only — a chunk gap counts nothing — over the trailing window
+      // of the run's own clock, so the figure decays when arrivals stop.
+      final liveRate = telemetry.observationKind == ObservationKind.token
+          ? liveDecodeRate(
+              telemetry.instantsMs,
+              now
+                  .difference(run.configuration.startedAt)
+                  .inMilliseconds
+                  .toDouble(),
+            )
+          : null;
       final text = switch (telemetry.observationKind) {
         ObservationKind.chunk => l10n.labPhaseGeneratingChunks(
           LabFormat.count(count, locale),
@@ -266,25 +274,6 @@ class _PhaseRow extends StatelessWidget {
         if (series.gapsMs.isNotEmpty) _LatencyRow(run: run, series: series),
       ],
     );
-  }
-
-  /// A live decode rate over the trailing two seconds of arrivals — measured
-  /// work over an explicit window, and only for tokens: a chunk gap counts
-  /// nothing.
-  static double? _liveRate(
-    LabTelemetry telemetry,
-    DateTime now,
-    DateTime start,
-  ) {
-    if (telemetry.observationKind != ObservationKind.token) return null;
-    final instants = telemetry.instantsMs;
-    if (instants.length < 2) return null;
-    final latest = instants.last;
-    final windowStart = latest - 2000;
-    final inWindow = instants.where((t) => t > windowStart).length;
-    final span = latest - instants.firstWhere((t) => t > windowStart);
-    if (inWindow < 2 || span <= 0) return null;
-    return (inWindow - 1) / (span / 1000);
   }
 
   Widget _phaseChip(
@@ -387,7 +376,7 @@ class _LoadProgress extends StatelessWidget {
               ),
             ),
             Text(
-              l10n.labElapsed(LabFormat.elapsed(elapsed)),
+              l10n.labElapsed(LabFormat.elapsed(elapsed, l10n)),
               style: LabText.detailStrong.copyWith(color: context.mutedInk),
             ),
           ],
@@ -511,7 +500,9 @@ class _CancelledRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final count = run.metrics?.tokenCount ?? run.telemetry.observationCount;
+    // Tokens when the engine counted tokens; an engine that stamps chunks
+    // has a chunk count until its metrics land, and says so.
+    final tokens = run.outputTokens;
     return Wrap(
       spacing: LabSpace.s3,
       runSpacing: LabSpace.s2,
@@ -520,7 +511,14 @@ class _CancelledRow extends StatelessWidget {
         LabChip(
           key: const Key('lab-cancelled-chip'),
           icon: CupertinoIcons.xmark_circle,
-          text: l10n.stoppedAfterTokens(count),
+          text: tokens != null
+              ? l10n.stoppedAfterTokens(tokens)
+              : l10n.labPhaseGeneratingChunks(
+                  LabFormat.count(
+                    run.telemetry.observationCount,
+                    Localizations.localeOf(context).toString(),
+                  ),
+                ),
         ),
         Text(
           l10n.labCancelledNote,
@@ -575,6 +573,7 @@ class _FailedRow extends StatelessWidget {
                     inferenceFailureMessage(
                       l10n,
                       run.failure ?? InferenceFailureKind.engine,
+                      contextTokens: run.failureContextTokens,
                     ),
                     style: LabText.bodyStrong.copyWith(color: context.ink),
                   ),

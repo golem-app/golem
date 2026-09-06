@@ -90,8 +90,13 @@ void main() {
       await pumpLabShell(tester, brightness: brightness, model: _installed);
       expect(find.byKey(const Key('lab-empty')), findsOneWidget);
       expect(find.byKey(const Key('lab-rig-locked')), findsNothing);
-      // Nothing armed: Run is offered but inert, and the tray is live.
+      // Nothing armed: Run and the settings are offered but inert — a draft
+      // with no profile to validate against could commit anything.
       expect(pressedHandler(tester, _run), isNull);
+      expect(
+        pressedHandler(tester, find.byKey(const Key('lab-settings-button'))),
+        isNull,
+      );
       await expectLater(
         find.byKey(const Key('lab-shell')),
         matchesGoldenFile(
@@ -268,6 +273,62 @@ void main() {
     }, variant: macChrome);
   }
 
+  testWidgets('the transcript follows a run only while it is at the end', (
+    tester,
+  ) async {
+    // The small window, and a slow stream: the card outgrows the viewport
+    // while there are still parts to come.
+    final container = await pumpLabShell(
+      tester,
+      size: labMinViewport,
+      model: _installed,
+      inference: FakeInferenceRepository(
+        eventDelay: const Duration(milliseconds: 300),
+      ),
+    );
+    await _arm(tester, container, 'gemma4-gguf');
+    await _send(tester, 'Explain in about 150 words why the sky is blue.');
+    LabRun run() => container.read(labBenchControllerProvider).activeRun!;
+    final scroll = tester
+        .widget<ListView>(find.byKey(const Key('lab-transcript')))
+        .controller!;
+    // Until the card outgrows the viewport, there is nothing to follow.
+    await _pumpUntil(
+      tester,
+      () => scroll.hasClients && scroll.position.maxScrollExtent > 100,
+    );
+    // One frame to lay the grown card out, one for the follow's jump.
+    await tester.pump();
+    await tester.pump();
+    expect(
+      scroll.position.pixels,
+      scroll.position.maxScrollExtent,
+      reason: 'a fresh run is followed to its end',
+    );
+    // The reader drags back up mid-run; the next publishes must not yank
+    // the view down again, nor the terminal one.
+    // From the gutter, clear of the card's own gestures.
+    final list = tester.getRect(find.byKey(const Key('lab-transcript')));
+    await tester.dragFrom(
+      Offset(list.left + 12, list.center.dy),
+      const Offset(0, 400),
+    );
+    // Let the bounce settle before reading where the reader left the view.
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    final held = scroll.position.pixels;
+    expect(held, greaterThanOrEqualTo(0));
+    expect(held, lessThan(scroll.position.maxScrollExtent - 50));
+    final lengthBefore = run().answer.length;
+    await _pumpUntil(tester, () => run().answer.length > lengthBefore + 20);
+    await tester.pump();
+    await tester.pump();
+    expect(scroll.position.pixels, held);
+    await _finish(tester, container);
+    expect(scroll.position.pixels, held, reason: 'nor the terminal publish');
+  }, variant: macChrome);
+
   testWidgets('Stop keeps the partial output and Retry runs it again', (
     tester,
   ) async {
@@ -347,8 +408,22 @@ void main() {
       await _finish(tester, container);
       await _send(tester, 'Two');
       await _finish(tester, container);
+      // The transcript builds lazily and follows the run, so the header is
+      // reached by scrolling back up.
+      await tester.scrollUntilVisible(
+        find.textContaining('2 TURNS'),
+        -200,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const Key('lab-transcript')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       expect(find.textContaining('2 TURNS'), findsOneWidget);
-      expect(find.byType(RunCard), findsNWidgets(2));
+      // Lazily built: the cards on screen are at most the runs recorded.
+      expect(find.byType(RunCard), findsAtLeastNWidgets(1));
+      expect(container.read(labBenchControllerProvider).session.runCount, 2);
       // Switching the engine closes the conversation; its cards stay.
       await tester.tap(find.byKey(const Key('lab-engine-menu')));
       await tester.pumpAndSettle();
@@ -357,7 +432,8 @@ void main() {
       final session = container.read(labBenchControllerProvider).session;
       expect(session.conversations, hasLength(2));
       expect(session.active!.runs, isEmpty);
-      expect(find.byType(RunCard), findsNWidgets(2));
+      expect(session.runCount, 2, reason: 'the cards stay');
+      expect(find.byType(RunCard), findsAtLeastNWidgets(1));
       expect(find.text('MLX'), findsWidgets);
     },
     variant: macChrome,
@@ -437,9 +513,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('pinned'), findsNothing);
     expect(find.text('4096'), findsNothing);
+    // A user value under the direct mode, then the toggle: the pinned row
+    // shows the profile's value, which is what will be sent, not the draft's.
+    await tester.tap(find.byKey(const Key('lab-setting-temperature-plus')));
+    await tester.pump();
+    expect(find.text('0.8'), findsOneWidget);
     await tester.tap(find.byKey(const Key('lab-setting-reasoning')));
     await tester.pumpAndSettle();
     expect(find.text('pinned'), findsNWidgets(3));
+    expect(find.text('1.0'), findsOneWidget, reason: 'the profile\'s pin');
+    expect(find.text('0.8'), findsNothing);
     expect(find.text('4096'), findsOneWidget, reason: 'the reasoning budget');
     expect(
       pressedHandler(

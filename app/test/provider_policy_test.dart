@@ -69,6 +69,7 @@ final _allProviders = <String, ProviderOrFamily>{
   'firstRunController': firstRunControllerProvider,
   'startupGateController': startupGateControllerProvider,
   'labConfigurationList': labConfigurationListProvider,
+  'labModelFamilies': labModelFamiliesProvider,
   'labProbes': labProbesProvider,
   'labDeviceProvenance': labDeviceProvenanceProvider,
   'labContract': labContractProvider,

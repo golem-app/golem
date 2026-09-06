@@ -1,9 +1,11 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/chrome/golem_sheet.dart';
+import '../../core/widgets/section_header.dart';
 import '../../l10n/l10n.dart';
 import '../../l10n/presentation_messages.dart';
 import 'application/lab_bench_controller.dart';
@@ -35,6 +37,27 @@ class _LabShellState extends ConsumerState<LabShell> {
   final _composerFocus = FocusNode(debugLabel: 'lab-composer');
   final _scroll = ScrollController();
   late final List<TrayPrompt> _tray = trayPrompts();
+
+  /// Whether the transcript follows the run. A run that grows keeps the view
+  /// at the end until the reader scrolls back up, and again once they reach
+  /// the end — the rule chat follows too. Read from the reader's own
+  /// scrolls, never from the position alone: a card that grows under a
+  /// still view moves the end away without anyone scrolling.
+  bool _atEnd = true;
+  String? _followedRunId;
+
+  bool _onScroll(ScrollNotification notification) {
+    if (notification is UserScrollNotification &&
+        notification.direction == ScrollDirection.forward) {
+      _atEnd = false;
+    } else if (notification is ScrollEndNotification &&
+        notification.metrics.extentAfter < LabSize.trayRow) {
+      // Judged where a scroll ends, not along the way: a drag up starts at
+      // the end, and the updates it emits there are not an arrival.
+      _atEnd = true;
+    }
+    return false;
+  }
 
   @override
   void dispose() {
@@ -88,6 +111,7 @@ class _LabShellState extends ConsumerState<LabShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scroll.hasClients) return;
       _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      _atEnd = true;
     });
   }
 
@@ -106,10 +130,18 @@ class _LabShellState extends ConsumerState<LabShell> {
     );
   }
 
-  /// The transcript follows a run as it grows, the way chat does.
+  /// A new run always comes into view; a growing one is followed only while
+  /// the view is already at the end.
   void _follow(LabBenchState? before, LabBenchState after) {
     _announce(before, after);
-    if (after.activeRun != null && before?.activeRun != after.activeRun) {
+    final run = after.activeRun;
+    if (run == null) return;
+    if (run.id != _followedRunId) {
+      _followedRunId = run.id;
+      _scrollToEnd();
+    } else if (_atEnd) {
+      // Including the terminal publish: the result line, or Retry, lands
+      // at the bottom of a card the view was already following.
       _scrollToEnd();
     }
   }
@@ -170,6 +202,7 @@ class _LabShellState extends ConsumerState<LabShell> {
                         child: hasRuns
                             ? _Transcript(
                                 controller: _scroll,
+                                onScroll: _onScroll,
                                 conversations: conversations,
                                 now: now,
                                 onRetry: locked
@@ -262,7 +295,6 @@ class _EmptyBench extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final locale = Localizations.localeOf(context);
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(
@@ -297,15 +329,9 @@ class _EmptyBench extends StatelessWidget {
                   0,
                   LabSpace.s3,
                 ),
-                child: Semantics(
-                  header: true,
-                  child: Text(
-                    localizedUppercase(l10n.labPromptTray, locale),
-                    style: localizedLabelStyle(
-                      LabText.overline,
-                      locale,
-                    ).copyWith(color: context.mutedInk),
-                  ),
+                child: SectionHeader(
+                  l10n.labPromptTray,
+                  style: LabText.overline,
                 ),
               ),
               PromptTrayGrid(prompts: prompts, onPick: onPick),
@@ -337,12 +363,14 @@ class _EmptyBench extends StatelessWidget {
 class _Transcript extends StatelessWidget {
   const _Transcript({
     required this.controller,
+    required this.onScroll,
     required this.conversations,
     required this.now,
     required this.onRetry,
   });
 
   final ScrollController controller;
+  final bool Function(ScrollNotification) onScroll;
   final List<LabConversation> conversations;
   final DateTime now;
   final VoidCallback? onRetry;
@@ -350,67 +378,70 @@ class _Transcript extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final locale = Localizations.localeOf(context);
+    // Flattened so the list builds only what is on screen: a conversation
+    // is not one child but a header and its runs, and only the live run
+    // reads the clock.
     final lastConversation = conversations.last;
-    return ListView(
-      key: const Key('lab-transcript'),
-      controller: controller,
-      padding: const EdgeInsets.symmetric(
-        horizontal: LabSpace.gutter * 2,
-        vertical: LabSpace.s8,
-      ),
-      children: [
-        for (final conversation in conversations)
-          if (conversation.runs.isNotEmpty)
-            Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: LabSize.transcriptMaxWidth,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: LabSpace.s4),
-                      child: Semantics(
-                        header: true,
-                        child: Text(
-                          localizedUppercase(
-                            l10n.labConversationHeader(
-                              conversation.runs.first.configuration.displayName,
-                              engineLabel(
-                                conversation.runs.first.configuration.engine,
-                              ),
-                              conversation.runs.length,
-                            ),
-                            locale,
-                          ),
-                          style: localizedLabelStyle(
-                            LabText.overline,
-                            locale,
-                          ).copyWith(color: context.mutedInk),
-                        ),
-                      ),
-                    ),
-                    for (final run in conversation.runs) ...[
-                      RunCard(
-                        run: run,
-                        now: now,
-                        onRetry:
-                            identical(conversation, lastConversation) &&
-                                identical(run, conversation.last) &&
-                                (run.phase == LabRunPhase.failed ||
-                                    run.phase == LabRunPhase.cancelled)
-                            ? onRetry
-                            : null,
-                      ),
-                      const SizedBox(height: LabSpace.s8),
-                    ],
-                  ],
-                ),
+    final entries = <Widget Function()>[];
+    for (final conversation in conversations) {
+      if (conversation.runs.isEmpty) continue;
+      final first = conversation.runs.first.configuration;
+      entries.add(
+        () => Padding(
+          padding: const EdgeInsets.only(bottom: LabSpace.s4),
+          child: SectionHeader(
+            l10n.labConversationHeader(
+              first.displayName,
+              engineLabel(first.engine),
+              conversation.runs.length,
+            ),
+            style: LabText.overline,
+          ),
+        ),
+      );
+      for (final run in conversation.runs) {
+        final last =
+            identical(conversation, lastConversation) &&
+            identical(run, conversation.last);
+        entries.add(
+          () => Padding(
+            padding: const EdgeInsets.only(bottom: LabSpace.s8),
+            child: RepaintBoundary(
+              child: RunCard(
+                key: ValueKey(run.id),
+                run: run,
+                now: run.isTerminal ? run.endedAt ?? now : now,
+                onRetry:
+                    last &&
+                        (run.phase == LabRunPhase.failed ||
+                            run.phase == LabRunPhase.cancelled)
+                    ? onRetry
+                    : null,
               ),
             ),
-      ],
+          ),
+        );
+      }
+    }
+    return NotificationListener<ScrollNotification>(
+      onNotification: onScroll,
+      child: ListView.builder(
+        key: const Key('lab-transcript'),
+        controller: controller,
+        padding: const EdgeInsets.symmetric(
+          horizontal: LabSpace.gutter * 2,
+          vertical: LabSpace.s8,
+        ),
+        itemCount: entries.length,
+        itemBuilder: (context, index) => Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: LabSize.transcriptMaxWidth,
+            ),
+            child: entries[index](),
+          ),
+        ),
+      ),
     );
   }
 }

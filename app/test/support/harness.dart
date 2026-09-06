@@ -130,6 +130,7 @@ VoidCallback? pressedHandler(WidgetTester tester, Finder finder) =>
       GolemIconButton(:final onPressed) => onPressed,
       GolemTappable(:final onPressed) => onPressed,
       LabButton(:final onPressed) => onPressed,
+      LabFocusable(:final onPressed) => onPressed,
       CupertinoButton(:final onPressed) => onPressed,
       final other => throw ArgumentError(
         '${other.runtimeType} is not a button',

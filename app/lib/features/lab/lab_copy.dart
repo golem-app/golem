@@ -1,7 +1,7 @@
 import 'package:intl/intl.dart';
 
+import '../../broker/context_window.dart' show contextPromptReserveTokens;
 import '../../core/domain/byte_format.dart';
-import '../../core/domain/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import 'domain/lab_run_settings.dart';
 
@@ -23,12 +23,15 @@ abstract final class LabFormat {
 
   static String milliseconds(double value) => value.round().toString();
 
-  /// A run's clock: seconds under a minute, minutes and seconds above.
-  static String elapsed(Duration value) {
-    if (value.inSeconds < 60) return seconds(value.inMilliseconds / 1000);
+  /// A run's clock: seconds under a minute, minutes and seconds above, with
+  /// the units from the catalog like every other figure's.
+  static String elapsed(Duration value, AppLocalizations l10n) {
+    if (value.inSeconds < 60) {
+      return l10n.labElapsedSeconds(seconds(value.inMilliseconds / 1000));
+    }
     final minutes = value.inMinutes;
     final rest = value.inSeconds - minutes * 60;
-    return '$minutes m ${rest.toString().padLeft(2, '0')} s';
+    return l10n.labElapsedMinutes(minutes, rest.toString().padLeft(2, '0'));
   }
 
   /// Physical memory as the machine is sold: binary, whole gigabytes.
@@ -41,27 +44,17 @@ String labSettingsProblemMessage(
   AppLocalizations l10n,
   LabSettingsProblem problem,
 ) => switch (problem) {
+  LabSettingsProblem.benchLocked => l10n.labProblemLocked,
   LabSettingsProblem.contextBelowFloor => l10n.labProblemContextFloor(
     labContextFloor,
   ),
   LabSettingsProblem.contextAboveCeiling => l10n.labProblemContextCeiling,
   LabSettingsProblem.maxTokensBelowOne => l10n.labProblemMaxTokensFloor,
   LabSettingsProblem.maxTokensAboveBudget => l10n.labProblemMaxTokensBudget(
-    labPromptReserveTokens,
+    contextPromptReserveTokens,
   ),
   LabSettingsProblem.temperatureOutOfRange => l10n.labProblemTemperature,
   LabSettingsProblem.topPOutOfRange => l10n.labProblemTopP,
   LabSettingsProblem.topKNegative => l10n.labProblemTopK,
   LabSettingsProblem.seedNegative => l10n.labProblemSeed,
 };
-
-/// Words an artifact's phase for the Rig chip.
-String labArtifactPhaseLabel(AppLocalizations l10n, ArtifactPhase phase) =>
-    switch (phase) {
-      ArtifactPhase.installed => l10n.labArtifactVerified,
-      ArtifactPhase.notDownloaded => l10n.labArtifactMissing,
-      ArtifactPhase.downloading => l10n.labArtifactDownloading,
-      ArtifactPhase.verifying => l10n.labArtifactVerifying,
-      ArtifactPhase.paused => l10n.paused,
-      ArtifactPhase.failed => l10n.labArtifactFailed,
-    };
