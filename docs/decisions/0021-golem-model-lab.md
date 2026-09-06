@@ -1,6 +1,7 @@
 # Golem Model Lab: a fourth flavor that exists on macOS only
 
-Status: decided on `feat/58-lab-flavor` (issue #58, epic #40)
+Status: decided on `feat/58-lab-flavor`, `feat/58-observation-events` and
+`feat/58-lab-bench` (issue #58, epic #40)
 
 ## Context
 
@@ -11,8 +12,8 @@ memory measurements off it. The three shipped identities are all phone apps
 with a macOS build that opens an iPad-shaped window for layout preview; none
 of them is a place for a bench, and the bench must not ride into a store
 build. This record covers the flavor, its identity and artwork, its window,
-its storage, and how its exclusion from every other flavor is proven. The
-observation events and the bench itself are recorded below as they land.
+its storage, how its exclusion from every other flavor is proven, the
+observation events the bench reads, and the bench itself.
 
 ## Decision
 
@@ -136,6 +137,84 @@ storage channel gains `physicalFootprintBytes` (the process's
 thermal state) for the readings every bench measurement carries; the phones
 do not answer either, by design.
 
+### The bench
+
+`features/lab/` is the bench (`app/README.md`, "Golem Model Lab"). Its
+domain is an immutable `LabRun` — the prompt, a configuration snapshot
+frozen when the run started (catalog key, engine, effective sampling as the
+broker computed it, the sparse settings that produced it, engine pins,
+artifact receipt state, device provenance, start time), the phase, the
+reasoning and answer text, bounded telemetry and the final metrics — folded
+by a pure reducer. A run passes through exactly one terminal phase: the
+reducer refuses to move a terminal run, and the controller tags every stream
+with an epoch and drops late events, so a cancelled run that still emits its
+metrics is terminated once. Stop keeps the partial output and waits for the
+engine's own end of stream rather than inventing one. Telemetry keeps the
+newest 512 instants and the true count, so a long generation cannot grow the
+state per token, and the controller publishes at most every 60 ms (phase
+changes and the terminal event at once), so the transcript and chart never
+rebuild per token.
+
+A run in flight locks the Rig. Changing the model, the engine or the settings
+under a live run would silently invalidate the comparison, so it is
+impossible rather than warned against; a change while idle closes the
+conversation and starts a new one, so runs of different configurations never
+sit side by side under one heading. The bench binds the chat session bridge
+to its own state, so the model commands that ask "is a generation in flight"
+read the bench and never build a chat.
+
+The Rig shows what the run will carry, computed by the same
+`effectiveSampling` the run sends; the phase chips show only what the engine
+reported (a submitted count for a prefill in flight, a rate only once the
+metrics say so, *chunks* on MLX and *tokens* on llama.cpp); the latency chart
+is the gaps between arrivals and is labelled inter-token or inter-chunk by
+the engine's kind; the footer holds one figure per phase and a dash where
+none was measured. Device provenance sits beside the engine pins in the
+sidebar: a Mac's numbers are not a phone's, and every measurement is made
+under both.
+
+#### The desktop tier
+
+The bench keeps Golem Navy's ramp and voice at pointer densities
+(`lab_theme.dart`): 11.5–13 pt text with tabular figures on every changing
+number, 24 pt as the interactive minimum (macOS's own controls sit between
+22 and 28 pt; the guideline sweep judges the bench at that size under the
+macOS variant), a hover wash and a focus ring on every control through one
+`LabFocusable`, keyboard activation on Enter and Space, and ⌘↩ / Esc / ⌘N
+for run, stop and new conversation wherever focus is. The composer keeps
+focus across a run: it is read-only while locked, never disabled. Reduced
+motion swaps the indeterminate load's spinner for a static mark.
+
+Two contrast fixes to the comps: small labels sit on the muted ink, never
+the tertiary ink (the handoff's 3.80:1 metric labels), and the filled Stop
+and Run buttons draw navy on the accent in dark, where white reads 2.95:1.
+Disabled controls keep readable ink on a quiet fill instead of fading. The
+Rig and the footer are wraps, not rows: every group truncates to the window
+and the band grows a line when the window is narrow or the catalog is long,
+which is what lets the same layout hold from 1440 × 900 to 1000 × 640 in
+thirteen catalogs and at a 1.6× text scale.
+
+Deviations from the comps, deferred to #59: no suite, history or prompt
+navigation, no sweep or plan strip, no saved runs or comparison, and no
+tokenizer-derived token count in the prompt tray before a run measured one.
+The batch size is shown for llama.cpp only; MLX reports none.
+
+#### Evidence
+
+The host suite renders the bench at both window sizes in light and dark,
+walks every state (empty, armed, loading, streaming, completed, cancelled,
+failed, settings, tray, missing artifact) under the 24 pt tap-target,
+labelled-target and contrast guidelines, drives the keyboard shortcuts,
+asserts the run edges are announced exactly once, and lays the bench out in
+every catalog at the smallest window. `integration_test/lab_acceptance_test.dart`
+is the real-model instrument: all four configurations, two turns each,
+engines switched both ways in one process, Stop with partial output, a forced
+failure and Retry, the version-2 timing relations on every run, and the
+observed stream timed against the silent one on each engine — a repeatable
+decode slowdown of five percent or more blocks acceptance. The first record
+is `docs/evals/2026-09-05-lab-acceptance-macos.md`: every configuration
+passed, 1.4 % on llama.cpp and −0.2 % on MLX.
+
 ## Consequences
 
 - Four identities. Every exhaustive switch over `AppIdentity` names the lab;
@@ -153,3 +232,6 @@ do not answer either, by design.
   found.
 - QA's icon changed on every platform; the flavor's identity, container and
   wiring did not.
+- Chat's reasoning card is now `features/chat/widgets/reasoning_card.dart`,
+  extracted unchanged so the bench renders reasoning the way chat does; the
+  chat goldens did not move.
