@@ -122,6 +122,13 @@ documented here before joining the test allowlist.
 Spanish also retains the ordinary response word *No*, whose spelling matches
 the English source.
 
+Golem Model Lab (the macOS `lab` flavor, ADR 0021) adds its product name,
+the `GML` version tag, the `ttft` acronym, contract chips built from
+single-letter parameter symbols (`ctx`, `t`, `p`, `k`), and unit-only
+fragments (`GB`, `tok`, `tok/s`, `s`) to the shared exceptions. Indonesian
+and Vietnamese retain *seed* and Indonesian *batch* as established technical
+loanwords; French retains the compact abbreviation *max*.
+
 Hindi copy uses concise modern Devanagari and avoids gendered forms where an
 impersonal construction is natural. Preserve conjunct clusters during layout;
 never add letter spacing to Devanagari headings.

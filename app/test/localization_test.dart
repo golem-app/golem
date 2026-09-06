@@ -67,18 +67,43 @@ const _commonSourceCopyAllowlist = <String>{
   'styleSource',
   'tokenRate',
   'rateMbs',
+  // Golem Model Lab (#58): the product name, its version tag, the ttft
+  // acronym, contract chips built from single-letter parameter symbols, and
+  // unit-only fragments (docs/localization.md).
+  'labAppName',
+  'labVersion',
+  'labFooterTtft',
+  'labTtft',
+  'labContractContext',
+  'labContractTemperature',
+  'labContractTopP',
+  'labContractTopK',
+  'labDeviceMemory',
+  'labPhaseGenerated',
 };
 
 const _localeLoanwordAllowlists = <String, Set<String>>{
   'pl': {'settingsSectionModel', 'settingsModel', 'model', 'prompt'},
+  // Seed and batch are the established technical loanwords.
+  'vi': {'labContractSeed', 'labSettingSeed'},
   // The ordinary Spanish negative response is spelled identically.
   'es': {'no'},
   // Prompt is the natural compact technical label in Brazilian Portuguese.
   'pt_BR': {'prompt'},
   // Standard Indonesian technical loanwords.
-  'id': {'settingsSectionModel', 'settingsModel', 'model', 'prompt'},
+  'id': {
+    'settingsSectionModel',
+    'settingsModel',
+    'model',
+    'prompt',
+    'labContractSeed',
+    'labSettingSeed',
+    'labContractBatch',
+  },
   // Model is the established technical loanword in Turkish.
   'tr': {'settingsSectionModel', 'settingsModel', 'model'},
+  // *max* is the natural compact abbreviation in French.
+  'fr': {'labContractMax'},
 };
 
 void main() {

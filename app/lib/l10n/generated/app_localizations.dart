@@ -3146,6 +3146,630 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Leans towards code and maths, and can think a problem through before it answers.'**
   String get qwenFourBModelSummary;
+
+  /// Product name of the macOS bench flavor.
+  ///
+  /// In en, this message translates to:
+  /// **'Golem Model Lab'**
+  String get labAppName;
+
+  /// Sidebar version line; GML is the product abbreviation.
+  ///
+  /// In en, this message translates to:
+  /// **'GML {version}'**
+  String labVersion(String version);
+
+  /// Sidebar navigation: the interactive bench surface.
+  ///
+  /// In en, this message translates to:
+  /// **'Bench'**
+  String get labNavBench;
+
+  /// Sidebar section header over the model families.
+  ///
+  /// In en, this message translates to:
+  /// **'Library'**
+  String get labLibrary;
+
+  /// Sidebar footer: which model is loaded in memory.
+  ///
+  /// In en, this message translates to:
+  /// **'Resident'**
+  String get labResidentLabel;
+
+  /// Sidebar footer value when no model is loaded.
+  ///
+  /// In en, this message translates to:
+  /// **'none'**
+  String get labResidentNone;
+
+  /// Sidebar footer: count of bench runs so far.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs this session'**
+  String get labRunsThisSession;
+
+  /// Rig state while a run is in flight.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked'**
+  String get labLocked;
+
+  /// Rig locked-state detail.
+  ///
+  /// In en, this message translates to:
+  /// **'run in flight'**
+  String get labLockedDetail;
+
+  /// Rig model chooser placeholder and accessible label.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose model'**
+  String get labChooseModel;
+
+  /// Rig engine chooser placeholder and accessible label.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose engine'**
+  String get labChooseEngine;
+
+  /// Rig hint before a configuration is armed.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing armed · pick a model and an engine'**
+  String get labNothingArmed;
+
+  /// Artifact chip: installed and hash-verified.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified'**
+  String get labArtifactVerified;
+
+  /// Artifact chip: not downloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Artifact missing'**
+  String get labArtifactMissing;
+
+  /// Artifact chip: transfer in progress.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading'**
+  String get labArtifactDownloading;
+
+  /// Artifact chip: hashing in progress.
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying'**
+  String get labArtifactVerifying;
+
+  /// Artifact chip: last transfer failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed'**
+  String get labArtifactFailed;
+
+  /// Artifact chip detail: size and file count.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} · {count, plural, =1{1 file} other{{count} files}}'**
+  String labArtifactMeta(String size, int count);
+
+  /// Contract chip: context length in tokens.
+  ///
+  /// In en, this message translates to:
+  /// **'ctx {value}'**
+  String labContractContext(int value);
+
+  /// Contract chip: max output tokens.
+  ///
+  /// In en, this message translates to:
+  /// **'max {value}'**
+  String labContractMax(int value);
+
+  /// Contract chip: temperature.
+  ///
+  /// In en, this message translates to:
+  /// **'t {value}'**
+  String labContractTemperature(String value);
+
+  /// Contract chip: top-p.
+  ///
+  /// In en, this message translates to:
+  /// **'p {value}'**
+  String labContractTopP(String value);
+
+  /// Contract chip: top-k.
+  ///
+  /// In en, this message translates to:
+  /// **'k {value}'**
+  String labContractTopK(int value);
+
+  /// Contract chip: fixed sampling seed.
+  ///
+  /// In en, this message translates to:
+  /// **'seed {value}'**
+  String labContractSeed(int value);
+
+  /// Contract chip: no fixed seed.
+  ///
+  /// In en, this message translates to:
+  /// **'seed free'**
+  String get labContractSeedFree;
+
+  /// Contract chip: prefill batch size or a not-reported marker.
+  ///
+  /// In en, this message translates to:
+  /// **'batch {value}'**
+  String labContractBatch(String value);
+
+  /// Contract chip before arming.
+  ///
+  /// In en, this message translates to:
+  /// **'No contract until a model is armed'**
+  String get labContractNone;
+
+  /// A measurement the engine does not expose.
+  ///
+  /// In en, this message translates to:
+  /// **'not reported'**
+  String get labNotReported;
+
+  /// Contract chip: reasoning mode enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'reasoning on'**
+  String get labReasoningOn;
+
+  /// Contract chip: reasoning mode disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'reasoning off'**
+  String get labReasoningOff;
+
+  /// Title of the run settings sheet and its opener.
+  ///
+  /// In en, this message translates to:
+  /// **'Run settings'**
+  String get labRunSettings;
+
+  /// Run settings sheet note.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied to the next run. Changing them starts a new conversation.'**
+  String get labRunSettingsNote;
+
+  /// Run setting label.
+  ///
+  /// In en, this message translates to:
+  /// **'Context length'**
+  String get labSettingContext;
+
+  /// Run setting label.
+  ///
+  /// In en, this message translates to:
+  /// **'Max tokens'**
+  String get labSettingMaxTokens;
+
+  /// Run setting label.
+  ///
+  /// In en, this message translates to:
+  /// **'Seed'**
+  String get labSettingSeed;
+
+  /// Seed field placeholder when unset.
+  ///
+  /// In en, this message translates to:
+  /// **'free'**
+  String get labSettingSeedFree;
+
+  /// Marks a setting at the profile default; also the reset button.
+  ///
+  /// In en, this message translates to:
+  /// **'default'**
+  String get labSettingDefault;
+
+  /// Note when sampling is pinned by the model profile.
+  ///
+  /// In en, this message translates to:
+  /// **'This profile pins its sampling in reasoning mode; the values above are the profile\'\'s.'**
+  String get labSettingPinned;
+
+  /// Short marker for a pinned setting.
+  ///
+  /// In en, this message translates to:
+  /// **'pinned'**
+  String get labSettingPinnedShort;
+
+  /// Accessible label of a stepper minus button.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease {label}'**
+  String labDecrease(String label);
+
+  /// Accessible label of a stepper plus button.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase {label}'**
+  String labIncrease(String label);
+
+  /// Accessible label of a stepper reset button.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset {label} to default'**
+  String labResetToDefault(String label);
+
+  /// Run settings sheet confirm action.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get labApply;
+
+  /// Settings validation.
+  ///
+  /// In en, this message translates to:
+  /// **'Context must be at least {floor} tokens'**
+  String labProblemContextFloor(int floor);
+
+  /// Settings validation.
+  ///
+  /// In en, this message translates to:
+  /// **'Context is above what this model is configured for'**
+  String get labProblemContextCeiling;
+
+  /// Settings validation.
+  ///
+  /// In en, this message translates to:
+  /// **'Max tokens must be at least 1'**
+  String get labProblemMaxTokensFloor;
+
+  /// Settings validation.
+  ///
+  /// In en, this message translates to:
+  /// **'Max tokens must leave {reserve} tokens of context for the prompt'**
+  String labProblemMaxTokensBudget(int reserve);
+
+  /// Settings validation.
+  ///
+  /// In en, this message translates to:
+  /// **'Temperature must be between 0 and 2'**
+  String get labProblemTemperature;
+
+  /// Settings validation.
+  ///
+  /// In en, this message translates to:
+  /// **'Top-p must be above 0 and at most 1'**
+  String get labProblemTopP;
+
+  /// Settings validation.
+  ///
+  /// In en, this message translates to:
+  /// **'Top-k cannot be negative'**
+  String get labProblemTopK;
+
+  /// Settings validation.
+  ///
+  /// In en, this message translates to:
+  /// **'Seed must be a whole number of 0 or more'**
+  String get labProblemSeed;
+
+  /// Device chip when the machine could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Device unknown'**
+  String get labDeviceUnknown;
+
+  /// Device chip memory figure.
+  ///
+  /// In en, this message translates to:
+  /// **'{gigabytes} GB'**
+  String labDeviceMemory(String gigabytes);
+
+  /// Sidebar pin row: the machine the bench measures on.
+  ///
+  /// In en, this message translates to:
+  /// **'Machine'**
+  String get labMachineLabel;
+
+  /// Sidebar pin row: the machine's physical memory.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory'**
+  String get labMemoryLabel;
+
+  /// Empty bench headline.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing measured yet.'**
+  String get labEmptyTitle;
+
+  /// Empty bench explanation.
+  ///
+  /// In en, this message translates to:
+  /// **'One model is resident at a time. Pick a prompt and Golem loads it, measures the load, then measures the run.'**
+  String get labEmptyBody;
+
+  /// Header over the example prompts.
+  ///
+  /// In en, this message translates to:
+  /// **'Prompt tray'**
+  String get labPromptTray;
+
+  /// Honesty note on the empty bench.
+  ///
+  /// In en, this message translates to:
+  /// **'Measured on this Mac. Numbers here do not transfer to a phone.'**
+  String get labMeasuredOnThisMac;
+
+  /// Tray prompt: number of grading checks.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{no checks} =1{1 check} other{{count} checks}}'**
+  String labChecks(int count);
+
+  /// Opens the full prompt tray.
+  ///
+  /// In en, this message translates to:
+  /// **'All {count}'**
+  String labAllPrompts(int count);
+
+  /// Composer placeholder and accessible label.
+  ///
+  /// In en, this message translates to:
+  /// **'Message the bench'**
+  String get labComposerHint;
+
+  /// Composer placeholder while a run is in flight.
+  ///
+  /// In en, this message translates to:
+  /// **'Run in flight · composer locked'**
+  String get labComposerLocked;
+
+  /// Send action on the bench.
+  ///
+  /// In en, this message translates to:
+  /// **'Run'**
+  String get labRun;
+
+  /// Starts a fresh bench conversation.
+  ///
+  /// In en, this message translates to:
+  /// **'New conversation'**
+  String get labNewConversation;
+
+  /// Screen reader announcement when a run begins.
+  ///
+  /// In en, this message translates to:
+  /// **'Run started'**
+  String get labRunStarted;
+
+  /// Screen reader announcement when a run ends.
+  ///
+  /// In en, this message translates to:
+  /// **'Run finished'**
+  String get labRunFinished;
+
+  /// Transcript header over one conversation.
+  ///
+  /// In en, this message translates to:
+  /// **'{model} · {engine} · {count, plural, =1{1 turn} other{{count} turns}}'**
+  String labConversationHeader(String model, String engine, int count);
+
+  /// Load phase headline.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading {model} into memory'**
+  String labLoadingModel(String model);
+
+  /// Load phase note when no fraction exists.
+  ///
+  /// In en, this message translates to:
+  /// **'This engine reports no load progress; the elapsed time is real.'**
+  String get labLoadIndeterminate;
+
+  /// Load phase footnote.
+  ///
+  /// In en, this message translates to:
+  /// **'Load is measured, not hidden. It counts toward this run\'\'s wall time.'**
+  String get labLoadNote;
+
+  /// Elapsed clock during a phase.
+  ///
+  /// In en, this message translates to:
+  /// **'{elapsed} elapsed'**
+  String labElapsed(String elapsed);
+
+  /// Process footprint while loading.
+  ///
+  /// In en, this message translates to:
+  /// **'resident {size}'**
+  String labResident(String size);
+
+  /// Phase chip: measured load time.
+  ///
+  /// In en, this message translates to:
+  /// **'Load {seconds} s'**
+  String labPhaseLoad(String seconds);
+
+  /// Phase chip while loading without a fraction.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading'**
+  String get labPhaseLoading;
+
+  /// Phase chip while loading with a fraction.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading {percent}%'**
+  String labPhaseLoadingPercent(int percent);
+
+  /// Phase chip while the prompt is processed without counts.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading prompt'**
+  String get labPhaseReading;
+
+  /// Phase chip: prompt tokens submitted so far.
+  ///
+  /// In en, this message translates to:
+  /// **'Read {completed} of {total} tok submitted'**
+  String labPhaseReadSubmitted(String completed, String total);
+
+  /// Phase chip: prompt tokens, rate unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Read {count} tok'**
+  String labPhaseReadCount(String count);
+
+  /// Phase chip: prompt tokens and measured rate.
+  ///
+  /// In en, this message translates to:
+  /// **'Read {count} tok · {rate} tok/s'**
+  String labPhaseReadDone(String count, String rate);
+
+  /// Phase chip: output tokens so far.
+  ///
+  /// In en, this message translates to:
+  /// **'Generating {count} tok'**
+  String labPhaseGenerating(String count);
+
+  /// Phase chip: output tokens and a live windowed rate.
+  ///
+  /// In en, this message translates to:
+  /// **'Generating {count} tok · {rate} tok/s'**
+  String labPhaseGeneratingRate(String count, String rate);
+
+  /// Phase chip: output chunks so far, on an engine that counts chunks.
+  ///
+  /// In en, this message translates to:
+  /// **'Generating {count} chunks'**
+  String labPhaseGeneratingChunks(String count);
+
+  /// Phase chip: final token count and decode rate.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tok · {rate} tok/s'**
+  String labPhaseGenerated(String count, String rate);
+
+  /// Time to first token.
+  ///
+  /// In en, this message translates to:
+  /// **'TTFT {seconds} s'**
+  String labTtft(String seconds);
+
+  /// Latency chart label for per-token instants.
+  ///
+  /// In en, this message translates to:
+  /// **'Inter-token'**
+  String get labInterToken;
+
+  /// Latency chart label for per-chunk instants.
+  ///
+  /// In en, this message translates to:
+  /// **'Inter-chunk arrival'**
+  String get labInterChunk;
+
+  /// Latency chart median gap.
+  ///
+  /// In en, this message translates to:
+  /// **'med {ms} ms'**
+  String labMedian(String ms);
+
+  /// Latency chart stall count.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 stall} other{{count} stalls}}'**
+  String labStalls(int count);
+
+  /// Accessible description of the latency chart.
+  ///
+  /// In en, this message translates to:
+  /// **'{series} latency chart, median {ms} ms, {count, plural, =0{no stalls} =1{1 stall} other{{count} stalls}}'**
+  String labLatencyChart(String series, String ms, int count);
+
+  /// Result line: load time.
+  ///
+  /// In en, this message translates to:
+  /// **'load {seconds} s'**
+  String labLoadSeconds(String seconds);
+
+  /// Result line: peak memory.
+  ///
+  /// In en, this message translates to:
+  /// **'peak {size}'**
+  String labPeak(String size);
+
+  /// Cancelled run note.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial output kept. The rates cover the tokens produced; the run is not comparable.'**
+  String get labCancelledNote;
+
+  /// Failed run note when output exists.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial output kept, with the run\'\'s own configuration.'**
+  String get labFailedPartial;
+
+  /// Metrics footer label.
+  ///
+  /// In en, this message translates to:
+  /// **'load'**
+  String get labFooterLoad;
+
+  /// Metrics footer label.
+  ///
+  /// In en, this message translates to:
+  /// **'read'**
+  String get labFooterRead;
+
+  /// Metrics footer label.
+  ///
+  /// In en, this message translates to:
+  /// **'ttft'**
+  String get labFooterTtft;
+
+  /// Metrics footer label.
+  ///
+  /// In en, this message translates to:
+  /// **'decode'**
+  String get labFooterDecode;
+
+  /// Metrics footer label.
+  ///
+  /// In en, this message translates to:
+  /// **'peak'**
+  String get labFooterPeak;
+
+  /// Metrics footer note before any run.
+  ///
+  /// In en, this message translates to:
+  /// **'No run recorded'**
+  String get labFooterNoRun;
+
+  /// Metrics footer note during a run.
+  ///
+  /// In en, this message translates to:
+  /// **'Live · phases never averaged'**
+  String get labFooterLive;
+
+  /// Metrics footer note for a completed run.
+  ///
+  /// In en, this message translates to:
+  /// **'Run {id} · measured on this Mac'**
+  String labFooterRun(String id);
+
+  /// Metrics footer note for a cancelled run.
+  ///
+  /// In en, this message translates to:
+  /// **'Run {id} · cancelled by operator'**
+  String labFooterCancelled(String id);
+
+  /// Metrics footer note for a failed run.
+  ///
+  /// In en, this message translates to:
+  /// **'Run {id} · failed'**
+  String labFooterFailed(String id);
 }
 
 class _AppLocalizationsDelegate
