@@ -11,9 +11,12 @@ const bool kLabBuild = appFlavor == 'lab';
 ///
 /// `appFlavor` is a compile-time constant injected by `--flavor` (or by the
 /// pubspec `default-flavor`, which host-side `flutter test` runs inherit).
-/// It is null in flavorless Xcode builds (`xcodebuild -scheme Runner`), which
-/// resolve to [qa] — the same identity their bundle ids and artwork carry, so
-/// no build path can mint an identity that has no product behind it.
+/// A null flavor resolves to [qa], the identity the flavorless Xcode
+/// configurations carry in their bundle ids and artwork. Note that a bare
+/// `xcodebuild -scheme Runner` does not clear the flavor: it reuses the
+/// dart-defines the last `flutter build` left in the generated xcconfig, so
+/// the Dart identity in such a bundle is whatever flavor was built last
+/// (`app/README.md`, "Flavors"). Build through `flutter` with `--flavor`.
 ///
 /// [lab] exists on macOS only: Golem Model Lab, the desktop bench for the
 /// models the phone flavors ship (ADR 0021). It has no iOS or Android
@@ -45,6 +48,15 @@ enum AppIdentity {
 
   /// Whether this build is Golem Model Lab rather than the consumer app.
   bool get isLab => this == lab;
+
+  /// Whether this build composes the simulated benchmark and routes to it.
+  /// The phone app's internal tool: qa and dev carry it, production omits it
+  /// (ADR 0003), and the lab — which measures real engines — has no route
+  /// for a simulation either.
+  bool get composesBenchmark => switch (this) {
+    qa || dev => true,
+    production || lab => false,
+  };
 
   /// The bundled app-icon tile for in-app surfaces (the drawer header).
   String get iconAsset => 'assets/images/golem_app_icon_$name.png';

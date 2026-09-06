@@ -86,9 +86,10 @@ void main() {
     final paths = _routePaths(router.configuration.routes).toList();
     expect(
       paths.contains('/benchmark'),
-      _expectedInternalTools,
-      reason: 'The internal route must follow the compiled identity.',
+      identity.composesBenchmark,
+      reason: 'The benchmark route must follow what the identity composes.',
     );
+    expect(identity.internalToolsEnabled, _expectedInternalTools);
 
     final diagnostics = <String>[];
     final repository = selectInferenceRepository(

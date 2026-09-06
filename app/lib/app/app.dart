@@ -87,7 +87,7 @@ GoRouter createAppRouter({
           path: '/settings/licenses',
           builder: (context, state) => const OpenSourceLicensesScreen(),
         ),
-        if (identity.internalToolsEnabled)
+        if (identity.composesBenchmark)
           GoRoute(
             path: '/benchmark',
             builder: (context, state) => const BenchmarkScreen(),
