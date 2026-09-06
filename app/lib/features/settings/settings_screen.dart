@@ -130,7 +130,7 @@ class SettingsScreen extends ConsumerWidget {
                       : '${(storage.usedBytes / 1e9).toStringAsFixed(1)} GB',
                   onTap: () => context.push('/settings/storage'),
                 ),
-                if (identity.internalToolsEnabled)
+                if (identity.composesBenchmark)
                   SettingsNavRow(
                     key: const Key('open-benchmark'),
                     label: l10n.settingsBenchmark,

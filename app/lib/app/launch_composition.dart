@@ -81,11 +81,10 @@ final class LaunchDependencies {
 typedef LaunchComposer =
     Future<LaunchDependencies> Function(AppIdentity identity);
 
-/// The simulated benchmark is the phone app's internal tool: qa and dev carry
-/// it, production omits it (ADR 0003), and the lab — which measures real
-/// engines — has no route for a simulation either.
+/// The router and Settings ask the identity the same question the composition
+/// does, so a route can never exist without its repository.
 bool composesSimulatedBenchmark(AppIdentity identity) =>
-    identity.internalToolsEnabled && !identity.isLab;
+    identity.composesBenchmark;
 
 /// Where one identity keeps its documents and lands its downloads. Pure, so
 /// the one decision here is testable without the platform.
@@ -144,9 +143,8 @@ const downloaderStartDeadline = Duration(seconds: 5);
 /// diagnostics, never onto a surface.
 LaunchFailure classifyLaunchFailure(Object error) => switch (error) {
   TimeoutException() => const LaunchFailure(LaunchFailureKind.timedOut),
-  MissingPluginException() || PlatformException() => const LaunchFailure(
-    LaunchFailureKind.storageUnavailable,
-  ),
+  MissingPluginException() || PlatformException() || FileSystemException() =>
+    const LaunchFailure(LaunchFailureKind.storageUnavailable),
   Error() => const LaunchFailure(LaunchFailureKind.invalidConfiguration),
   _ => const LaunchFailure(LaunchFailureKind.unknown),
 };
@@ -265,7 +263,11 @@ _composeRequired({
     support: support,
     documents: await getApplicationDocumentsDirectory(),
   );
-  final documents = await layout.documents.create(recursive: true);
+  // The platform guarantees its own documents directory; only the lab's
+  // relocated root is Golem's to create.
+  final documents = layout.downloadSubdirectory.isEmpty
+      ? layout.documents
+      : await layout.documents.create(recursive: true);
   final temporary = await getTemporaryDirectory();
   await keepOutOfBackups(const DeviceStorageChannel(), [support, documents]);
   final stateFile = File('${support.path}/flutter-model-v2.json');

@@ -98,6 +98,12 @@ abstract interface class ArtifactFileDownloader {
 /// real `~/Documents`, shared by every flavor.
 enum ArtifactDownloadRoot { documents, applicationSupport }
 
+/// The plugin's base directory for a root, in one place.
+BaseDirectory baseDirectoryFor(ArtifactDownloadRoot root) => switch (root) {
+  ArtifactDownloadRoot.documents => BaseDirectory.applicationDocuments,
+  ArtifactDownloadRoot.applicationSupport => BaseDirectory.applicationSupport,
+};
+
 /// background_downloader implementation: URLSession on iOS/macOS and
 /// DownloadWorker on Android, so multi-gigabyte downloads survive screen lock
 /// and backgrounding. allowPause is mandatory — Android hard-stops plain
@@ -266,15 +272,13 @@ final class BackgroundArtifactDownloader implements ArtifactFileDownloader {
 
   DownloadTask _taskFor(ArtifactFileRef ref) => DownloadTask(
     url: ref.sourceUrl,
-    directory: subdirectory.isEmpty
-        ? ref.directory
-        : '$subdirectory/${ref.directory}',
+    directory: artifactTaskDestination(
+      ref: ref,
+      root: root.name,
+      subdirectory: subdirectory,
+    ).directory,
     filename: ref.filename,
-    baseDirectory: switch (root) {
-      ArtifactDownloadRoot.documents => BaseDirectory.applicationDocuments,
-      ArtifactDownloadRoot.applicationSupport =>
-        BaseDirectory.applicationSupport,
-    },
+    baseDirectory: baseDirectoryFor(root),
     group: _group,
     metaData: artifactTaskMetadata(ref),
     updates: Updates.statusAndProgress,

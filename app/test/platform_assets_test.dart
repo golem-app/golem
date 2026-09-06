@@ -102,12 +102,21 @@ Map<String, int> _settingCounts(String project, String setting) {
 /// two, or — for `neutral` — all three within a hair of each other, which is
 /// what a luminance-preserving desaturation of the tile produces.
 void _expectTint(image.Pixel pixel, String tint) {
+  // Rendered artwork first: a transparent or blank pixel is neutral too, and
+  // would pass a channel comparison for nothing.
+  expect(pixel.a, 255, reason: 'expected opaque artwork at $pixel');
   if (tint == 'neutral') {
     final channels = [pixel.r, pixel.g, pixel.b];
     final spread =
         channels.reduce((a, b) => a > b ? a : b) -
         channels.reduce((a, b) => a < b ? a : b);
     expect(spread, lessThanOrEqualTo(8), reason: 'expected grey in $pixel');
+    final luminance = 0.2126 * pixel.r + 0.7152 * pixel.g + 0.0722 * pixel.b;
+    expect(
+      luminance,
+      inInclusiveRange(20, 235),
+      reason: 'expected a mid grey, not black or white, in $pixel',
+    );
     return;
   }
   final others = {'r', 'g', 'b'}.difference({tint});

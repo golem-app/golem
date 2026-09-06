@@ -415,7 +415,26 @@ void main() {
       }
       // Production's composition stays a build-time fact: a detection that
       // ever answered wrong on a phone may refuse a shipping build, but must
-      // never turn one into a simulation.
+      // never turn one into a simulation. Nor the lab's: a bench that
+      // reported simulated numbers as measurements would be worse than none.
+      expect(
+        resolveBackendName(
+          backendDefine: '',
+          identity: AppIdentity.lab,
+          virtualDevice: true,
+          artifactDefine: '',
+          modelPathDefine: '',
+        ),
+        'auto',
+      );
+      expect(
+        useFakeModelManagement(
+          identity: AppIdentity.lab,
+          simulatedInference: true,
+          virtualDevice: true,
+        ),
+        isFalse,
+      );
       expect(
         resolveBackendName(
           backendDefine: '',
