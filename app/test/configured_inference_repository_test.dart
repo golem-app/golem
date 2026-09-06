@@ -42,7 +42,7 @@ InferenceRepository _select({
   required String backend,
   String modelPath = '',
   String modelProfile = 'gemma4',
-  int samplingSeed = 0,
+  int? samplingSeed,
   String? initialCatalogKey,
   String? initialProjectorPath,
   bool sideloaded = false,

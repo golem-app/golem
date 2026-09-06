@@ -1,6 +1,7 @@
 # Golem Model Lab: a fourth flavor that exists on macOS only
 
-Status: decided on `feat/58-lab-flavor` (issue #58, epic #40)
+Status: decided on `feat/58-lab-flavor`, `feat/58-observation-events` and
+`feat/58-lab-bench` (issue #58, epic #40)
 
 ## Context
 
@@ -11,8 +12,8 @@ memory measurements off it. The three shipped identities are all phone apps
 with a macOS build that opens an iPad-shaped window for layout preview; none
 of them is a place for a bench, and the bench must not ride into a store
 build. This record covers the flavor, its identity and artwork, its window,
-its storage, and how its exclusion from every other flavor is proven. The
-observation events and the bench itself are recorded below as they land.
+its storage, how its exclusion from every other flavor is proven, the
+observation events the bench reads, and the bench itself.
 
 ## Decision
 
@@ -136,6 +137,126 @@ storage channel gains `physicalFootprintBytes` (the process's
 thermal state) for the readings every bench measurement carries; the phones
 do not answer either, by design.
 
+### The bench
+
+`features/lab/` is the bench (`app/README.md`, "Golem Model Lab"). Its
+domain is an immutable `LabRun` — the prompt, a configuration snapshot
+frozen when the run started (catalog key, engine, effective sampling as the
+broker computed it, the sparse settings that produced it, engine pins,
+artifact receipt state, device provenance, start time), the phase, the
+reasoning and answer text, bounded telemetry and the final metrics — folded
+by a pure reducer. A run passes through exactly one terminal phase: the
+reducer refuses to move a terminal run, and the controller tags every stream
+with an epoch and drops late events, so a cancelled run that still emits its
+metrics is terminated once. Stop keeps the partial output and waits for the
+engine's own end of stream rather than inventing one — and whatever ends it
+after Stop, a completion or the error both engines raise for a cancelled
+load, records as cancelled. Stop is a flag on the run, not a phase: the run
+keeps the phase it reached, so a load stopped mid-way shows no prefill or
+decode it never did. Telemetry keeps the newest 4,096 instants, their gap
+series computed once per batch, and the true count, so a long generation
+cannot grow the state per token; the median and stall count of a run longer
+than that describe its last 4,096 arrivals, which the README states. The
+live decode rate is measured on the instants' own clock, anchored at the
+engine's acceptance rather than the run's start (the load sits between), and
+its interval runs to now, so the figure sinks while arrivals stall instead
+of freezing at the last burst. The controller publishes at most every 60 ms
+(phase changes and the terminal event at once), so the transcript and chart
+never rebuild per token.
+
+A run in flight locks the Rig. Changing the model, the engine or the settings
+under a live run would silently invalidate the comparison, so it is
+impossible rather than warned against; a change while idle closes the
+conversation and starts a new one, so runs of different configurations never
+sit side by side under one heading. A send locks the bench synchronously,
+before anything can change what the run measures under; the artifact's
+verified state is read from the model store as it stands. The seed a run
+records is the one the engine receives: an empty seed inherits the launch
+seed (`GOLEM_SAMPLING_SEED`) at the broker, and the snapshot and the
+contract chip resolve it the same way.
+
+The Rig shows what the run will carry, computed by the same
+`effectiveSampling` the run sends; the phase chips show only what the engine
+reported (a submitted count for a prefill in flight, a rate only once the
+metrics say so, *chunks* on MLX and *tokens* on llama.cpp); the latency chart
+is the gaps between arrivals and is labelled inter-token or inter-chunk by
+the engine's kind; the footer holds one figure per phase and a dash where
+none was measured. Device provenance sits beside the engine pins in the
+sidebar: a Mac's numbers are not a phone's, and every measurement is made
+under both.
+
+#### The desktop tier
+
+The bench keeps Golem Navy's ramp and voice at pointer densities
+(`lab_theme.dart`): 11.5–13 pt text with tabular figures on every changing
+number, 24 pt as the interactive minimum (macOS's own controls sit between
+22 and 28 pt; the guideline sweep judges the bench at that size under the
+macOS variant), a hover wash and a focus ring on every control through one
+`LabFocusable`, keyboard activation on Enter and Space, and ⌘↩ / Esc / ⌘N
+for run, stop and new conversation wherever focus is. The composer keeps
+focus across a run: it is read-only while locked, never disabled. Reduced
+motion swaps the indeterminate load's spinner for a static mark.
+
+Two contrast fixes to the comps: small labels sit on the muted ink, never
+the tertiary ink (the handoff's 3.80:1 metric labels), and the filled Stop
+and Run buttons draw navy on the accent in dark, where white reads 2.95:1.
+Disabled controls keep readable ink on a quiet fill instead of fading. The
+Rig and the footer are wraps, not rows: every group truncates to the window
+and the band grows a line when the window is narrow or the catalog is long,
+which is what lets the same layout hold from 1440 × 900 to 1000 × 640 in
+thirteen catalogs and at a 1.6× text scale.
+
+Deviations from the comps, deferred to #59: no suite, history or prompt
+navigation, no sweep or plan strip, no saved runs or comparison, and no
+tokenizer-derived token count in the prompt tray before a run measured one.
+The batch size is shown for llama.cpp only; MLX reports none.
+
+#### Evidence
+
+The host suite renders the bench at both window sizes in light and dark,
+walks every state (empty, armed, loading, streaming, completed, cancelled,
+failed, settings, tray, missing artifact) under the 24 pt tap-target,
+labelled-target and contrast guidelines, drives the keyboard shortcuts,
+asserts the run edges are announced exactly once, and lays the bench out in
+every catalog at the smallest window. `integration_test/lab_acceptance_test.dart`
+is the real-model instrument: all four configurations, two turns each,
+engines switched both ways in one process, Stop with partial output, a forced
+failure and Retry, the version-2 timing relations on every run, and the
+observed stream timed against the silent one on each engine — a repeatable
+decode slowdown of five percent or more blocks acceptance. The first record
+is `docs/evals/2026-09-05-lab-acceptance-macos.md`: every configuration
+passed, 1.4 % on llama.cpp and −0.2 % on MLX.
+
+#### Lifecycle, deliberately narrower than the phone's
+
+The handbook's rule that multi-gigabyte weights must not stay resident while
+backgrounded is a phone rule: the background ceiling kills the process. The
+lab root handles `detached` (a synchronous engine release, #124) and
+`resumed` (a download reconcile) and nothing else — no release on `paused`
+and none on memory pressure. A bench keeps its resident model between runs
+by design, macOS has no jetsam ceiling, and a release on every window switch
+would make every next run a cold one. The bench does terminate a run whose
+stream ended without its completion event as *cancelled*, never completed,
+so a teardown mid-run cannot read as a measurement.
+
+#### The session bridge, bound by the bench
+
+Model commands ask two things of the session through `ChatSessionBridge`:
+the model the engine would load now, and whether a generation is in flight.
+Chat answers both from its `ChatState`; the bench answers them as facts — the
+armed configuration's key and its lock — through `bindFacts`, so it never
+fabricates a chat state to be read through. The ensure-owner hook lives in
+the lab's launch overrides (`labLaunchOverrides` names the bench controller
+by a container read, the way the consumer composition names chat), so the
+first command a launch dispatches builds the bench before it asks, no widget
+lifecycle holds the hook, and the lab widget harness carries it.
+
+Stop waits for the engine's own end of stream, which is the honest
+terminator; an engine that never sends it would otherwise hold the whole
+bench locked, so a ten-second watchdog ends the run as cancelled. Stop is
+once per run: a held Escape repeats, and each repeat would re-arm the
+deadline.
+
 ## Consequences
 
 - Four identities. Every exhaustive switch over `AppIdentity` names the lab;
@@ -144,12 +265,15 @@ do not answer either, by design.
   device-tier artifact — only to satisfy the repository's constructor; the
   bench arms configurations by key and never runs the boot-resolved one, and
   no artifact is stamped active for it.
-- The lab has no chat, so `launchOverrides(lab: true)` leaves the chat
-  session bridge unbound: a model command asking whether a generation is in
-  flight gets "no" instead of force-building `ChatController` and reading a
-  chat history the lab never shows. Overriding the bridge a second time in a
-  separate list is not an option — a `ProviderScope` with the same provider
-  twice fails silently under a deferred first frame, which is how this was
-  found.
+- The lab has no chat, so `launchOverrides(lab: true)` never names
+  `ChatController` as the session owner: the lab root passes the bench
+  instead, and a model command asking whether a generation is in flight
+  reads the bench rather than force-building a chat and its history.
+  Overriding the bridge a second time in a separate list is not an option —
+  a `ProviderScope` with the same provider twice fails silently under a
+  deferred first frame, which is how this was found.
 - QA's icon changed on every platform; the flavor's identity, container and
   wiring did not.
+- Chat's reasoning card is now `features/chat/widgets/reasoning_card.dart`,
+  extracted unchanged so the bench renders reasoning the way chat does; the
+  chat goldens did not move.

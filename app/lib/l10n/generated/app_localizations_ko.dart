@@ -1820,4 +1820,415 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get qwenFourBModelSummary => '코드와 수학에 강하며 답하기 전에 문제를 깊이 생각할 수 있습니다.';
+
+  @override
+  String get labAppName => 'Golem Model Lab';
+
+  @override
+  String labVersion(String version) {
+    return 'GML $version';
+  }
+
+  @override
+  String get labNavBench => '벤치';
+
+  @override
+  String get labLibrary => '라이브러리';
+
+  @override
+  String get labResidentLabel => '메모리 상주';
+
+  @override
+  String get labResidentNone => '없음';
+
+  @override
+  String get labRunsThisSession => '이번 세션 실행 수';
+
+  @override
+  String get labLocked => '잠김';
+
+  @override
+  String get labLockedDetail => '실행 중';
+
+  @override
+  String get labChooseModel => '모델 선택';
+
+  @override
+  String get labChooseEngine => '엔진 선택';
+
+  @override
+  String get labNothingArmed => '준비되지 않음 · 모델과 엔진을 선택하세요';
+
+  @override
+  String labArtifactMeta(String size, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '파일 $count개',
+    );
+    return '$size · $_temp0';
+  }
+
+  @override
+  String labContractContext(int value) {
+    return 'ctx $value';
+  }
+
+  @override
+  String labContractMax(int value) {
+    return '최대 $value';
+  }
+
+  @override
+  String labContractTemperature(String value) {
+    return 't $value';
+  }
+
+  @override
+  String labContractTopP(String value) {
+    return 'p $value';
+  }
+
+  @override
+  String labContractTopK(int value) {
+    return 'k $value';
+  }
+
+  @override
+  String labContractSeed(int value) {
+    return '시드 $value';
+  }
+
+  @override
+  String get labContractSeedFree => '시드 자유';
+
+  @override
+  String labContractBatch(String value) {
+    return '배치 $value';
+  }
+
+  @override
+  String get labContractNone => '모델을 준비하기 전에는 계약이 없습니다';
+
+  @override
+  String get labNotReported => '보고되지 않음';
+
+  @override
+  String get labReasoningOn => '추론 켜짐';
+
+  @override
+  String get labReasoningOff => '추론 꺼짐';
+
+  @override
+  String get labRunSettings => '실행 설정';
+
+  @override
+  String get labRunSettingsNote => '다음 실행부터 적용됩니다. 변경하면 새 대화가 시작됩니다.';
+
+  @override
+  String get labSettingSeed => '시드';
+
+  @override
+  String get labSettingSeedFree => '자유';
+
+  @override
+  String get labSettingDefault => '기본값';
+
+  @override
+  String get labSettingPinned => '이 프로필은 추론 모드에서 샘플링을 고정합니다. 위 값은 프로필의 값입니다.';
+
+  @override
+  String get labSettingPinnedShort => '고정';
+
+  @override
+  String labDecrease(String label) {
+    return '$label 줄이기';
+  }
+
+  @override
+  String labIncrease(String label) {
+    return '$label 늘리기';
+  }
+
+  @override
+  String labResetToDefault(String label) {
+    return '$label 기본값으로 재설정';
+  }
+
+  @override
+  String get labApply => '적용';
+
+  @override
+  String labProblemContextFloor(int floor) {
+    return '컨텍스트는 최소 $floor 토큰이어야 합니다';
+  }
+
+  @override
+  String get labProblemContextCeiling => '컨텍스트가 이 모델의 설정을 초과합니다';
+
+  @override
+  String get labProblemMaxTokensFloor => '최대 토큰은 최소 1이어야 합니다';
+
+  @override
+  String labProblemMaxTokensBudget(int reserve) {
+    return '최대 토큰은 프롬프트를 위해 컨텍스트 $reserve 토큰을 남겨야 합니다';
+  }
+
+  @override
+  String get labProblemTemperature => '온도는 0에서 2 사이여야 합니다';
+
+  @override
+  String get labProblemTopP => 'Top-p는 0보다 크고 최대 1이어야 합니다';
+
+  @override
+  String get labProblemTopK => 'Top-k는 음수일 수 없습니다';
+
+  @override
+  String get labProblemSeed => '시드는 0 이상의 정수여야 합니다';
+
+  @override
+  String get labProblemLocked => '실행 중이므로 설정이 잠겨 있습니다';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds초';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes분 $seconds초';
+  }
+
+  @override
+  String get labDeviceUnknown => '기기 알 수 없음';
+
+  @override
+  String labDeviceMemory(String gigabytes) {
+    return '$gigabytes GB';
+  }
+
+  @override
+  String get labMachineLabel => '기기';
+
+  @override
+  String get labMemoryLabel => '메모리';
+
+  @override
+  String get labEmptyTitle => '아직 측정한 것이 없습니다.';
+
+  @override
+  String get labEmptyBody =>
+      '한 번에 하나의 모델만 메모리에 상주합니다. 프롬프트를 선택하면 Golem이 모델을 로드하고, 로드를 측정한 뒤 실행을 측정합니다.';
+
+  @override
+  String get labPromptTray => '프롬프트 트레이';
+
+  @override
+  String get labMeasuredOnThisMac => '이 Mac에서 측정했습니다. 이 수치는 휴대폰에 적용되지 않습니다.';
+
+  @override
+  String labChecks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '검사 $count개',
+      zero: '검사 없음',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String labAllPrompts(int count) {
+    return '전체 ($count)';
+  }
+
+  @override
+  String get labComposerHint => '벤치에 메시지 보내기';
+
+  @override
+  String get labComposerLocked => '실행 중 · 입력란 잠김';
+
+  @override
+  String get labRun => '실행';
+
+  @override
+  String get labNewConversation => '새 대화';
+
+  @override
+  String get labRunStarted => '실행 시작됨';
+
+  @override
+  String get labRunFinished => '실행 완료됨';
+
+  @override
+  String labConversationHeader(String model, String engine, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count턴',
+    );
+    return '$model · $engine · $_temp0';
+  }
+
+  @override
+  String labLoadingModel(String model) {
+    return '$model을(를) 메모리에 로드하는 중';
+  }
+
+  @override
+  String get labLoadIndeterminate => '이 엔진은 로드 진행률을 보고하지 않습니다. 경과 시간은 실제입니다.';
+
+  @override
+  String get labLoadNote => '로드는 숨기지 않고 측정합니다. 이 실행의 총 시간에 포함됩니다.';
+
+  @override
+  String labElapsed(String elapsed) {
+    return '$elapsed 경과';
+  }
+
+  @override
+  String labResident(String size) {
+    return '상주 $size';
+  }
+
+  @override
+  String labPhaseLoad(String seconds) {
+    return '로드 $seconds초';
+  }
+
+  @override
+  String get labPhaseLoading => '로드 중';
+
+  @override
+  String labPhaseLoadingPercent(int percent) {
+    return '로드 중 $percent%';
+  }
+
+  @override
+  String get labPhaseReading => '프롬프트 읽는 중';
+
+  @override
+  String labPhaseReadSubmitted(String completed, String total) {
+    return '$total tok 중 $completed tok 전송됨';
+  }
+
+  @override
+  String labPhaseReadCount(String count) {
+    return '$count tok 읽음';
+  }
+
+  @override
+  String labPhaseReadDone(String count, String rate) {
+    return '$count tok 읽음 · $rate tok/s';
+  }
+
+  @override
+  String labPhaseGenerating(String count) {
+    return '$count tok 생성 중';
+  }
+
+  @override
+  String labPhaseGeneratingRate(String count, String rate) {
+    return '$count tok 생성 중 · $rate tok/s';
+  }
+
+  @override
+  String labPhaseGeneratingChunks(String count) {
+    return '청크 $count개 생성 중';
+  }
+
+  @override
+  String labPhaseGenerated(String count, String rate) {
+    return '$count tok · $rate tok/s';
+  }
+
+  @override
+  String labTtft(String seconds) {
+    return 'TTFT $seconds초';
+  }
+
+  @override
+  String get labInterToken => '토큰 간';
+
+  @override
+  String get labInterChunk => '청크 도착 간격';
+
+  @override
+  String labMedian(String ms) {
+    return '중앙값 $ms ms';
+  }
+
+  @override
+  String labStalls(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '정체 $count회',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String labLatencyChart(String series, String ms, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '정체 $count회',
+      zero: '정체 없음',
+    );
+    return '$series 지연 시간 차트, 중앙값 $ms ms, $_temp0';
+  }
+
+  @override
+  String labLoadSeconds(String seconds) {
+    return '로드 $seconds초';
+  }
+
+  @override
+  String labPeak(String size) {
+    return '최대 $size';
+  }
+
+  @override
+  String get labCancelledNote =>
+      '부분 출력을 보존했습니다. 속도는 생성된 토큰만 반영하며, 이 실행은 비교할 수 없습니다.';
+
+  @override
+  String get labFailedPartial => '부분 출력을 이 실행의 설정과 함께 보존했습니다.';
+
+  @override
+  String get labFooterLoad => '로드';
+
+  @override
+  String get labFooterRead => '읽기';
+
+  @override
+  String get labFooterTtft => 'ttft';
+
+  @override
+  String get labFooterDecode => '디코드';
+
+  @override
+  String get labFooterPeak => '최대';
+
+  @override
+  String get labFooterNoRun => '기록된 실행 없음';
+
+  @override
+  String get labFooterLive => '실시간 · 단계는 평균 내지 않음';
+
+  @override
+  String labFooterRun(String id) {
+    return '실행 $id · 이 Mac에서 측정';
+  }
+
+  @override
+  String labFooterCancelled(String id) {
+    return '실행 $id · 운영자가 취소';
+  }
+
+  @override
+  String labFooterFailed(String id) {
+    return '실행 $id · 실패';
+  }
 }

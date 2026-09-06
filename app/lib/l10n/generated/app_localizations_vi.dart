@@ -1879,4 +1879,424 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get qwenFourBModelSummary =>
       'Thiên về mã và toán học, có thể suy nghĩ kỹ về vấn đề trước khi trả lời.';
+
+  @override
+  String get labAppName => 'Golem Model Lab';
+
+  @override
+  String labVersion(String version) {
+    return 'GML $version';
+  }
+
+  @override
+  String get labNavBench => 'Bàn thử';
+
+  @override
+  String get labLibrary => 'Thư viện';
+
+  @override
+  String get labResidentLabel => 'Trong bộ nhớ';
+
+  @override
+  String get labResidentNone => 'không có';
+
+  @override
+  String get labRunsThisSession => 'Số lần chạy trong phiên';
+
+  @override
+  String get labLocked => 'Đã khóa';
+
+  @override
+  String get labLockedDetail => 'đang chạy';
+
+  @override
+  String get labChooseModel => 'Chọn mô hình';
+
+  @override
+  String get labChooseEngine => 'Chọn engine';
+
+  @override
+  String get labNothingArmed =>
+      'Chưa sẵn sàng · chọn một mô hình và một engine';
+
+  @override
+  String labArtifactMeta(String size, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tệp',
+    );
+    return '$size · $_temp0';
+  }
+
+  @override
+  String labContractContext(int value) {
+    return 'ctx $value';
+  }
+
+  @override
+  String labContractMax(int value) {
+    return 'tối đa $value';
+  }
+
+  @override
+  String labContractTemperature(String value) {
+    return 't $value';
+  }
+
+  @override
+  String labContractTopP(String value) {
+    return 'p $value';
+  }
+
+  @override
+  String labContractTopK(int value) {
+    return 'k $value';
+  }
+
+  @override
+  String labContractSeed(int value) {
+    return 'seed $value';
+  }
+
+  @override
+  String get labContractSeedFree => 'seed tự do';
+
+  @override
+  String labContractBatch(String value) {
+    return 'lô $value';
+  }
+
+  @override
+  String get labContractNone => 'Chưa có hợp đồng cho đến khi chọn mô hình';
+
+  @override
+  String get labNotReported => 'không báo cáo';
+
+  @override
+  String get labReasoningOn => 'lập luận bật';
+
+  @override
+  String get labReasoningOff => 'lập luận tắt';
+
+  @override
+  String get labRunSettings => 'Cài đặt lần chạy';
+
+  @override
+  String get labRunSettingsNote =>
+      'Áp dụng cho lần chạy tiếp theo. Thay đổi sẽ bắt đầu cuộc trò chuyện mới.';
+
+  @override
+  String get labSettingSeed => 'Seed';
+
+  @override
+  String get labSettingSeedFree => 'tự do';
+
+  @override
+  String get labSettingDefault => 'mặc định';
+
+  @override
+  String get labSettingPinned =>
+      'Hồ sơ này cố định lấy mẫu ở chế độ lập luận; các giá trị trên là của hồ sơ.';
+
+  @override
+  String get labSettingPinnedShort => 'cố định';
+
+  @override
+  String labDecrease(String label) {
+    return 'Giảm $label';
+  }
+
+  @override
+  String labIncrease(String label) {
+    return 'Tăng $label';
+  }
+
+  @override
+  String labResetToDefault(String label) {
+    return 'Đặt lại $label về mặc định';
+  }
+
+  @override
+  String get labApply => 'Áp dụng';
+
+  @override
+  String labProblemContextFloor(int floor) {
+    return 'Ngữ cảnh phải có ít nhất $floor token';
+  }
+
+  @override
+  String get labProblemContextCeiling =>
+      'Ngữ cảnh vượt quá cấu hình của mô hình này';
+
+  @override
+  String get labProblemMaxTokensFloor => 'Số token tối đa phải ít nhất là 1';
+
+  @override
+  String labProblemMaxTokensBudget(int reserve) {
+    return 'Số token tối đa phải chừa $reserve token ngữ cảnh cho lời nhắc';
+  }
+
+  @override
+  String get labProblemTemperature => 'Nhiệt độ phải nằm trong khoảng 0 đến 2';
+
+  @override
+  String get labProblemTopP => 'Top-p phải lớn hơn 0 và tối đa là 1';
+
+  @override
+  String get labProblemTopK => 'Top-k không được âm';
+
+  @override
+  String get labProblemSeed => 'Seed phải là số nguyên từ 0 trở lên';
+
+  @override
+  String get labProblemLocked => 'Đang có lượt chạy; cài đặt đã bị khóa';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds giây';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes phút $seconds giây';
+  }
+
+  @override
+  String get labDeviceUnknown => 'Thiết bị không xác định';
+
+  @override
+  String labDeviceMemory(String gigabytes) {
+    return '$gigabytes GB';
+  }
+
+  @override
+  String get labMachineLabel => 'Máy';
+
+  @override
+  String get labMemoryLabel => 'Bộ nhớ';
+
+  @override
+  String get labEmptyTitle => 'Chưa đo gì cả.';
+
+  @override
+  String get labEmptyBody =>
+      'Mỗi lúc chỉ có một mô hình trong bộ nhớ. Chọn một lời nhắc, Golem sẽ nạp mô hình, đo việc nạp, rồi đo lần chạy.';
+
+  @override
+  String get labPromptTray => 'Khay lời nhắc';
+
+  @override
+  String get labMeasuredOnThisMac =>
+      'Đo trên máy Mac này. Các con số ở đây không áp dụng cho điện thoại.';
+
+  @override
+  String labChecks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count kiểm tra',
+      zero: 'không có kiểm tra',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String labAllPrompts(int count) {
+    return 'Tất cả ($count)';
+  }
+
+  @override
+  String get labComposerHint => 'Nhắn cho bàn thử';
+
+  @override
+  String get labComposerLocked => 'Đang chạy · ô nhập bị khóa';
+
+  @override
+  String get labRun => 'Chạy';
+
+  @override
+  String get labNewConversation => 'Cuộc trò chuyện mới';
+
+  @override
+  String get labRunStarted => 'Đã bắt đầu chạy';
+
+  @override
+  String get labRunFinished => 'Đã chạy xong';
+
+  @override
+  String labConversationHeader(String model, String engine, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count lượt',
+    );
+    return '$model · $engine · $_temp0';
+  }
+
+  @override
+  String labLoadingModel(String model) {
+    return 'Đang nạp $model vào bộ nhớ';
+  }
+
+  @override
+  String get labLoadIndeterminate =>
+      'Engine này không báo cáo tiến độ nạp; thời gian đã trôi qua là thật.';
+
+  @override
+  String get labLoadNote =>
+      'Việc nạp được đo, không bị ẩn. Nó tính vào tổng thời gian của lần chạy này.';
+
+  @override
+  String labElapsed(String elapsed) {
+    return 'đã trôi qua $elapsed';
+  }
+
+  @override
+  String labResident(String size) {
+    return 'trong bộ nhớ $size';
+  }
+
+  @override
+  String labPhaseLoad(String seconds) {
+    return 'Nạp $seconds giây';
+  }
+
+  @override
+  String get labPhaseLoading => 'Đang nạp';
+
+  @override
+  String labPhaseLoadingPercent(int percent) {
+    return 'Đang nạp $percent%';
+  }
+
+  @override
+  String get labPhaseReading => 'Đang đọc lời nhắc';
+
+  @override
+  String labPhaseReadSubmitted(String completed, String total) {
+    return 'Đã gửi $completed trên $total tok';
+  }
+
+  @override
+  String labPhaseReadCount(String count) {
+    return 'Đã đọc $count tok';
+  }
+
+  @override
+  String labPhaseReadDone(String count, String rate) {
+    return 'Đã đọc $count tok · $rate tok/giây';
+  }
+
+  @override
+  String labPhaseGenerating(String count) {
+    return 'Đang sinh $count tok';
+  }
+
+  @override
+  String labPhaseGeneratingRate(String count, String rate) {
+    return 'Đang sinh $count tok · $rate tok/giây';
+  }
+
+  @override
+  String labPhaseGeneratingChunks(String count) {
+    return 'Đang sinh $count đoạn';
+  }
+
+  @override
+  String labPhaseGenerated(String count, String rate) {
+    return '$count tok · $rate tok/giây';
+  }
+
+  @override
+  String labTtft(String seconds) {
+    return 'TTFT $seconds giây';
+  }
+
+  @override
+  String get labInterToken => 'Giữa các token';
+
+  @override
+  String get labInterChunk => 'Khoảng đến giữa các đoạn';
+
+  @override
+  String labMedian(String ms) {
+    return 'trung vị $ms ms';
+  }
+
+  @override
+  String labStalls(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count lần khựng',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String labLatencyChart(String series, String ms, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count lần khựng',
+      zero: 'không khựng',
+    );
+    return 'Biểu đồ độ trễ $series, trung vị $ms ms, $_temp0';
+  }
+
+  @override
+  String labLoadSeconds(String seconds) {
+    return 'nạp $seconds giây';
+  }
+
+  @override
+  String labPeak(String size) {
+    return 'đỉnh $size';
+  }
+
+  @override
+  String get labCancelledNote =>
+      'Đã giữ đầu ra một phần. Tốc độ chỉ tính các token đã sinh; lần chạy này không thể so sánh.';
+
+  @override
+  String get labFailedPartial =>
+      'Đã giữ đầu ra một phần cùng cấu hình riêng của lần chạy.';
+
+  @override
+  String get labFooterLoad => 'nạp';
+
+  @override
+  String get labFooterRead => 'đọc';
+
+  @override
+  String get labFooterTtft => 'ttft';
+
+  @override
+  String get labFooterDecode => 'giải mã';
+
+  @override
+  String get labFooterPeak => 'đỉnh';
+
+  @override
+  String get labFooterNoRun => 'Chưa có lần chạy nào';
+
+  @override
+  String get labFooterLive =>
+      'Trực tiếp · các giai đoạn không bao giờ được lấy trung bình';
+
+  @override
+  String labFooterRun(String id) {
+    return 'Lần chạy $id · đo trên máy Mac này';
+  }
+
+  @override
+  String labFooterCancelled(String id) {
+    return 'Lần chạy $id · người vận hành đã hủy';
+  }
+
+  @override
+  String labFooterFailed(String id) {
+    return 'Lần chạy $id · thất bại';
+  }
 }

@@ -214,21 +214,9 @@ class _GolemAppState extends ConsumerState<GolemApp>
       minTextScale,
       maxTextScale,
     );
-    final locale = switch (preferences?.language ?? AppLanguage.system) {
-      AppLanguage.system => null,
-      AppLanguage.english => const Locale('en'),
-      AppLanguage.polish => const Locale('pl'),
-      AppLanguage.spanish => const Locale('es'),
-      AppLanguage.brazilianPortuguese => const Locale('pt', 'BR'),
-      AppLanguage.japanese => const Locale('ja'),
-      AppLanguage.indonesian => const Locale('id'),
-      AppLanguage.hindi => const Locale('hi'),
-      AppLanguage.french => const Locale('fr'),
-      AppLanguage.vietnamese => const Locale('vi'),
-      AppLanguage.turkish => const Locale('tr'),
-      AppLanguage.korean => const Locale('ko'),
-      AppLanguage.arabic => const Locale('ar'),
-    };
+    final locale = localeForLanguage(
+      preferences?.language ?? AppLanguage.system,
+    );
     return CupertinoApp.router(
       title: widget.identity.displayName,
       debugShowCheckedModeBanner: false,

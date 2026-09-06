@@ -4,6 +4,7 @@ import '../core/domain/model_admission.dart';
 import '../core/domain/model_catalog.dart';
 import '../core/domain/models.dart';
 import '../core/domain/repository_resolution.dart';
+import '../core/repositories/contracts.dart';
 import 'bidi.dart';
 import 'generated/app_localizations.dart';
 
@@ -86,3 +87,28 @@ String artifactFailureMessage(AppLocalizations l10n, ArtifactStatus status) =>
         l10n.downloadUnexpectedFileSize(ltrIsolate(fileName)),
       _ => l10n.downloadFailed,
     };
+
+/// What a generation failure means, by kind, for a surface that shows a run
+/// rather than a chat (#58): the same sentences the chat recovery banner
+/// uses for the kinds an engine can raise.
+String inferenceFailureMessage(
+  AppLocalizations l10n,
+  InferenceFailureKind kind, {
+  int? contextTokens,
+}) => switch (kind) {
+  InferenceFailureKind.engine => l10n.generationFailed,
+  InferenceFailureKind.modelUnavailable => l10n.modelUnavailableFailure,
+  InferenceFailureKind.unsupportedModel => l10n.unsupportedModelFailure,
+  InferenceFailureKind.attachmentUnavailable =>
+    l10n.attachmentUnavailableFailure,
+  InferenceFailureKind.unsupportedImages => l10n.unsupportedImagesFailure,
+  InferenceFailureKind.invalidModelArtifact => l10n.invalidModelArtifactFailure,
+  InferenceFailureKind.unsupportedDevice => l10n.modelsUnavailableGeneric,
+  InferenceFailureKind.contextExhausted => l10n.contextExhausted,
+  InferenceFailureKind.outOfMemory =>
+    contextTokens == null
+        ? l10n.outOfMemory
+        : l10n.outOfMemoryAtContext(contextTokens),
+  InferenceFailureKind.insufficientMemory => l10n.insufficientMemory,
+  InferenceFailureKind.budgetExhaustedBeforeAnswer => l10n.budgetExhausted,
+};

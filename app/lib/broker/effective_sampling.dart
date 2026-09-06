@@ -2,6 +2,14 @@ import '../core/domain/generation_settings.dart';
 import 'model_profile.dart';
 import 'runtime.dart';
 
+/// The process-wide sampling seed, from `GOLEM_SAMPLING_SEED` at build time
+/// (0, the default, is none): what a request without a seed of its own
+/// inherits at the engine, so a surface that records the seed a run used
+/// resolves it here rather than reporting free sampling it did not do.
+const int? launchSamplingSeed = int.fromEnvironment('GOLEM_SAMPLING_SEED') == 0
+    ? null
+    : int.fromEnvironment('GOLEM_SAMPLING_SEED');
+
 /// The sampling a request actually carries to the engine: the profile's
 /// mode-specific defaults with the user's sparse overrides layered on, except
 /// where the profile pins them (a correctness constraint — see the Qwen

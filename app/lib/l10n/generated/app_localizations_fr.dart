@@ -1911,4 +1911,432 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get qwenFourBModelSummary =>
       'Orienté vers le code et les mathématiques, il peut raisonner sur un problème avant de répondre.';
+
+  @override
+  String get labAppName => 'Golem Model Lab';
+
+  @override
+  String labVersion(String version) {
+    return 'GML $version';
+  }
+
+  @override
+  String get labNavBench => 'Banc';
+
+  @override
+  String get labLibrary => 'Bibliothèque';
+
+  @override
+  String get labResidentLabel => 'En mémoire';
+
+  @override
+  String get labResidentNone => 'aucun';
+
+  @override
+  String get labRunsThisSession => 'Exécutions dans cette session';
+
+  @override
+  String get labLocked => 'Verrouillé';
+
+  @override
+  String get labLockedDetail => 'exécution en cours';
+
+  @override
+  String get labChooseModel => 'Choisir un modèle';
+
+  @override
+  String get labChooseEngine => 'Choisir un moteur';
+
+  @override
+  String get labNothingArmed =>
+      'Rien d’armé · choisissez un modèle et un moteur';
+
+  @override
+  String labArtifactMeta(String size, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count fichiers',
+      one: '1 fichier',
+    );
+    return '$size · $_temp0';
+  }
+
+  @override
+  String labContractContext(int value) {
+    return 'ctx $value';
+  }
+
+  @override
+  String labContractMax(int value) {
+    return 'max $value';
+  }
+
+  @override
+  String labContractTemperature(String value) {
+    return 't $value';
+  }
+
+  @override
+  String labContractTopP(String value) {
+    return 'p $value';
+  }
+
+  @override
+  String labContractTopK(int value) {
+    return 'k $value';
+  }
+
+  @override
+  String labContractSeed(int value) {
+    return 'graine $value';
+  }
+
+  @override
+  String get labContractSeedFree => 'graine libre';
+
+  @override
+  String labContractBatch(String value) {
+    return 'lot $value';
+  }
+
+  @override
+  String get labContractNone => 'Aucun contrat tant qu’aucun modèle n’est armé';
+
+  @override
+  String get labNotReported => 'non rapporté';
+
+  @override
+  String get labReasoningOn => 'raisonnement activé';
+
+  @override
+  String get labReasoningOff => 'raisonnement désactivé';
+
+  @override
+  String get labRunSettings => 'Réglages d’exécution';
+
+  @override
+  String get labRunSettingsNote =>
+      'Appliqués à la prochaine exécution. Les modifier démarre une nouvelle conversation.';
+
+  @override
+  String get labSettingSeed => 'Graine';
+
+  @override
+  String get labSettingSeedFree => 'libre';
+
+  @override
+  String get labSettingDefault => 'par défaut';
+
+  @override
+  String get labSettingPinned =>
+      'Ce profil fige l’échantillonnage en mode raisonnement ; les valeurs ci-dessus sont celles du profil.';
+
+  @override
+  String get labSettingPinnedShort => 'figé';
+
+  @override
+  String labDecrease(String label) {
+    return 'Diminuer $label';
+  }
+
+  @override
+  String labIncrease(String label) {
+    return 'Augmenter $label';
+  }
+
+  @override
+  String labResetToDefault(String label) {
+    return 'Réinitialiser $label';
+  }
+
+  @override
+  String get labApply => 'Appliquer';
+
+  @override
+  String labProblemContextFloor(int floor) {
+    return 'Le contexte doit compter au moins $floor tokens';
+  }
+
+  @override
+  String get labProblemContextCeiling =>
+      'Le contexte dépasse la configuration de ce modèle';
+
+  @override
+  String get labProblemMaxTokensFloor =>
+      'Les tokens max doivent être au moins 1';
+
+  @override
+  String labProblemMaxTokensBudget(int reserve) {
+    return 'Les tokens max doivent laisser $reserve tokens de contexte pour l’instruction';
+  }
+
+  @override
+  String get labProblemTemperature =>
+      'La température doit être comprise entre 0 et 2';
+
+  @override
+  String get labProblemTopP => 'Top-p doit être supérieur à 0 et au plus 1';
+
+  @override
+  String get labProblemTopK => 'Top-k ne peut pas être négatif';
+
+  @override
+  String get labProblemSeed =>
+      'La graine doit être un entier supérieur ou égal à 0';
+
+  @override
+  String get labProblemLocked =>
+      'Une exécution est en cours ; les réglages sont verrouillés';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds s';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes min $seconds s';
+  }
+
+  @override
+  String get labDeviceUnknown => 'Appareil inconnu';
+
+  @override
+  String labDeviceMemory(String gigabytes) {
+    return '$gigabytes GB';
+  }
+
+  @override
+  String get labMachineLabel => 'Appareil';
+
+  @override
+  String get labMemoryLabel => 'Mémoire';
+
+  @override
+  String get labEmptyTitle => 'Rien de mesuré pour l’instant.';
+
+  @override
+  String get labEmptyBody =>
+      'Un seul modèle est en mémoire à la fois. Choisissez une instruction : Golem charge le modèle, mesure le chargement, puis mesure l’exécution.';
+
+  @override
+  String get labPromptTray => 'Plateau d’instructions';
+
+  @override
+  String get labMeasuredOnThisMac =>
+      'Mesuré sur ce Mac. Ces chiffres ne se transposent pas à un téléphone.';
+
+  @override
+  String labChecks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count vérifications',
+      one: '1 vérification',
+      zero: 'aucune vérification',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String labAllPrompts(int count) {
+    return 'Toutes ($count)';
+  }
+
+  @override
+  String get labComposerHint => 'Écrire au banc';
+
+  @override
+  String get labComposerLocked => 'Exécution en cours · champ verrouillé';
+
+  @override
+  String get labRun => 'Exécuter';
+
+  @override
+  String get labNewConversation => 'Nouvelle conversation';
+
+  @override
+  String get labRunStarted => 'Exécution démarrée';
+
+  @override
+  String get labRunFinished => 'Exécution terminée';
+
+  @override
+  String labConversationHeader(String model, String engine, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tours',
+      one: '1 tour',
+    );
+    return '$model · $engine · $_temp0';
+  }
+
+  @override
+  String labLoadingModel(String model) {
+    return 'Chargement de $model en mémoire';
+  }
+
+  @override
+  String get labLoadIndeterminate =>
+      'Ce moteur ne rapporte pas la progression du chargement ; le temps écoulé est réel.';
+
+  @override
+  String get labLoadNote =>
+      'Le chargement est mesuré, pas caché. Il compte dans la durée totale de cette exécution.';
+
+  @override
+  String labElapsed(String elapsed) {
+    return '$elapsed écoulées';
+  }
+
+  @override
+  String labResident(String size) {
+    return 'en mémoire $size';
+  }
+
+  @override
+  String labPhaseLoad(String seconds) {
+    return 'Chargement $seconds s';
+  }
+
+  @override
+  String get labPhaseLoading => 'Chargement';
+
+  @override
+  String labPhaseLoadingPercent(int percent) {
+    return 'Chargement $percent %';
+  }
+
+  @override
+  String get labPhaseReading => 'Lecture de l’instruction';
+
+  @override
+  String labPhaseReadSubmitted(String completed, String total) {
+    return '$completed sur $total tok soumis';
+  }
+
+  @override
+  String labPhaseReadCount(String count) {
+    return '$count tok lus';
+  }
+
+  @override
+  String labPhaseReadDone(String count, String rate) {
+    return '$count tok lus · $rate tok/s';
+  }
+
+  @override
+  String labPhaseGenerating(String count) {
+    return 'Génération $count tok';
+  }
+
+  @override
+  String labPhaseGeneratingRate(String count, String rate) {
+    return 'Génération $count tok · $rate tok/s';
+  }
+
+  @override
+  String labPhaseGeneratingChunks(String count) {
+    return 'Génération $count fragments';
+  }
+
+  @override
+  String labPhaseGenerated(String count, String rate) {
+    return '$count tok · $rate tok/s';
+  }
+
+  @override
+  String labTtft(String seconds) {
+    return 'TTFT $seconds s';
+  }
+
+  @override
+  String get labInterToken => 'Entre tokens';
+
+  @override
+  String get labInterChunk => 'Arrivée entre fragments';
+
+  @override
+  String labMedian(String ms) {
+    return 'médiane $ms ms';
+  }
+
+  @override
+  String labStalls(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count blocages',
+      one: '1 blocage',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String labLatencyChart(String series, String ms, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count blocages',
+      one: '1 blocage',
+      zero: 'aucun blocage',
+    );
+    return 'Graphique de latence $series, médiane $ms ms, $_temp0';
+  }
+
+  @override
+  String labLoadSeconds(String seconds) {
+    return 'chargement $seconds s';
+  }
+
+  @override
+  String labPeak(String size) {
+    return 'pic $size';
+  }
+
+  @override
+  String get labCancelledNote =>
+      'Sortie partielle conservée. Les débits couvrent les tokens produits ; l’exécution n’est pas comparable.';
+
+  @override
+  String get labFailedPartial =>
+      'Sortie partielle conservée, avec la configuration propre à l’exécution.';
+
+  @override
+  String get labFooterLoad => 'chargement';
+
+  @override
+  String get labFooterRead => 'lecture';
+
+  @override
+  String get labFooterTtft => 'ttft';
+
+  @override
+  String get labFooterDecode => 'décodage';
+
+  @override
+  String get labFooterPeak => 'pic';
+
+  @override
+  String get labFooterNoRun => 'Aucune exécution enregistrée';
+
+  @override
+  String get labFooterLive => 'En direct · les phases ne sont jamais moyennées';
+
+  @override
+  String labFooterRun(String id) {
+    return 'Exécution $id · mesurée sur ce Mac';
+  }
+
+  @override
+  String labFooterCancelled(String id) {
+    return 'Exécution $id · annulée par l’opérateur';
+  }
+
+  @override
+  String labFooterFailed(String id) {
+    return 'Exécution $id · échec';
+  }
 }

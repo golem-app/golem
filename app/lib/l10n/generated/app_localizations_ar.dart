@@ -1923,4 +1923,446 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get qwenFourBModelSummary =>
       'يميل إلى البرمجة والرياضيات، ويمكنه التفكير في المسألة قبل الإجابة.';
+
+  @override
+  String get labAppName => 'Golem Model Lab';
+
+  @override
+  String labVersion(String version) {
+    return 'GML $version';
+  }
+
+  @override
+  String get labNavBench => 'منصة الاختبار';
+
+  @override
+  String get labLibrary => 'المكتبة';
+
+  @override
+  String get labResidentLabel => 'في الذاكرة';
+
+  @override
+  String get labResidentNone => 'لا شيء';
+
+  @override
+  String get labRunsThisSession => 'عمليات التشغيل في هذه الجلسة';
+
+  @override
+  String get labLocked => 'مقفل';
+
+  @override
+  String get labLockedDetail => 'تشغيل جارٍ';
+
+  @override
+  String get labChooseModel => 'اختر النموذج';
+
+  @override
+  String get labChooseEngine => 'اختر المحرّك';
+
+  @override
+  String get labNothingArmed => 'لا شيء مُجهّز · اختر نموذجًا ومحرّكًا';
+
+  @override
+  String labArtifactMeta(String size, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ملف',
+      many: '$count ملفًا',
+      few: '$count ملفات',
+      two: 'ملفان',
+      one: 'ملف واحد',
+      zero: 'لا ملفات',
+    );
+    return '$size · $_temp0';
+  }
+
+  @override
+  String labContractContext(int value) {
+    return 'ctx $value';
+  }
+
+  @override
+  String labContractMax(int value) {
+    return 'الحد الأقصى $value';
+  }
+
+  @override
+  String labContractTemperature(String value) {
+    return 't $value';
+  }
+
+  @override
+  String labContractTopP(String value) {
+    return 'p $value';
+  }
+
+  @override
+  String labContractTopK(int value) {
+    return 'k $value';
+  }
+
+  @override
+  String labContractSeed(int value) {
+    return 'البذرة $value';
+  }
+
+  @override
+  String get labContractSeedFree => 'بذرة حرة';
+
+  @override
+  String labContractBatch(String value) {
+    return 'الدفعة $value';
+  }
+
+  @override
+  String get labContractNone => 'لا عقد قبل تجهيز نموذج';
+
+  @override
+  String get labNotReported => 'غير مُبلَّغ عنه';
+
+  @override
+  String get labReasoningOn => 'التفكير مفعّل';
+
+  @override
+  String get labReasoningOff => 'التفكير معطّل';
+
+  @override
+  String get labRunSettings => 'إعدادات التشغيل';
+
+  @override
+  String get labRunSettingsNote =>
+      'تُطبَّق على التشغيل التالي. تغييرها يبدأ محادثة جديدة.';
+
+  @override
+  String get labSettingSeed => 'البذرة';
+
+  @override
+  String get labSettingSeedFree => 'حرة';
+
+  @override
+  String get labSettingDefault => 'الافتراضي';
+
+  @override
+  String get labSettingPinned =>
+      'يثبّت هذا الملف الشخصي إعدادات أخذ العينات في وضع التفكير؛ القيم أعلاه هي قيم الملف الشخصي.';
+
+  @override
+  String get labSettingPinnedShort => 'مثبّت';
+
+  @override
+  String labDecrease(String label) {
+    return 'إنقاص $label';
+  }
+
+  @override
+  String labIncrease(String label) {
+    return 'زيادة $label';
+  }
+
+  @override
+  String labResetToDefault(String label) {
+    return 'إعادة $label إلى الافتراضي';
+  }
+
+  @override
+  String get labApply => 'تطبيق';
+
+  @override
+  String labProblemContextFloor(int floor) {
+    return 'يجب ألا يقل السياق عن $floor رمز';
+  }
+
+  @override
+  String get labProblemContextCeiling =>
+      'السياق يتجاوز ما هو مُعدّ لهذا النموذج';
+
+  @override
+  String get labProblemMaxTokensFloor => 'يجب ألا يقل الحد الأقصى للرموز عن 1';
+
+  @override
+  String labProblemMaxTokensBudget(int reserve) {
+    return 'يجب أن يترك الحد الأقصى للرموز $reserve رمزًا من السياق للتعليمات';
+  }
+
+  @override
+  String get labProblemTemperature => 'يجب أن تكون درجة الحرارة بين 0 و2';
+
+  @override
+  String get labProblemTopP => 'يجب أن يكون Top-p أكبر من 0 وبحد أقصى 1';
+
+  @override
+  String get labProblemTopK => 'لا يمكن أن يكون Top-k سالبًا';
+
+  @override
+  String get labProblemSeed =>
+      'يجب أن تكون البذرة عددًا صحيحًا يساوي 0 أو أكبر';
+
+  @override
+  String get labProblemLocked => 'هناك تشغيل جارٍ؛ الإعدادات مقفلة';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds ث';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes د $seconds ث';
+  }
+
+  @override
+  String get labDeviceUnknown => 'الجهاز غير معروف';
+
+  @override
+  String labDeviceMemory(String gigabytes) {
+    return '$gigabytes GB';
+  }
+
+  @override
+  String get labMachineLabel => 'الجهاز';
+
+  @override
+  String get labMemoryLabel => 'الذاكرة';
+
+  @override
+  String get labEmptyTitle => 'لم يُقَس شيء بعد.';
+
+  @override
+  String get labEmptyBody =>
+      'يوجد نموذج واحد في الذاكرة في كل مرة. اختر تعليمات، فيحمّل Golem النموذج ويقيس التحميل ثم يقيس التشغيل.';
+
+  @override
+  String get labPromptTray => 'درج التعليمات';
+
+  @override
+  String get labMeasuredOnThisMac =>
+      'قِيس على جهاز Mac هذا. لا تنطبق هذه الأرقام على الهاتف.';
+
+  @override
+  String labChecks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count فحص',
+      many: '$count فحصًا',
+      few: '$count فحوصات',
+      two: 'فحصان',
+      one: 'فحص واحد',
+      zero: 'لا فحوصات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String labAllPrompts(int count) {
+    return 'الكل ($count)';
+  }
+
+  @override
+  String get labComposerHint => 'اكتب إلى منصة الاختبار';
+
+  @override
+  String get labComposerLocked => 'تشغيل جارٍ · الحقل مقفل';
+
+  @override
+  String get labRun => 'تشغيل';
+
+  @override
+  String get labNewConversation => 'محادثة جديدة';
+
+  @override
+  String get labRunStarted => 'بدأ التشغيل';
+
+  @override
+  String get labRunFinished => 'انتهى التشغيل';
+
+  @override
+  String labConversationHeader(String model, String engine, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count دور',
+      many: '$count دورًا',
+      few: '$count أدوار',
+      two: 'دوران',
+      one: 'دور واحد',
+      zero: 'لا أدوار',
+    );
+    return '$model · $engine · $_temp0';
+  }
+
+  @override
+  String labLoadingModel(String model) {
+    return 'جارٍ تحميل $model إلى الذاكرة';
+  }
+
+  @override
+  String get labLoadIndeterminate =>
+      'لا يُبلغ هذا المحرّك عن تقدّم التحميل؛ الوقت المنقضي حقيقي.';
+
+  @override
+  String get labLoadNote =>
+      'التحميل يُقاس ولا يُخفى. يُحتسب ضمن الوقت الكلي لهذا التشغيل.';
+
+  @override
+  String labElapsed(String elapsed) {
+    return 'انقضى $elapsed';
+  }
+
+  @override
+  String labResident(String size) {
+    return 'في الذاكرة $size';
+  }
+
+  @override
+  String labPhaseLoad(String seconds) {
+    return 'التحميل $seconds ث';
+  }
+
+  @override
+  String get labPhaseLoading => 'جارٍ التحميل';
+
+  @override
+  String labPhaseLoadingPercent(int percent) {
+    return 'جارٍ التحميل $percent٪';
+  }
+
+  @override
+  String get labPhaseReading => 'جارٍ قراءة التعليمات';
+
+  @override
+  String labPhaseReadSubmitted(String completed, String total) {
+    return 'أُرسل $completed من $total رمز';
+  }
+
+  @override
+  String labPhaseReadCount(String count) {
+    return 'قُرئ $count رمز';
+  }
+
+  @override
+  String labPhaseReadDone(String count, String rate) {
+    return 'قُرئ $count رمز · $rate رمز/ث';
+  }
+
+  @override
+  String labPhaseGenerating(String count) {
+    return 'جارٍ توليد $count رمز';
+  }
+
+  @override
+  String labPhaseGeneratingRate(String count, String rate) {
+    return 'جارٍ توليد $count رمز · $rate رمز/ث';
+  }
+
+  @override
+  String labPhaseGeneratingChunks(String count) {
+    return 'جارٍ توليد $count مقطع';
+  }
+
+  @override
+  String labPhaseGenerated(String count, String rate) {
+    return '$count رمز · $rate رمز/ث';
+  }
+
+  @override
+  String labTtft(String seconds) {
+    return 'TTFT $seconds ث';
+  }
+
+  @override
+  String get labInterToken => 'بين الرموز';
+
+  @override
+  String get labInterChunk => 'وصول المقاطع';
+
+  @override
+  String labMedian(String ms) {
+    return 'الوسيط $ms ms';
+  }
+
+  @override
+  String labStalls(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count توقف',
+      many: '$count توقفًا',
+      few: '$count توقفات',
+      two: 'توقفان',
+      one: 'توقف واحد',
+      zero: 'لا توقفات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String labLatencyChart(String series, String ms, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count توقف',
+      many: '$count توقفًا',
+      few: '$count توقفات',
+      two: 'توقفان',
+      one: 'توقف واحد',
+      zero: 'لا توقفات',
+    );
+    return 'مخطط زمن الاستجابة $series، الوسيط $ms ms، $_temp0';
+  }
+
+  @override
+  String labLoadSeconds(String seconds) {
+    return 'التحميل $seconds ث';
+  }
+
+  @override
+  String labPeak(String size) {
+    return 'الذروة $size';
+  }
+
+  @override
+  String get labCancelledNote =>
+      'احتُفظ بالمخرجات الجزئية. تغطي المعدلات الرموز المُولَّدة فقط؛ هذا التشغيل غير قابل للمقارنة.';
+
+  @override
+  String get labFailedPartial =>
+      'احتُفظ بالمخرجات الجزئية مع إعدادات هذا التشغيل.';
+
+  @override
+  String get labFooterLoad => 'التحميل';
+
+  @override
+  String get labFooterRead => 'القراءة';
+
+  @override
+  String get labFooterTtft => 'ttft';
+
+  @override
+  String get labFooterDecode => 'فك الترميز';
+
+  @override
+  String get labFooterPeak => 'الذروة';
+
+  @override
+  String get labFooterNoRun => 'لا تشغيل مسجّل';
+
+  @override
+  String get labFooterLive => 'مباشر · لا تُحسب متوسطات المراحل أبدًا';
+
+  @override
+  String labFooterRun(String id) {
+    return 'التشغيل $id · قِيس على جهاز Mac هذا';
+  }
+
+  @override
+  String labFooterCancelled(String id) {
+    return 'التشغيل $id · ألغاه المشغّل';
+  }
+
+  @override
+  String labFooterFailed(String id) {
+    return 'التشغيل $id · فشل';
+  }
 }

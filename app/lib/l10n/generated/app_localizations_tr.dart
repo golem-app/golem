@@ -1879,4 +1879,427 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get qwenFourBModelSummary =>
       'Kod ve matematiğe ağırlık verir; yanıtlamadan önce bir problemi düşünüp çözebilir.';
+
+  @override
+  String get labAppName => 'Golem Model Lab';
+
+  @override
+  String labVersion(String version) {
+    return 'GML $version';
+  }
+
+  @override
+  String get labNavBench => 'Tezgâh';
+
+  @override
+  String get labLibrary => 'Kitaplık';
+
+  @override
+  String get labResidentLabel => 'Bellekte';
+
+  @override
+  String get labResidentNone => 'yok';
+
+  @override
+  String get labRunsThisSession => 'Bu oturumdaki çalıştırmalar';
+
+  @override
+  String get labLocked => 'Kilitli';
+
+  @override
+  String get labLockedDetail => 'çalıştırma sürüyor';
+
+  @override
+  String get labChooseModel => 'Model seç';
+
+  @override
+  String get labChooseEngine => 'Motor seç';
+
+  @override
+  String get labNothingArmed => 'Hazır değil · bir model ve bir motor seçin';
+
+  @override
+  String labArtifactMeta(String size, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count dosya',
+      one: '1 dosya',
+    );
+    return '$size · $_temp0';
+  }
+
+  @override
+  String labContractContext(int value) {
+    return 'ctx $value';
+  }
+
+  @override
+  String labContractMax(int value) {
+    return 'en fazla $value';
+  }
+
+  @override
+  String labContractTemperature(String value) {
+    return 't $value';
+  }
+
+  @override
+  String labContractTopP(String value) {
+    return 'p $value';
+  }
+
+  @override
+  String labContractTopK(int value) {
+    return 'k $value';
+  }
+
+  @override
+  String labContractSeed(int value) {
+    return 'tohum $value';
+  }
+
+  @override
+  String get labContractSeedFree => 'tohum serbest';
+
+  @override
+  String labContractBatch(String value) {
+    return 'yığın $value';
+  }
+
+  @override
+  String get labContractNone => 'Bir model hazırlanana kadar sözleşme yok';
+
+  @override
+  String get labNotReported => 'bildirilmedi';
+
+  @override
+  String get labReasoningOn => 'akıl yürütme açık';
+
+  @override
+  String get labReasoningOff => 'akıl yürütme kapalı';
+
+  @override
+  String get labRunSettings => 'Çalıştırma ayarları';
+
+  @override
+  String get labRunSettingsNote =>
+      'Sonraki çalıştırmada geçerli olur. Değiştirmek yeni bir sohbet başlatır.';
+
+  @override
+  String get labSettingSeed => 'Tohum';
+
+  @override
+  String get labSettingSeedFree => 'serbest';
+
+  @override
+  String get labSettingDefault => 'varsayılan';
+
+  @override
+  String get labSettingPinned =>
+      'Bu profil akıl yürütme kipinde örneklemeyi sabitler; yukarıdaki değerler profile aittir.';
+
+  @override
+  String get labSettingPinnedShort => 'sabit';
+
+  @override
+  String labDecrease(String label) {
+    return '$label azalt';
+  }
+
+  @override
+  String labIncrease(String label) {
+    return '$label artır';
+  }
+
+  @override
+  String labResetToDefault(String label) {
+    return '$label varsayılana döndür';
+  }
+
+  @override
+  String get labApply => 'Uygula';
+
+  @override
+  String labProblemContextFloor(int floor) {
+    return 'Bağlam en az $floor token olmalı';
+  }
+
+  @override
+  String get labProblemContextCeiling =>
+      'Bağlam bu modelin yapılandırmasını aşıyor';
+
+  @override
+  String get labProblemMaxTokensFloor => 'En fazla token en az 1 olmalı';
+
+  @override
+  String labProblemMaxTokensBudget(int reserve) {
+    return 'En fazla token, istem için $reserve token bağlam bırakmalı';
+  }
+
+  @override
+  String get labProblemTemperature => 'Sıcaklık 0 ile 2 arasında olmalı';
+
+  @override
+  String get labProblemTopP => 'Top-p 0’dan büyük ve en fazla 1 olmalı';
+
+  @override
+  String get labProblemTopK => 'Top-k negatif olamaz';
+
+  @override
+  String get labProblemSeed => 'Tohum 0 veya daha büyük bir tam sayı olmalı';
+
+  @override
+  String get labProblemLocked => 'Bir çalıştırma sürüyor; ayarlar kilitli';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds sn';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes dk $seconds sn';
+  }
+
+  @override
+  String get labDeviceUnknown => 'Cihaz bilinmiyor';
+
+  @override
+  String labDeviceMemory(String gigabytes) {
+    return '$gigabytes GB';
+  }
+
+  @override
+  String get labMachineLabel => 'Makine';
+
+  @override
+  String get labMemoryLabel => 'Bellek';
+
+  @override
+  String get labEmptyTitle => 'Henüz bir ölçüm yok.';
+
+  @override
+  String get labEmptyBody =>
+      'Bellekte aynı anda tek model bulunur. Bir istem seçin; Golem modeli yükler, yüklemeyi ölçer, sonra çalıştırmayı ölçer.';
+
+  @override
+  String get labPromptTray => 'İstem tepsisi';
+
+  @override
+  String get labMeasuredOnThisMac =>
+      'Bu Mac’te ölçüldü. Buradaki sayılar telefona aktarılamaz.';
+
+  @override
+  String labChecks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count denetim',
+      one: '1 denetim',
+      zero: 'denetim yok',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String labAllPrompts(int count) {
+    return 'Tümü ($count)';
+  }
+
+  @override
+  String get labComposerHint => 'Tezgâha yazın';
+
+  @override
+  String get labComposerLocked => 'Çalıştırma sürüyor · alan kilitli';
+
+  @override
+  String get labRun => 'Çalıştır';
+
+  @override
+  String get labNewConversation => 'Yeni sohbet';
+
+  @override
+  String get labRunStarted => 'Çalıştırma başladı';
+
+  @override
+  String get labRunFinished => 'Çalıştırma bitti';
+
+  @override
+  String labConversationHeader(String model, String engine, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tur',
+      one: '1 tur',
+    );
+    return '$model · $engine · $_temp0';
+  }
+
+  @override
+  String labLoadingModel(String model) {
+    return '$model belleğe yükleniyor';
+  }
+
+  @override
+  String get labLoadIndeterminate =>
+      'Bu motor yükleme ilerlemesini bildirmez; geçen süre gerçektir.';
+
+  @override
+  String get labLoadNote =>
+      'Yükleme gizlenmez, ölçülür. Bu çalıştırmanın toplam süresine dahildir.';
+
+  @override
+  String labElapsed(String elapsed) {
+    return '$elapsed geçti';
+  }
+
+  @override
+  String labResident(String size) {
+    return 'bellekte $size';
+  }
+
+  @override
+  String labPhaseLoad(String seconds) {
+    return 'Yükleme $seconds sn';
+  }
+
+  @override
+  String get labPhaseLoading => 'Yükleniyor';
+
+  @override
+  String labPhaseLoadingPercent(int percent) {
+    return 'Yükleniyor %$percent';
+  }
+
+  @override
+  String get labPhaseReading => 'İstem okunuyor';
+
+  @override
+  String labPhaseReadSubmitted(String completed, String total) {
+    return '$total tokenin $completed tanesi gönderildi';
+  }
+
+  @override
+  String labPhaseReadCount(String count) {
+    return '$count token okundu';
+  }
+
+  @override
+  String labPhaseReadDone(String count, String rate) {
+    return '$count token okundu · $rate tok/sn';
+  }
+
+  @override
+  String labPhaseGenerating(String count) {
+    return '$count token üretiliyor';
+  }
+
+  @override
+  String labPhaseGeneratingRate(String count, String rate) {
+    return '$count token üretiliyor · $rate tok/sn';
+  }
+
+  @override
+  String labPhaseGeneratingChunks(String count) {
+    return '$count parça üretiliyor';
+  }
+
+  @override
+  String labPhaseGenerated(String count, String rate) {
+    return '$count tok · $rate tok/sn';
+  }
+
+  @override
+  String labTtft(String seconds) {
+    return 'TTFT $seconds sn';
+  }
+
+  @override
+  String get labInterToken => 'Tokenler arası';
+
+  @override
+  String get labInterChunk => 'Parçalar arası varış';
+
+  @override
+  String labMedian(String ms) {
+    return 'ortanca $ms ms';
+  }
+
+  @override
+  String labStalls(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count takılma',
+      one: '1 takılma',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String labLatencyChart(String series, String ms, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count takılma',
+      one: '1 takılma',
+      zero: 'takılma yok',
+    );
+    return '$series gecikme grafiği, ortanca $ms ms, $_temp0';
+  }
+
+  @override
+  String labLoadSeconds(String seconds) {
+    return 'yükleme $seconds sn';
+  }
+
+  @override
+  String labPeak(String size) {
+    return 'tepe $size';
+  }
+
+  @override
+  String get labCancelledNote =>
+      'Kısmi çıktı korundu. Hızlar yalnızca üretilen tokenleri kapsar; bu çalıştırma karşılaştırılamaz.';
+
+  @override
+  String get labFailedPartial =>
+      'Kısmi çıktı, çalıştırmanın kendi yapılandırmasıyla korundu.';
+
+  @override
+  String get labFooterLoad => 'yükleme';
+
+  @override
+  String get labFooterRead => 'okuma';
+
+  @override
+  String get labFooterTtft => 'ttft';
+
+  @override
+  String get labFooterDecode => 'çözme';
+
+  @override
+  String get labFooterPeak => 'tepe';
+
+  @override
+  String get labFooterNoRun => 'Kayıtlı çalıştırma yok';
+
+  @override
+  String get labFooterLive => 'Canlı · evrelerin ortalaması alınmaz';
+
+  @override
+  String labFooterRun(String id) {
+    return 'Çalıştırma $id · bu Mac’te ölçüldü';
+  }
+
+  @override
+  String labFooterCancelled(String id) {
+    return 'Çalıştırma $id · operatör iptal etti';
+  }
+
+  @override
+  String labFooterFailed(String id) {
+    return 'Çalıştırma $id · başarısız';
+  }
 }

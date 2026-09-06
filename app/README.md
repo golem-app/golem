@@ -229,7 +229,11 @@ contracts live under `lib/core/`. No feature builds a platform button
 directly: a label is a `GolemButton`, a glyph a `GolemIconButton`, and a
 tappable row or chip a `GolemTappable`, which is the one place the platform tap
 minimum is stated. `test/chrome_boundary_test.dart` enforces that, and the
-sizes it owns are why `features/` holds no hard-coded 44 or 48.
+sizes it owns are why `features/` holds no hard-coded 44 or 48. The one
+exception is the macOS-only bench (ADR 0021): a pointer tier with its own
+controls under `features/lab/widgets/lab_controls.dart` and its own 24 pt
+minimum in `lab_theme.dart`, judged by the guideline sweep under the macOS
+variant — a phone minimum on a desktop bench would be the wrong promise.
 `lib/core/providers/app_providers.dart` holds only what is genuinely shared:
 the launch seams wired by `launchOverrides`, the boot-constant derivations,
 and the session bridges through which one feature's controller offers
@@ -405,6 +409,7 @@ footnote while each row says only that it is refused.
 
 Stable keys/semantics preserve the native automation vocabulary. The most useful
 identifiers are `launch-splash`, `chat-composer`, `send-button`, `stop-button`,
+(the lab's own are listed under "Golem Model Lab"),
 `reasoning-toggle`, `reasoning-card-header` (the transcript card's own
 disclosure, which reports Expanded/Collapsed as its semantic value; cards
 arrive collapsed and, while live, show a three-line `reasoning-peek` that is
@@ -825,6 +830,80 @@ flutter build ios --release --no-codesign --flavor production --analyze-size \
 
 `integration_test/release_hygiene_test.dart` takes `GOLEM_EXPECTED_LAB=true`
 on a lab build and expects it false on every other flavor.
+
+### The bench
+
+The lab opens on the bench: arm a model and an engine in the Rig (or click
+a library row in the sidebar), pick a prompt from the tray or type one, and
+Run (⌘↩). Stop (Esc) keeps the partial output and ends the run as
+cancelled whatever the engine answers, in the phase it had reached; ⌘N
+starts a new conversation. The Rig locks while a run is in flight — changing what a run
+measures under mid-run would silently invalidate the comparison — and a
+change while idle closes the conversation and starts a new one under the new
+snapshot. The Rig's artifact chip offers Download / Pause / Resume / Retry /
+Delete through the same model store the phones use, after the same consent;
+nothing downloads because the lab opened or because a model was armed. Run
+settings (the contract chip) hold context, token budget, sampling, reasoning
+and a seed, applied as one change; a pinned profile shows its values and
+takes no edits. An empty seed inherits the build's `GOLEM_SAMPLING_SEED`,
+and the chip and the run's snapshot show the seed the engine received.
+
+Every run card names the configuration it ran under and shows only what the
+engine reported: load with the engine's own fraction (llama.cpp) or an
+indeterminate phase (MLX), prefill as submitted tokens then the measured
+rate, output as tokens (llama.cpp) or *chunks* (MLX, one or more tokens
+each) with the gaps between arrivals charted and labelled inter-token or
+inter-chunk accordingly (the median and stall count of a run longer than
+4,096 arrivals describe its last 4,096), then TTFT, decode rate, peak
+footprint and load time once the metrics land. The footer keeps the newest
+run's figures across a new conversation. Numbers here are correctness and relative comparison
+only — the sidebar carries the machine beside the engine pins, and nothing
+transfers to a phone. Saved history, grading, comparison and export are #59.
+
+Identifiers: `lab-shell`, `lab-sidebar`, `lab-library-<family>` (the stem
+its catalog keys share, `gemma4`, `qwen35`), `lab-rig`, `lab-rig-locked`,
+`lab-model-menu` / `lab-model-<family>`,
+`lab-engine-menu` / `lab-engine-<engine>`, `lab-artifact-chip` plus
+`lab-artifact-{download,pause,resume,retry,delete}`, `lab-contract-chip`,
+`lab-settings-button`, `lab-settings-sheet` plus
+`lab-setting-<name>{,-minus,-plus,-reset}`, `lab-setting-reasoning`,
+`lab-setting-seed`, `lab-settings-{apply,cancel}`, `lab-empty`,
+`lab-transcript`, `lab-run-<id>`, `lab-phase-{load,read,generate}`,
+`lab-sparkline`, `lab-result-chip`, `lab-cancelled-chip`,
+`lab-failed-notice`, `lab-retry`, `lab-tray-<prompt id>`, `lab-tray-all`,
+`lab-tray-sheet`, `lab-composer`, `lab-run-button`, `lab-stop-button`,
+`lab-new-conversation`, `lab-footer`, `lab-device`.
+
+Host coverage is `test/lab/`: the domain and reducer, the controller against
+the fake repository, and the shell — goldens at 1440 × 900 and 1000 × 640 in
+light and dark under the macOS variant (`-macos` suffix), the guideline
+sweep at the pointer tier's 24 pt minimum, keyboard, announcements, a 1.6×
+text scale and every catalog at the smallest window. The fake repository
+emits a deterministic observed stream when asked, so the bench's states are
+reproducible without weights.
+
+### Real-model acceptance (lab)
+
+`integration_test/lab_acceptance_test.dart` is the bench's instrument on the
+lab build. Provision all four artifacts as above (`gemma4-gguf`,
+`gemma4-mlx`, `qwen35-gguf`, `qwen35-mlx`; the MLX directories link every
+file of the fetched copy), then:
+
+```sh
+flutter test integration_test/lab_acceptance_test.dart -d macos --flavor lab \
+  --dart-define=GOLEM_LAB_ACCEPTANCE=true
+```
+
+It verifies each artifact offline through the lab's store, drives two turns
+per configuration through the composer with the engines switched in both
+directions in one process, stops a long run and retries it, forces a failure
+(reasoning under a one-token budget) and retries that, asserts the version-2
+timing relations and the observation counts on every run, and times the
+observed stream against the silent one on each engine
+(`GOLEM_LAB_OVERHEAD_REPEATS`, default 3): a decode slowdown of five percent
+or more fails it. Evidence is the `GOLEM_LAB` lines on the host console; the
+record for a run goes to `docs/evals/`
+(`../docs/evals/2026-09-05-lab-acceptance-macos.md` is the first).
 
 ## Real-model acceptance (device)
 

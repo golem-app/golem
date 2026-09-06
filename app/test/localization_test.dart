@@ -67,18 +67,73 @@ const _commonSourceCopyAllowlist = <String>{
   'styleSource',
   'tokenRate',
   'rateMbs',
+  // Golem Model Lab (#58): the product name, its version tag, the ttft
+  // acronym and contract chips built from single-letter parameter symbols
+  // (docs/localization.md). Unit fragments that some catalogs translate
+  // are exempted per locale below, so the ones that translate stay guarded.
+  'labAppName',
+  'labVersion',
+  'labFooterTtft',
+  'labContractContext',
+  'labContractTemperature',
+  'labContractTopP',
+  'labContractTopK',
 };
 
 const _localeLoanwordAllowlists = <String, Set<String>>{
-  'pl': {'settingsSectionModel', 'settingsModel', 'model', 'prompt'},
+  'pl': {
+    'settingsSectionModel',
+    'settingsModel',
+    'model',
+    'prompt',
+    'labTtft',
+    'labDeviceMemory',
+    'labElapsedSeconds',
+  },
+  // Seed and batch are the established technical loanwords.
+  'vi': {'labContractSeed', 'labSettingSeed', 'labDeviceMemory'},
   // The ordinary Spanish negative response is spelled identically.
-  'es': {'no'},
+  'es': {
+    'no',
+    'labTtft',
+    'labDeviceMemory',
+    'labPhaseGenerated',
+    'labElapsedSeconds',
+  },
   // Prompt is the natural compact technical label in Brazilian Portuguese.
-  'pt_BR': {'prompt'},
+  'pt_BR': {
+    'prompt',
+    'labTtft',
+    'labDeviceMemory',
+    'labPhaseGenerated',
+    'labElapsedSeconds',
+  },
+  // `GB`, `tok` and `tok/s` are the units these catalogs use as they are.
+  'ja': {'labDeviceMemory', 'labPhaseGenerated'},
+  'hi': {'labDeviceMemory'},
+  'ko': {'labDeviceMemory', 'labPhaseGenerated'},
+  'ar': {'labDeviceMemory'},
   // Standard Indonesian technical loanwords.
-  'id': {'settingsSectionModel', 'settingsModel', 'model', 'prompt'},
+  'id': {
+    'settingsSectionModel',
+    'settingsModel',
+    'model',
+    'prompt',
+    'labContractSeed',
+    'labSettingSeed',
+    'labContractBatch',
+    'labDeviceMemory',
+  },
   // Model is the established technical loanword in Turkish.
-  'tr': {'settingsSectionModel', 'settingsModel', 'model'},
+  'tr': {'settingsSectionModel', 'settingsModel', 'model', 'labDeviceMemory'},
+  // *max* is the natural compact abbreviation in French; `s` its second.
+  'fr': {
+    'labContractMax',
+    'labTtft',
+    'labDeviceMemory',
+    'labPhaseGenerated',
+    'labElapsedSeconds',
+  },
 };
 
 void main() {

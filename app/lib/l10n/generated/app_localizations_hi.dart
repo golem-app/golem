@@ -1891,4 +1891,427 @@ class AppLocalizationsHi extends AppLocalizations {
   @override
   String get qwenFourBModelSummary =>
       'कोड और गणित पर अधिक केंद्रित, और जवाब देने से पहले समस्या पर सोच सकता है।';
+
+  @override
+  String get labAppName => 'Golem Model Lab';
+
+  @override
+  String labVersion(String version) {
+    return 'GML $version';
+  }
+
+  @override
+  String get labNavBench => 'बेंच';
+
+  @override
+  String get labLibrary => 'लाइब्रेरी';
+
+  @override
+  String get labResidentLabel => 'मेमोरी में';
+
+  @override
+  String get labResidentNone => 'कोई नहीं';
+
+  @override
+  String get labRunsThisSession => 'इस सत्र में रन';
+
+  @override
+  String get labLocked => 'लॉक';
+
+  @override
+  String get labLockedDetail => 'रन चालू है';
+
+  @override
+  String get labChooseModel => 'मॉडल चुनें';
+
+  @override
+  String get labChooseEngine => 'इंजन चुनें';
+
+  @override
+  String get labNothingArmed => 'कुछ तैयार नहीं · एक मॉडल और एक इंजन चुनें';
+
+  @override
+  String labArtifactMeta(String size, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count फ़ाइलें',
+      one: '1 फ़ाइल',
+    );
+    return '$size · $_temp0';
+  }
+
+  @override
+  String labContractContext(int value) {
+    return 'ctx $value';
+  }
+
+  @override
+  String labContractMax(int value) {
+    return 'अधिकतम $value';
+  }
+
+  @override
+  String labContractTemperature(String value) {
+    return 't $value';
+  }
+
+  @override
+  String labContractTopP(String value) {
+    return 'p $value';
+  }
+
+  @override
+  String labContractTopK(int value) {
+    return 'k $value';
+  }
+
+  @override
+  String labContractSeed(int value) {
+    return 'सीड $value';
+  }
+
+  @override
+  String get labContractSeedFree => 'सीड मुक्त';
+
+  @override
+  String labContractBatch(String value) {
+    return 'बैच $value';
+  }
+
+  @override
+  String get labContractNone => 'मॉडल तैयार होने तक कोई अनुबंध नहीं';
+
+  @override
+  String get labNotReported => 'रिपोर्ट नहीं';
+
+  @override
+  String get labReasoningOn => 'तर्क चालू';
+
+  @override
+  String get labReasoningOff => 'तर्क बंद';
+
+  @override
+  String get labRunSettings => 'रन सेटिंग';
+
+  @override
+  String get labRunSettingsNote =>
+      'अगले रन पर लागू होंगी। बदलने से नई बातचीत शुरू होती है।';
+
+  @override
+  String get labSettingSeed => 'सीड';
+
+  @override
+  String get labSettingSeedFree => 'मुक्त';
+
+  @override
+  String get labSettingDefault => 'डिफ़ॉल्ट';
+
+  @override
+  String get labSettingPinned =>
+      'यह प्रोफ़ाइल तर्क मोड में सैंपलिंग को पिन करती है; ऊपर के मान प्रोफ़ाइल के हैं।';
+
+  @override
+  String get labSettingPinnedShort => 'पिन';
+
+  @override
+  String labDecrease(String label) {
+    return '$label घटाएँ';
+  }
+
+  @override
+  String labIncrease(String label) {
+    return '$label बढ़ाएँ';
+  }
+
+  @override
+  String labResetToDefault(String label) {
+    return '$label डिफ़ॉल्ट पर लौटाएँ';
+  }
+
+  @override
+  String get labApply => 'लागू करें';
+
+  @override
+  String labProblemContextFloor(int floor) {
+    return 'कॉन्टेक्स्ट कम से कम $floor टोकन होना चाहिए';
+  }
+
+  @override
+  String get labProblemContextCeiling =>
+      'कॉन्टेक्स्ट इस मॉडल की कॉन्फ़िगरेशन से अधिक है';
+
+  @override
+  String get labProblemMaxTokensFloor => 'अधिकतम टोकन कम से कम 1 होना चाहिए';
+
+  @override
+  String labProblemMaxTokensBudget(int reserve) {
+    return 'अधिकतम टोकन को प्रॉम्प्ट के लिए $reserve टोकन का कॉन्टेक्स्ट छोड़ना होगा';
+  }
+
+  @override
+  String get labProblemTemperature => 'तापमान 0 और 2 के बीच होना चाहिए';
+
+  @override
+  String get labProblemTopP => 'Top-p 0 से अधिक और अधिकतम 1 होना चाहिए';
+
+  @override
+  String get labProblemTopK => 'Top-k ऋणात्मक नहीं हो सकता';
+
+  @override
+  String get labProblemSeed => 'सीड 0 या उससे बड़ी पूर्ण संख्या होनी चाहिए';
+
+  @override
+  String get labProblemLocked => 'एक रन चल रहा है; सेटिंग्स लॉक हैं';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds से';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes मि $seconds से';
+  }
+
+  @override
+  String get labDeviceUnknown => 'डिवाइस अज्ञात';
+
+  @override
+  String labDeviceMemory(String gigabytes) {
+    return '$gigabytes GB';
+  }
+
+  @override
+  String get labMachineLabel => 'मशीन';
+
+  @override
+  String get labMemoryLabel => 'मेमोरी';
+
+  @override
+  String get labEmptyTitle => 'अभी तक कुछ मापा नहीं गया।';
+
+  @override
+  String get labEmptyBody =>
+      'एक समय में एक ही मॉडल मेमोरी में रहता है। एक प्रॉम्प्ट चुनें; Golem मॉडल लोड करता है, लोड को मापता है, फिर रन को मापता है।';
+
+  @override
+  String get labPromptTray => 'प्रॉम्प्ट ट्रे';
+
+  @override
+  String get labMeasuredOnThisMac =>
+      'इस Mac पर मापा गया। यहाँ के आँकड़े फ़ोन पर लागू नहीं होते।';
+
+  @override
+  String labChecks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count जाँचें',
+      one: '1 जाँच',
+      zero: 'कोई जाँच नहीं',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String labAllPrompts(int count) {
+    return 'सभी ($count)';
+  }
+
+  @override
+  String get labComposerHint => 'बेंच को संदेश लिखें';
+
+  @override
+  String get labComposerLocked => 'रन चालू है · फ़ील्ड लॉक';
+
+  @override
+  String get labRun => 'चलाएँ';
+
+  @override
+  String get labNewConversation => 'नई बातचीत';
+
+  @override
+  String get labRunStarted => 'रन शुरू हुआ';
+
+  @override
+  String get labRunFinished => 'रन पूरा हुआ';
+
+  @override
+  String labConversationHeader(String model, String engine, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count टर्न',
+      one: '1 टर्न',
+    );
+    return '$model · $engine · $_temp0';
+  }
+
+  @override
+  String labLoadingModel(String model) {
+    return '$model को मेमोरी में लोड किया जा रहा है';
+  }
+
+  @override
+  String get labLoadIndeterminate =>
+      'यह इंजन लोड की प्रगति रिपोर्ट नहीं करता; बीता समय वास्तविक है।';
+
+  @override
+  String get labLoadNote =>
+      'लोड मापा जाता है, छिपाया नहीं। यह इस रन के कुल समय में गिना जाता है।';
+
+  @override
+  String labElapsed(String elapsed) {
+    return '$elapsed बीता';
+  }
+
+  @override
+  String labResident(String size) {
+    return 'मेमोरी में $size';
+  }
+
+  @override
+  String labPhaseLoad(String seconds) {
+    return 'लोड $seconds से.';
+  }
+
+  @override
+  String get labPhaseLoading => 'लोड हो रहा है';
+
+  @override
+  String labPhaseLoadingPercent(int percent) {
+    return 'लोड हो रहा है $percent%';
+  }
+
+  @override
+  String get labPhaseReading => 'प्रॉम्प्ट पढ़ा जा रहा है';
+
+  @override
+  String labPhaseReadSubmitted(String completed, String total) {
+    return '$total में से $completed टोकन भेजे गए';
+  }
+
+  @override
+  String labPhaseReadCount(String count) {
+    return '$count टोकन पढ़े';
+  }
+
+  @override
+  String labPhaseReadDone(String count, String rate) {
+    return '$count टोकन पढ़े · $rate टोकन/से.';
+  }
+
+  @override
+  String labPhaseGenerating(String count) {
+    return '$count टोकन बन रहे हैं';
+  }
+
+  @override
+  String labPhaseGeneratingRate(String count, String rate) {
+    return '$count टोकन बन रहे हैं · $rate टोकन/से.';
+  }
+
+  @override
+  String labPhaseGeneratingChunks(String count) {
+    return '$count खंड बन रहे हैं';
+  }
+
+  @override
+  String labPhaseGenerated(String count, String rate) {
+    return '$count टोकन · $rate टोकन/से.';
+  }
+
+  @override
+  String labTtft(String seconds) {
+    return 'TTFT $seconds से.';
+  }
+
+  @override
+  String get labInterToken => 'टोकनों के बीच';
+
+  @override
+  String get labInterChunk => 'खंडों के आगमन के बीच';
+
+  @override
+  String labMedian(String ms) {
+    return 'माध्यिका $ms ms';
+  }
+
+  @override
+  String labStalls(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count रुकावटें',
+      one: '1 रुकावट',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String labLatencyChart(String series, String ms, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count रुकावटें',
+      one: '1 रुकावट',
+      zero: 'कोई रुकावट नहीं',
+    );
+    return '$series विलंबता चार्ट, माध्यिका $ms ms, $_temp0';
+  }
+
+  @override
+  String labLoadSeconds(String seconds) {
+    return 'लोड $seconds से.';
+  }
+
+  @override
+  String labPeak(String size) {
+    return 'शिखर $size';
+  }
+
+  @override
+  String get labCancelledNote =>
+      'आंशिक आउटपुट रखा गया। दरें केवल बने टोकनों की हैं; यह रन तुलनीय नहीं है।';
+
+  @override
+  String get labFailedPartial =>
+      'आंशिक आउटपुट इस रन की अपनी कॉन्फ़िगरेशन के साथ रखा गया।';
+
+  @override
+  String get labFooterLoad => 'लोड';
+
+  @override
+  String get labFooterRead => 'पढ़ना';
+
+  @override
+  String get labFooterTtft => 'ttft';
+
+  @override
+  String get labFooterDecode => 'डिकोड';
+
+  @override
+  String get labFooterPeak => 'शिखर';
+
+  @override
+  String get labFooterNoRun => 'कोई रन दर्ज नहीं';
+
+  @override
+  String get labFooterLive => 'लाइव · चरणों का औसत कभी नहीं';
+
+  @override
+  String labFooterRun(String id) {
+    return 'रन $id · इस Mac पर मापा गया';
+  }
+
+  @override
+  String labFooterCancelled(String id) {
+    return 'रन $id · ऑपरेटर ने रद्द किया';
+  }
+
+  @override
+  String labFooterFailed(String id) {
+    return 'रन $id · विफल';
+  }
 }

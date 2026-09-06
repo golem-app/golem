@@ -4,7 +4,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/chrome/golem_alert.dart';
 import '../../core/chrome/golem_badge.dart';
 import '../../core/chrome/golem_button.dart';
 import '../../core/chrome/golem_nav_bar.dart';
@@ -27,6 +26,7 @@ import '../chat/application/chat_providers.dart';
 import '../models/application/download_pace_providers.dart';
 import '../models/application/model_providers.dart';
 import '../models/artifact_transfer.dart';
+import '../models/model_delete_consent.dart';
 import '../models/model_download_consent.dart';
 import '../models/widgets/custom_repository_card.dart';
 import '../models/widgets/download_note_banner.dart';
@@ -621,34 +621,14 @@ class _ModelCard extends ConsumerWidget {
   Future<void> _confirmDelete(
     BuildContext context,
     ModelController controller,
-  ) => showGolemAlert(
-    context: context,
-    dialogKey: const Key('model-delete-dialog'),
-    // Display names no longer carry a quantization, so two artifacts of one
-    // family share one (#79). A destructive dialog must still say which.
-    title: context.l10n.deleteModelArtifactTitle(
-      entry.displayName,
-      engineFormat(entry.engine),
-    ),
-    message: context.l10n.deleteModelStorageMessage(
-      gigabytes(entry.totalBytes),
-    ),
-    actions: [
-      GolemAlertAction(
-        label: context.l10n.keep,
-        onPressed: () => Navigator.pop(context),
-      ),
-      GolemAlertAction(
-        key: const Key('confirm-model-delete'),
-        label: context.l10n.delete,
-        isDestructive: true,
-        onPressed: () {
-          Navigator.pop(context);
-          controller.delete(entry.key);
-        },
-      ),
-    ],
-  );
+  ) async {
+    final approved = await confirmModelDelete(
+      context: context,
+      entry: entry,
+      bytes: entry.totalBytes,
+    );
+    if (approved) await controller.delete(entry.key);
+  }
 
   String _statusLabel(BuildContext context, String suffix) =>
       switch (status.phase) {

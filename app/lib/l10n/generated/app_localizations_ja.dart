@@ -1810,4 +1810,415 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get qwenFourBModelSummary => 'コードと数学を得意とし、応答する前に問題を考えることができます。';
+
+  @override
+  String get labAppName => 'Golem Model Lab';
+
+  @override
+  String labVersion(String version) {
+    return 'GML $version';
+  }
+
+  @override
+  String get labNavBench => 'ベンチ';
+
+  @override
+  String get labLibrary => 'ライブラリ';
+
+  @override
+  String get labResidentLabel => '常駐中';
+
+  @override
+  String get labResidentNone => 'なし';
+
+  @override
+  String get labRunsThisSession => 'このセッションの実行数';
+
+  @override
+  String get labLocked => 'ロック中';
+
+  @override
+  String get labLockedDetail => '実行中';
+
+  @override
+  String get labChooseModel => 'モデルを選択';
+
+  @override
+  String get labChooseEngine => 'エンジンを選択';
+
+  @override
+  String get labNothingArmed => '未設定 · モデルとエンジンを選んでください';
+
+  @override
+  String labArtifactMeta(String size, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ファイル',
+    );
+    return '$size · $_temp0';
+  }
+
+  @override
+  String labContractContext(int value) {
+    return 'ctx $value';
+  }
+
+  @override
+  String labContractMax(int value) {
+    return '最大 $value';
+  }
+
+  @override
+  String labContractTemperature(String value) {
+    return 't $value';
+  }
+
+  @override
+  String labContractTopP(String value) {
+    return 'p $value';
+  }
+
+  @override
+  String labContractTopK(int value) {
+    return 'k $value';
+  }
+
+  @override
+  String labContractSeed(int value) {
+    return 'シード $value';
+  }
+
+  @override
+  String get labContractSeedFree => 'シード未固定';
+
+  @override
+  String labContractBatch(String value) {
+    return 'バッチ $value';
+  }
+
+  @override
+  String get labContractNone => 'モデルを設定するまで契約はありません';
+
+  @override
+  String get labNotReported => '未報告';
+
+  @override
+  String get labReasoningOn => '思考オン';
+
+  @override
+  String get labReasoningOff => '思考オフ';
+
+  @override
+  String get labRunSettings => '実行設定';
+
+  @override
+  String get labRunSettingsNote => '次の実行から適用されます。変更すると新しい会話が始まります。';
+
+  @override
+  String get labSettingSeed => 'シード';
+
+  @override
+  String get labSettingSeedFree => '未固定';
+
+  @override
+  String get labSettingDefault => '既定';
+
+  @override
+  String get labSettingPinned => 'このプロファイルは思考モードでサンプリングを固定します。上の値はプロファイルのものです。';
+
+  @override
+  String get labSettingPinnedShort => '固定';
+
+  @override
+  String labDecrease(String label) {
+    return '$labelを減らす';
+  }
+
+  @override
+  String labIncrease(String label) {
+    return '$labelを増やす';
+  }
+
+  @override
+  String labResetToDefault(String label) {
+    return '$labelを既定に戻す';
+  }
+
+  @override
+  String get labApply => '適用';
+
+  @override
+  String labProblemContextFloor(int floor) {
+    return 'コンテキストは $floor トークン以上にしてください';
+  }
+
+  @override
+  String get labProblemContextCeiling => 'コンテキストがこのモデルの設定を超えています';
+
+  @override
+  String get labProblemMaxTokensFloor => '最大トークン数は 1 以上にしてください';
+
+  @override
+  String labProblemMaxTokensBudget(int reserve) {
+    return '最大トークン数はプロンプト用にコンテキストを $reserve トークン残す必要があります';
+  }
+
+  @override
+  String get labProblemTemperature => '温度は 0 から 2 の範囲にしてください';
+
+  @override
+  String get labProblemTopP => 'Top-p は 0 より大きく 1 以下にしてください';
+
+  @override
+  String get labProblemTopK => 'Top-k は負にできません';
+
+  @override
+  String get labProblemSeed => 'シードは 0 以上の整数にしてください';
+
+  @override
+  String get labProblemLocked => '実行中のため設定はロックされています';
+
+  @override
+  String labElapsedSeconds(String seconds) {
+    return '$seconds 秒';
+  }
+
+  @override
+  String labElapsedMinutes(int minutes, String seconds) {
+    return '$minutes 分 $seconds 秒';
+  }
+
+  @override
+  String get labDeviceUnknown => 'デバイス不明';
+
+  @override
+  String labDeviceMemory(String gigabytes) {
+    return '$gigabytes GB';
+  }
+
+  @override
+  String get labMachineLabel => 'マシン';
+
+  @override
+  String get labMemoryLabel => 'メモリ';
+
+  @override
+  String get labEmptyTitle => 'まだ何も計測していません。';
+
+  @override
+  String get labEmptyBody =>
+      '常駐するモデルは一度に 1 つです。プロンプトを選ぶと Golem がモデルを読み込み、読み込みを計測し、次に実行を計測します。';
+
+  @override
+  String get labPromptTray => 'プロンプトトレイ';
+
+  @override
+  String get labMeasuredOnThisMac => 'この Mac で計測しました。ここの数値はスマートフォンには当てはまりません。';
+
+  @override
+  String labChecks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'チェック $count 件',
+      zero: 'チェックなし',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String labAllPrompts(int count) {
+    return 'すべて（$count）';
+  }
+
+  @override
+  String get labComposerHint => 'ベンチにメッセージを送る';
+
+  @override
+  String get labComposerLocked => '実行中 · 入力欄はロック中';
+
+  @override
+  String get labRun => '実行';
+
+  @override
+  String get labNewConversation => '新しい会話';
+
+  @override
+  String get labRunStarted => '実行を開始しました';
+
+  @override
+  String get labRunFinished => '実行が終了しました';
+
+  @override
+  String labConversationHeader(String model, String engine, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ターン',
+    );
+    return '$model · $engine · $_temp0';
+  }
+
+  @override
+  String labLoadingModel(String model) {
+    return '$model をメモリに読み込み中';
+  }
+
+  @override
+  String get labLoadIndeterminate => 'このエンジンは読み込みの進捗を報告しません。経過時間は実測です。';
+
+  @override
+  String get labLoadNote => '読み込みは隠さず計測します。この実行の総時間に含まれます。';
+
+  @override
+  String labElapsed(String elapsed) {
+    return '経過 $elapsed';
+  }
+
+  @override
+  String labResident(String size) {
+    return '常駐 $size';
+  }
+
+  @override
+  String labPhaseLoad(String seconds) {
+    return '読み込み $seconds 秒';
+  }
+
+  @override
+  String get labPhaseLoading => '読み込み中';
+
+  @override
+  String labPhaseLoadingPercent(int percent) {
+    return '読み込み中 $percent%';
+  }
+
+  @override
+  String get labPhaseReading => 'プロンプトを読み取り中';
+
+  @override
+  String labPhaseReadSubmitted(String completed, String total) {
+    return '$total tok 中 $completed tok を送信';
+  }
+
+  @override
+  String labPhaseReadCount(String count) {
+    return '読み取り $count tok';
+  }
+
+  @override
+  String labPhaseReadDone(String count, String rate) {
+    return '読み取り $count tok · $rate tok/s';
+  }
+
+  @override
+  String labPhaseGenerating(String count) {
+    return '生成中 $count tok';
+  }
+
+  @override
+  String labPhaseGeneratingRate(String count, String rate) {
+    return '生成中 $count tok · $rate tok/s';
+  }
+
+  @override
+  String labPhaseGeneratingChunks(String count) {
+    return '生成中 $count チャンク';
+  }
+
+  @override
+  String labPhaseGenerated(String count, String rate) {
+    return '$count tok · $rate tok/s';
+  }
+
+  @override
+  String labTtft(String seconds) {
+    return 'TTFT $seconds 秒';
+  }
+
+  @override
+  String get labInterToken => 'トークン間';
+
+  @override
+  String get labInterChunk => 'チャンク到着間隔';
+
+  @override
+  String labMedian(String ms) {
+    return '中央値 $ms ms';
+  }
+
+  @override
+  String labStalls(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '停滞 $count 回',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String labLatencyChart(String series, String ms, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '停滞 $count 回',
+      zero: '停滞なし',
+    );
+    return '$seriesのレイテンシグラフ、中央値 $ms ms、$_temp0';
+  }
+
+  @override
+  String labLoadSeconds(String seconds) {
+    return '読み込み $seconds 秒';
+  }
+
+  @override
+  String labPeak(String size) {
+    return 'ピーク $size';
+  }
+
+  @override
+  String get labCancelledNote =>
+      '部分的な出力を保持しました。速度は生成済みトークンのみを対象とし、この実行は比較できません。';
+
+  @override
+  String get labFailedPartial => '部分的な出力を、この実行の設定とともに保持しました。';
+
+  @override
+  String get labFooterLoad => '読み込み';
+
+  @override
+  String get labFooterRead => '読み取り';
+
+  @override
+  String get labFooterTtft => 'ttft';
+
+  @override
+  String get labFooterDecode => 'デコード';
+
+  @override
+  String get labFooterPeak => 'ピーク';
+
+  @override
+  String get labFooterNoRun => '実行の記録はありません';
+
+  @override
+  String get labFooterLive => 'ライブ · フェーズは平均化しません';
+
+  @override
+  String labFooterRun(String id) {
+    return '実行 $id · この Mac で計測';
+  }
+
+  @override
+  String labFooterCancelled(String id) {
+    return '実行 $id · 操作者が中止';
+  }
+
+  @override
+  String labFooterFailed(String id) {
+    return '実行 $id · 失敗';
+  }
 }

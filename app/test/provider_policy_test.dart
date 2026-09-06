@@ -13,6 +13,9 @@ import 'package:golem_flutter/features/benchmark/application/benchmark_providers
 import 'package:golem_flutter/features/chat/application/active_model_providers.dart';
 import 'package:golem_flutter/features/chat/application/chat_providers.dart';
 import 'package:golem_flutter/features/chat/application/search_providers.dart';
+import 'package:golem_flutter/features/lab/application/lab_bench_controller.dart';
+import 'package:golem_flutter/features/lab/application/lab_contract.dart';
+import 'package:golem_flutter/features/lab/application/lab_providers.dart';
 import 'package:golem_flutter/features/models/application/custom_repository_controller.dart';
 import 'package:golem_flutter/features/models/application/download_note_providers.dart';
 import 'package:golem_flutter/features/models/application/download_pace_providers.dart';
@@ -65,6 +68,12 @@ final _allProviders = <String, ProviderOrFamily>{
   'benchmarkController': benchmarkControllerProvider,
   'firstRunController': firstRunControllerProvider,
   'startupGateController': startupGateControllerProvider,
+  'labConfigurationList': labConfigurationListProvider,
+  'labModelFamilies': labModelFamiliesProvider,
+  'labProbes': labProbesProvider,
+  'labDeviceProvenance': labDeviceProvenanceProvider,
+  'labContract': labContractProvider,
+  'labBenchController': labBenchControllerProvider,
 };
 
 final class _FailingSettingsRepository implements SettingsRepository {
