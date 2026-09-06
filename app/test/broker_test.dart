@@ -772,6 +772,50 @@ void main() {
     expect(runtime.tornDown, isTrue);
   });
 
+  test(
+    'a cancel during the activation ends the run without generating',
+    () async {
+      final runtime = _SlowLoadRuntime();
+      final repository = InfernoInferenceRepository(
+        runtime,
+        engine: BrokerEngine.llamaCpp,
+        profile: const Gemma4Profile(),
+        modelPath: '/local/model.gguf',
+      );
+      final events = <InferenceEvent>[];
+      final done = repository
+          .generate(
+            context: [PromptMessage.text('user', 'Hello')],
+            reasoningEnabled: false,
+          )
+          .forEach(events.add);
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(events, [isA<RunPhaseEvent>()]);
+      // Stop while the model is still loading: the engine has nothing to cancel
+      // yet, so the repository must remember the request itself.
+      await repository.cancel();
+      runtime.loading.complete();
+      await done;
+      expect(runtime.request, isNull, reason: 'the engine never generated');
+      expect(events.last, isA<CompletedEvent>());
+      expect(
+        (events.last as CompletedEvent).stopReason,
+        InferenceStopReason.cancelled,
+      );
+      // The model stayed resident: the next run is warm and unaffected.
+      final next = await repository
+          .generate(
+            context: [PromptMessage.text('user', 'Again')],
+            reasoningEnabled: false,
+          )
+          .toList();
+      expect(runtime.request, isNotNull);
+      expect(next.whereType<AnswerDelta>(), isNotEmpty);
+    },
+  );
+
   test('concurrent prepare calls join one load', () async {
     final runtime = _SlowLoadRuntime();
     final repository = InfernoInferenceRepository(
