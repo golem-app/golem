@@ -140,8 +140,18 @@ final class InfernoInferenceRepository implements InferenceRepository {
     _residency.value = const InferenceResidency.unloaded();
   }
 
+  /// The generation a cancel applies to. The engine's own cancel reaches
+  /// only a generation in flight; one requested while the generation is
+  /// still activating its model would be lost, so it is remembered here and
+  /// honoured the moment the activation returns.
+  int _generationTicket = 0;
+  int? _cancelledTicket;
+
   @override
-  Future<void> cancel() => _runtime.cancel();
+  Future<void> cancel() {
+    _cancelledTicket = _generationTicket;
+    return _runtime.cancel();
+  }
 
   @override
   void releaseEngine() {
@@ -294,6 +304,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
   }) async* {
     final target = _targetFor(modelKey);
     final observation = observe ?? const GenerationObservation();
+    final ticket = ++_generationTicket;
     if (_isResident(target)) {
       await _ensureResident(target);
     } else {
@@ -313,6 +324,10 @@ final class InfernoInferenceRepository implements InferenceRepository {
       }
       await activation;
       yield RunPhaseEvent(InferencePhase.loaded, loadDuration: loading.elapsed);
+    }
+    if (_cancelledTicket == ticket) {
+      yield const CompletedEvent(stopReason: InferenceStopReason.cancelled);
+      return;
     }
     final profile = target.profile;
     final parser = profile.newParser(reasoningEnabled: reasoningEnabled);
@@ -373,6 +388,10 @@ final class InfernoInferenceRepository implements InferenceRepository {
     var sawOutput = false;
     final probe = effectiveSeed == null ? null : StringBuffer();
     final loadedImages = await _loadImages(images);
+    if (_cancelledTicket == ticket) {
+      yield const CompletedEvent(stopReason: InferenceStopReason.cancelled);
+      return;
+    }
     yield const RunPhaseEvent(InferencePhase.promptProcessing);
     try {
       await for (final event in _runtime.generate(
