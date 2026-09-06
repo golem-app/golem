@@ -38,6 +38,12 @@ import UIKit
       #endif
       return
     }
+    // The bench's readings (#58) are the Mac's; a phone says "unknown", the
+    // null the Dart contract promises, rather than refusing the call.
+    if call.method == "physicalFootprintBytes" || call.method == "deviceProvenance" {
+      result(nil)
+      return
+    }
     if call.method == "availableMemoryBytes" {
       // The jetsam headroom: what this process can still allocate before
       // iOS terminates it. The increased-memory-limit entitlement raises

@@ -561,7 +561,8 @@ final class InferenceMetrics {
       other.promptTokenCount == promptTokenCount &&
       other.timeToFirstTokenSeconds == timeToFirstTokenSeconds &&
       other.peakPhysicalFootprintBytes == peakPhysicalFootprintBytes &&
-      other.timingSemanticsVersion == timingSemanticsVersion;
+      other.timingSemanticsVersion == timingSemanticsVersion &&
+      other.promptBatchSize == promptBatchSize;
 
   @override
   int get hashCode => Object.hash(
@@ -573,6 +574,7 @@ final class InferenceMetrics {
     timeToFirstTokenSeconds,
     peakPhysicalFootprintBytes,
     timingSemanticsVersion,
+    promptBatchSize,
   );
 }
 
@@ -648,6 +650,16 @@ final class GenerationObservation {
     promptProgress: true,
     tokenTiming: true,
   );
+
+  @override
+  bool operator ==(Object other) =>
+      other is GenerationObservation &&
+      other.loadProgress == loadProgress &&
+      other.promptProgress == promptProgress &&
+      other.tokenTiming == tokenTiming;
+
+  @override
+  int get hashCode => Object.hash(loadProgress, promptProgress, tokenTiming);
 
   bool get isEmpty => !loadProgress && !promptProgress && !tokenTiming;
 }

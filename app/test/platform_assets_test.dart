@@ -502,9 +502,12 @@ void main() {
     final client = File(
       'lib/core/services/device_storage.dart',
     ).readAsStringSync();
+    // One level of nested generics (`Map<Object?, Object?>`) — a flat
+    // `[^>]+` stopped at the inner `>` and never saw deviceProvenance.
     final invoked = RegExp(
-      r"invokeMethod<[^>]+>\(\s*'(\w+)'",
+      r"invokeMethod<(?:[^<>]|<[^<>]*>)+>\(\s*'(\w+)'",
     ).allMatches(client).map((match) => match[1]!).toSet();
+    expect(invoked, contains('deviceProvenance'));
     expect(invoked, isNotEmpty);
     for (final handler in const [
       'ios/Runner/AppDelegate.swift',
@@ -512,13 +515,13 @@ void main() {
       _mainActivity,
     ]) {
       final source = File(handler).readAsStringSync();
-      // Each side answers a few methods fewer on purpose. macOS has no
-      // jetsam ceiling, so the mobile load preflight has nothing to ask it;
-      // the phones never run the bench, so its live footprint and machine
-      // provenance readings (#58) are the Mac's alone.
+      // macOS answers one method fewer on purpose: it has no jetsam
+      // ceiling, so the mobile load preflight has nothing to ask it. The
+      // phones name the bench's readings (#58) too — answering null, the
+      // unknown the Dart contract promises, rather than refusing the call.
       final exempt = handler.startsWith('macos')
           ? const {'availableMemoryBytes'}
-          : const {'physicalFootprintBytes', 'deviceProvenance'};
+          : const <String>{};
       for (final method in invoked.difference(exempt)) {
         expect(source, contains("\"$method\""), reason: '$handler: $method');
       }
