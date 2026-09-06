@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:golem_flutter/app/lab_app.dart';
 import 'package:golem_flutter/app/launch_composition.dart';
 import 'package:golem_flutter/broker/backend_policy.dart';
 import 'package:golem_flutter/broker/model_catalog.dart';
@@ -394,6 +395,7 @@ Future<ProviderContainer> pumpLabShell(
   double textScale = 1,
   bool reducedMotion = false,
   ModelState model = const ModelState(),
+  ModelManagementRepository? models,
   InferenceRepository? inference,
   LabProbes? probes,
   DateTime Function()? clock,
@@ -401,9 +403,12 @@ Future<ProviderContainer> pumpLabShell(
   setViewport(tester, size: size);
   final container = ProviderContainer(
     overrides: [
-      ...launchOverrides(
-        launchDependenciesWith(inference: inference, model: model),
-        lab: true,
+      ...labLaunchOverrides(
+        launchDependenciesWith(
+          inference: inference,
+          model: model,
+          models: models,
+        ),
       ),
       labProbesProvider.overrideWithValue(
         probes ??

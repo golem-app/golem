@@ -11,15 +11,15 @@ final class LatencySeries {
     required this.stallIndexes,
   });
 
+  static const empty = LatencySeries._(
+    gapsMs: [],
+    medianMs: null,
+    stallIndexes: {},
+  );
+
   /// From [instantsMs], in arrival order. Fewer than two instants have no gap.
   factory LatencySeries.from(List<double> instantsMs) {
-    if (instantsMs.length < 2) {
-      return const LatencySeries._(
-        gapsMs: [],
-        medianMs: null,
-        stallIndexes: {},
-      );
-    }
+    if (instantsMs.length < 2) return empty;
     final gaps = <double>[
       for (var i = 1; i < instantsMs.length; i++)
         instantsMs[i] - instantsMs[i - 1],
@@ -56,8 +56,10 @@ final class LatencySeries {
 /// The decode rate over the trailing [windowMs] of a run's clock, from the
 /// token instants that fell inside it — measured work over an explicit
 /// window, and only for tokens: a chunk gap counts nothing. [elapsedMs] is
-/// how far the run's clock has come, so a rate decays to nothing when
-/// arrivals stop instead of freezing at the last burst.
+/// how far the instants' own clock has come, and the interval runs from the
+/// window's first instant to now, so a rate sinks while arrivals stall and
+/// reaches nothing once they leave the window, instead of freezing at the
+/// last burst.
 double? liveDecodeRate(
   List<double> instantsMs,
   double elapsedMs, {
@@ -66,13 +68,11 @@ double? liveDecodeRate(
   final start = elapsedMs - windowMs;
   var count = 0;
   double? first;
-  double? last;
   for (final instant in instantsMs) {
     if (instant <= start || instant > elapsedMs) continue;
     first ??= instant;
-    last = instant;
     count++;
   }
-  if (count < 2 || last! <= first!) return null;
-  return (count - 1) / ((last - first) / 1000);
+  if (count < 2 || elapsedMs <= first!) return null;
+  return (count - 1) / ((elapsedMs - first) / 1000);
 }

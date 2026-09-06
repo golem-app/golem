@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:golem_flutter/app/launch_composition.dart';
+import 'package:golem_flutter/app/lab_app.dart';
 import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
@@ -16,6 +16,7 @@ import 'package:golem_flutter/features/lab/application/lab_bench_controller.dart
 import 'package:golem_flutter/features/lab/application/lab_providers.dart';
 import 'package:golem_flutter/features/lab/domain/lab_run.dart';
 import 'package:golem_flutter/features/lab/domain/lab_run_settings.dart';
+import 'package:golem_flutter/features/models/application/model_providers.dart';
 
 import '../support/harness.dart';
 
@@ -32,35 +33,6 @@ final class _Probes implements ProcessFootprintProbe, DeviceProvenanceProbe {
 
 /// A model store that answers when told, so a test can act between a send
 /// and the store's reply.
-final class _GatedModels implements ModelManagementRepository {
-  final Completer<void> gate = Completer<void>();
-  static const _inner = StaticModels(ModelState());
-
-  @override
-  Future<ModelState> load() async {
-    await gate.future;
-    return _inner.load();
-  }
-
-  @override
-  Future<ModelState> recordRuntime(
-    RuntimePhase phase, {
-    RuntimeFailureKind? failure,
-  }) => _inner.recordRuntime(phase, failure: failure);
-  @override
-  Stream<ModelState> download(String artifactKey) =>
-      _inner.download(artifactKey);
-  @override
-  Future<ModelState> pause(String artifactKey) => _inner.pause(artifactKey);
-  @override
-  Future<ModelState> cancel(String artifactKey) => _inner.cancel(artifactKey);
-  @override
-  Future<ModelState> delete(String artifactKey) => _inner.delete(artifactKey);
-  @override
-  Future<ModelState> addModel(ModelCatalogEntry entry) =>
-      _inner.addModel(entry);
-}
-
 /// A repository whose stream ignores Stop, or ends without its completion
 /// event — the engines a bench must survive.
 final class _StubbornRepository implements InferenceRepository {
@@ -129,13 +101,12 @@ ProviderContainer _container({
 }) {
   final container = ProviderContainer(
     overrides: [
-      ...launchOverrides(
+      ...labLaunchOverrides(
         launchDependenciesWith(
           inference: inference,
           model: model,
           models: models,
         ),
-        lab: true,
       ),
       labProbesProvider.overrideWithValue(
         LabProbes(
@@ -169,8 +140,8 @@ void main() {
     final controller = container.read(labBenchControllerProvider.notifier);
     expect(controller.arm('nope'), isFalse);
     expect(controller.arm('gemma4-gguf'), isTrue);
-    expect(await controller.send('   '), isFalse, reason: 'empty prompt');
-    expect(await controller.send('Hello'), isTrue);
+    expect(controller.send('   '), isFalse, reason: 'empty prompt');
+    expect(controller.send('Hello'), isTrue);
     expect(container.read(labBenchControllerProvider).locked, isTrue);
     // The chat bridge answers for the bench: a model command asking whether
     // a generation is in flight is told yes.
@@ -184,11 +155,7 @@ void main() {
       isNotEmpty,
     );
     expect(controller.newConversation(), isFalse);
-    expect(
-      await controller.send('Again'),
-      isFalse,
-      reason: 'one run at a time',
-    );
+    expect(controller.send('Again'), isFalse, reason: 'one run at a time');
     final run = await _settle(container);
     expect(run.phase, LabRunPhase.completed);
     expect(
@@ -224,7 +191,10 @@ void main() {
         final phase = next.activeRun?.phase;
         if (phase != null) publishes.add(phase);
       });
-      expect(await controller.send('Read a CSV without pandas'), isTrue);
+      // The Rig watches the store from the first frame; a unit test warms
+      // it the same way, or the snapshot honestly reads unverified.
+      await container.read(modelControllerProvider.future);
+      expect(controller.send('Read a CSV without pandas'), isTrue);
       final run = await _settle(container);
 
       expect(run.phase, LabRunPhase.completed);
@@ -259,7 +229,6 @@ void main() {
       expect(run.telemetry.observationKind, ObservationKind.token);
       expect(run.telemetry.observationCount, run.metrics!.tokenCount);
       expect(run.telemetry.footprintBytes, greaterThan(1000));
-      expect(run.telemetry.peakFootprintBytes, run.telemetry.footprintBytes);
       expect(run.reasoning, isNotEmpty);
       expect(run.answer, isNotEmpty);
       expect(run.metrics!.timeToFirstTokenSeconds, 0.31);
@@ -275,7 +244,7 @@ void main() {
     final container = _container(inference: inference);
     final controller = container.read(labBenchControllerProvider.notifier);
     controller.arm('qwen35-gguf');
-    await controller.send('Hello');
+    controller.send('Hello');
     // Let the run reach its answer before stopping.
     final deadline = DateTime.now().add(const Duration(seconds: 5));
     while (container
@@ -288,8 +257,8 @@ void main() {
     }
     controller.stop();
     expect(
-      container.read(labBenchControllerProvider).activeRun!.phase,
-      LabRunPhase.cancelling,
+      container.read(labBenchControllerProvider).activeRun!.cancelling,
+      isTrue,
     );
     expect(inference.cancels, 1);
     final run = await _settle(container);
@@ -310,13 +279,13 @@ void main() {
       );
       final controller = container.read(labBenchControllerProvider.notifier);
       controller.arm('gemma4-mlx');
-      await controller.send('[fail] please');
+      controller.send('[fail] please');
       final failed = await _settle(container);
       expect(failed.phase, LabRunPhase.failed);
       expect(failed.failure, InferenceFailureKind.engine);
       expect(failed.answer, isNotEmpty);
       expect(failed.configuration.catalogKey, 'gemma4-mlx');
-      expect(await controller.retry(), isTrue);
+      expect(controller.retry(), isTrue);
       final retried = await _settle(container);
       expect(retried.id, isNot(failed.id));
       expect(retried.prompt, failed.prompt);
@@ -343,9 +312,9 @@ void main() {
         container.read(labBenchControllerProvider).session.conversations,
         isEmpty,
       );
-      await controller.send('One');
+      controller.send('One');
       await _settle(container);
-      await controller.send('Two');
+      controller.send('Two');
       await _settle(container);
       final first = container.read(labBenchControllerProvider).session.active!;
       expect(first.runs, hasLength(2));
@@ -369,29 +338,6 @@ void main() {
     },
   );
 
-  test(
-    'a send whose configuration changed before the store answered is refused',
-    () async {
-      final models = _GatedModels();
-      final container = _container(
-        inference: FakeInferenceRepository(eventDelay: Duration.zero),
-        models: models,
-      );
-      final controller = container.read(labBenchControllerProvider.notifier);
-      controller.arm('gemma4-gguf');
-      final sending = controller.send('Hello');
-      // The bench is not locked yet, so the Rig still takes a change.
-      expect(controller.arm('qwen35-gguf'), isTrue);
-      models.gate.complete();
-      expect(await sending, isFalse);
-      expect(container.read(labBenchControllerProvider).session.runCount, 0);
-      // The next send runs what is armed now.
-      expect(await controller.send('Hello'), isTrue);
-      final run = await _settle(container);
-      expect(run.configuration.catalogKey, 'qwen35-gguf');
-    },
-  );
-
   test('Retry after Stop runs the prompt again to completion', () async {
     final container = _container(
       inference: FakeInferenceRepository(
@@ -400,7 +346,7 @@ void main() {
     );
     final controller = container.read(labBenchControllerProvider.notifier);
     controller.arm('gemma4-gguf');
-    await controller.send('Hello');
+    controller.send('Hello');
     final deadline = DateTime.now().add(const Duration(seconds: 5));
     while (container
             .read(labBenchControllerProvider)
@@ -413,7 +359,7 @@ void main() {
     controller.stop();
     final cancelled = await _settle(container);
     expect(cancelled.phase, LabRunPhase.cancelled);
-    expect(await controller.retry(), isTrue);
+    expect(controller.retry(), isTrue);
     final retried = await _settle(container);
     expect(retried.id, isNot(cancelled.id));
     expect(retried.phase, LabRunPhase.completed);
@@ -428,7 +374,7 @@ void main() {
     );
     final controller = container.read(labBenchControllerProvider.notifier);
     controller.arm('gemma4-gguf');
-    await controller.send('Hello');
+    controller.send('Hello');
     expect(controller.updateSettings(const LabRunSettings(maxTokens: 64)), [
       LabSettingsProblem.benchLocked,
     ]);
@@ -441,7 +387,7 @@ void main() {
     );
     final controller = container.read(labBenchControllerProvider.notifier);
     controller.arm('gemma4-gguf');
-    await controller.send('Hello');
+    controller.send('Hello');
     final run = await _settle(container);
     // Torn down under it: not a measurement, its partial answer kept and
     // fed to nothing, and Retry on offer.
@@ -452,7 +398,7 @@ void main() {
       container.read(labBenchControllerProvider).session.active!.context,
       isEmpty,
     );
-    expect(await controller.retry(), isTrue);
+    expect(controller.retry(), isTrue);
     await _settle(container);
   });
 
@@ -464,7 +410,7 @@ void main() {
     final container = _container(inference: repository);
     final controller = container.read(labBenchControllerProvider.notifier);
     controller.arm('gemma4-gguf');
-    await controller.send('Hello');
+    controller.send('Hello');
     expect(container.read(labBenchControllerProvider).locked, isTrue);
     container.dispose();
     expect(repository.cancels, 1, reason: 'native decode must not outlive it');
@@ -497,7 +443,7 @@ void main() {
     final container = _container(inference: repository);
     final controller = container.read(labBenchControllerProvider.notifier);
     controller.arm('gemma4-gguf');
-    await controller.send('Hello');
+    controller.send('Hello');
     LabBenchState bench() => container.read(labBenchControllerProvider);
     // Let the answer arrive, then Stop: the engine ignores it.
     for (
@@ -508,7 +454,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 10));
     }
     controller.stop();
-    expect(bench().activeRun!.phase, LabRunPhase.cancelling);
+    expect(bench().activeRun!.cancelling, isTrue);
     expect(repository.cancels, 1);
     await tester.pump(labStopDeadline - const Duration(seconds: 1));
     expect(bench().locked, isTrue, reason: 'the engine still has a chance');

@@ -25,7 +25,7 @@ BrokerSamplingParameters? labContract(Ref ref) {
     profile: profile,
     defaults: profile.sampling(reasoningEnabled: settings.reasoningEnabled),
     overrides: settings.toOverrides(),
-    seed: settings.seed,
+    seed: settings.seed ?? launchSamplingSeed,
   );
   return sampling;
 }

@@ -60,9 +60,22 @@ final class LabModelFamily {
   final String displayName;
   final List<LabConfiguration> configurations;
 
-  /// A stable handle for keys and menus: the profile every engine of the
-  /// family shares, independent of catalog order.
-  String get id => configurations.first.profileKey;
+  /// A stable handle for keys and menus: the stem its catalog keys share,
+  /// independent of catalog order — and, unlike the profile key, its own,
+  /// since two families can run on one profile.
+  String get id {
+    var stem = configurations.first.key;
+    for (final configuration in configurations.skip(1)) {
+      final key = configuration.key;
+      var i = 0;
+      while (i < stem.length && i < key.length && stem[i] == key[i]) {
+        i++;
+      }
+      stem = stem.substring(0, i);
+    }
+    final trimmed = stem.replaceFirst(RegExp(r'-+$'), '');
+    return trimmed.isEmpty ? configurations.first.key : trimmed;
+  }
 
   /// The same family on [engine], or null when it does not ship on it.
   LabConfiguration? on(ModelEngine engine) =>

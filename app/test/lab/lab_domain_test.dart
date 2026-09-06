@@ -196,8 +196,10 @@ void main() {
     });
 
     test('instants stay bounded while the count keeps the truth', () {
+      const capacity = LabTelemetry.instantCapacity;
+      const batches = capacity ~/ 16 + 8;
       var run = _run(phase: LabRunPhase.generating);
-      for (var batch = 0; batch < 40; batch++) {
+      for (var batch = 0; batch < batches; batch++) {
         run = reduceLabRun(
           run,
           TokenTimingEvent(
@@ -207,26 +209,64 @@ void main() {
           ),
         );
       }
-      expect(run.telemetry.observationCount, 640);
-      expect(run.telemetry.instantsMs, hasLength(LabTelemetry.instantCapacity));
-      expect(run.telemetry.instantsMs.first, (640 - 512) * 50.0);
+      const total = batches * 16;
+      expect(run.telemetry.observationCount, total);
+      expect(run.telemetry.instantsMs, hasLength(capacity));
+      expect(run.telemetry.instantsMs.first, (total - capacity) * 50.0);
       expect(run.telemetry.firstInstantMs, 0);
       expect(run.telemetry.observationKind, ObservationKind.token);
+      expect(run.telemetry.series.gapsMs, hasLength(capacity - 1));
+      // A batch larger than the ring — reachable from the fake and the eval
+      // paths — is bounded too, keeping its own newest instants.
+      final huge = const LabTelemetry().withInstants(ObservationKind.token, [
+        for (var i = 0; i < capacity + 10; i++) i * 1.0,
+      ]);
+      expect(huge.instantsMs, hasLength(capacity));
+      expect(huge.instantsMs.first, 10);
+      expect(huge.observationCount, capacity + 10);
     });
 
     test('Stop makes the run cancelling until the engine ends it', () {
       var run = _run(phase: LabRunPhase.generating);
       run = reduceLabRun(run, const AnswerDelta('partial'));
       run = requestCancel(run);
-      expect(run.phase, LabRunPhase.cancelling);
+      expect(run.cancelling, isTrue);
+      expect(run.phase, LabRunPhase.generating, reason: 'the phase it reached');
       // Output that lands while cancelling is still kept; the phase holds.
       run = reduceLabRun(run, const AnswerDelta(' more'));
-      expect(run.phase, LabRunPhase.cancelling);
+      expect(run.cancelling, isTrue);
       expect(run.answer, 'partial more');
       run = reduceLabRun(run, const CompletedEvent());
       expect(run.phase, LabRunPhase.cancelled);
+      expect(run.cancelling, isFalse);
       expect(run.answer, 'partial more', reason: 'partial output survives');
       expect(requestCancel(run).phase, LabRunPhase.cancelled);
+    });
+
+    test('an error after Stop is the cancellation, not a failure', () {
+      // Both engines abort a cancelled load with an error rather than a
+      // completion; the run the user stopped must not read as a red failure.
+      var run = requestCancel(_run());
+      run = failRun(run, InferenceFailureKind.engine);
+      expect(run.phase, LabRunPhase.cancelled);
+      expect(run.stopReason, InferenceStopReason.cancelled);
+      expect(run.failure, isNull);
+    });
+
+    test('the engine\'s acceptance stamps the instants\' zero', () {
+      final accepted = DateTime(2026, 9, 6, 12);
+      var run = reduceLabRun(
+        _run(),
+        const RunPhaseEvent(InferencePhase.promptProcessing),
+        now: accepted,
+      );
+      expect(run.acceptedAt, accepted);
+      run = reduceLabRun(
+        run,
+        const RunPhaseEvent(InferencePhase.promptProcessing),
+        now: accepted.add(const Duration(seconds: 1)),
+      );
+      expect(run.acceptedAt, accepted, reason: 'stamped once');
     });
 
     test('a failure keeps the partial output and the snapshot', () {
@@ -243,14 +283,12 @@ void main() {
       );
     });
 
-    test('the process footprint tracks its peak', () {
+    test('the process footprint keeps the last reading', () {
       var telemetry = const LabTelemetry();
-      telemetry = telemetry.withFootprint(100);
       telemetry = telemetry.withFootprint(300);
       telemetry = telemetry.withFootprint(200);
       telemetry = telemetry.withFootprint(null);
       expect(telemetry.footprintBytes, 200);
-      expect(telemetry.peakFootprintBytes, 300);
     });
   });
 
@@ -318,11 +356,13 @@ void main() {
     });
 
     test('the live decode rate is measured over the run\'s own window', () {
-      // Ten tokens 50 ms apart from 300 ms: twenty per second.
+      // Ten tokens 50 ms apart from 300 ms: twenty per second at the tenth.
       final instants = [for (var i = 0; i < 10; i++) 300.0 + i * 50];
-      expect(liveDecodeRate(instants, 800), closeTo(20, 1e-9));
-      // The clock moved on and nothing arrived: the rate decays to nothing
-      // rather than freezing at the last burst.
+      expect(liveDecodeRate(instants, 750), closeTo(20, 1e-9));
+      // The clock moved on and nothing arrived: the idle tail is in the
+      // interval, so the rate sinks rather than freezing at the last burst.
+      expect(liveDecodeRate(instants, 2200), closeTo(9 / 1.9, 1e-9));
+      // Every instant left the window: nothing to report.
       expect(liveDecodeRate(instants, 3000), isNull);
       expect(liveDecodeRate(instants, 300), isNull, reason: 'one instant');
     });
@@ -335,13 +375,16 @@ void main() {
         isFalse,
       );
       expect(LabRunPhase.generating.reaches(LabRunPhase.loading), isTrue);
-      expect(LabRunPhase.completed.reaches(LabRunPhase.cancelling), isTrue);
+      expect(LabRunPhase.completed.reaches(LabRunPhase.generating), isTrue);
       var run = reduceLabRun(_run(), const AnswerDelta('Hi'));
       run = requestCancel(run);
       // A repository that re-announces a load mid-stream cannot pull a
       // cancelling run back to loading.
       run = reduceLabRun(run, const RunPhaseEvent(InferencePhase.loading));
-      expect(run.phase, LabRunPhase.cancelling);
+      expect(run.phase, LabRunPhase.generating);
+      // Nor does Stop during a load claim phases the engine never reached.
+      final stopped = requestCancel(_run());
+      expect(stopped.phase.reaches(LabRunPhase.promptProcessing), isFalse);
     });
 
     test('a load fraction only ever climbs', () {
@@ -376,6 +419,28 @@ void main() {
         ),
       );
       expect(run.outputTokens, 3);
+    });
+  });
+
+  group('families', () {
+    test('two families on one profile keep their own ids', () {
+      const keys = {
+        'qwen35-2b-gguf',
+        'qwen35-2b-mlx',
+        'qwen35-gguf',
+        'qwen35-mlx',
+      };
+      final families = labModelFamiliesOf([
+        for (final entry in modelCatalog)
+          if (keys.contains(entry.key)) LabConfiguration(entry),
+      ]);
+      expect(
+        families.map((f) => f.id),
+        unorderedEquals(['qwen35-2b', 'qwen35']),
+      );
+      expect(families.map((f) => f.configurations.first.profileKey).toSet(), {
+        'qwen35',
+      });
     });
   });
 }

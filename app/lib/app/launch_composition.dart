@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderContainer;
 import 'package:flutter_riverpod/misc.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -420,6 +421,7 @@ _composeRequired({
 List<Override> launchOverrides(
   LaunchDependencies dependencies, {
   bool lab = false,
+  void Function(ProviderContainer container)? labSessionOwner,
 }) => [
   chatHistoryRepositoryProvider.overrideWithValue(
     dependencies.chatHistoryRepository,
@@ -460,9 +462,14 @@ List<Override> launchOverrides(
   // on refresh, so a ref read here would register bridge→owner and trip the
   // circular-dependency assert. The container read force-builds without
   // registering a dependency.
+  // The lab's owner is the bench, which only the lab root may name: it
+  // passes a container read here (ADR 0021), so the hook lives with the
+  // bridge and not in a widget's lifecycle.
   chatSessionBridgeProvider.overrideWith((ref) {
     final bridge = ChatSessionBridge();
-    if (!lab) {
+    if (labSessionOwner != null) {
+      bridge.bindEnsureOwner(() => labSessionOwner(ref.container));
+    } else if (!lab) {
       bridge.bindEnsureOwner(() => ref.container.read(chatControllerProvider));
     }
     return bridge;

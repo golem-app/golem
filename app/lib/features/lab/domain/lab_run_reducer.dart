@@ -22,10 +22,12 @@ LabRun reduceLabRun(LabRun run, InferenceEvent event, {DateTime? now}) {
             loadFraction: 1,
           ),
         ),
+        // The engine accepted the request here: the instants' clock starts
+        // now, not when the run did, since the load sat between the two.
         InferencePhase.promptProcessing => _advance(
           run,
           LabRunPhase.promptProcessing,
-        ),
+        ).copyWith(acceptedAt: run.acceptedAt ?? now ?? DateTime.now()),
         InferencePhase.generating => _advance(run, LabRunPhase.generating),
       };
     case LoadProgressEvent():
@@ -77,30 +79,39 @@ LabRun reduceLabRun(LabRun run, InferenceEvent event, {DateTime? now}) {
   }
 }
 
-/// Stop was pressed: the run reads as cancelling until the engine ends the
-/// stream, which the reducer then records as cancelled.
-LabRun requestCancel(LabRun run) => run.isTerminal
-    ? run
-    : run.copyWith(phase: LabRunPhase.cancelling, cancelRequested: true);
+/// Stop was pressed: the run reads as cancelling, in the phase it reached,
+/// until the engine ends the stream — which then records as cancelled
+/// whether it ends in a completion or, as a cancelled load does, an error.
+LabRun requestCancel(LabRun run) =>
+    run.isTerminal ? run : run.copyWith(cancelRequested: true);
 
-/// The stream ended in an error: partial output and the snapshot stay.
+/// The stream ended in an error: partial output and the snapshot stay. After
+/// Stop the error is the cancellation's, so the run reads as cancelled.
 LabRun failRun(
   LabRun run,
   InferenceFailureKind kind, {
   int? contextTokens,
   DateTime? now,
-}) => run.isTerminal
-    ? run
-    : run.copyWith(
-        phase: LabRunPhase.failed,
-        failure: kind,
-        failureContextTokens: contextTokens,
-        endedAt: now ?? DateTime.now(),
-      );
+}) {
+  if (run.isTerminal) return run;
+  if (run.cancelRequested) {
+    return run.copyWith(
+      phase: LabRunPhase.cancelled,
+      stopReason: InferenceStopReason.cancelled,
+      endedAt: now ?? DateTime.now(),
+    );
+  }
+  return run.copyWith(
+    phase: LabRunPhase.failed,
+    failure: kind,
+    failureContextTokens: contextTokens,
+    endedAt: now ?? DateTime.now(),
+  );
+}
 
-/// Phases only move forward, and never out of cancelling: a stream that keeps
-/// producing after Stop is still a run being cancelled.
+/// Phases only move forward, and never after Stop: a stream that keeps
+/// producing is still a run being cancelled in the phase it reached.
 LabRun _advance(LabRun run, LabRunPhase phase) =>
-    run.phase == LabRunPhase.cancelling || run.phase.reaches(phase)
+    run.cancelRequested || run.phase.reaches(phase)
     ? run
     : run.copyWith(phase: phase);

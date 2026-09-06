@@ -8,7 +8,6 @@ import 'package:go_router/go_router.dart';
 import '../core/app_identity.dart';
 import '../core/domain/app_preferences.dart';
 import '../core/theme/golem_theme.dart';
-import '../core/providers/app_providers.dart';
 import '../features/lab/application/lab_bench_controller.dart';
 import '../features/lab/lab_shell.dart';
 import '../features/models/application/model_providers.dart';
@@ -16,10 +15,18 @@ import '../features/preferences/application/preferences_providers.dart';
 import '../l10n/l10n.dart';
 import 'launch_composition.dart';
 
-/// The lab's provider seams: the consumer app's, with the chat session bridge
-/// left for the bench controller to bind (see [launchOverrides]).
+/// The lab's provider seams: the consumer app's, with the bench as the
+/// session owner the chat session bridge builds on demand (see
+/// [launchOverrides]); the bench binds its facts to the bridge itself.
 List<Override> labLaunchOverrides(LaunchDependencies dependencies) =>
-    launchOverrides(dependencies, lab: true);
+    launchOverrides(
+      dependencies,
+      lab: true,
+      // The bench owns the session the model commands ask about (#88): a
+      // command arriving first builds it before it asks.
+      labSessionOwner: (container) =>
+          container.read(labBenchControllerProvider),
+    );
 
 /// Golem Model Lab's root (ADR 0021): the macOS-only bench for the models the
 /// phone flavors ship. It shares the consumer app's launch composition and
@@ -61,12 +68,6 @@ class _LabAppState extends ConsumerState<LabApp> with WidgetsBindingObserver {
       ],
     );
     WidgetsBinding.instance.addObserver(this);
-    // The bench owns the session the model commands ask about (#88): bound
-    // here, behind kLabBuild, so the first command — the post-frame
-    // reconcile below — builds the bench before it asks.
-    ref
-        .read(chatSessionBridgeProvider)
-        .bindEnsureOwner(() => ref.read(labBenchControllerProvider));
     WidgetsBinding.instance.addPostFrameCallback((_) => _reconcileDownloads());
   }
 

@@ -6,7 +6,6 @@ import '../../../broker/effective_sampling.dart';
 import '../../../broker/model_profile.dart';
 import '../../../broker/model_runtime_config.dart';
 import '../../../broker/runtime.dart' show engineBuildLabel;
-import '../../../core/domain/app_state.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/retry.dart';
@@ -96,12 +95,8 @@ class LabBenchController extends _$LabBenchController {
     // bridge is bound once per container, and a rebuild here would reset
     // the session under a run whose subscription lives in this instance.
     final bridge = ref.read(chatSessionBridgeProvider);
-    bridge.bindSessionState(
-      () => ChatState(
-        generation: state.locked
-            ? GenerationPhase.streaming
-            : GenerationPhase.idle,
-      ),
+    bridge.bindFacts(
+      () => (activeModelKey: state.armed?.key, generationActive: state.locked),
     );
     ref.onDispose(() {
       _epoch++;
@@ -111,7 +106,7 @@ class LabBenchController extends _$LabBenchController {
       unawaited(_subscription?.cancel());
       // Native decode outlives the subscription otherwise (#127).
       unawaited(_inFlight?.cancel());
-      bridge.bindSessionState(() => null);
+      bridge.bindFacts(() => null);
     });
     return const LabBenchState();
   }
@@ -185,8 +180,10 @@ class LabBenchController extends _$LabBenchController {
   /// Sends [prompt] against the armed configuration as a new run. Returns
   /// false when nothing is armed, a run is in flight, the prompt is empty, or
   /// the settings do not validate — the surfaces gate every one of those
-  /// before offering the action, so this is the second line.
-  Future<bool> send(String prompt) async {
+  /// before offering the action, so this is the second line. Synchronous up
+  /// to the subscription: the bench is locked before anything can change
+  /// what the run measures under.
+  bool send(String prompt) {
     final armed = state.armed;
     if (armed == null || state.locked || prompt.trim().isEmpty) return false;
     final profile = _profileFor(armed);
@@ -199,32 +196,22 @@ class LabBenchController extends _$LabBenchController {
         .isNotEmpty) {
       return false;
     }
+    // What the engine receives: an empty seed inherits the launch seed at
+    // the broker, so the snapshot resolves it the same way.
+    final seed = settings.seed ?? launchSamplingSeed;
     final (sampling, _) = effectiveSampling(
       profile: profile,
       defaults: defaults,
       overrides: settings.toOverrides(),
-      seed: settings.seed,
+      seed: seed,
     );
-    // The artifact's verified state, from the model store once it has read;
-    // a store that will not read leaves the provenance unverified rather than
-    // blocking the run.
-    ModelState? models;
-    try {
-      models = await ref
-          .read(modelControllerProvider.future)
-          .timeout(const Duration(seconds: 1));
-    } on Object {
-      models = null;
-    }
-    // The bench stayed unlocked while the store answered: a run under what
-    // was armed then, not now, would mislabel the conversation.
-    if (!ref.mounted ||
-        state.locked ||
-        state.armed != armed ||
-        state.settings != settings) {
-      return false;
-    }
-    final artifact = models?.statusOf(armed.key);
+    // The artifact's verified state, from the model store as it stands; a
+    // store that has not read yet leaves the provenance unverified rather
+    // than holding the bench open, unlocked, until it has.
+    final artifact = ref
+        .read(modelControllerProvider)
+        .value
+        ?.statusOf(armed.key);
     final run = LabRun(
       id: 'run-${++_runSerial}',
       prompt: prompt.trim(),
@@ -271,7 +258,7 @@ class LabBenchController extends _$LabBenchController {
           overrides: settings.toOverrides(),
           modelKey: armed.key,
           observe: GenerationObservation.everything,
-          seed: settings.seed,
+          seed: seed,
         )
         .listen(
           (event) => _fold(epoch, event),
@@ -317,10 +304,11 @@ class LabBenchController extends _$LabBenchController {
 
   /// Stop: the run reads as cancelling until the engine ends the stream,
   /// keeping whatever it produced. The cancel itself is fire-and-forget, like
-  /// chat's — the stream's own end is what terminates the run.
+  /// chat's — the stream's own end is what terminates the run. Once per run:
+  /// a held Escape repeats, and each repeat would re-arm the deadline.
   void stop() {
     final pending = _pending;
-    if (pending == null || !state.locked) return;
+    if (pending == null || !state.locked || pending.cancelRequested) return;
     _pending = requestCancel(pending);
     _publishNow();
     unawaited(ref.read(inferenceRepositoryProvider).cancel());
@@ -343,7 +331,7 @@ class LabBenchController extends _$LabBenchController {
 
   /// Sends the last cancelled or failed prompt again under the current
   /// configuration, as a new run beside the old one.
-  Future<bool> retry() async {
+  bool retry() {
     final last = state.session.active?.last;
     if (last == null ||
         !last.isTerminal ||

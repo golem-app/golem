@@ -11,6 +11,7 @@ import '../core/repositories/fake_inference_repository.dart';
 import '../core/services/device_storage.dart';
 import 'backend_policy.dart';
 import 'device_capability.dart';
+import 'effective_sampling.dart';
 import 'inferno_inference_repository.dart';
 import 'model_catalog.dart';
 import 'model_profile.dart';
@@ -145,8 +146,8 @@ InferenceRepository createConfiguredInferenceRepository({
     initialProjectorPath: initialRuntime?.projectorPath,
     initialSupportsImages: initialRuntime?.supportsImages ?? false,
     activationCatalog: activationCatalog,
-    // A fixed seed pins sampling for determinism probes (0 = engine default).
-    samplingSeed: const int.fromEnvironment('GOLEM_SAMPLING_SEED'),
+    // A fixed seed pins sampling for determinism probes.
+    samplingSeed: launchSamplingSeed,
     fakeStreamDelay: fakeStreamDelay,
     documentsDirectory: documentsDirectory,
     createRuntime: InfernoRuntimeAdapter.native,
@@ -188,7 +189,7 @@ InferenceRepository selectInferenceRepository({
   required String documentsDirectory,
   required BrokerRuntime Function() createRuntime,
   Future<List<int>?> Function(String attachmentId)? readAttachment,
-  required int samplingSeed,
+  required int? samplingSeed,
   BrokerLoadOptions loadOptions = const BrokerLoadOptions(),
   InferenceDiagnosticSink? diagnosticSink,
 }) {
@@ -243,7 +244,7 @@ InferenceRepository selectInferenceRepository({
     documentsDirectory: documentsDirectory,
     availableMemoryBytes: const DeviceStorageChannel().availableMemoryBytes,
     loadOptions: loadOptions,
-    seed: samplingSeed == 0 ? null : samplingSeed,
+    seed: samplingSeed,
     readAttachment: readAttachment,
     diagnosticSink: identity.internalToolsEnabled ? diagnosticSink : null,
   );

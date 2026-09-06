@@ -4,15 +4,17 @@ import '../../../core/domain/models.dart';
 import '../../../core/repositories/contracts.dart';
 import '../../../core/services/device_storage.dart';
 import 'lab_run_settings.dart';
+import 'latency_series.dart';
 
 /// Where a bench run is. Each run passes through exactly one terminal phase;
 /// the reducer refuses to move a terminal run and the controller drops late
-/// events by epoch, so a run is terminated once.
+/// events by epoch, so a run is terminated once. Stop is not a phase: a run
+/// being cancelled keeps the phase it reached (see [LabRun.cancelling]), so
+/// the card shows only what the engine actually did.
 enum LabRunPhase {
   loading,
   promptProcessing,
   generating,
-  cancelling,
   completed,
   cancelled,
   failed;
@@ -27,8 +29,7 @@ enum LabRunPhase {
     loading => 0,
     promptProcessing => 1,
     generating => 2,
-    cancelling => 3,
-    completed || cancelled || failed => 4,
+    completed || cancelled || failed => 3,
   };
 
   /// Whether a run in this phase has reached [other] on that way.
@@ -91,7 +92,9 @@ final class LabArtifactProvenance {
 
 /// The live observations of one run, bounded (#58): the instants ring holds
 /// the newest [instantCapacity] arrivals so a long generation cannot grow
-/// the state per token, while [observationCount] keeps the true total.
+/// the state per token, while [observationCount] keeps the true total. The
+/// latency figures therefore describe the last [instantCapacity] arrivals of
+/// a run longer than that, which the README states beside them.
 final class LabTelemetry {
   const LabTelemetry({
     this.loadFraction,
@@ -101,12 +104,14 @@ final class LabTelemetry {
     this.observationKind,
     this.observationCount = 0,
     this.instantsMs = const [],
+    this.series = LatencySeries.empty,
     this.firstInstantMs,
     this.footprintBytes,
-    this.peakFootprintBytes,
   });
 
-  static const instantCapacity = 512;
+  /// Larger than any token budget the bench offers by default, so the ring
+  /// only ever truncates a deliberately long run; 32 KB of doubles at most.
+  static const instantCapacity = 4096;
 
   /// The engine's own fraction, or null for an engine that reports none —
   /// which the UI shows as an indeterminate load, never a guess.
@@ -122,12 +127,15 @@ final class LabTelemetry {
   final ObservationKind? observationKind;
   final int observationCount;
   final List<double> instantsMs;
+
+  /// The gaps over [instantsMs], computed once per batch rather than by
+  /// every card on every publish.
+  final LatencySeries series;
   final double? firstInstantMs;
 
-  /// The process footprint as last sampled, and its peak during the run —
-  /// this process, not the model: null where the platform does not report.
+  /// The process footprint as last sampled — this process, not the model:
+  /// null where the platform does not report.
   final int? footprintBytes;
-  final int? peakFootprintBytes;
 
   LabTelemetry copyWith({
     double? loadFraction,
@@ -137,9 +145,9 @@ final class LabTelemetry {
     ObservationKind? observationKind,
     int? observationCount,
     List<double>? instantsMs,
+    LatencySeries? series,
     double? firstInstantMs,
     int? footprintBytes,
-    int? peakFootprintBytes,
   }) => LabTelemetry(
     loadFraction: loadFraction ?? this.loadFraction,
     loadDuration: loadDuration ?? this.loadDuration,
@@ -148,34 +156,33 @@ final class LabTelemetry {
     observationKind: observationKind ?? this.observationKind,
     observationCount: observationCount ?? this.observationCount,
     instantsMs: instantsMs ?? this.instantsMs,
+    series: series ?? this.series,
     firstInstantMs: firstInstantMs ?? this.firstInstantMs,
     footprintBytes: footprintBytes ?? this.footprintBytes,
-    peakFootprintBytes: peakFootprintBytes ?? this.peakFootprintBytes,
   );
 
   /// Appends a batch, keeping the newest [instantCapacity] instants in one
-  /// allocation.
+  /// allocation — from the batch alone when the batch is larger than that.
   LabTelemetry withInstants(ObservationKind kind, List<double> batch) {
     if (batch.isEmpty) return this;
-    final overflow = instantsMs.length + batch.length - instantCapacity;
-    final kept = overflow > 0 ? instantsMs.skip(overflow) : instantsMs;
+    final total = instantsMs.length + batch.length;
+    final drop = total > instantCapacity ? total - instantCapacity : 0;
+    final fromBatch = drop > instantsMs.length ? drop - instantsMs.length : 0;
+    final instants = [
+      for (var i = drop; i < instantsMs.length; i++) instantsMs[i],
+      for (var i = fromBatch; i < batch.length; i++) batch[i],
+    ];
     return copyWith(
       observationKind: kind,
       observationCount: observationCount + batch.length,
-      instantsMs: [...kept, ...batch],
+      instantsMs: instants,
+      series: LatencySeries.from(instants),
       firstInstantMs: firstInstantMs ?? batch.first,
     );
   }
 
-  LabTelemetry withFootprint(int? bytes) => bytes == null
-      ? this
-      : copyWith(
-          footprintBytes: bytes,
-          peakFootprintBytes:
-              peakFootprintBytes == null || bytes > peakFootprintBytes!
-              ? bytes
-              : peakFootprintBytes,
-        );
+  LabTelemetry withFootprint(int? bytes) =>
+      bytes == null ? this : copyWith(footprintBytes: bytes);
 }
 
 /// One prompt against one configuration: the bench's unit of data (#40).
@@ -194,6 +201,7 @@ final class LabRun {
     this.failure,
     this.failureContextTokens,
     this.cancelRequested = false,
+    this.acceptedAt,
     this.endedAt,
   });
 
@@ -215,9 +223,16 @@ final class LabRun {
 
   /// Stop was pressed: whatever ends the stream is a cancellation.
   final bool cancelRequested;
+
+  /// When the engine accepted the request — the zero of the instants' clock,
+  /// which starts after the load; null until prompt processing began.
+  final DateTime? acceptedAt;
   final DateTime? endedAt;
 
   bool get isTerminal => phase.isTerminal;
+
+  /// Stop was pressed and the engine has not ended the stream yet.
+  bool get cancelling => cancelRequested && !isTerminal;
   bool get hasOutput => reasoning.isNotEmpty || answer.isNotEmpty;
 
   /// Tokens produced: the metrics' count once they exist, else the engine's
@@ -240,6 +255,7 @@ final class LabRun {
     InferenceFailureKind? failure,
     int? failureContextTokens,
     bool? cancelRequested,
+    DateTime? acceptedAt,
     DateTime? endedAt,
   }) => LabRun(
     id: id,
@@ -254,6 +270,7 @@ final class LabRun {
     failure: failure ?? this.failure,
     failureContextTokens: failureContextTokens ?? this.failureContextTokens,
     cancelRequested: cancelRequested ?? this.cancelRequested,
+    acceptedAt: acceptedAt ?? this.acceptedAt,
     endedAt: endedAt ?? this.endedAt,
   );
 }
@@ -292,6 +309,11 @@ final class LabSession {
   final List<LabConversation> conversations;
 
   LabConversation? get active => conversations.lastOrNull;
+
+  /// The newest run anywhere in the session: what the persistent metrics
+  /// band shows across a conversation change.
+  LabRun? get lastRun =>
+      conversations.reversed.map((c) => c.last).nonNulls.firstOrNull;
 
   int get runCount => conversations.fold(0, (sum, c) => sum + c.runs.length);
 
