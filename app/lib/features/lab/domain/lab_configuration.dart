@@ -38,7 +38,7 @@ List<LabConfiguration> labConfigurations(List<ModelCatalogEntry> catalog) => [
 
 /// The model families the bench offers — one row per display name, in
 /// catalog order — each with the engines it ships on.
-List<LabModelFamily> labModelFamilies(List<LabConfiguration> configurations) {
+List<LabModelFamily> labModelFamiliesOf(List<LabConfiguration> configurations) {
   final families = <String, List<LabConfiguration>>{};
   for (final configuration in configurations) {
     families

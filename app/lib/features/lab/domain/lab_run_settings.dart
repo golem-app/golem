@@ -1,3 +1,4 @@
+import '../../../broker/context_window.dart' show contextPromptReserveTokens;
 import '../../../core/domain/generation_settings.dart';
 import '../../../core/domain/model_profile_spec.dart';
 
@@ -66,7 +67,7 @@ final class LabRunSettings {
       if (context < labContextFloor) LabSettingsProblem.contextBelowFloor,
       if (context > contextCeiling) LabSettingsProblem.contextAboveCeiling,
       if (budget < 1) LabSettingsProblem.maxTokensBelowOne,
-      if (budget > context - labPromptReserveTokens)
+      if (budget > context - contextPromptReserveTokens)
         LabSettingsProblem.maxTokensAboveBudget,
       if (temperature case final t? when t < 0 || t > 2)
         LabSettingsProblem.temperatureOutOfRange,
@@ -103,11 +104,9 @@ final class LabRunSettings {
 /// The smallest context the bench lets a run claim.
 const labContextFloor = 512;
 
-/// The prompt reserve Settings keeps under the context (ADR 0003): a budget
-/// that fills the whole window can never be satisfied.
-const labPromptReserveTokens = 512;
-
 enum LabSettingsProblem {
+  /// Not a validation failure: a run is in flight, and settings are locked.
+  benchLocked,
   contextBelowFloor,
   contextAboveCeiling,
   maxTokensBelowOne,

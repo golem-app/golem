@@ -1,8 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golem_flutter/app/launch_composition.dart';
+import 'package:golem_flutter/core/domain/generation_settings.dart';
 import 'package:golem_flutter/core/domain/model_catalog.dart';
 import 'package:golem_flutter/core/domain/models.dart';
 import 'package:golem_flutter/core/providers/app_providers.dart';
@@ -58,8 +61,68 @@ final class _GatedModels implements ModelManagementRepository {
       _inner.addModel(entry);
 }
 
+/// A repository whose stream ignores Stop, or ends without its completion
+/// event — the engines a bench must survive.
+final class _StubbornRepository implements InferenceRepository {
+  _StubbornRepository({required this.ignoresCancel, required this.truncates});
+
+  final bool ignoresCancel;
+  final bool truncates;
+  final _inner = FakeInferenceRepository(
+    eventDelay: const Duration(milliseconds: 10),
+  );
+  int cancels = 0;
+
+  @override
+  Stream<InferenceEvent> generate({
+    required List<PromptMessage> context,
+    required bool reasoningEnabled,
+    SamplingOverrides? overrides,
+    String? modelKey,
+    String? systemPrompt,
+    GenerationObservation? observe,
+    int? seed,
+  }) async* {
+    await for (final event in _inner.generate(
+      context: context,
+      reasoningEnabled: reasoningEnabled,
+      overrides: overrides,
+      modelKey: modelKey,
+      systemPrompt: systemPrompt,
+      observe: observe,
+      seed: seed,
+    )) {
+      // A torn-down engine: its numbers and its completion never arrive.
+      if (truncates && (event is MetricsEvent || event is CompletedEvent)) {
+        continue;
+      }
+      yield event;
+    }
+    if (ignoresCancel) {
+      // Never ends: the engine wedged after Stop.
+      await Completer<void>().future;
+    }
+  }
+
+  @override
+  Future<void> cancel() async {
+    cancels++;
+    if (!ignoresCancel) await _inner.cancel();
+  }
+
+  @override
+  Future<void> prepare({String? modelKey}) =>
+      _inner.prepare(modelKey: modelKey);
+  @override
+  Future<void> unload() => _inner.unload();
+  @override
+  void releaseEngine() => _inner.releaseEngine();
+  @override
+  ValueListenable<InferenceResidency> get residency => _inner.residency;
+}
+
 ProviderContainer _container({
-  FakeInferenceRepository? inference,
+  InferenceRepository? inference,
   ModelState model = const ModelState(),
   ModelManagementRepository? models,
   _Probes? probes,
@@ -329,6 +392,84 @@ void main() {
     },
   );
 
+  test('Retry after Stop runs the prompt again to completion', () async {
+    final container = _container(
+      inference: FakeInferenceRepository(
+        eventDelay: const Duration(milliseconds: 20),
+      ),
+    );
+    final controller = container.read(labBenchControllerProvider.notifier);
+    controller.arm('gemma4-gguf');
+    await controller.send('Hello');
+    final deadline = DateTime.now().add(const Duration(seconds: 5));
+    while (container
+            .read(labBenchControllerProvider)
+            .activeRun!
+            .answer
+            .isEmpty &&
+        DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    controller.stop();
+    final cancelled = await _settle(container);
+    expect(cancelled.phase, LabRunPhase.cancelled);
+    expect(await controller.retry(), isTrue);
+    final retried = await _settle(container);
+    expect(retried.id, isNot(cancelled.id));
+    expect(retried.phase, LabRunPhase.completed);
+    expect(container.read(labBenchControllerProvider).locked, isFalse);
+  });
+
+  test('a locked bench refuses settings with its own reason', () async {
+    final container = _container(
+      inference: FakeInferenceRepository(
+        eventDelay: const Duration(milliseconds: 30),
+      ),
+    );
+    final controller = container.read(labBenchControllerProvider.notifier);
+    controller.arm('gemma4-gguf');
+    await controller.send('Hello');
+    expect(controller.updateSettings(const LabRunSettings(maxTokens: 64)), [
+      LabSettingsProblem.benchLocked,
+    ]);
+    await _settle(container);
+  });
+
+  test('a stream that ends without completing reads as cancelled', () async {
+    final container = _container(
+      inference: _StubbornRepository(ignoresCancel: false, truncates: true),
+    );
+    final controller = container.read(labBenchControllerProvider.notifier);
+    controller.arm('gemma4-gguf');
+    await controller.send('Hello');
+    final run = await _settle(container);
+    // Torn down under it: not a measurement, its partial answer kept and
+    // fed to nothing, and Retry on offer.
+    expect(run.phase, LabRunPhase.cancelled);
+    expect(run.answer, isNotEmpty);
+    expect(run.metrics, isNull);
+    expect(
+      container.read(labBenchControllerProvider).session.active!.context,
+      isEmpty,
+    );
+    expect(await controller.retry(), isTrue);
+    await _settle(container);
+  });
+
+  test('disposing the bench mid-run cancels the engine', () async {
+    final repository = _StubbornRepository(
+      ignoresCancel: false,
+      truncates: false,
+    );
+    final container = _container(inference: repository);
+    final controller = container.read(labBenchControllerProvider.notifier);
+    controller.arm('gemma4-gguf');
+    await controller.send('Hello');
+    expect(container.read(labBenchControllerProvider).locked, isTrue);
+    container.dispose();
+    expect(repository.cancels, 1, reason: 'native decode must not outlive it');
+  });
+
   test(
     'invalid settings are refused with their problems and nothing applies',
     () {
@@ -345,4 +486,35 @@ void main() {
       );
     },
   );
+
+  testWidgets('Stop ends a run the engine will not end, after the deadline', (
+    tester,
+  ) async {
+    final repository = _StubbornRepository(
+      ignoresCancel: true,
+      truncates: true,
+    );
+    final container = _container(inference: repository);
+    final controller = container.read(labBenchControllerProvider.notifier);
+    controller.arm('gemma4-gguf');
+    await controller.send('Hello');
+    LabBenchState bench() => container.read(labBenchControllerProvider);
+    // Let the answer arrive, then Stop: the engine ignores it.
+    for (
+      var i = 0;
+      i < 100 && (bench().activeRun?.answer.isEmpty ?? true);
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 10));
+    }
+    controller.stop();
+    expect(bench().activeRun!.phase, LabRunPhase.cancelling);
+    expect(repository.cancels, 1);
+    await tester.pump(labStopDeadline - const Duration(seconds: 1));
+    expect(bench().locked, isTrue, reason: 'the engine still has a chance');
+    await tester.pump(const Duration(seconds: 2));
+    expect(bench().activeRun!.phase, LabRunPhase.cancelled);
+    expect(bench().locked, isFalse, reason: 'the bench is usable again');
+    expect(bench().activeRun!.answer, isNotEmpty);
+  });
 }

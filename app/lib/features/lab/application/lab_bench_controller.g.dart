@@ -48,7 +48,7 @@ final class LabBenchControllerProvider
 }
 
 String _$labBenchControllerHash() =>
-    r'b13a7af4d364ad558402c7aa2f0ad52eab10b1c1';
+    r'bf3672d40161ed84afaa0d195742c675a8bbbf65';
 
 /// KeepAlive: a command controller whose run, epoch and timers must outlive
 /// any one widget (handbook v5.0 §3.4).

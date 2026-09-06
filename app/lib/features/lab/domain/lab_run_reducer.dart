@@ -14,7 +14,7 @@ LabRun reduceLabRun(LabRun run, InferenceEvent event, {DateTime? now}) {
   switch (event) {
     case RunPhaseEvent():
       return switch (event.phase) {
-        InferencePhase.loading => run.copyWith(phase: LabRunPhase.loading),
+        InferencePhase.loading => _advance(run, LabRunPhase.loading),
         InferencePhase.loaded => run.copyWith(
           telemetry: telemetry.copyWith(
             loadDuration: event.loadDuration,
@@ -29,8 +29,15 @@ LabRun reduceLabRun(LabRun run, InferenceEvent event, {DateTime? now}) {
         InferencePhase.generating => _advance(run, LabRunPhase.generating),
       };
     case LoadProgressEvent():
+      // Only ever climbing: a late fraction never pulls a finished bar back.
       return run.copyWith(
-        telemetry: telemetry.copyWith(loadFraction: event.fraction),
+        telemetry: telemetry.copyWith(
+          loadFraction: telemetry.loadFraction == null
+              ? event.fraction
+              : (event.fraction > telemetry.loadFraction!
+                    ? event.fraction
+                    : telemetry.loadFraction),
+        ),
       );
     case PromptProgressEvent():
       return run.copyWith(
@@ -77,18 +84,23 @@ LabRun requestCancel(LabRun run) => run.isTerminal
     : run.copyWith(phase: LabRunPhase.cancelling, cancelRequested: true);
 
 /// The stream ended in an error: partial output and the snapshot stay.
-LabRun failRun(LabRun run, InferenceFailureKind kind, {DateTime? now}) =>
-    run.isTerminal
+LabRun failRun(
+  LabRun run,
+  InferenceFailureKind kind, {
+  int? contextTokens,
+  DateTime? now,
+}) => run.isTerminal
     ? run
     : run.copyWith(
         phase: LabRunPhase.failed,
         failure: kind,
+        failureContextTokens: contextTokens,
         endedAt: now ?? DateTime.now(),
       );
 
 /// Phases only move forward, and never out of cancelling: a stream that keeps
 /// producing after Stop is still a run being cancelled.
 LabRun _advance(LabRun run, LabRunPhase phase) =>
-    run.phase == LabRunPhase.cancelling || run.phase.index >= phase.index
+    run.phase == LabRunPhase.cancelling || run.phase.reaches(phase)
     ? run
     : run.copyWith(phase: phase);

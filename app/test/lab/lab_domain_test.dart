@@ -53,7 +53,7 @@ void main() {
         'qwen35-mlx',
         'qwen35-gguf',
       ]);
-      final families = labModelFamilies(configurations);
+      final families = labModelFamiliesOf(configurations);
       expect(families.map((f) => f.displayName), [
         'Gemma 4 E2B',
         'Qwen 3.5 4B',
@@ -307,6 +307,75 @@ void main() {
 
     test('an even count medians the middle pair', () {
       expect(LatencySeries.from([0, 10, 30, 60]).medianMs, 20);
+    });
+
+    test('a zero median flags no stalls', () {
+      // Coarse or batched stamps: half the gaps are 0, so "twice the median"
+      // would have been every non-zero gap.
+      final series = LatencySeries.from([0, 0, 0, 0, 12]);
+      expect(series.medianMs, 0);
+      expect(series.stallIndexes, isEmpty);
+    });
+
+    test('the live decode rate is measured over the run\'s own window', () {
+      // Ten tokens 50 ms apart from 300 ms: twenty per second.
+      final instants = [for (var i = 0; i < 10; i++) 300.0 + i * 50];
+      expect(liveDecodeRate(instants, 800), closeTo(20, 1e-9));
+      // The clock moved on and nothing arrived: the rate decays to nothing
+      // rather than freezing at the last burst.
+      expect(liveDecodeRate(instants, 3000), isNull);
+      expect(liveDecodeRate(instants, 300), isNull, reason: 'one instant');
+    });
+  });
+
+  group('phase order', () {
+    test('is explicit, and cancelling admits no phase after it', () {
+      expect(
+        LabRunPhase.loading.reaches(LabRunPhase.promptProcessing),
+        isFalse,
+      );
+      expect(LabRunPhase.generating.reaches(LabRunPhase.loading), isTrue);
+      expect(LabRunPhase.completed.reaches(LabRunPhase.cancelling), isTrue);
+      var run = reduceLabRun(_run(), const AnswerDelta('Hi'));
+      run = requestCancel(run);
+      // A repository that re-announces a load mid-stream cannot pull a
+      // cancelling run back to loading.
+      run = reduceLabRun(run, const RunPhaseEvent(InferencePhase.loading));
+      expect(run.phase, LabRunPhase.cancelling);
+    });
+
+    test('a load fraction only ever climbs', () {
+      var run = reduceLabRun(_run(), const LoadProgressEvent(0.8));
+      run = reduceLabRun(run, const LoadProgressEvent(0.6));
+      expect(run.telemetry.loadFraction, 0.8);
+      run = reduceLabRun(
+        run,
+        const RunPhaseEvent(InferencePhase.loaded, loadDuration: Duration.zero),
+      );
+      run = reduceLabRun(run, const LoadProgressEvent(0.9));
+      expect(run.telemetry.loadFraction, 1);
+    });
+
+    test('output tokens are never a chunk count', () {
+      var run = reduceLabRun(
+        _run(),
+        const TokenTimingEvent(
+          kind: ObservationKind.chunk,
+          firstIndex: 0,
+          timesMs: [300, 340, 380],
+        ),
+      );
+      expect(run.telemetry.observationCount, 3);
+      expect(run.outputTokens, isNull, reason: 'chunks are not tokens');
+      run = reduceLabRun(
+        _run(),
+        const TokenTimingEvent(
+          kind: ObservationKind.token,
+          firstIndex: 0,
+          timesMs: [300, 340, 380],
+        ),
+      );
+      expect(run.outputTokens, 3);
     });
   });
 }

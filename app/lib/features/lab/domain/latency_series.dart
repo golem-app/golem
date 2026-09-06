@@ -32,9 +32,12 @@ final class LatencySeries {
     return LatencySeries._(
       gapsMs: gaps,
       medianMs: median,
+      // No stalls against a zero median: coarse or batched stamps make
+      // every non-zero gap "twice the median" of nothing.
       stallIndexes: {
-        for (var i = 0; i < gaps.length; i++)
-          if (gaps[i] > median * stallFactor) i,
+        if (median > 0)
+          for (var i = 0; i < gaps.length; i++)
+            if (gaps[i] > median * stallFactor) i,
       },
     );
   }
@@ -48,4 +51,28 @@ final class LatencySeries {
   final Set<int> stallIndexes;
 
   int get stallCount => stallIndexes.length;
+}
+
+/// The decode rate over the trailing [windowMs] of a run's clock, from the
+/// token instants that fell inside it — measured work over an explicit
+/// window, and only for tokens: a chunk gap counts nothing. [elapsedMs] is
+/// how far the run's clock has come, so a rate decays to nothing when
+/// arrivals stop instead of freezing at the last burst.
+double? liveDecodeRate(
+  List<double> instantsMs,
+  double elapsedMs, {
+  double windowMs = 2000,
+}) {
+  final start = elapsedMs - windowMs;
+  var count = 0;
+  double? first;
+  double? last;
+  for (final instant in instantsMs) {
+    if (instant <= start || instant > elapsedMs) continue;
+    first ??= instant;
+    last = instant;
+    count++;
+  }
+  if (count < 2 || last! <= first!) return null;
+  return (count - 1) / ((last - first) / 1000);
 }

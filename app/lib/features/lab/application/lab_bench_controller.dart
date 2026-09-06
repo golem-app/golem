@@ -29,17 +29,15 @@ final class LabBenchState {
     this.armed,
     this.settings = const LabRunSettings(),
     this.session = const LabSession(),
-    this.activeRunId,
   });
 
   final LabConfiguration? armed;
   final LabRunSettings settings;
   final LabSession session;
-  final String? activeRunId;
 
-  LabRun? get activeRun => activeRunId == null
-      ? null
-      : session.active?.runs.where((run) => run.id == activeRunId).firstOrNull;
+  /// The run in flight, or the last one: `send` appends a run last and every
+  /// publish re-appends it, so the active conversation's tail is the run.
+  LabRun? get activeRun => session.active?.last;
 
   /// A run in flight locks the Rig: changing what a run measures under
   /// mid-run would silently invalidate the comparison, so it is impossible
@@ -47,15 +45,13 @@ final class LabBenchState {
   bool get locked => !(activeRun?.isTerminal ?? true);
 
   LabBenchState copyWith({
-    LabConfiguration? Function()? armed,
+    LabConfiguration? armed,
     LabRunSettings? settings,
     LabSession? session,
-    String? Function()? activeRunId,
   }) => LabBenchState(
-    armed: armed == null ? this.armed : armed(),
+    armed: armed ?? this.armed,
     settings: settings ?? this.settings,
     session: session ?? this.session,
-    activeRunId: activeRunId == null ? this.activeRunId : activeRunId(),
   );
 }
 
@@ -68,36 +64,54 @@ const labPublishInterval = Duration(milliseconds: 60);
 /// How often the process footprint is sampled while a run is in flight.
 const labFootprintInterval = Duration(milliseconds: 500);
 
+/// How long Stop waits for the engine to end the stream before the bench
+/// ends the run itself. The stream's own end is the honest terminator; an
+/// engine that never sends it must not hold the whole bench locked.
+const labStopDeadline = Duration(seconds: 10);
+
 /// KeepAlive: a command controller whose run, epoch and timers must outlive
 /// any one widget (handbook v5.0 §3.4).
 @Riverpod(keepAlive: true, retry: noRetry)
 class LabBenchController extends _$LabBenchController {
+  /// Advances on every run start *and* end, so a late event, a late footprint
+  /// sample or a stale watchdog for a finished run is dropped by the guard
+  /// rather than by the order stream teardown happens to take.
   int _epoch = 0;
   int _runSerial = 0;
   int _conversationSerial = 0;
   LabRun? _pending;
   Timer? _publish;
   Timer? _footprint;
+  Timer? _stopWatchdog;
   StreamSubscription<InferenceEvent>? _subscription;
+
+  /// The repository the run in flight streams from, held so disposal can
+  /// cancel the engine without touching `ref` inside a lifecycle.
+  InferenceRepository? _inFlight;
 
   @override
   LabBenchState build() {
     // The lab has no chat: model commands asking whether a generation is in
-    // flight read the bench instead (ADR 0021). Watched so a refreshed bridge
-    // re-binds.
-    ref
-        .watch(chatSessionBridgeProvider)
-        .bindSessionState(
-          () => ChatState(
-            generation: state.locked
-                ? GenerationPhase.streaming
-                : GenerationPhase.idle,
-          ),
-        );
+    // flight read the bench instead (ADR 0021). Read, not watched — the
+    // bridge is bound once per container, and a rebuild here would reset
+    // the session under a run whose subscription lives in this instance.
+    final bridge = ref.read(chatSessionBridgeProvider);
+    bridge.bindSessionState(
+      () => ChatState(
+        generation: state.locked
+            ? GenerationPhase.streaming
+            : GenerationPhase.idle,
+      ),
+    );
     ref.onDispose(() {
+      _epoch++;
       _publish?.cancel();
       _footprint?.cancel();
+      _stopWatchdog?.cancel();
       unawaited(_subscription?.cancel());
+      // Native decode outlives the subscription otherwise (#127).
+      unawaited(_inFlight?.cancel());
+      bridge.bindSessionState(() => null);
     });
     return const LabBenchState();
   }
@@ -113,8 +127,27 @@ class LabBenchController extends _$LabBenchController {
         .firstOrNull;
     if (configuration == null) return false;
     if (state.armed == configuration) return true;
+    // Settings are the bench's, not the model's: ones the new profile cannot
+    // take (a context above its ceiling) reset to its defaults rather than
+    // leaving Run silently refused.
+    final settings = state.settings;
+    final defaults = _profileFor(
+      configuration,
+    ).sampling(reasoningEnabled: settings.reasoningEnabled);
+    final valid = settings
+        .validate(
+          defaults: defaults,
+          contextCeiling: configuration.entry.contextLength,
+        )
+        .isEmpty;
     state = state.copyWith(
-      armed: () => configuration,
+      armed: configuration,
+      settings: valid
+          ? settings
+          : LabRunSettings(
+              reasoningEnabled: settings.reasoningEnabled,
+              seed: settings.seed,
+            ),
       session: _sessionForChange(),
     );
     return true;
@@ -124,7 +157,7 @@ class LabBenchController extends _$LabBenchController {
   /// problems otherwise and applies nothing. A change under a conversation
   /// with runs starts a new one. Refused while a run is in flight.
   List<LabSettingsProblem> updateSettings(LabRunSettings settings) {
-    if (state.locked) return const [LabSettingsProblem.contextBelowFloor];
+    if (state.locked) return const [LabSettingsProblem.benchLocked];
     final armed = state.armed;
     if (armed != null) {
       final problems = settings.validate(
@@ -177,7 +210,9 @@ class LabBenchController extends _$LabBenchController {
     // blocking the run.
     ModelState? models;
     try {
-      models = await ref.read(modelControllerProvider.future);
+      models = await ref
+          .read(modelControllerProvider.future)
+          .timeout(const Duration(seconds: 1));
     } on Object {
       models = null;
     }
@@ -223,12 +258,12 @@ class LabBenchController extends _$LabBenchController {
     _pending = run;
     state = state.copyWith(
       session: session.withActive(conversation.withRun(run)),
-      activeRunId: () => run.id,
     );
     final epoch = ++_epoch;
     _startFootprintSampling(epoch);
     final repository = ref.read(inferenceRepositoryProvider);
-    final completed = Completer<void>();
+    _inFlight = repository;
+    unawaited(_subscription?.cancel());
     _subscription = repository
         .generate(
           context: context,
@@ -241,29 +276,39 @@ class LabBenchController extends _$LabBenchController {
         .listen(
           (event) => _fold(epoch, event),
           onError: (Object error) {
-            if (epoch != _epoch) return;
+            final pending = _pending;
+            if (epoch != _epoch || pending == null) return;
             _terminate(
               epoch,
               failRun(
-                _pending!,
+                pending,
                 error is InferenceException
                     ? error.kind
                     : InferenceFailureKind.engine,
+                contextTokens: error is InferenceException
+                    ? error.contextTokens
+                    : null,
               ),
             );
           },
           onDone: () {
-            if (epoch != _epoch) return;
-            final pending = _pending!;
+            final pending = _pending;
+            if (epoch != _epoch || pending == null) return;
             // A stream that ended without its completion event: the engine
-            // was torn down under it, or Stop cut it before the first event.
+            // was torn down under it. That run did not finish — it reads as
+            // cancelled, keeps its partial output, feeds nothing to the next
+            // turn and can be retried — never as a completed measurement.
             _terminate(
               epoch,
               pending.isTerminal
                   ? pending
-                  : reduceLabRun(pending, const CompletedEvent()),
+                  : reduceLabRun(
+                      requestCancel(pending),
+                      const CompletedEvent(
+                        stopReason: InferenceStopReason.cancelled,
+                      ),
+                    ),
             );
-            completed.complete();
           },
           cancelOnError: true,
         );
@@ -279,6 +324,21 @@ class LabBenchController extends _$LabBenchController {
     _pending = requestCancel(pending);
     _publishNow();
     unawaited(ref.read(inferenceRepositoryProvider).cancel());
+    // The engine's end of stream is what terminates the run; an engine that
+    // never sends it must not hold the bench locked for the process's life.
+    final epoch = _epoch;
+    _stopWatchdog?.cancel();
+    _stopWatchdog = Timer(labStopDeadline, () {
+      final stuck = _pending;
+      if (epoch != _epoch || stuck == null || stuck.isTerminal) return;
+      _terminate(
+        epoch,
+        reduceLabRun(
+          stuck,
+          const CompletedEvent(stopReason: InferenceStopReason.cancelled),
+        ),
+      );
+    });
   }
 
   /// Sends the last cancelled or failed prompt again under the current
@@ -294,8 +354,8 @@ class LabBenchController extends _$LabBenchController {
   }
 
   void _fold(int epoch, InferenceEvent event) {
-    if (epoch != _epoch) return;
-    final before = _pending!;
+    final before = _pending;
+    if (epoch != _epoch || before == null) return;
     final after = reduceLabRun(before, event);
     _pending = after;
     if (after.isTerminal) {
@@ -309,11 +369,16 @@ class LabBenchController extends _$LabBenchController {
 
   void _terminate(int epoch, LabRun run) {
     if (epoch != _epoch) return;
+    // Whatever the stream still delivers belongs to a run that has ended.
+    _epoch++;
     _pending = run;
     _footprint?.cancel();
     _footprint = null;
+    _stopWatchdog?.cancel();
+    _stopWatchdog = null;
     _publishNow();
     _pending = null;
+    _inFlight = null;
     unawaited(_subscription?.cancel());
     _subscription = null;
   }
