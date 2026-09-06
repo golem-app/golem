@@ -316,7 +316,6 @@ final class InfernoRuntimeAdapter implements BrokerRuntime {
         ],
         observe: switch (request.observe) {
           null => null,
-          final observe when observe.isEmpty => null,
           final observe => InfernoObservation(
             promptProgress: observe.promptProgress,
             tokenTiming: observe.tokenTiming,

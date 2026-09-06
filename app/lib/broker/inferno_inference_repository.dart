@@ -301,29 +301,96 @@ final class InfernoInferenceRepository implements InferenceRepository {
     String? systemPrompt,
     GenerationObservation? observe,
     int? seed,
+  }) {
+    // Taken here, not in the generator: an `async*` body starts a microtask
+    // after `listen`, and a cancel issued in between must name this run.
+    final ticket = ++_generationTicket;
+    // The generator learns when its consumer has gone: a generator parked
+    // on the fractions stream outlives a cancelled subscription until the
+    // load ends, and a load that fails then has nobody to throw to.
+    var consumerGone = false;
+    StreamSubscription<InferenceEvent>? inner;
+    late final StreamController<InferenceEvent> controller;
+    controller = StreamController<InferenceEvent>(
+      onListen: () {
+        inner =
+            _generate(
+              context: context,
+              reasoningEnabled: reasoningEnabled,
+              overrides: overrides,
+              modelKey: modelKey,
+              systemPrompt: systemPrompt,
+              observe: observe,
+              seed: seed,
+              ticket: ticket,
+              consumerGone: () => consumerGone,
+            ).listen(
+              controller.add,
+              onError: controller.addError,
+              onDone: controller.close,
+            );
+      },
+      onCancel: () {
+        consumerGone = true;
+        return inner?.cancel();
+      },
+    );
+    return controller.stream;
+  }
+
+  Stream<InferenceEvent> _generate({
+    required List<PromptMessage> context,
+    required bool reasoningEnabled,
+    required SamplingOverrides? overrides,
+    required String? modelKey,
+    required String? systemPrompt,
+    required GenerationObservation? observe,
+    required int? seed,
+    required int ticket,
+    required bool Function() consumerGone,
   }) async* {
     final target = _targetFor(modelKey);
+    // Phases are part of the observation: a caller that never asks — chat —
+    // gets the stream it always had, byte for byte, like the fake.
+    final observed = observe != null;
     final observation = observe ?? const GenerationObservation();
-    final ticket = ++_generationTicket;
     if (_isResident(target)) {
+      // Nothing to wait for.
+    } else if (_activating != null && _activatingKey == target.catalogKey) {
+      // Someone else's activation is in flight: join it silently. Its
+      // fractions went to that caller, and a duration measured from here
+      // would be the tail of a load this run did not make.
       await _ensureResident(target);
     } else {
       // This generation owns its activation, so the caller sees it as a
       // phase with a measured wall time rather than as silence before the
       // first token. The engine's fraction, when asked for, arrives on the
       // load's own callback and is forwarded here between the two phases.
-      yield const RunPhaseEvent(InferencePhase.loading);
+      if (observed) yield const RunPhaseEvent(InferencePhase.loading);
       final loading = Stopwatch()..start();
       final fractions = StreamController<double>();
       final activation = _ensureResident(
         target,
         onProgress: observation.loadProgress ? fractions.add : null,
-      ).whenComplete(fractions.close);
+      );
+      unawaited(activation.whenComplete(fractions.close).catchError((_) {}));
       await for (final fraction in fractions.stream) {
         yield LoadProgressEvent(fraction);
       }
-      await activation;
-      yield RunPhaseEvent(InferencePhase.loaded, loadDuration: loading.elapsed);
+      try {
+        await activation;
+      } catch (_) {
+        // The activation logged its own failure; with the consumer gone a
+        // rethrow would land in nobody's hands but the zone's.
+        if (consumerGone()) return;
+        rethrow;
+      }
+      if (observed) {
+        yield RunPhaseEvent(
+          InferencePhase.loaded,
+          loadDuration: loading.elapsed,
+        );
+      }
     }
     if (_cancelledTicket == ticket) {
       yield const CompletedEvent(stopReason: InferenceStopReason.cancelled);
@@ -387,13 +454,16 @@ final class InfernoInferenceRepository implements InferenceRepository {
     var sawAnswer = false;
     var sawOutput = false;
     final probe = effectiveSeed == null ? null : StringBuffer();
-    final loadedImages = await _loadImages(images);
+    if (observed) yield const RunPhaseEvent(InferencePhase.promptProcessing);
+    // The last look before the engine is asked: a cancel that landed while
+    // the phase above was being consumed would reach an engine that is not
+    // generating yet, and be lost.
     if (_cancelledTicket == ticket) {
       yield const CompletedEvent(stopReason: InferenceStopReason.cancelled);
       return;
     }
-    yield const RunPhaseEvent(InferencePhase.promptProcessing);
     try {
+      final loadedImages = await _loadImages(images);
       await for (final event in _runtime.generate(
         BrokerGenerationRequest(
           prompt: profile.render(
@@ -409,7 +479,11 @@ final class InfernoInferenceRepository implements InferenceRepository {
           case BrokerTextDelta():
             if (!sawOutput) {
               sawOutput = true;
-              yield const RunPhaseEvent(InferencePhase.generating);
+              if (observed) {
+                if (observed) {
+                  yield const RunPhaseEvent(InferencePhase.generating);
+                }
+              }
             }
             probe?.write(event.text);
             for (final domainEvent in _domainEvents(
@@ -446,7 +520,11 @@ final class InfernoInferenceRepository implements InferenceRepository {
             // to is visible (a stop-sequence hold-back), and is output too.
             if (!sawOutput) {
               sawOutput = true;
-              yield const RunPhaseEvent(InferencePhase.generating);
+              if (observed) {
+                if (observed) {
+                  yield const RunPhaseEvent(InferencePhase.generating);
+                }
+              }
             }
             yield TokenTimingEvent(
               kind: event.kind,
@@ -461,7 +539,9 @@ final class InfernoInferenceRepository implements InferenceRepository {
               sampling,
               overridesApplied,
             );
-            if (probe != null) _logProbe(target.engine, probe.toString());
+            if (probe != null) {
+              _logProbe(target.engine, probe.toString(), seed: effectiveSeed);
+            }
             for (final domainEvent in _domainEvents(parser.finish())) {
               if (domainEvent is AnswerDelta) sawAnswer = true;
               yield domainEvent;
@@ -521,6 +601,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
       ' maxTokens=${sampling.maxTokens}'
       ' contextLength=${sampling.contextLength}'
       ' seed=${sampling.seed}'
+      ' promptBatchSize=${metrics.promptBatchSize}'
       ' overridesApplied=$overridesApplied',
     );
   }
@@ -550,7 +631,7 @@ final class InfernoInferenceRepository implements InferenceRepository {
 
   /// Hashes the raw pre-parser text so two devices can be compared for
   /// token-identical output without shipping transcripts through logs.
-  void _logProbe(BrokerEngine engine, String rawText) {
+  void _logProbe(BrokerEngine engine, String rawText, {required int? seed}) {
     diagnosticSink?.call(
       'INFERNO_PROBE engine=${engine.name}'
       ' seed=$seed'

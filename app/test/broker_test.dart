@@ -455,11 +455,8 @@ void main() {
       expect(events.whereType<LoadProgressEvent>(), isEmpty);
       expect(events.whereType<PromptProgressEvent>(), isEmpty);
       expect(events.whereType<TokenTimingEvent>(), isEmpty);
-      // Resident already: no activation phases, only the engine's two.
-      expect(events.whereType<RunPhaseEvent>().map((e) => e.phase), [
-        InferencePhase.promptProcessing,
-        InferencePhase.generating,
-      ]);
+      // Phases are part of the observation: chat's stream is what it was.
+      expect(events.whereType<RunPhaseEvent>(), isEmpty);
       // The engine's batch size still rides the metrics.
       expect(
         events.whereType<MetricsEvent>().last.metrics.promptBatchSize,
@@ -584,6 +581,7 @@ void main() {
     expect(defaults, contains(' maxTokens=2048'));
     expect(defaults, contains(' contextLength=8192'));
     expect(defaults, contains(' overridesApplied=false'));
+    expect(defaults, contains(' promptBatchSize='));
 
     final overridden = await metricsLine(
       overrides: const SamplingOverrides(temperature: 1.4, maxTokens: 32),
@@ -760,17 +758,98 @@ void main() {
           context: [PromptMessage.text('user', 'Hello')],
           reasoningEnabled: false,
         )
-        .listen((event) {
-          // The first engine-originated event: the phase before it is the
-          // repository's own, published before the runtime stream exists,
-          // and a cancel there has nothing to tear down.
-          if (event is AnswerDelta) unawaited(subscription.cancel());
-        });
+        .listen((_) => unawaited(subscription.cancel()));
     for (var i = 0; i < 10; i++) {
       await Future<void>.delayed(Duration.zero);
     }
     expect(runtime.tornDown, isTrue);
   });
+
+  test('a cancel issued right after listen names this run', () async {
+    // The generator body starts a microtask after `listen`; the ticket a
+    // cancel stamps must already be this run's.
+    final runtime = _SlowLoadRuntime();
+    final repository = InfernoInferenceRepository(
+      runtime,
+      engine: BrokerEngine.llamaCpp,
+      profile: const Gemma4Profile(),
+      modelPath: '/local/model.gguf',
+    );
+    final events = <InferenceEvent>[];
+    final done = repository
+        .generate(
+          context: [PromptMessage.text('user', 'Hello')],
+          reasoningEnabled: false,
+          observe: GenerationObservation.everything,
+        )
+        .forEach(events.add);
+    await repository.cancel();
+    runtime.loading.complete();
+    await done;
+    expect(runtime.request, isNull);
+    expect(
+      (events.last as CompletedEvent).stopReason,
+      InferenceStopReason.cancelled,
+    );
+  });
+
+  test('a run that joins an activation in flight reports no load', () async {
+    final runtime = _SlowLoadRuntime();
+    final repository = InfernoInferenceRepository(
+      runtime,
+      engine: BrokerEngine.llamaCpp,
+      profile: const Gemma4Profile(),
+      modelPath: '/local/model.gguf',
+    );
+    final preparing = repository.prepare();
+    final events = <InferenceEvent>[];
+    final done = repository
+        .generate(
+          context: [PromptMessage.text('user', 'Hello')],
+          reasoningEnabled: false,
+          observe: GenerationObservation.everything,
+        )
+        .forEach(events.add);
+    runtime.loading.complete();
+    await preparing;
+    await done;
+    expect(runtime.loads, 1);
+    // Joining is silent: neither a loading phase nor a duration measured
+    // from the middle of somebody else's load.
+    final phases = events.whereType<RunPhaseEvent>().map((e) => e.phase);
+    expect(phases, isNot(contains(InferencePhase.loading)));
+    expect(phases, isNot(contains(InferencePhase.loaded)));
+    expect(events.whereType<AnswerDelta>(), isNotEmpty);
+  });
+
+  test(
+    'a load that fails after the consumer left is nobody\'s crash',
+    () async {
+      final runtime = _SlowLoadRuntime();
+      final repository = InfernoInferenceRepository(
+        runtime,
+        engine: BrokerEngine.llamaCpp,
+        profile: const Gemma4Profile(),
+        modelPath: '/local/model.gguf',
+      );
+      final subscription = repository
+          .generate(
+            context: [PromptMessage.text('user', 'Hello')],
+            reasoningEnabled: false,
+            observe: GenerationObservation.everything,
+          )
+          .listen((_) {});
+      await Future<void>.delayed(Duration.zero);
+      // Cancelling a generator parked on the fractions stream settles only
+      // when that stream closes, which the failing load does below.
+      final cancelled = subscription.cancel();
+      // The load fails with nobody awaiting it; an unhandled error would reach
+      // the test zone and fail this test.
+      runtime.loading.completeError(StateError('load failed'));
+      await cancelled;
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    },
+  );
 
   test(
     'a cancel during the activation ends the run without generating',
@@ -787,6 +866,7 @@ void main() {
           .generate(
             context: [PromptMessage.text('user', 'Hello')],
             reasoningEnabled: false,
+            observe: GenerationObservation.everything,
           )
           .forEach(events.add);
       for (var i = 0; i < 5; i++) {
